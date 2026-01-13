@@ -1,10 +1,31 @@
+from app.core.security import decode_2fa_temp_token
+
+from app.core.security import create_2fa_temp_token
+from app.db.repositories.user_2fa_repository import User2FARepository
+
+from fastapi import Depends, HTTPException
+from sqlalchemy.orm import Session
+from datetime import datetime, timezone
+
+from app.db.database import get_db
+from app.db.repositories.user_repository import UserRepository
+from app.db.models.user_2fa import User2FA
+
+from app.core.two_fa_totp import generate_totp_secret, build_totp_uri
+from app.core.two_fa_crypto import encrypt_secret
+from app.core.two_fa_qr import generate_qr_base64
+from app.core.two_fa_crypto import decrypt_secret
+from app.core.two_fa_totp import verify_totp_code
+
+from app.core.config import settings
+
 # SQLAlchemy
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.db.repositories.user_repository import UserRepository
 
 # FastAPI
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Header
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import Body
 
@@ -14,7 +35,7 @@ from app.core.config import settings
 
 
 # Auth
-from .models import RegisterRequest, LoginRequest, TokenPair, UserPublic
+from .models import RegisterRequest, LoginRequest, TokenPair, UserPublic,  TwoFAVerifyRequest
 from app.core.security import (
     validate_password_policy,
     hash_password,
@@ -84,7 +105,7 @@ def register(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/login", response_model=TokenPair)
+"""@router.post("/login", response_model=TokenPair)
 def login(
     data: LoginRequest,
     db: Session = Depends(get_db),
@@ -116,7 +137,44 @@ def login(
     return TokenPair(
         access_token=access,
         refresh_token=refresh["token"],
+    )"""
+
+@router.post("/login")
+def login(data: LoginRequest, db: Session = Depends(get_db)):
+    repo = UserRepository(db)
+    user = repo.get_user_by_email(data.email)
+
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+
+    if not verify_password(data.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+
+    # 🔐 Revisar si tiene 2FA activo
+    two_fa_repo = User2FARepository(db)
+    two_fa = two_fa_repo.get_by_user_id(user.id)
+
+    if two_fa and two_fa.is_enabled:
+        temp_token = create_2fa_temp_token(sub=user.id)
+        return {
+            "2fa_required": True,
+            "temp_token": temp_token,
+        }
+
+    # 🟢 Login normal (sin 2FA)
+    access = create_access_token(
+        sub=user.id,
+        role=user.role,
+        gr=user.guardian_rank,
     )
+    refresh = create_refresh_token(sub=user.id)
+
+    return {
+        "access_token": access,
+        "refresh_token": refresh["token"],
+        "token_type": "bearer",
+    }
+
 
  
 @router.post("/refresh", response_model=TokenPair)
@@ -175,3 +233,165 @@ def refresh(
 @router.get("/me", response_model=UserPublic)
 def me(current: UserPublic = Depends(get_current_user)):
     return current
+
+@router.post("/2fa/setup")
+def setup_2fa(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # 1. Verificar si ya existe 2FA activo
+    existing = (
+        db.query(User2FA)
+        .filter(User2FA.user_id == current.user_number)
+        .one_or_none()
+    )
+
+    if existing and existing.is_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="2FA ya está habilitado para este usuario.",
+        )
+
+    # 2. Generar secreto TOTP
+    secret = generate_totp_secret()
+
+    # 3. Cifrar el secreto
+    secret_encrypted = encrypt_secret(secret)
+
+    # 4. Crear o actualizar registro user_2fa
+    if existing:
+        existing.secret_encrypted = secret_encrypted
+        existing.is_enabled = False
+        existing.is_confirmed = False
+        existing.confirmed_at = None
+        existing.created_at = datetime.now(timezone.utc)
+        two_fa = existing
+    else:
+        two_fa = User2FA(
+            user_id=current.user_number,
+            method="totp",
+            secret_encrypted=secret_encrypted,
+            is_enabled=False,
+            is_confirmed=False,
+        )
+        db.add(two_fa)
+
+    db.commit()
+
+    # 5. Construir URI otpauth://
+    uri = build_totp_uri(
+        secret=secret,
+        email=current.email,
+        issuer=settings.JWT_ISSUER,
+    )
+
+    # 6. Generar QR en base64
+    qr_base64 = generate_qr_base64(uri)
+
+    # 7. Responder (QR + código manual)
+    return {
+        "qr_code": f"data:image/png;base64,{qr_base64}",
+        "manual_code": secret,
+        "issuer": settings.JWT_ISSUER,
+    }
+
+@router.post("/2fa/confirm")
+def confirm_2fa(
+    code: str = Body(..., embed=True),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    # 1. Buscar registro 2FA del usuario
+    two_fa = (
+        db.query(User2FA)
+        .filter(User2FA.user_id == current.user_number)
+        .one_or_none()
+    )
+
+    if not two_fa:
+        raise HTTPException(
+            status_code=400,
+            detail="2FA no está configurado para este usuario.",
+        )
+
+    if two_fa.is_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="2FA ya está habilitado.",
+        )
+
+    # 2. Descifrar el secreto
+    secret = decrypt_secret(two_fa.secret_encrypted)
+
+    # 3. Verificar el código TOTP
+    if not verify_totp_code(secret=secret, code=code):
+        raise HTTPException(
+            status_code=400,
+            detail="Código 2FA inválido.",
+        )
+
+    # 4. Activar oficialmente 2FA
+    now = datetime.now(timezone.utc)
+    two_fa.is_enabled = True
+    two_fa.is_confirmed = True
+    two_fa.confirmed_at = now
+    two_fa.last_used_at = now
+
+    db.commit()
+
+    return {
+        "2fa_enabled": True,
+        "confirmed_at": now.isoformat(),
+    }
+
+@router.post("/2fa/verify")
+def verify_2fa(
+    data: TwoFAVerifyRequest,
+    authorization: str = Header(...),
+    db: Session = Depends(get_db),
+):
+    # Extraer token
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    temp_token = authorization.replace("Bearer ", "")
+
+    try:
+        user_id = decode_2fa_temp_token(temp_token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token 2FA inválido")
+
+    repo = UserRepository(db)
+    user = repo.get_user_by_id(user_id)
+
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Usuario inválido")
+
+    # Validar TOTP
+    two_fa_repo = User2FARepository(db)
+    two_fa = two_fa_repo.get_by_user_id(user.id)
+
+    if not two_fa or not two_fa.is_enabled:
+        raise HTTPException(status_code=400, detail="2FA no configurado")
+
+    secret = decrypt_secret(two_fa.secret_encrypted)
+
+    if not verify_totp_code(secret=secret, code=data.code):
+
+        raise HTTPException(status_code=401, detail="Código incorrecto")
+
+
+    # 🎉 Login exitoso
+    access = create_access_token(
+        sub=user.id,
+        role=user.role,
+        gr=user.guardian_rank,
+    )
+    refresh = create_refresh_token(sub=user.id)
+
+    return {
+        "access_token": access,
+        "refresh_token": refresh["token"],
+        "token_type": "bearer",
+    }

@@ -110,3 +110,29 @@ def decode_token(token: str) -> Dict[str, Any]:
         )
     except JWTError as e:
         raise ValueError("Token inválido o expirado.") from e
+
+def create_2fa_temp_token(sub: int) -> str:
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=5)
+    jti = str(uuid.uuid4())
+
+    payload = {
+        "sub": str(sub),
+        "iat": int(now.timestamp()),
+        "exp": int(exp.timestamp()),
+        "jti": jti,
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
+        "typ": "2fa_pending",
+    }
+
+    return jwt.encode(payload, PRIVATE_KEY, algorithm="RS256")
+
+
+def decode_2fa_temp_token(token: str) -> int:
+    payload = decode_token(token)
+
+    if payload.get("typ") != "2fa_pending":
+        raise ValueError("Token no es 2FA pending")
+
+    return int(payload["sub"])

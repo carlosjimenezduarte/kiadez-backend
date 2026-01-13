@@ -25,3 +25,7 @@ class UserPublic(BaseModel):
 
 class UserInternal(UserPublic):
     password_hash: str
+
+
+class TwoFAVerifyRequest(BaseModel):
+    code: str = Field(..., min_length=6, max_length=6)

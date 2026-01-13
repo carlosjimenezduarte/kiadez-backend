@@ -11,5 +11,6 @@ class Settings(BaseSettings):
 
     JWT_ISSUER: str = "kiadez"
     JWT_AUDIENCE: str = "kiadez-app"
+    TWO_FA_ENCRYPTION_KEY: str  
 
 settings = Settings()
