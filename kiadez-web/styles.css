@@ -1,0 +1,328 @@
+* {
+    box-sizing: border-box;
+    font-family: system-ui, sans-serif;
+}
+
+body {
+    margin: 0;
+    background: #f5f8f0;
+}
+
+.container {
+    display: flex;
+    min-height: 90vh;
+}
+
+/* LADO IZQUIERDO */
+.left {
+    flex: 1;
+    background: #9ef7c2;
+    padding: 3rem;
+}
+
+.logo img {
+    width: 80px;
+}
+
+.gallery {
+    display: grid;
+    grid-template-columns: repeat(3, 80px);
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.user {
+    width: 80px;
+    height: 80px;
+    background: #dcdcdc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    cursor: pointer;
+}
+
+/* LADO DERECHO */
+.right {
+    flex: 1;
+    background: #ffffff;
+    padding: 3rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.right blockquote {
+    max-width: 420px;
+    margin: 0 auto 18px auto;
+}
+
+
+blockquote {
+    font-style: italic;
+    margin-bottom: 2rem;
+}
+
+/* ---- AUTH CARD estilo Facebook, con identidad Kiadez ---- */
+
+.auth-card {
+    width: 100%;
+    max-width: 380px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #fff;
+    padding: 22px;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.auth-title {
+    width: 100%;
+    font-family: 'Liberation Serif', serif;
+    font-weight: 600;
+    font-size: 1.15rem;
+    margin: 0 0 12px 0;
+    color: #111;
+}
+
+#auth-form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#auth-form input {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    font-family: 'Liberation Serif', serif;
+    font-size: 0.95rem;
+    outline: none;
+    transition: 0.2s ease;
+}
+
+#auth-form input:focus {
+    border-color: #0b5f2a;
+    box-shadow: 0 0 0 2px rgba(11, 95, 42, 0.15);
+}
+
+#auth-form input::placeholder {
+    color: rgba(0, 0, 0, 0.45);
+    font-style: italic;
+}
+
+/* Botones */
+.btn {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 999px;
+    font-family: 'Liberation Serif', serif;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+/* Botón verde principal */
+.btn-primary {
+    background: #0b5f2a;
+    color: #fff;
+    border: none;
+}
+
+.btn-primary:hover {
+    background: #094d22;
+    transform: translateY(-1px);
+}
+
+/* Link */
+.auth-link {
+    text-align: center;
+    font-size: 0.9rem;
+    color: rgba(0, 0, 0, 0.7);
+    text-decoration: none;
+    margin-top: 2px;
+}
+
+.auth-link:hover {
+    text-decoration: underline;
+}
+
+/* Separador tipo Facebook */
+.auth-divider {
+    width: 100%;
+    height: 1px;
+    background: rgba(0, 0, 0, 0.12);
+    margin: 8px 0 4px 0;
+}
+
+/* Botón blanco con borde verde */
+.btn-outline {
+    background: #ffffff;
+    color: #0b5f2a;
+    border: 1px solid rgba(11, 95, 42, 0.55);
+}
+
+.btn-outline:hover {
+    border-color: #0b5f2a;
+    box-shadow: 0 0 0 2px rgba(11, 95, 42, 0.12);
+}
+
+/* Marca al final */
+.auth-brand {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.85;
+}
+
+.auth-brand-icon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+}
+
+.auth-brand-name {
+    font-family: 'Liberation Serif', serif;
+    font-size: 0.95rem;
+    color: #0b5f2a;
+    font-weight: 600;
+}
+
+
+@import url('https://fonts.googleapis.com/css2?family=Liberation+Serif&display=swap');
+
+.kiadez-footer {
+    background-color: #0b5f2a;
+    /* verde oscuro Kiadez */
+    color: #ffffff;
+    font-family: 'Liberation Serif', serif;
+    padding: 32px 64px 20px;
+}
+
+.footer-main {
+    display: grid;
+    grid-template-columns: 1.3fr 4fr;
+    gap: 48px;
+    margin-bottom: 12px;
+}
+
+.footer-origin {
+    display: flex;
+    align-items: flex-start;
+}
+
+/* Texto poético */
+.footer-poem {
+    font-style: italic;
+    opacity: 0.9;
+    max-width: 420px;
+}
+
+/* Columnas */
+
+
+.footer-columns {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 48px;
+    margin-bottom: 12px;
+}
+
+.footer-column h4 {
+    font-size: 1.05rem;
+    margin-bottom: 16px;
+    font-weight: 600;
+}
+
+.footer-column ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.footer-column li {
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.footer-column a {
+    color: #ffffff;
+    text-decoration: none;
+    opacity: 0.85;
+}
+
+.footer-column a:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+/* Línea inferior */
+.footer-bottom {
+    border-top: 1px solid rgba(255, 255, 255, 0.25);
+    padding-top: 12px;
+    font-size: 0.85rem;
+    opacity: 0.85;
+    text-align: center;
+    /* 👈 esto es lo clave */
+}
+
+/* Responsive básico */
+@media (max-width: 900px) {
+    .footer-main {
+        grid-template-columns: 1fr;
+    }
+
+    .footer-origin {
+        margin-bottom: 24px;
+    }
+}
+
+#auth-form {
+    width: 100%;
+    max-width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 24px;
+}
+
+#auth-form input {
+    width: 100%;
+    padding: 14px 18px;
+    border-radius: 999px;
+    /* ley universal de Kiadez */
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    font-family: 'Liberation Serif', serif;
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+#auth-form input::placeholder {
+    color: rgba(0, 0, 0, 0.45);
+    font-style: italic;
+}
+
+#auth-form button {
+    margin-top: 8px;
+    padding: 14px;
+    border-radius: 999px;
+    border: none;
+    background-color: #111111;
+    color: #ffffff;
+    font-family: 'Liberation Serif', serif;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+
+#auth-form button:hover {
+    background-color: #000000;
+    transform: translateY(-1px);
+}
