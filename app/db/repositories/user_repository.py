@@ -2,19 +2,34 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models.user import User
-
+from datetime import date
 
 class UserRepository:
     def __init__(self, session: Session):
         self.session = session
 
-    def create_user(self, email: str, password_hash: str, role: str = "user") -> User:
+    def create_user(
+        self,
+        *,
+        email: str,
+        password_hash: str,
+        first_name: str,
+        last_name: str,
+        birth_date: date,
+        gender: str,
+        role: str = "user",
+        is_active: bool = True,
+    ) -> User:
         user = User(
             email=email.lower(),
             password_hash=password_hash,
             role=role,
             guardian_rank=None,
-            is_active=True,
+            is_active=is_active,
+            first_name=first_name,
+            last_name=last_name,
+            birth_date=birth_date,
+            gender=gender,
         )
         self.session.add(user)
         self.session.commit()

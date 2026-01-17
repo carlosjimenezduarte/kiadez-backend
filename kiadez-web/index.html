@@ -9,137 +9,124 @@
 
 <body>
 
-    <main class="container">
+    <div class="page-background">
 
-        <!-- LADO IZQUIERDO -->
-        <section class="left">
-            <div class="logo">
-                <!-- aquí solo cambias la imagen -->
-                <img src="logo.png" alt="Kiadez" />
-                <h1>Kiadez</h1>
-                <p>Una red social pensada para cumplir los deseos</p>
-            </div>
+        <main class="hero">
 
-            <div class="gallery">
-                <div class="user filled">
-                    <!-- aquí luego va tu foto desde backend -->
-                    <span>👤</span>
+            <!-- FORMULARIO / ACCIÓN -->
+            <section class="hero-left">
+
+                <div class="auth-card">
+                    <h2 class="auth-title">Iniciar sesión en Kiadez</h2>
+
+                    <form id="auth-form">
+                        <input type="email" placeholder="Correo electrónico" required />
+                        <input type="password" placeholder="Contraseña" required />
+
+                        <button type="submit" class="btn btn-primary">
+                            Iniciar sesión
+                        </button>
+
+                        <a href="#" class="auth-link">
+                            ¿Olvidaste tu contraseña?
+                        </a>
+
+                        <div class="auth-divider"></div>
+                        <a href="register.html" class="btn btn-outline">
+                            Registrarse en Kiadez
+                        </a>
+
+                    </form>
+
+                    <div class="auth-brand">
+                        <img src="logo.png" alt="Kiadez" />
+                        <span>Kiadez</span>
+                    </div>
                 </div>
 
-                <!-- placeholders -->
-                <div class="user">+</div>
-                <div class="user">+</div>
-                <div class="user">+</div>
-                <div class="user">+</div>
-                <div class="user">+</div>
-                <div class="user">+</div>
-                <div class="user">+</div>
-                <div class="user">+</div>
-            </div>
-        </section>
+            </section>
 
-        <!-- LADO DERECHO -->
-        <section class="right">
-            <blockquote>
-                La sabiduría suprema consiste en tener sueños lo suficientemente grandes
-                para no perderlos de vista mientras se persiguen.
-                <br>
-                <br>
-                <span>— William Faulkner</span>
-            </blockquote>
+            <!-- VISIÓN / HORIZONTE -->
+            <section class="hero-right">
+                <h1 class="hero-title">Kiadez</h1>
 
-            <div class="auth-card">
-                <h2 class="auth-title">Iniciar sesión en Kiadez</h2>
-
-                <form id="auth-form">
-                    <input type="email" placeholder="Correo electrónico" required />
-                    <input type="password" placeholder="Contraseña" required />
-
-                    <button type="submit" class="btn btn-primary">Iniciar sesión</button>
-
-                    <a href="#" class="auth-link">¿Olvidaste tu contraseña?</a>
-
-                    <div class="auth-divider"></div>
-
-                    <button type="button" class="btn btn-outline">Registrarse en Kiadez</button>
-                </form>
-
-                <div class="auth-brand">
-                    <img src="logo.png" alt="" class="auth-brand-icon" />
-                    <span class="auth-brand-name">Kiadez</span>
-                </div>
-            </div>
-
-
-
-
-        </section>
-
-    </main>
-
-    <footer class="kiadez-footer">
-
-        <div class="footer-main">
-
-            <!-- Columna 0 -->
-            <div class="footer-column footer-origin">
-                <p class="footer-poem">
-                    Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br>
-                    No para dominar, sino para orientar.<br>
-                    Su luz no deslumbra: acompaña.
+                <p class="hero-subtitle">
+                    Una red social pensada para cumplir los deseos
                 </p>
+
+                <blockquote class="hero-quote">
+                    La sabiduría suprema consiste en tener sueños lo suficientemente grandes
+                    para no perderlos de vista mientras se persiguen.
+                    <span>— William Faulkner</span>
+                </blockquote>
+            </section>
+
+        </main>
+
+        <footer class="kiadez-footer">
+
+            <div class="footer-main">
+
+                <!-- Columna 0 -->
+                <div class="footer-column footer-origin">
+                    <p class="footer-poem">
+                        Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br>
+                        No para dominar, sino para orientar.<br>
+                        Su luz no deslumbra: acompaña.
+                    </p>
+                </div>
+
+                <!-- Columnas 1–4 -->
+                <div class="footer-columns">
+
+                    <div class="footer-column">
+                        <h4>Sobre nuestra red social</h4>
+                        <ul>
+                            <li><a href="#">Qué es Kiadez</a></li>
+                            <li><a href="#">Rangos de Guardianes</a></li>
+                            <li><a href="#">Ser Guardián</a></li>
+                            <li><a href="#">Contacto</a></li>
+                            <li><a href="#">Donaciones</a></li>
+                        </ul>
+                    </div>
+
+                    <div class="footer-column">
+                        <h4>Idiomas</h4>
+                        <ul>
+                            <li><a href="#">Español</a></li>
+                            <li><a href="#">English</a></li>
+                            <li><a href="#">Français</a></li>
+                        </ul>
+                    </div>
+
+                    <div class="footer-column">
+                        <h4>Contacto</h4>
+                        <ul>
+                            <li>info@kiadez.com</li>
+                            <li>+57 333 225 6078</li>
+                        </ul>
+                    </div>
+
+                    <div class="footer-column">
+                        <h4>Información legal</h4>
+                        <ul>
+                            <li><a href="#">Términos y condiciones</a></li>
+                            <li><a href="#">Privacidad</a></li>
+                        </ul>
+                    </div>
+
+                </div>
+
             </div>
 
-            <!-- Columnas 1–4 -->
-            <div class="footer-columns">
-
-                <div class="footer-column">
-                    <h4>Sobre nuestra red social</h4>
-                    <ul>
-                        <li><a href="#">Qué es Kiadez</a></li>
-                        <li><a href="#">Rangos de Guardianes</a></li>
-                        <li><a href="#">Ser Guardián</a></li>
-                        <li><a href="#">Contacto</a></li>
-                    </ul>
-                </div>
-
-                <div class="footer-column">
-                    <h4>Idiomas</h4>
-                    <ul>
-                        <li><a href="#">Español</a></li>
-                        <li><a href="#">English</a></li>
-                        <li><a href="#">Français</a></li>
-                    </ul>
-                </div>
-
-                <div class="footer-column">
-                    <h4>Contacto</h4>
-                    <ul>
-                        <li>info@kiadez.com</li>
-                        <li>+57 333 225 6078</li>
-                    </ul>
-                </div>
-
-                <div class="footer-column">
-                    <h4>Información legal</h4>
-                    <ul>
-                        <li><a href="#">Términos y condiciones</a></li>
-                        <li><a href="#">Privacidad</a></li>
-                    </ul>
-                </div>
-
+            <!-- Línea inferior -->
+            <div class="footer-bottom">
+                © 2026 Kiadez — Una red social para cumplir deseos.
             </div>
 
-        </div>
+        </footer>
 
-        <!-- Línea inferior -->
-        <div class="footer-bottom">
-            © 2026 Kiadez — Una red social para cumplir deseos.
-        </div>
-
-    </footer>
-
-
+    </div>
 
     <script src="app.js"></script>
 </body>

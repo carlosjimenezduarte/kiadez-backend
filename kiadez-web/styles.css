@@ -1,69 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Liberation+Serif&display=swap');
+
 * {
     box-sizing: border-box;
-    font-family: system-ui, sans-serif;
-}
-
-body {
     margin: 0;
-    background: #f5f8f0;
+    padding: 0;
 }
 
-.container {
+/*body {
+    font-family: 'Liberation Serif', serif;
+    background: #000;
+    color: #fff;
+}*/
+body {
+    font-family: 'Liberation Serif', serif;
+    /*background: #000;
+    color: #fff;
+    min-height: 100vh;
     display: flex;
-    min-height: 90vh;
+    flex-direction: column;*/
+    background: #000;
 }
 
-/* LADO IZQUIERDO */
-.left {
+
+/* ---------- HERO (estructura principal) ---------- */
+
+.hero {
+    display: flex;
     flex: 1;
-    background: #9ef7c2;
-    padding: 3rem;
 }
 
-.logo img {
-    width: 80px;
-}
 
-.gallery {
-    display: grid;
-    grid-template-columns: repeat(3, 80px);
-    gap: 1rem;
-    margin-top: 2rem;
-}
+/* ---------- LADO IZQUIERDO (acción) ---------- */
 
-.user {
-    width: 80px;
-    height: 80px;
-    background: #dcdcdc;
+.hero-left {
+    flex: 1;
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-    cursor: pointer;
+    padding-left: 6vw;
 }
 
-/* LADO DERECHO */
-.right {
+/* ---------- LADO DERECHO (visión) ---------- */
+
+.hero-right {
     flex: 1;
-    background: #ffffff;
-    padding: 3rem;
     display: flex;
     flex-direction: column;
     justify-content: center;
+    padding-right: 6vw;
+    text-align: right;
 }
 
-.right blockquote {
-    max-width: 420px;
-    margin: 0 auto 18px auto;
+.hero-title {
+    font-size: 4rem;
+    margin-bottom: 12px;
+    color: #ffffff;
+
+    text-shadow:
+        -1px -1px 0 #0b5f2a,
+        1px -1px 0 #0b5f2a,
+        -1px 1px 0 #0b5f2a,
+        1px 1px 0 #0b5f2a;
 }
 
+.hero-subtitle {
+    font-size: 1.5rem;
+    opacity: 0.9;
+    margin-bottom: 24px;
+    color: #ffffff;
 
-blockquote {
+    text-shadow:
+        -1px -1px 0 #0b5f2a,
+        1px -1px 0 #0b5f2a,
+        -1px 1px 0 #0b5f2a,
+        1px 1px 0 #0b5f2a;
+}
+
+.hero-quote {
     font-style: italic;
-    margin-bottom: 2rem;
+    font-size: 1.5rem;
+    max-width: 420px;
+    margin-left: auto;
+    opacity: 0.85;
+    color: #ffffff;
+    text-shadow:
+        -1px -1px 0 #0b5f2a,
+        1px -1px 0 #0b5f2a,
+        -1px 1px 0 #0b5f2a,
+        1px 1px 0 #0b5f2a;
 }
 
-/* ---- AUTH CARD estilo Facebook, con identidad Kiadez ---- */
+.hero-quote span {
+    display: block;
+    margin-top: 12px;
+    font-size: 0.9rem;
+    font-size: 1.5rem;
+}
+
+/* ---------- AUTH CARD ---------- */
 
 .auth-card {
     width: 100%;
@@ -72,14 +105,21 @@ blockquote {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: #fff;
-    padding: 22px;
-    border-radius: 18px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+
+    /* efecto pergamino luminoso */
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(6px);
+
+    padding: 26px 24px;
+    border-radius: 22px;
+
+    box-shadow:
+        0 12px 32px rgba(0, 0, 0, 0.12),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
+
 .auth-title {
-    width: 100%;
     font-family: 'Liberation Serif', serif;
     font-weight: 600;
     font-size: 1.15rem;
@@ -88,121 +128,115 @@ blockquote {
 }
 
 #auth-form {
-    width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
 }
 
 #auth-form input {
     width: 100%;
-    padding: 14px 16px;
+    padding: 16px 18px;
     border-radius: 999px;
-    border: 1px solid rgba(0, 0, 0, 0.18);
+
+    background: rgba(255, 255, 255, 0.65);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+
     font-family: 'Liberation Serif', serif;
     font-size: 0.95rem;
+
     outline: none;
-    transition: 0.2s ease;
+    transition: all 0.25s ease;
 }
 
 #auth-form input:focus {
-    border-color: #0b5f2a;
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(11, 95, 42, 0.45);
     box-shadow: 0 0 0 2px rgba(11, 95, 42, 0.15);
 }
 
-#auth-form input::placeholder {
-    color: rgba(0, 0, 0, 0.45);
-    font-style: italic;
-}
-
-/* Botones */
 .btn {
-    width: 100%;
-    padding: 14px 16px;
+    padding: 14px;
     border-radius: 999px;
-    font-family: 'Liberation Serif', serif;
     font-size: 0.95rem;
     cursor: pointer;
-    transition: 0.2s ease;
+
 }
 
-/* Botón verde principal */
 .btn-primary {
-    background: #0b5f2a;
-    color: #fff;
+    background: linear-gradient(to bottom,
+            #0f6a34,
+            #0b5f2a);
+    color: #ffffff;
     border: none;
+
+    font-weight: 600;
+    letter-spacing: 0.3px;
 }
 
 .btn-primary:hover {
-    background: #094d22;
+    background: linear-gradient(to bottom,
+            #0c5a2b,
+            #094d22);
     transform: translateY(-1px);
 }
 
-/* Link */
-.auth-link {
-    text-align: center;
-    font-size: 0.9rem;
-    color: rgba(0, 0, 0, 0.7);
-    text-decoration: none;
-    margin-top: 2px;
-}
-
-.auth-link:hover {
-    text-decoration: underline;
-}
-
-/* Separador tipo Facebook */
-.auth-divider {
-    width: 100%;
-    height: 1px;
-    background: rgba(0, 0, 0, 0.12);
-    margin: 8px 0 4px 0;
-}
-
-/* Botón blanco con borde verde */
 .btn-outline {
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.6);
     color: #0b5f2a;
-    border: 1px solid rgba(11, 95, 42, 0.55);
+
+    border: 1px solid rgba(11, 95, 42, 0.45);
 }
+
 
 .btn-outline:hover {
-    border-color: #0b5f2a;
+    background: rgba(255, 255, 255, 0.85);
     box-shadow: 0 0 0 2px rgba(11, 95, 42, 0.12);
 }
 
-/* Marca al final */
+.auth-link {
+    text-align: center;
+    font-size: 0.9rem;
+    text-decoration: none;
+    color: rgba(0, 0, 0, 0.7);
+}
+
+.auth-divider {
+    height: 1px;
+    background: rgba(0, 0, 0, 0.15);
+}
+
+/* ---------- MARCA ---------- */
+
 .auth-brand {
-    margin-top: 14px;
+    margin-top: 16px;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
-    opacity: 0.85;
-}
-
-.auth-brand-icon {
-    width: 22px;
-    height: 22px;
-    object-fit: contain;
-}
-
-.auth-brand-name {
-    font-family: 'Liberation Serif', serif;
-    font-size: 0.95rem;
     color: #0b5f2a;
     font-weight: 600;
+    opacity: 0.75;
 }
 
+.auth-brand img {
+    width: 22px;
+}
 
 @import url('https://fonts.googleapis.com/css2?family=Liberation+Serif&display=swap');
 
+
 .kiadez-footer {
-    background-color: #0b5f2a;
-    /* verde oscuro Kiadez */
+    background: rgba(11, 95, 42, 0.55);
+    /* verde Kiadez translúcido */
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+
     color: #ffffff;
     font-family: 'Liberation Serif', serif;
-    padding: 32px 64px 20px;
+    padding: 28px 64px 18px;
 }
+
+
 
 .footer-main {
     display: grid;
@@ -308,12 +342,12 @@ blockquote {
     font-style: italic;
 }
 
-#auth-form button {
+#auth-form .btn-primary {
     margin-top: 8px;
     padding: 14px;
     border-radius: 999px;
     border: none;
-    background-color: #111111;
+    background-color: #6cd586;
     color: #ffffff;
     font-family: 'Liberation Serif', serif;
     font-size: 0.95rem;
@@ -323,6 +357,51 @@ blockquote {
 
 
 #auth-form button:hover {
-    background-color: #000000;
+    background-color: #6ce58e;
     transform: translateY(-1px);
+}
+
+.page-background {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+
+    background-image: url("hero-background.png");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* el hero ocupa el espacio restante */
+.hero {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    /* importante para que no crezca de más */
+}
+
+a.btn {
+    text-decoration: none;
+}
+
+.auth-card a,
+.auth-card a:link,
+.auth-card a:visited,
+.auth-card a:hover,
+.auth-card a:active {
+    text-decoration: none !important;
+}
+
+a.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+a.btn:focus,
+a.btn:focus-visible {
+    outline: none;
 }

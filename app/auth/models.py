@@ -1,10 +1,15 @@
 from pydantic import BaseModel, EmailStr, Field
+from datetime import datetime
 from typing import Optional, Literal
 
 Role = Literal["user", "guardian", "admin"]
 
 class RegisterRequest(BaseModel):
+    first_name: str
+    last_name: str
     email: EmailStr
+    birth_date: datetime
+    gender: Literal["male", "female"]
     password: str = Field(min_length=8)
 
 class LoginRequest(BaseModel):

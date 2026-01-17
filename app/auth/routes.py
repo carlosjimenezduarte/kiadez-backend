@@ -4,11 +4,12 @@ from app.core.security import create_2fa_temp_token
 from app.db.repositories.user_2fa_repository import User2FARepository
 
 from fastapi import Depends, HTTPException
-from sqlalchemy.orm import Session
-from datetime import datetime, timezone
 
-from app.db.database import get_db
-from app.db.repositories.user_repository import UserRepository
+from datetime import datetime, timezone
+from sqlalchemy.exc import IntegrityError
+from datetime import date
+
+
 from app.db.models.user_2fa import User2FA
 
 from app.core.two_fa_totp import generate_totp_secret, build_totp_uri
@@ -29,6 +30,7 @@ from fastapi import APIRouter, HTTPException, Depends, Header
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import Body
 
+
 from app.db.repositories.refresh_token_repository import RefreshTokenRepository
 from datetime import datetime, timedelta, timezone
 from app.core.config import settings
@@ -45,6 +47,12 @@ from app.core.security import (
     decode_token,
 )
 
+from app.db.models.email_verification_token import EmailVerificationToken
+from app.core.email_verification import (
+    generate_email_verification_token,
+    get_email_verification_expiry,
+)
+from app.db.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")  # aunque login sea JSON, sirve para dependencia
@@ -76,6 +84,11 @@ def get_current_user(
     except Exception:
         raise HTTPException(status_code=401, detail="No autorizado")
 
+def calculate_age(birth_date: date) -> int:
+    today = date.today()
+    return today.year - birth_date.year - (
+        (today.month, today.day) < (birth_date.month, birth_date.day)
+    )
 
 
 @router.post("/register", response_model=UserPublic)
@@ -83,61 +96,66 @@ def register(
     data: RegisterRequest,
     db: Session = Depends(get_db),
 ):
-    try:
-        validate_password_policy(data.password)
-        pw_hash = hash_password(data.password)
+    # 1. Validar política de contraseña
+    validate_password_policy(data.password)
+    pw_hash = hash_password(data.password)
 
-        repo = UserRepository(db)
+    # 2. Validar fecha de nacimiento
+    birth_date = data.birth_date.date()
+
+    if birth_date > date.today():
+        raise HTTPException(
+            status_code=400,
+            detail="La fecha de nacimiento no es válida.",
+        )
+
+    # 3. Calcular edad
+    age = calculate_age(birth_date)
+
+    # 4. Decidir estado inicial
+    #is_active = age >= 18
+
+    repo = UserRepository(db)
+
+    try:
         user = repo.create_user(
             email=data.email,
             password_hash=pw_hash,
+            first_name=data.first_name,
+            last_name=data.last_name,
+            birth_date=birth_date,
+            gender=data.gender,
             role="user",
+            is_active=False
         )
+        token = generate_email_verification_token()
 
-        return UserPublic(
-            user_number=user.id,
-            email=user.email,
-            role=user.role,
-            guardian_rank=user.guardian_rank,
-            is_active=user.is_active,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-"""@router.post("/login", response_model=TokenPair)
-def login(
-    data: LoginRequest,
-    db: Session = Depends(get_db),
-):
-    repo = UserRepository(db)
-    user = repo.get_user_by_email(data.email)
-
-    if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="Credenciales inválidas.")
-    if not verify_password(data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Credenciales inválidas.")
-
-    access = create_access_token(
-        sub=user.id,
-        role=user.role,
-        gr=user.guardian_rank,
-    )
-
-    refresh = create_refresh_token(sub=user.id)
-
-    refresh_repo = RefreshTokenRepository(db)
-    refresh_repo.create(
+        verification = EmailVerificationToken(
         user_id=user.id,
-        jti=refresh["jti"],
-        expires_at=datetime.now(timezone.utc)
-        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        token=token,
+        expires_at=get_email_verification_expiry(),
     )
 
-    return TokenPair(
-        access_token=access,
-        refresh_token=refresh["token"],
-    )"""
+        db.add(verification)
+        db.commit()
+
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="El correo electrónico ya está registrado.",
+        )
+
+    return UserPublic(
+        user_number=user.id,
+        email=user.email,
+        role=user.role,
+        guardian_rank=user.guardian_rank,
+        is_active=user.is_active,
+    )
+
+
 
 @router.post("/login")
 def login(data: LoginRequest, db: Session = Depends(get_db)):
@@ -394,4 +412,48 @@ def verify_2fa(
         "access_token": access,
         "refresh_token": refresh["token"],
         "token_type": "bearer",
+    }
+
+@router.post("/verify-email")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    # 1. Buscar el token
+    verification = (
+        db.query(EmailVerificationToken)
+        .filter(EmailVerificationToken.token == token)
+        .first()
+    )
+
+    if not verification:
+        raise HTTPException(
+            status_code=400,
+            detail="Token de verificación inválido.",
+        )
+
+    # 2. Verificar expiración
+    if verification.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=400,
+            detail="El token de verificación ha expirado.",
+        )
+
+    # 3. Buscar usuario
+    user = db.query(User).filter(User.id == verification.user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="Usuario no encontrado.",
+        )
+
+    # 4. Activar usuario
+    user.is_active = True
+
+    # 5. Eliminar token (uso único)
+    db.delete(verification)
+
+    # 6. Persistir cambios
+    db.commit()
+
+    return {
+        "message": "Correo verificado correctamente. Tu cuenta ha sido activada."
     }

@@ -1,9 +1,12 @@
-from datetime import datetime, timezone
+# Python
+from datetime import datetime, timezone, date
 
-from sqlalchemy import String, Boolean, Integer, DateTime
+# SQLAlchemy
+from sqlalchemy import String, Boolean, Integer, DateTime, Date
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
+
 
 
 class User(Base):
@@ -15,11 +18,31 @@ class User(Base):
         index=True,
     )
 
+    first_name: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    last_name: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
     email: Mapped[str] = mapped_column(
         String(255),
         unique=True,
         nullable=False,
         index=True,
+    )
+
+    birth_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    gender: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
     )
 
     password_hash: Mapped[str] = mapped_column(
