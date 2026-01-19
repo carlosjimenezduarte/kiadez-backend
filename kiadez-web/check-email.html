@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kiadez — Revisa tu correo</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <div class="page-background">
+
+        <main class="auth-center">
+            <div class="auth-card auth-card--wide">
+
+                <h2 class="auth-title">Revisa tu correo</h2>
+
+                <div class="auth-message">
+                    <p>
+                        Te enviamos un enlace de verificación para activar tu cuenta.
+                    </p>
+                    <br>
+
+                    <p class="muted">
+                        Abre tu bandeja de entrada (y revisa spam si no lo ves).
+                    </p>
+                    <br>
+
+                </div>
+
+                <div class="auth-actions">
+                    <!-- Esto lo conectamos después: reenviar -->
+                    <button class="btn btn-primary" id="resend-btn" type="button">
+                        Reenviar correo
+                    </button>
+                    <br>
+
+                    <a href="index.html" class="btn btn-outline">
+                        Volver al inicio de sesión
+                    </a>
+                    <br>
+                    <br>
+                </div>
+
+
+
+                <div class="auth-divider"></div>
+
+                <p class="auth-help muted">
+                    Si cerraste la ventana o perdiste el enlace, puedes reenviar el correo desde aquí.
+                </p>
+
+                <div class="auth-brand">
+                    <img src="logo.png" alt="Kiadez" />
+                    <span>Kiadez</span>
+                </div>
+
+            </div>
+        </main>
+
+        <footer class="kiadez-footer">
+            <div class="footer-bottom">
+                © 2026 Kiadez — Una red social para cumplir deseos.
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        // Placeholder. Luego lo conectamos al endpoint real de "resend".
+        document.getElementById("resend-btn").addEventListener("click", () => {
+            alert("Listo. (Luego conectamos esto al endpoint real de reenvío).");
+        });
+    </script>
+</body>
+
+</html>

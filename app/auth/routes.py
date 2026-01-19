@@ -27,6 +27,7 @@ from app.db.repositories.user_repository import UserRepository
 
 # FastAPI
 from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import Body
 
@@ -34,6 +35,8 @@ from fastapi import Body
 from app.db.repositories.refresh_token_repository import RefreshTokenRepository
 from datetime import datetime, timedelta, timezone
 from app.core.config import settings
+from app.core.mailer import send_verification_email
+
 
 
 # Auth
@@ -139,6 +142,10 @@ def register(
         db.add(verification)
         db.commit()
 
+        send_verification_email(
+            to_email=user.email,
+            token=token,
+        )
 
     except IntegrityError:
         db.rollback()
@@ -414,9 +421,8 @@ def verify_2fa(
         "token_type": "bearer",
     }
 
-@router.post("/verify-email")
+@router.get("/verify-email")
 def verify_email(token: str, db: Session = Depends(get_db)):
-    # 1. Buscar el token
     verification = (
         db.query(EmailVerificationToken)
         .filter(EmailVerificationToken.token == token)
@@ -424,36 +430,21 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     )
 
     if not verification:
-        raise HTTPException(
-            status_code=400,
-            detail="Token de verificación inválido.",
-        )
+        raise HTTPException(status_code=400, detail="Token inválido")
 
-    # 2. Verificar expiración
     if verification.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=400,
-            detail="El token de verificación ha expirado.",
-        )
+        raise HTTPException(status_code=400, detail="Token expirado")
 
-    # 3. Buscar usuario
     user = db.query(User).filter(User.id == verification.user_id).first()
 
     if not user:
-        raise HTTPException(
-            status_code=404,
-            detail="Usuario no encontrado.",
-        )
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    # 4. Activar usuario
     user.is_active = True
-
-    # 5. Eliminar token (uso único)
     db.delete(verification)
-
-    # 6. Persistir cambios
     db.commit()
 
-    return {
-        "message": "Correo verificado correctamente. Tu cuenta ha sido activada."
-    }
+    return RedirectResponse(
+        url=f"{settings.FRONTEND_URL}/email-verified.html",
+        status_code=302
+    )
