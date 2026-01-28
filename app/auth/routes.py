@@ -1,13 +1,12 @@
 from app.core.security import decode_2fa_temp_token
-
+from fastapi import Query
 from app.core.security import create_2fa_temp_token
 from app.db.repositories.user_2fa_repository import User2FARepository
 
-from fastapi import Depends, HTTPException
-
-from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 from datetime import date
+
+from sqlalchemy import delete
 
 
 from app.db.models.user_2fa import User2FA
@@ -18,7 +17,7 @@ from app.core.two_fa_qr import generate_qr_base64
 from app.core.two_fa_crypto import decrypt_secret
 from app.core.two_fa_totp import verify_totp_code
 
-from app.core.config import settings
+
 
 # SQLAlchemy
 from sqlalchemy.orm import Session
@@ -162,6 +161,19 @@ def register(
         is_active=user.is_active,
     )
 
+
+
+@router.get("/verification-status")
+def verification_status(
+    email: str = Query(..., min_length=3, max_length=320),
+    db: Session = Depends(get_db),
+):
+    repo = UserRepository(db)
+    user = repo.get_user_by_email(email.strip().lower())
+
+    # Importante: no revelamos si el usuario existe o no.
+    # Solo decimos "verified true/false".
+    return {"verified": bool(user and user.is_active)}
 
 
 @router.post("/login")
@@ -422,29 +434,81 @@ def verify_2fa(
     }
 
 @router.get("/verify-email")
-def verify_email(token: str, db: Session = Depends(get_db)):
+def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
+    # 1. Buscar el token
     verification = (
         db.query(EmailVerificationToken)
         .filter(EmailVerificationToken.token == token)
         .first()
     )
-
     if not verification:
-        raise HTTPException(status_code=400, detail="Token inválido")
+        # Redirect bonito al frontend (puedes crear invalid-token.html si quieres)
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/email-verified.html?status=invalid", status_code=302)
 
+    # 2. Verificar expiración
     if verification.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Token expirado")
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/email-verified.html?status=expired", status_code=302)
 
+    # 3. Buscar usuario
     user = db.query(User).filter(User.id == verification.user_id).first()
-
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/email-verified.html?status=notfound", status_code=302)
 
+    # 4. Activar usuario
     user.is_active = True
+
+    # 5. Eliminar token (uso único)
     db.delete(verification)
+
+    # 6. Persistir cambios
     db.commit()
 
+    # 7. Redirect final al frontend (le pasamos email para autocompletar login)
     return RedirectResponse(
-        url=f"{settings.FRONTEND_URL}/email-verified.html",
-        status_code=302
+        url=f"{settings.FRONTEND_URL}/email-verified.html?status=ok&email={user.email}",
+        status_code=302,
     )
+
+@router.post("/resend-verification")
+def resend_verification(
+    email: str = Body(..., embed=True),
+    db: Session = Depends(get_db),
+):
+    email = email.strip().lower()
+
+    repo = UserRepository(db)
+    user = repo.get_user_by_email(email)
+
+    # Respuesta genérica SIEMPRE (seguridad: no revelamos si existe)
+    generic = {"message": "Si el correo existe y no está verificado, enviaremos un nuevo enlace."}
+
+    if not user:
+        return generic
+
+    if user.is_active:
+        return generic
+
+    # Borrar tokens viejos del usuario (simple y sano)
+    db.execute(
+        delete(EmailVerificationToken).where(EmailVerificationToken.user_id == user.id)
+    )
+
+    # Crear token nuevo
+    token = generate_email_verification_token()
+    verification = EmailVerificationToken(
+        user_id=user.id,
+        token=token,
+        expires_at=get_email_verification_expiry(),
+    )
+    db.add(verification)
+    db.commit()
+
+    # Enviar correo
+    try:
+        from app.core.mailer import send_verification_email
+        send_verification_email(to_email=user.email, token=token)
+    except Exception:
+        # El token quedó creado; si falla el SMTP, no exponemos detalles
+        raise HTTPException(status_code=500, detail="No se pudo enviar el correo en este momento.")
+
+    return {"message": "Listo. Si tu correo no estaba verificado, enviamos un enlace nuevo."}

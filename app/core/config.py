@@ -15,6 +15,9 @@ class Settings(BaseSettings):
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    # 🌐 Backend (para armar links en correos)
+    BACKEND_URL: str = "http://127.0.0.1:8000"
+
 
     # 🔐 2FA
     TWO_FA_ENCRYPTION_KEY: str

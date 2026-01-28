@@ -3,125 +3,72 @@
 
 <head>
   <meta charset="UTF-8" />
-  <title>Correo verificado · Kiadez</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <style>
-    :root {
-      --kiadez-green: #00674F;
-      --bg-dark: #0e0e0e;
-      --card-bg: rgba(255, 255, 255, 0.08);
-      --text-main: #eaeaea;
-      --text-muted: #b0b0b0;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: "Arial", sans-serif;
-    }
-
-    body {
-      min-height: 100vh;
-      background: radial-gradient(circle at top, #1a1a1a, var(--bg-dark));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-main);
-    }
-
-    .container {
-      width: 100%;
-      max-width: 420px;
-      padding: 40px 30px;
-      background: var(--card-bg);
-      border-radius: 14px;
-      text-align: center;
-      backdrop-filter: blur(6px);
-      box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
-    }
-
-    .logo {
-      margin-bottom: 20px;
-    }
-
-    .logo img {
-      max-width: 120px;
-    }
-
-    .icon {
-      font-size: 42px;
-      margin-bottom: 15px;
-      color: var(--kiadez-green);
-    }
-
-    h1 {
-      font-size: 22px;
-      margin-bottom: 15px;
-      font-weight: 600;
-    }
-
-    p {
-      font-size: 15px;
-      line-height: 1.5;
-      color: var(--text-muted);
-      margin-bottom: 25px;
-    }
-
-    .btn {
-      display: inline-block;
-      width: 100%;
-      padding: 14px;
-      background-color: var(--kiadez-green);
-      color: #fff;
-      text-decoration: none;
-      font-size: 15px;
-      font-weight: 600;
-      border-radius: 8px;
-      transition: background-color 0.2s ease;
-    }
-
-    .btn:hover {
-      background-color: #008062;
-    }
-
-    .footer {
-      margin-top: 25px;
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kiadez — Correo verificado</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
-  <div class="container">
-    <!-- Logo -->
-    <div class="logo">
-      <!-- Reemplaza el src por tu logo real -->
-      <img src="logo-kiadez.png" alt="Kiadez" />
-    </div>
+  <div class="page-backgroundlogin">
+    <main class="auth-center">
+      <div class="auth-card auth-card--wide">
+        <h2 class="auth-title">Correo verificado</h2>
 
-    <!-- Icono -->
-    <div class="icon">✔</div>
+        <div class="auth-message">
+          <p>Tu cuenta ha sido activada con éxito.</p>
+          <p class="muted" id="redirect-label">Redirigiendo al inicio de sesión…</p>
+        </div>
 
-    <!-- Texto -->
-    <h1>Correo verificado correctamente</h1>
+        <div class="auth-actions">
+          <a id="login-link" href="login.html" class="btn btn-primary">
+            Iniciar sesión
+          </a>
+        </div>
 
-    <p>
-      Tu cuenta en <strong>Kiadez</strong> ha sido activada con éxito.
-      <br /><br />
-      Ahora puedes iniciar sesión y continuar con tu proceso dentro de la plataforma.
-    </p>
+        <div class="auth-brand">
+          <img src="logo.png" alt="Kiadez" />
+          <span>Kiadez</span>
+        </div>
+      </div>
+    </main>
 
-    <!-- Acción -->
-    <a href="/login.html" class="btn">Iniciar sesión</a>
-
-    <!-- Footer -->
-    <div class="footer">
-      Kiadez · El primer paso para cumplir tus deseos
-    </div>
+    <footer class="kiadez-footer">
+      <div class="footer-bottom">
+        © 2026 Kiadez — Una red social para cumplir deseos.
+      </div>
+    </footer>
   </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("status");
+    const email = params.get("email") || "";
+
+    const label = document.getElementById("redirect-label");
+    const link = document.getElementById("login-link");
+
+    if (status === "ok") {
+      const target = email
+        ? `login.html?email=${encodeURIComponent(email)}`
+        : "login.html";
+
+      link.href = target;
+
+      let t = 2;
+      const timer = setInterval(() => {
+        label.textContent = `Redirigiendo al inicio de sesión en ${t}…`;
+        t--;
+        if (t < 0) {
+          clearInterval(timer);
+          window.location.href = target;
+        }
+      }, 600);
+    } else {
+      label.textContent = "El enlace no es válido o expiró. Puedes solicitar uno nuevo.";
+      link.textContent = "Volver a revisar el correo";
+      link.href = "check-email.html";
+    }
+  </script>
 </body>
 
 </html>

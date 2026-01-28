@@ -136,3 +136,29 @@ def decode_2fa_temp_token(token: str) -> int:
         raise ValueError("Token no es 2FA pending")
 
     return int(payload["sub"])
+
+def create_vault_token(*, sub: int) -> str:
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=20)  # vault session corta
+    jti = str(uuid.uuid4())
+
+    payload = {
+        "sub": str(sub),
+        "iat": int(now.timestamp()),
+        "exp": int(exp.timestamp()),
+        "jti": jti,
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
+        "typ": "vault",
+    }
+
+    return jwt.encode(payload, PRIVATE_KEY, algorithm="RS256")
+
+
+def decode_vault_token(token: str) -> int:
+    payload = decode_token(token)
+
+    if payload.get("typ") != "vault":
+        raise ValueError("Token no es vault")
+
+    return int(payload["sub"])
