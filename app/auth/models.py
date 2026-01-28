@@ -34,3 +34,12 @@ class UserInternal(UserPublic):
 
 class TwoFAVerifyRequest(BaseModel):
     code: str = Field(..., min_length=6, max_length=6)
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8)

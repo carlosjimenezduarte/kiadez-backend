@@ -25,6 +25,16 @@ class Settings(BaseSettings):
     # 🌐 Frontend
     FRONTEND_URL: str = "http://localhost:5500"
 
+    # 🌐 CORS
+    CORS_ALLOW_ORIGINS: str = (
+        "http://localhost,"
+        "http://127.0.0.1,"
+        "http://localhost:5173,"
+        "http://localhost:3000,"
+        "https://kiadez.com,"
+        "https://www.kiadez.com"
+    )
+
     # 📧 SMTP
     SMTP_HOST: str
     SMTP_PORT: int
@@ -33,5 +43,23 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "noreply@kiadez.com"
     SMTP_USE_SSL: bool = True
     SMTP_USE_TLS: bool = False
+    SUPPORT_EMAIL: str = "info@kiadez.com"
+
+    # 🔑 Password reset
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 60
+
+    # ☁️ S3 (Backblaze B2)
+    S3_ENDPOINT: str
+    S3_REGION: str
+    S3_BUCKET: str
+    S3_ACCESS_KEY_ID: str
+    S3_SECRET_ACCESS_KEY: str
+    S3_FORCE_PATH_STYLE: bool = True
+
+    # 🎞️ Media
+    MEDIA_UPLOAD_EXPIRE_MINUTES: int = 20
+    MEDIA_DOWNLOAD_EXPIRE_HOURS: int = 24
+    MEDIA_MAX_IMAGE_MB: int = 10
+    MEDIA_MAX_VIDEO_MB: int = 100
 
 settings = Settings()

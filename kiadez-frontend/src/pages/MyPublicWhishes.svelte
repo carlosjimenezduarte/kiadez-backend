@@ -1,0 +1,693 @@
+<script>
+  import { onMount } from "svelte";
+
+  onMount(() => {
+    const prefixInputs = document.querySelectorAll(".wish-prefix-input");
+    
+        prefixInputs.forEach((input) => {
+          const prefix = input.dataset.prefix || "Deseo ";
+          if (!input.value.startsWith(prefix)) {
+            input.value = `${prefix}${input.value}`;
+          }
+    
+          const ensurePrefix = () => {
+            if (!input.value.startsWith(prefix)) {
+              const cleaned = input.value.replace(prefix, "");
+              input.value = `${prefix}${cleaned}`;
+            }
+            if (input.value.length < prefix.length) {
+              input.value = prefix;
+            }
+          };
+    
+          input.addEventListener("input", ensurePrefix);
+    
+          input.addEventListener("keydown", (event) => {
+            const cursorStart = input.selectionStart || 0;
+            if ((event.key === "Backspace" || event.key === "Delete") && cursorStart <= prefix.length) {
+              event.preventDefault();
+              input.setSelectionRange(prefix.length, prefix.length);
+            }
+          });
+        });
+    
+        const emptySlotTemplate = document.getElementById("wishEmptySlotTemplate");
+    
+        document.querySelectorAll(".wish-slot-list[data-total]").forEach((list) => {
+          const total = Number.parseInt(list.dataset.total || "0", 10);
+          const current = list.querySelectorAll("li").length;
+          if (!emptySlotTemplate || Number.isNaN(total)) return;
+    
+          for (let i = current; i < total; i += 1) {
+            const li = document.createElement("li");
+            li.className = "wish-slot is-empty";
+            li.appendChild(emptySlotTemplate.content.cloneNode(true));
+            list.appendChild(li);
+          }
+        });
+  });
+</script>
+
+<svelte:head>
+<meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kiadez — Mis deseos públicos</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</svelte:head>
+
+<svelte:body data-visitor="false" />
+
+<div class="page-background page-background-user public-wishes-background">
+
+    <main class="user-home">
+
+      <!-- =========================
+       *  PORTADA / COVER
+       *  ========================= -->
+      <section class="cover" id="cover">
+        <div class="cover-media" id="coverMedia">
+          <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
+
+          <div class="cover-actions">
+            <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
+              Cambiar portada
+            </button>
+            <button class="icon-btn" id="btnEditPurposes" type="button" title="Editar deseos de propósito">
+              Editar propósito
+            </button>
+
+            <input id="coverFile" type="file" accept="image/*" class="hidden" />
+          </div>
+
+          <div class="purpose-triangle" aria-label="Deseos de propósito">
+            <button class="purpose-pill purpose-top" type="button" id="purpose1">
+              Deseo #1: Secreto
+            </button>
+
+            <button class="purpose-pill purpose-left" type="button" id="purpose2">
+              Deseo construir el Reino de Combray
+            </button>
+
+            <button class="purpose-pill purpose-right" type="button" id="purpose3">
+              Deseo estar unido a Jesús
+            </button>
+          </div>
+
+          <div class="cover-hint" id="coverHint">
+            Arrastra la portada para encuadrarla
+          </div>
+        </div>
+      </section>
+
+      <div class="public-wishes-body">
+        <!-- =========================
+         *  NAV / LINKS
+         *  ========================= -->
+        <nav class="profile-nav" aria-label="Navegación de perfil">
+          <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
+          <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+            <span class="nav-icon">⭐</span>
+            <span><strong>5.000.000</strong> estrellas</span>
+          </a>
+          <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
+          <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
+          <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
+          <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
+          <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
+        </nav>
+
+        <!-- =========================
+         *  MIS DESEOS PUBLICOS
+         *  ========================= -->
+        <section class="public-wishes-shell" aria-label="Mis deseos públicos">
+          <header class="public-wishes-head">
+            <div>
+              <h2 class="public-wishes-title">Mis deseos públicos</h2>
+              <p class="public-wishes-subtitle">
+                Estética de portada y enlaces integrada. Ahora mostramos las categorías y los flujos de deseos.
+              </p>
+            </div>
+            <div class="public-wishes-tags">
+              <span class="panel-badge">7 categorías</span>
+              <span class="panel-badge">50 deseos personales</span>
+              <span class="panel-badge">20 deseos cooperativos</span>
+            </div>
+          </header>
+
+          <!-- =========================
+           *  CATEGORIAS DE DESEOS
+           *  ========================= -->
+          <section class="panel wish-categories" aria-label="Categorías de deseos">
+            <div class="panel-head">
+              <h3 class="panel-title">Categorías de deseos</h3>
+              <span class="panel-badge">Cuadrícula 3x2 + 1</span>
+            </div>
+
+            <div class="wish-category-grid">
+              <article class="wish-category-card">
+                <div class="wish-category-icon">
+                  <img src="/css/icons/Espiritual.webp" alt="Deseos espirituales" />
+                </div>
+                <h4>Deseos Espirituales</h4>
+                <p>
+                  Deseos relacionados con el sentido de vida, la conciencia, la fe, la paz interior y el crecimiento
+                  espiritual. Ejemplo: perseverar en el hábito de la meditación, leer libros sobre espiritualidad,
+                  asistir a misa.
+                </p>
+              </article>
+
+              <article class="wish-category-card">
+                <div class="wish-category-icon">
+                  <img src="/css/icons/Material.webp" alt="Deseos materiales" />
+                </div>
+                <h4>Deseos Materiales</h4>
+                <p>
+                  Deseos vinculados a bienes, objetos o condiciones tangibles que mejoran la calidad de vida.
+                  Pueden involucrar recursos externos y, en algunos casos, la ayuda o participación de otras personas.
+                  Ejemplo: tener una cafetera nueva, un nuevo auto, una nueva computadora.
+                </p>
+              </article>
+
+              <article class="wish-category-card">
+                <div class="wish-category-icon">
+                  <img src="/css/icons/Monetario.webp" alt="Deseos monetarios" />
+                </div>
+                <h4>Deseos Monetarios</h4>
+                <p>
+                  Deseos relacionados exclusivamente con metas económicas personales. No pueden ser concedidos por otras
+                  personas y funcionan como objetivos de ahorro, disciplina y logro individual. Solo el propio usuario
+                  puede cumplirlos.
+                </p>
+              </article>
+
+              <article class="wish-category-card">
+                <div class="wish-category-icon">
+                  <img src="/css/icons/Profesional.webp" alt="Deseos profesionales" />
+                </div>
+                <h4>Deseos Profesionales</h4>
+                <p>
+                  Deseos asociados al desarrollo laboral, académico o creativo. Incluyen proyectos, estudios,
+                  reconocimiento, impacto profesional y crecimiento en la vocación personal. Ejemplo: estudiar
+                  arquitectura y graduarme de la Universidad Politécnico de Milán.
+                </p>
+              </article>
+
+              <article class="wish-category-card">
+                <div class="wish-category-icon">
+                  <img src="/css/icons/Salud.webp" alt="Deseos de salud y cuerpo" />
+                </div>
+                <h4>Deseos de Salud y Cuerpo</h4>
+                <p>
+                  Deseos enfocados en el bienestar físico, la energía vital, la recuperación y la relación consciente
+                  con el cuerpo. No sustituyen atención médica ni tratamientos profesionales. Ejemplo: mantener la
+                  disciplina de ejercitar tu cuerpo a diario, correr 1 km diario, alimentarte bien.
+                </p>
+              </article>
+
+              <article class="wish-category-card">
+                <div class="wish-category-icon">
+                  <img src="/css/icons/Relacional.webp" alt="Deseos relacionales" />
+                </div>
+                <h4>Deseos Relacionales</h4>
+                <p>
+                  Deseos relacionados con vínculos humanos: familia, pareja, amistades y comunidad. Incluyen encuentros,
+                  reconciliaciones, fortalecimiento de relaciones y construcción de lazos significativos. Ejemplo:
+                  tomarse una cerveza con Lars Ulrich, ir a un concierto con tu hermano, disfrutar de un día en familia
+                  en el Restaurante La Matriarca.
+                </p>
+              </article>
+
+              <article class="wish-category-card wish-category-wide">
+                <div class="wish-category-icon">
+                  <img src="/css/icons/Vivencial.webp" alt="Deseos vivenciales" />
+                </div>
+                <div>
+                  <h4>Deseos Vivenciales</h4>
+                  <p>
+                    Deseos orientados a experiencias, momentos únicos y vivencias significativas. No se definen por la
+                    posesión, sino por el hecho de vivir algo que deje huella en la memoria y la conciencia. Ejemplo:
+                    lanzarse en paracaídas, visitar Las Islas Maldivas, viajar en helicóptero.
+                  </p>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <!-- =========================
+           *  LISTAS DE DESEOS
+           *  ========================= -->
+          <section class="wish-lists-grid" aria-label="Listas de deseos">
+            <article class="panel wish-list-panel">
+              <div class="panel-head">
+                <h3 class="panel-title">Deseos personales</h3>
+                <span class="panel-badge">1 - 50</span>
+              </div>
+              <p class="panel-muted">
+                Lista numerada del 1 al 50. El botón con lámpara abre la configuración del deseo.
+              </p>
+              <ol class="wish-slot-list" id="personalWishList" data-total="50" aria-label="Deseos personales">
+                <li class="wish-slot is-filled">
+                  <div class="wish-slot-row">
+                    <div class="wish-slot-main">
+                      <div class="wish-slot-title">Deseo tener una nueva computadora</div>
+                      <div class="wish-slot-meta">
+                        <span class="wish-type-pill">Material</span>
+                        <span class="wish-meta-item">Imagen adjunta</span>
+                      </div>
+                    </div>
+                    <div class="wish-slot-actions">
+                      <button class="wish-icon-btn" type="button" title="Editar deseo">
+                        <img src="/css/icons/iconedit.webp" alt="Editar deseo" />
+                      </button>
+                      <button class="wish-icon-btn" type="button" title="Marcar como cumplido">
+                        <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo como cumplido" />
+                      </button>
+                      <button class="wish-icon-btn" type="button" title="Borrar deseo">
+                        <img src="/css/icons/icondelete.webp" alt="Borrar deseo" />
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              </ol>
+            </article>
+
+            <article class="panel wish-list-panel">
+              <div class="panel-head">
+                <h3 class="panel-title">Deseos cooperativos</h3>
+                <span class="panel-badge">1 - 20</span>
+              </div>
+              <p class="panel-muted">
+                Lista numerada del 1 al 20. Los deseos cooperativos incluyen una invitación a participar.
+              </p>
+              <ol class="wish-slot-list" id="cooperativeWishList" data-total="20" aria-label="Deseos cooperativos">
+                <li class="wish-slot is-filled">
+                  <div class="wish-slot-row">
+                    <div class="wish-slot-main">
+                      <div class="wish-slot-title">
+                        Deseo nivelar a 50 personajes del videojuego Dofus, del servidor Tal Kasha, a nivel 200 en
+                        Anutropia
+                      </div>
+                      <div class="wish-slot-meta">
+                        <span class="wish-type-pill">Relacional</span>
+                        <span class="wish-meta-item">Imagen adjunta</span>
+                      </div>
+                      <div class="wish-slot-note">
+                        Este es un deseo cooperativo, así que puedes desear desde tu cuenta en la construcción de esta
+                        meta.
+                      </div>
+                    </div>
+                    <div class="wish-slot-actions">
+                      <button class="wish-icon-btn" type="button" title="Editar deseo">
+                        <img src="/css/icons/iconedit.webp" alt="Editar deseo" />
+                      </button>
+                      <button class="wish-icon-btn" type="button" title="Marcar como cumplido">
+                        <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo como cumplido" />
+                      </button>
+                      <button class="wish-icon-btn" type="button" title="Borrar deseo">
+                        <img src="/css/icons/icondelete.webp" alt="Borrar deseo" />
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              </ol>
+            </article>
+          </section>
+
+          <template id="wishEmptySlotTemplate">
+            <div class="wish-slot-row">
+              <button class="wish-add-btn" type="button" title="Agregar deseo">
+                <img src="/css/icons/iconlamp.webp" alt="Agregar deseo" />
+              </button>
+              <span class="wish-add-label">Agregar deseo</span>
+            </div>
+          </template>
+
+          <!-- =========================
+           *  CONFIGURACION DEL DESEO
+           *  ========================= -->
+          <section class="panel wish-config" aria-label="Configuración del deseo">
+            <div class="panel-head">
+              <h3 class="panel-title">Configuración del deseo</h3>
+              <span class="panel-badge">Personal / Cooperativo</span>
+            </div>
+            <p class="panel-muted">
+              Al presionar el botón con la lámpara (+) se abre esta interfaz. Incluye los botones de tipo de deseo,
+              la descripción, la carga de imagen y el guardado.
+            </p>
+
+            <div class="wish-config-toggle">
+              <button class="btn btn-outline btn-compact btn-icon" type="button">
+                <img src="/css/icons/iconpersonal.webp" alt="Deseo personal" />
+                Deseo personal
+              </button>
+              <button class="btn btn-outline btn-compact btn-icon" type="button">
+                <img src="/css/icons/iconcooperative.webp" alt="Deseo cooperativo" />
+                Deseo cooperativo
+              </button>
+            </div>
+
+            <div class="wish-config-grid">
+              <article class="wish-config-card">
+                <div class="wish-config-head">
+                  <div class="wish-config-icon">
+                    <img src="/css/icons/iconpersonal.webp" alt="Deseo personal" />
+                  </div>
+                  <div>
+                    <h4>Flujo del deseo personal</h4>
+                    <p class="panel-muted">Siempre inicia con la palabra “Deseo…”.</p>
+                  </div>
+                </div>
+
+                <label class="modal-label" for="personalWishText">Descripción del deseo</label>
+                <textarea class="modal-textarea wish-prefix-input" id="personalWishText" rows="3"
+                  data-prefix="Deseo ">Deseo tener una nueva computadora</textarea>
+                <div class="wish-helper">
+                  El cajón de texto acepta texto libre, números y símbolos. La palabra “Deseo” no se borra.
+                </div>
+
+                <label class="modal-label" for="personalWishType">Tipo de deseo</label>
+                <select class="modal-select" id="personalWishType">
+                  <option>Espiritual</option>
+                  <option>Material</option>
+                  <option>Monetario</option>
+                  <option>Profesional</option>
+                  <option>Salud y cuerpo</option>
+                  <option>Relacional</option>
+                  <option>Vivencial</option>
+                </select>
+
+                <div class="wish-warning">
+                  <span class="wish-warning-icon">!</span>
+                  <span>
+                    Los deseos monetarios no pueden ser concedidos por otras personas. Funcionan como objetivos de
+                    ahorro, disciplina y logro individual.
+                  </span>
+                </div>
+
+                <label class="modal-label" for="personalWishMedia">Agregar imagen</label>
+                <input class="modal-input" id="personalWishMedia" type="file" accept="image/*" />
+
+                <label class="modal-label">¿Es un deseo acumulativo y abierto a los demás?</label>
+                <div class="wish-radio-group">
+                  <label class="wish-radio">
+                    <input type="radio" name="personalOpen" checked />
+                    Sí
+                  </label>
+                  <label class="wish-radio">
+                    <input type="radio" name="personalOpen" />
+                    No
+                  </label>
+                </div>
+
+                <div class="wish-form-actions">
+                  <button class="btn btn-primary btn-compact btn-icon" type="button">
+                    <img src="/css/icons/iconsave.webp" alt="Guardar deseo" />
+                    Guardar deseo
+                  </button>
+                </div>
+              </article>
+
+              <article class="wish-config-card">
+                <div class="wish-config-head">
+                  <div class="wish-config-icon">
+                    <img src="/css/icons/iconcooperative.webp" alt="Deseo cooperativo" />
+                  </div>
+                  <div>
+                    <h4>Flujo del deseo cooperativo</h4>
+                    <p class="panel-muted">Incluye participantes y un texto guía para completar.</p>
+                  </div>
+                </div>
+
+                <label class="modal-label" for="cooperativeWishText">Descripción del deseo cooperativo</label>
+                <textarea class="modal-textarea wish-prefix-input" id="cooperativeWishText" rows="3"
+                  data-prefix="Deseo ">Deseo nivelar a 50 personajes del videojuego Dofus, del servidor Tal Kasha, a nivel 200 en Anutropia</textarea>
+
+                <label class="modal-label" for="cooperativeWishCount">Número máximo de personas participantes</label>
+                <input class="modal-input" id="cooperativeWishCount" type="number" min="1" value="50" />
+
+                <label class="modal-label" for="cooperativeWishTemplate">Configuración del deseo abierto</label>
+                <textarea class="modal-textarea" id="cooperativeWishTemplate" rows="3">Deseo que el Team Guardian nivele, en el servidor Tal Kasha, a mi personaje *marca aquí el nombre de tu personaje*</textarea>
+                <div class="wish-helper">
+                  Siempre deja una marca final que deba rellenarse con convicción por quien participa.
+                </div>
+
+                <label class="modal-label" for="cooperativeWishMedia">Agregar imagen</label>
+                <input class="modal-input" id="cooperativeWishMedia" type="file" accept="image/*" />
+
+                <div class="wish-form-actions">
+                  <button class="btn btn-primary btn-compact btn-icon" type="button">
+                    <img src="/css/icons/iconsave.webp" alt="Guardar deseo cooperativo" />
+                    Guardar deseo cooperativo
+                  </button>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <!-- =========================
+           *  ACCIONES Y MODALES
+           *  ========================= -->
+          <section class="panel wish-actions" aria-label="Acciones y modales de deseos">
+            <div class="panel-head">
+              <h3 class="panel-title">Acciones y modales</h3>
+              <span class="panel-badge">Propietario y visitantes</span>
+            </div>
+
+            <div class="wish-action-grid">
+              <article class="wish-action-group">
+                <h4>Vista del propietario</h4>
+                <div class="wish-icon-legend">
+                  <div class="wish-legend-item">
+                    <span class="wish-legend-icon">
+                      <img src="/css/icons/iconedit.webp" alt="Editar deseo" />
+                    </span>
+                    <span>Editar deseo</span>
+                  </div>
+                  <div class="wish-legend-item">
+                    <span class="wish-legend-icon">
+                      <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo como cumplido" />
+                    </span>
+                    <span>Marcar como cumplido</span>
+                  </div>
+                  <div class="wish-legend-item">
+                    <span class="wish-legend-icon">
+                      <img src="/css/icons/icondelete.webp" alt="Borrar deseo" />
+                    </span>
+                    <span>Borrar deseo</span>
+                  </div>
+                </div>
+
+                <div class="wish-modal-grid">
+                  <div class="modal wish-modal">
+                    <div class="modal-head">
+                      <h3>¿Estás seguro de que deseas borrar este deseo?</h3>
+                    </div>
+                    <div class="modal-body">
+                      <p class="panel-muted">
+                        Antes de borrar en bruto, se solicita confirmación. Si aceptas, el slot vuelve al icono de la
+                        lámpara y queda disponible.
+                      </p>
+                    </div>
+                    <div class="modal-actions">
+                      <button class="btn btn-primary btn-compact" type="button">Sí</button>
+                      <button class="btn btn-outline btn-compact" type="button">No</button>
+                    </div>
+                  </div>
+
+                  <div class="modal wish-modal">
+                    <div class="modal-head">
+                      <h3>¡Sube la evidencia!</h3>
+                    </div>
+                    <div class="modal-body">
+                      <p class="panel-muted">El usuario puede subir una imagen o un video como evidencia.</p>
+                      <div class="upload-row">
+                        <label class="upload-btn" for="fulfillEvidence">Adjuntar imagen o video</label>
+                        <input id="fulfillEvidence" type="file" accept="image/*,video/*" class="hidden" />
+                        <div class="upload-hint">Sin archivo adjunto</div>
+                      </div>
+                      <p class="panel-muted">
+                        ¿Declaras bajo verdad de juramento que este deseo se ha cumplido?
+                      </p>
+                    </div>
+                    <div class="modal-actions">
+                      <button class="btn btn-primary btn-compact" type="button">
+                        Juro bajo verdad de juramento que este deseo se ha cumplido
+                      </button>
+                      <button class="btn btn-outline btn-compact" type="button">Cancelar</button>
+                    </div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="wish-action-group">
+                <h4>Vista del visitante</h4>
+                <div class="wish-icon-legend">
+                  <div class="wish-legend-item">
+                    <span class="wish-legend-icon">
+                      <img src="/css/icons/iconican.webp" alt="Yo puedo conceder ese deseo" />
+                    </span>
+                    <span>Yo puedo conceder ese deseo</span>
+                  </div>
+                  <div class="wish-legend-item">
+                    <span class="wish-legend-icon">
+                      <img src="/css/icons/iconcooperative2.webp" alt="Yo puedo ayudar a cumplir este deseo" />
+                    </span>
+                    <span>Yo puedo ayudar a cumplir este deseo</span>
+                  </div>
+                </div>
+
+                <div class="wish-modal-grid">
+                  <div class="modal wish-modal">
+                    <div class="modal-head">
+                      <h3>Yo puedo conceder ese deseo</h3>
+                    </div>
+                    <div class="modal-body">
+                      <p class="panel-muted">¿Estás seguro de que deseas cumplir este deseo?</p>
+                    </div>
+                    <div class="modal-actions">
+                      <button class="btn btn-primary btn-compact" type="button">Sí</button>
+                      <button class="btn btn-outline btn-compact" type="button">No</button>
+                    </div>
+                  </div>
+
+                  <div class="modal wish-modal">
+                    <div class="modal-head">
+                      <h3>Contactar a un Guardián</h3>
+                    </div>
+                    <div class="modal-body">
+                      <p class="panel-muted">
+                        La interfaz revela los rostros de los Guardianes disponibles para acompañar la gestión.
+                      </p>
+                      <div class="guardian-row">
+                        <img class="guardian-avatar" src="assets/avatar-default.jpg" alt="Guardián 1" />
+                        <img class="guardian-avatar" src="assets/avatar-default.jpg" alt="Guardián 2" />
+                        <img class="guardian-avatar" src="assets/avatar-default.jpg" alt="Guardián 3" />
+                        <img class="guardian-avatar" src="assets/avatar-default.jpg" alt="Guardián 4" />
+                      </div>
+
+                      <label class="modal-label" for="guardianReason">Describe por qué deseas conceder ese deseo</label>
+                      <textarea class="modal-textarea" id="guardianReason" rows="3"></textarea>
+
+                      <label class="modal-label" for="guardianPhone">Número telefónico</label>
+                      <input class="modal-input" id="guardianPhone" type="tel" inputmode="tel"
+                        placeholder="+57 300 000 0000" />
+
+                      <label class="modal-label" for="guardianEmail">Email</label>
+                      <input class="modal-input" id="guardianEmail" type="email" placeholder="correo@ejemplo.com" />
+
+                      <label class="modal-label">Evidencia</label>
+                      <div class="upload-row">
+                        <label class="upload-btn" for="guardianEvidence">Adjuntar imagen o video</label>
+                        <input id="guardianEvidence" type="file" accept="image/*,video/*" class="hidden" />
+                        <div class="upload-hint">Envíanos una evidencia de tu buena intención</div>
+                      </div>
+                    </div>
+                    <div class="modal-actions">
+                      <button class="btn btn-primary btn-compact" type="button">Enviar</button>
+                      <button class="btn btn-outline btn-compact" type="button">Cancelar</button>
+                    </div>
+                  </div>
+
+                  <div class="modal wish-modal">
+                    <div class="modal-head">
+                      <h3>Gestión de participación en el deseo cooperativo</h3>
+                    </div>
+                    <div class="modal-body">
+                      <p class="panel-muted">
+                        Deseo nivelar a 50 personajes del videojuego Dofus, del servidor Tal Kasha, a nivel 200 en
+                        Anutropia.
+                      </p>
+                      <p class="panel-muted">¿Seguro que quieres ayudar a cumplir este deseo?</p>
+                      <div class="wish-quote">
+                        “Deseo que el Team Guardian nivele, en el servidor Tal Kasha, a mi personaje
+                        <strong>*marca aquí el nombre de tu personaje*</strong>”
+                      </div>
+                      <label class="modal-label" for="cooperativeCharacter">Nombre del personaje</label>
+                      <input class="modal-input" id="cooperativeCharacter" type="text"
+                        placeholder="Ej: Zenejim" />
+                    </div>
+                    <div class="modal-actions">
+                      <button class="btn btn-primary btn-compact" type="button">Ayudar a cumplir este deseo</button>
+                      <button class="btn btn-outline btn-compact" type="button">Cancelar</button>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <!-- =========================
+           *  DESEOS PUBLICOS COOPERATIVOS
+           *  ========================= -->
+          <section class="panel wish-cooperative-public" aria-label="Deseos públicos cooperativos">
+            <div class="panel-head">
+              <h3 class="panel-title">Deseos públicos cooperativos</h3>
+              <span class="panel-badge">Visibles para participantes</span>
+            </div>
+            <p class="panel-muted">
+              Si un usuario acepta ayudar, el deseo se refleja en su cuenta como un deseo público cooperativo.
+            </p>
+            <ul class="wish-public-list">
+              <li>
+                <div class="wish-public-main">
+                  <strong>Deseo que mi personaje Zenejim llegue a nivel 200 con el Team Guardian.</strong>
+                  <span>Deseo relacional · Imagen vinculada.</span>
+                </div>
+                <span class="wish-public-meta">Raíz del deseo: usuario #0</span>
+              </li>
+            </ul>
+          </section>
+        </section>
+      </div>
+
+    </main>
+
+    <!-- FOOTER reutilizado -->
+    <footer class="kiadez-footer">
+      <div class="footer-main">
+
+        <div class="footer-column footer-origin">
+          <p class="footer-poem">
+            Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br>
+            No para dominar, sino para orientar.<br>
+            Su luz no deslumbra: acompaña.
+          </p>
+        </div>
+
+        <div class="footer-columns">
+          <div class="footer-column">
+            <h4>Sobre nuestra red social</h4>
+            <ul>
+              <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
+              <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
+              <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
+              <li><a href="/contact.html">Contacto</a></li>
+            </ul>
+          </div>
+
+          <div class="footer-column">
+            <h4>Idiomas</h4>
+            <ul>
+              <li><a href="/?lang=es">Español</a></li>
+              <li><a href="/?lang=en">English</a></li>
+              <li><a href="/?lang=fr">Français</a></li>
+              <li><a href="/?lang=pt">Português</a></li>
+            </ul>
+          </div>
+
+          <div class="footer-column">
+            <h4>Información legal</h4>
+            <ul>
+              <li><a href="/terms.html">Términos y condiciones</a></li>
+              <li><a href="/privacy.html">Privacidad</a></li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="footer-bottom">
+        © 2026 Kiadez — Una red social para cumplir deseos.
+      </div>
+    </footer>
+  </div>

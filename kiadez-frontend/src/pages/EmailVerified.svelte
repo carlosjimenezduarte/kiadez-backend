@@ -1,0 +1,71 @@
+<script>
+  import { onMount } from "svelte";
+
+  onMount(() => {
+    const params = new URLSearchParams(window.location.search);
+        const status = params.get("status");
+        const email = params.get("email") || "";
+    
+        const label = document.getElementById("redirect-label");
+        const link = document.getElementById("login-link");
+    
+        if (status === "ok") {
+          const target = email
+            ? `login.html?email=${encodeURIComponent(email)}`
+            : "/login.html";
+    
+          link.href = target;
+    
+          let t = 2;
+          const timer = setInterval(() => {
+            label.textContent = `Redirigiendo al inicio de sesión en ${t}…`;
+            t--;
+            if (t < 0) {
+              clearInterval(timer);
+              window.location.href = target;
+            }
+          }, 600);
+        } else {
+          label.textContent = "El enlace no es válido o expiró. Puedes solicitar uno nuevo.";
+          link.textContent = "Volver a revisar el correo";
+          link.href = "/check-email.html";
+        }
+  });
+</script>
+
+<svelte:head>
+<meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kiadez — Correo verificado</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</svelte:head>
+
+<div class="page-backgroundlogin">
+    <main class="auth-center">
+      <div class="auth-card auth-card--wide">
+        <h2 class="auth-title">Correo verificado</h2>
+
+        <div class="auth-message">
+          <p>Tu cuenta ha sido activada con éxito.</p>
+          <p class="muted" id="redirect-label">Redirigiendo al inicio de sesión…</p>
+        </div>
+
+        <div class="auth-actions">
+          <a id="login-link" href="/login.html" class="btn btn-primary">
+            Iniciar sesión
+          </a>
+        </div>
+
+        <div class="auth-brand">
+          <img src="logo.png" alt="Kiadez" />
+          <span>Kiadez</span>
+        </div>
+      </div>
+    </main>
+
+    <footer class="kiadez-footer">
+      <div class="footer-bottom">
+        © 2026 Kiadez — Una red social para cumplir deseos.
+      </div>
+    </footer>
+  </div>

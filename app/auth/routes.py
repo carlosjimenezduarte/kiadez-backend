@@ -34,12 +34,21 @@ from fastapi import Body
 from app.db.repositories.refresh_token_repository import RefreshTokenRepository
 from datetime import datetime, timedelta, timezone
 from app.core.config import settings
-from app.core.mailer import send_verification_email
+from app.core.mailer import send_verification_email, send_password_reset_email
+from app.core.password_reset import generate_password_reset_token, get_password_reset_expiry
 
 
 
 # Auth
-from .models import RegisterRequest, LoginRequest, TokenPair, UserPublic,  TwoFAVerifyRequest
+from .models import (
+    RegisterRequest,
+    LoginRequest,
+    TokenPair,
+    UserPublic,
+    TwoFAVerifyRequest,
+    PasswordResetRequest,
+    PasswordResetConfirm,
+)
 from app.core.security import (
     validate_password_policy,
     hash_password,
@@ -55,6 +64,7 @@ from app.core.email_verification import (
     get_email_verification_expiry,
 )
 from app.db.models.user import User
+from app.db.models.password_reset_token import PasswordResetToken
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")  # aunque login sea JSON, sirve para dependencia
@@ -512,3 +522,74 @@ def resend_verification(
         raise HTTPException(status_code=500, detail="No se pudo enviar el correo en este momento.")
 
     return {"message": "Listo. Si tu correo no estaba verificado, enviamos un enlace nuevo."}
+
+
+@router.post("/password-reset/request")
+def request_password_reset(
+    payload: PasswordResetRequest,
+    db: Session = Depends(get_db),
+):
+    email = payload.email.strip().lower()
+
+    # Respuesta genérica para evitar enumeración
+    generic = {"message": "Si el correo existe, enviaremos un enlace de recuperación."}
+
+    repo = UserRepository(db)
+    user = repo.get_user_by_email(email)
+    if not user or not user.is_active:
+        return generic
+
+    # limpiar tokens previos
+    db.execute(
+        delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
+    )
+
+    token = generate_password_reset_token()
+    reset = PasswordResetToken(
+        user_id=user.id,
+        token=token,
+        expires_at=get_password_reset_expiry(settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES),
+    )
+    db.add(reset)
+    db.commit()
+
+    try:
+        send_password_reset_email(to_email=user.email, token=token)
+    except Exception:
+        raise HTTPException(status_code=500, detail="No se pudo enviar el correo.")
+
+    return generic
+
+
+@router.post("/password-reset/confirm")
+def confirm_password_reset(
+    payload: PasswordResetConfirm,
+    db: Session = Depends(get_db),
+):
+    token = payload.token.strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="Token inválido.")
+
+    reset = (
+        db.query(PasswordResetToken)
+        .filter(PasswordResetToken.token == token)
+        .one_or_none()
+    )
+
+    if not reset or reset.is_used:
+        raise HTTPException(status_code=400, detail="Token inválido o usado.")
+
+    if reset.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Token expirado.")
+
+    repo = UserRepository(db)
+    user = repo.get_user_by_id(reset.user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=400, detail="Usuario inválido.")
+
+    validate_password_policy(payload.new_password)
+    user.password_hash = hash_password(payload.new_password)
+    reset.is_used = True
+
+    db.commit()
+    return {"reset": True}
