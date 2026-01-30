@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
 
   onMount(() => {
+    document.body.dataset.visitor = "false";
+
     const prefixInputs = document.querySelectorAll(".wish-prefix-input");
     
         prefixInputs.forEach((input) => {
@@ -54,8 +56,6 @@
   <title>Kiadez — Mis deseos públicos</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
-
-<svelte:body data-visitor="false" />
 
 <div class="page-background page-background-user public-wishes-background">
 
@@ -387,17 +387,19 @@
                 <label class="modal-label" for="personalWishMedia">Agregar imagen</label>
                 <input class="modal-input" id="personalWishMedia" type="file" accept="image/*" />
 
-                <label class="modal-label">¿Es un deseo acumulativo y abierto a los demás?</label>
-                <div class="wish-radio-group">
-                  <label class="wish-radio">
-                    <input type="radio" name="personalOpen" checked />
-                    Sí
-                  </label>
-                  <label class="wish-radio">
-                    <input type="radio" name="personalOpen" />
-                    No
-                  </label>
-                </div>
+                <fieldset class="wish-fieldset">
+                  <legend class="modal-label">¿Es un deseo acumulativo y abierto a los demás?</legend>
+                  <div class="wish-radio-group">
+                    <label class="wish-radio">
+                      <input type="radio" name="personalOpen" checked />
+                      Sí
+                    </label>
+                    <label class="wish-radio">
+                      <input type="radio" name="personalOpen" />
+                      No
+                    </label>
+                  </div>
+                </fieldset>
 
                 <div class="wish-form-actions">
                   <button class="btn btn-primary btn-compact btn-icon" type="button">
@@ -575,7 +577,7 @@
                       <label class="modal-label" for="guardianEmail">Email</label>
                       <input class="modal-input" id="guardianEmail" type="email" placeholder="correo@ejemplo.com" />
 
-                      <label class="modal-label">Evidencia</label>
+                      <div class="modal-label">Evidencia</div>
                       <div class="upload-row">
                         <label class="upload-btn" for="guardianEvidence">Adjuntar imagen o video</label>
                         <input id="guardianEvidence" type="file" accept="image/*,video/*" class="hidden" />

@@ -28,6 +28,8 @@
   };
 
   onMount(() => {
+    document.body.dataset.visitor = isVisitor ? 'true' : 'false';
+
     const forceConfirm = sessionStorage.getItem('star_pool_force_confirm') === '1';
     const confirmShown = sessionStorage.getItem('star_pool_confirm_shown') === '1';
 
@@ -53,8 +55,6 @@
   <title>Kiadez — Fondo Común de Estrellas</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
-
-<svelte:body data-visitor={isVisitor ? 'true' : 'false'} />
 
 <div class="page-background page-background-user star-pool-background">
   <main class="user-home">
@@ -316,8 +316,8 @@
     </div>
 
     <div class="star-modal-note">
-      Esta opción solo aparece para visitantes. Para simularlo, cambia <code>data-visitor</code> a <code>true</code> en
-      la etiqueta <code>body</code>.
+      Esta opción solo aparece para visitantes. Para simularlo, cambia <code>isVisitor</code> a <code>true</code> en el
+      script (eso actualiza <code>data-visitor</code> en <code>body</code>).
     </div>
   </div>
 </div>

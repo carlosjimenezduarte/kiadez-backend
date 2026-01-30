@@ -229,13 +229,13 @@
           </div>
 
           <div class="modal-body">
-            <label class="modal-label">Deseo 1</label>
+            <label class="modal-label" for="purposeInput1">Deseo 1</label>
             <input class="modal-input" id="purposeInput1" type="text" />
 
-            <label class="modal-label">Deseo 2</label>
+            <label class="modal-label" for="purposeInput2">Deseo 2</label>
             <input class="modal-input" id="purposeInput2" type="text" />
 
-            <label class="modal-label">Deseo 3</label>
+            <label class="modal-label" for="purposeInput3">Deseo 3</label>
             <input class="modal-input" id="purposeInput3" type="text" />
           </div>
 
@@ -437,6 +437,7 @@
             <div class="infobox-section">
               <div class="infobox-section-title">Información personal</div>
               <table class="infobox-table">
+                <tbody>
                 <tr data-field="birthname">
                   <th>Nombre de nacimiento</th>
                   <td><span data-value>Carlos Jiménez Duarte</span><span class="infobox-hidden" data-hidden
@@ -468,12 +469,14 @@
                   <td><span data-value>Melquíades, Kiadez, Saint Martin</span><span class="infobox-hidden" data-hidden
                       hidden>Prefiero no decirlo</span></td>
                 </tr>
+                </tbody>
               </table>
             </div>
 
             <div class="infobox-section">
               <div class="infobox-section-title">Características físicas</div>
               <table class="infobox-table">
+                <tbody>
                 <tr data-field="height">
                   <th>Altura</th>
                   <td><span data-value>1,80 m</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
@@ -494,12 +497,14 @@
                   <td><span data-value>Castaño</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
                       decirlo</span></td>
                 </tr>
+                </tbody>
               </table>
             </div>
 
             <div class="infobox-section">
               <div class="infobox-section-title">Educación</div>
               <table class="infobox-table">
+                <tbody>
                 <tr data-field="education">
                   <th>Educado en</th>
                   <td><span data-value>Colegio Calasanz; Universidad Pontificia Bolivariana; Politécnico
@@ -507,12 +512,14 @@
                       decirlo</span>
                   </td>
                 </tr>
+                </tbody>
               </table>
             </div>
 
             <div class="infobox-section">
               <div class="infobox-section-title">Información profesional</div>
               <table class="infobox-table">
+                <tbody>
                 <tr data-field="occupation">
                   <th>Ocupación</th>
                   <td><span data-value>Escritor, Ingeniero de Software, Artista Plástico Aficionado</span><span
@@ -523,12 +530,14 @@
                   <td><span data-value>2003 — presente</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
                       decirlo</span></td>
                 </tr>
+                </tbody>
               </table>
             </div>
 
             <div class="infobox-section">
               <div class="infobox-section-title">Distinciones</div>
               <table class="infobox-table">
+                <tbody>
                 <tr data-field="awards">
                   <th>Premio</th>
                   <td><span data-value>Wattys 2019 — Categoría Ciencia Ficción, La Guerra Solar I</span><span
@@ -539,12 +548,14 @@
                   <td><span data-value>Kiadez.com</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
                       decirlo</span></td>
                 </tr>
+                </tbody>
               </table>
             </div>
 
             <div class="infobox-section">
               <div class="infobox-section-title">Curiosidades</div>
               <table class="infobox-table">
+                <tbody>
                 <tr data-field="hero">
                   <th>Superhéroe favorito</th>
                   <td><span data-value>Batman</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
@@ -582,12 +593,14 @@
                       hidden>Prefiero
                       no decirlo</span></td>
                 </tr>
+                </tbody>
               </table>
             </div>
 
             <div class="infobox-section">
               <div class="infobox-section-title">Actividad en Kiadez.com</div>
               <table class="infobox-table">
+                <tbody>
                 <tr data-field="wishes_done">
                   <th>Deseos cumplidos</th>
                   <td><span data-value>20</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
@@ -606,6 +619,7 @@
                       no
                       decirlo</span></td>
                 </tr>
+                </tbody>
               </table>
             </div>
 

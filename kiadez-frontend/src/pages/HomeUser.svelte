@@ -552,13 +552,13 @@
     </div>
 
     <div class="modal-body">
-      <label class="modal-label">Deseo 1</label>
+      <label class="modal-label" for="purposeInput1">Deseo 1</label>
       <input class="modal-input" id="purposeInput1" type="text" />
 
-      <label class="modal-label">Deseo 2</label>
+      <label class="modal-label" for="purposeInput2">Deseo 2</label>
       <input class="modal-input" id="purposeInput2" type="text" />
 
-      <label class="modal-label">Deseo 3</label>
+      <label class="modal-label" for="purposeInput3">Deseo 3</label>
       <input class="modal-input" id="purposeInput3" type="text" />
     </div>
 

@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
 
   onMount(() => {
+    document.body.dataset.visitor = "false";
+
     const oracleCards = [
           {
             id: 1,
@@ -581,8 +583,6 @@
   <title>Kiadez — Oráculo</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
-
-<svelte:body data-visitor="false" />
 
 <div class="page-background page-background-user oracle-background">
 

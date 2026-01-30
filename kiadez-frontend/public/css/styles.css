@@ -2640,6 +2640,12 @@ body[data-visitor="true"] .visitor-only {
     flex-wrap: wrap;
 }
 
+.wish-fieldset {
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
 .wish-radio {
     display: flex;
     align-items: center;
@@ -3313,6 +3319,10 @@ body[data-visitor="true"] .visitor-only {
     min-height: 110px;
     cursor: pointer;
     outline: none;
+    border: none;
+    font: inherit;
+    color: inherit;
+    text-align: center;
 }
 
 .badge-figure img {

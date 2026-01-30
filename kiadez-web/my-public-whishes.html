@@ -79,111 +79,10 @@
                 Estética de portada y enlaces integrada. Ahora mostramos las categorías y los flujos de deseos.
               </p>
             </div>
-            <div class="public-wishes-tags">
-              <span class="panel-badge">7 categorías</span>
-              <span class="panel-badge">50 deseos personales</span>
-              <span class="panel-badge">20 deseos cooperativos</span>
-            </div>
+
           </header>
 
-          <!-- =========================
-           *  CATEGORIAS DE DESEOS
-           *  ========================= -->
-          <section class="panel wish-categories" aria-label="Categorías de deseos">
-            <div class="panel-head">
-              <h3 class="panel-title">Categorías de deseos</h3>
-              <span class="panel-badge">Cuadrícula 3x2 + 1</span>
-            </div>
 
-            <div class="wish-category-grid">
-              <article class="wish-category-card">
-                <div class="wish-category-icon">
-                  <img src="/css/icons/Espiritual.webp" alt="Deseos espirituales" />
-                </div>
-                <h4>Deseos Espirituales</h4>
-                <p>
-                  Deseos relacionados con el sentido de vida, la conciencia, la fe, la paz interior y el crecimiento
-                  espiritual. Ejemplo: perseverar en el hábito de la meditación, leer libros sobre espiritualidad,
-                  asistir a misa.
-                </p>
-              </article>
-
-              <article class="wish-category-card">
-                <div class="wish-category-icon">
-                  <img src="/css/icons/Material.webp" alt="Deseos materiales" />
-                </div>
-                <h4>Deseos Materiales</h4>
-                <p>
-                  Deseos vinculados a bienes, objetos o condiciones tangibles que mejoran la calidad de vida.
-                  Pueden involucrar recursos externos y, en algunos casos, la ayuda o participación de otras personas.
-                  Ejemplo: tener una cafetera nueva, un nuevo auto, una nueva computadora.
-                </p>
-              </article>
-
-              <article class="wish-category-card">
-                <div class="wish-category-icon">
-                  <img src="/css/icons/Monetario.webp" alt="Deseos monetarios" />
-                </div>
-                <h4>Deseos Monetarios</h4>
-                <p>
-                  Deseos relacionados exclusivamente con metas económicas personales. No pueden ser concedidos por otras
-                  personas y funcionan como objetivos de ahorro, disciplina y logro individual. Solo el propio usuario
-                  puede cumplirlos.
-                </p>
-              </article>
-
-              <article class="wish-category-card">
-                <div class="wish-category-icon">
-                  <img src="/css/icons/Profesional.webp" alt="Deseos profesionales" />
-                </div>
-                <h4>Deseos Profesionales</h4>
-                <p>
-                  Deseos asociados al desarrollo laboral, académico o creativo. Incluyen proyectos, estudios,
-                  reconocimiento, impacto profesional y crecimiento en la vocación personal. Ejemplo: estudiar
-                  arquitectura y graduarme de la Universidad Politécnico de Milán.
-                </p>
-              </article>
-
-              <article class="wish-category-card">
-                <div class="wish-category-icon">
-                  <img src="/css/icons/Salud.webp" alt="Deseos de salud y cuerpo" />
-                </div>
-                <h4>Deseos de Salud y Cuerpo</h4>
-                <p>
-                  Deseos enfocados en el bienestar físico, la energía vital, la recuperación y la relación consciente
-                  con el cuerpo. No sustituyen atención médica ni tratamientos profesionales. Ejemplo: mantener la
-                  disciplina de ejercitar tu cuerpo a diario, correr 1 km diario, alimentarte bien.
-                </p>
-              </article>
-
-              <article class="wish-category-card">
-                <div class="wish-category-icon">
-                  <img src="/css/icons/Relacional.webp" alt="Deseos relacionales" />
-                </div>
-                <h4>Deseos Relacionales</h4>
-                <p>
-                  Deseos relacionados con vínculos humanos: familia, pareja, amistades y comunidad. Incluyen encuentros,
-                  reconciliaciones, fortalecimiento de relaciones y construcción de lazos significativos. Ejemplo:
-                  tomarse una cerveza con Lars Ulrich, ir a un concierto con tu hermano, disfrutar de un día en familia
-                  en el Restaurante La Matriarca.
-                </p>
-              </article>
-
-              <article class="wish-category-card wish-category-wide">
-                <div class="wish-category-icon">
-                  <img src="/css/icons/Vivencial.webp" alt="Deseos vivenciales" />
-                </div>
-                <div>
-                  <h4>Deseos Vivenciales</h4>
-                  <p>
-                    Deseos orientados a experiencias, momentos únicos y vivencias significativas. No se definen por la
-                    posesión, sino por el hecho de vivir algo que deje huella en la memoria y la conciencia. Ejemplo:
-                    lanzarse en paracaídas, visitar Las Islas Maldivas, viajar en helicóptero.
-                  </p>
-                </div>
-              </article>
-            </div>
-          </section>
 
           <!-- =========================
            *  LISTAS DE DESEOS
@@ -192,209 +91,227 @@
             <article class="panel wish-list-panel">
               <div class="panel-head">
                 <h3 class="panel-title">Deseos personales</h3>
-                <span class="panel-badge">1 - 50</span>
+                <span class="panel-badge"><span id="personalWishCount">7</span> / 50</span>
               </div>
               <p class="panel-muted">
-                Lista numerada del 1 al 50. El botón con lámpara abre la configuración del deseo.
+                Lista numerada del 1 al 50. Empieza con 7 deseos. El botón (+) agrega nuevos deseos.
               </p>
               <ol class="wish-slot-list" id="personalWishList" data-total="50" aria-label="Deseos personales">
-                <li class="wish-slot is-filled">
-                  <div class="wish-slot-row">
-                    <div class="wish-slot-main">
-                      <div class="wish-slot-title">Deseo tener una nueva computadora</div>
-                      <div class="wish-slot-meta">
-                        <span class="wish-type-pill">Material</span>
-                        <span class="wish-meta-item">Imagen adjunta</span>
-                      </div>
-                    </div>
-                    <div class="wish-slot-actions">
-                      <button class="wish-icon-btn" type="button" title="Editar deseo">
-                        <img src="/css/icons/iconedit.webp" alt="Editar deseo" />
-                      </button>
-                      <button class="wish-icon-btn" type="button" title="Marcar como cumplido">
-                        <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo como cumplido" />
-                      </button>
-                      <button class="wish-icon-btn" type="button" title="Borrar deseo">
-                        <img src="/css/icons/icondelete.webp" alt="Borrar deseo" />
-                      </button>
-                    </div>
-                  </div>
-                </li>
               </ol>
+              <div class="wish-add-row">
+                <button class="wish-add-btn" id="personalWishAdd" type="button" title="Agregar deseo">
+                  <span class="wish-add-plus">+</span>
+                </button>
+              </div>
             </article>
 
             <article class="panel wish-list-panel">
               <div class="panel-head">
                 <h3 class="panel-title">Deseos cooperativos</h3>
-                <span class="panel-badge">1 - 20</span>
+                <span class="panel-badge">0 / 20</span>
               </div>
               <p class="panel-muted">
-                Lista numerada del 1 al 20. Los deseos cooperativos incluyen una invitación a participar.
+                Zona vacía hasta que el usuario configura un deseo cooperativo.
               </p>
-              <ol class="wish-slot-list" id="cooperativeWishList" data-total="20" aria-label="Deseos cooperativos">
-                <li class="wish-slot is-filled">
-                  <div class="wish-slot-row">
-                    <div class="wish-slot-main">
-                      <div class="wish-slot-title">
-                        Deseo nivelar a 50 personajes del videojuego Dofus, del servidor Tal Kasha, a nivel 200 en
-                        Anutropia
-                      </div>
-                      <div class="wish-slot-meta">
-                        <span class="wish-type-pill">Relacional</span>
-                        <span class="wish-meta-item">Imagen adjunta</span>
-                      </div>
-                      <div class="wish-slot-note">
-                        Este es un deseo cooperativo, así que puedes desear desde tu cuenta en la construcción de esta
-                        meta.
-                      </div>
-                    </div>
-                    <div class="wish-slot-actions">
-                      <button class="wish-icon-btn" type="button" title="Editar deseo">
-                        <img src="/css/icons/iconedit.webp" alt="Editar deseo" />
-                      </button>
-                      <button class="wish-icon-btn" type="button" title="Marcar como cumplido">
-                        <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo como cumplido" />
-                      </button>
-                      <button class="wish-icon-btn" type="button" title="Borrar deseo">
-                        <img src="/css/icons/icondelete.webp" alt="Borrar deseo" />
-                      </button>
-                    </div>
-                  </div>
-                </li>
+              <ol class="wish-slot-list" id="cooperativeWishList" data-total="0" aria-label="Deseos cooperativos">
               </ol>
             </article>
           </section>
 
-          <template id="wishEmptySlotTemplate">
-            <div class="wish-slot-row">
-              <button class="wish-add-btn" type="button" title="Agregar deseo">
-                <img src="/css/icons/iconlamp.webp" alt="Agregar deseo" />
+          <template id="wishLampSlotTemplate">
+            <div class="wish-slot-row wish-slot-row-empty">
+              <button class="wish-add-btn wish-lamp-btn" type="button" title="Agregar deseo">
+                <img class="wish-lamp-icon" src="/css/icons/iconlamp.webp" alt="Agregar deseo" />
               </button>
-              <span class="wish-add-label">Agregar deseo</span>
             </div>
           </template>
 
-          <!-- =========================
-           *  CONFIGURACION DEL DESEO
-           *  ========================= -->
-          <section class="panel wish-config" aria-label="Configuración del deseo">
-            <div class="panel-head">
-              <h3 class="panel-title">Configuración del deseo</h3>
-              <span class="panel-badge">Personal / Cooperativo</span>
-            </div>
-            <p class="panel-muted">
-              Al presionar el botón con la lámpara (+) se abre esta interfaz. Incluye los botones de tipo de deseo,
-              la descripción, la carga de imagen y el guardado.
-            </p>
-
-            <div class="wish-config-toggle">
-              <button class="btn btn-outline btn-compact btn-icon" type="button">
-                <img src="/css/icons/iconpersonal.webp" alt="Deseo personal" />
-                Deseo personal
-              </button>
-              <button class="btn btn-outline btn-compact btn-icon" type="button">
-                <img src="/css/icons/iconcooperative.webp" alt="Deseo cooperativo" />
-                Deseo cooperativo
-              </button>
-            </div>
-
-            <div class="wish-config-grid">
-              <article class="wish-config-card">
-                <div class="wish-config-head">
-                  <div class="wish-config-icon">
+          <template id="wishChoiceInlineTemplate">
+            <div class="wish-slot-row wish-slot-row-choice">
+              <div class="wish-choice-inline">
+                <button class="wish-choice-card wish-choice-btn" type="button" data-choice="personal">
+                  <span class="wish-config-icon">
                     <img src="/css/icons/iconpersonal.webp" alt="Deseo personal" />
-                  </div>
-                  <div>
-                    <h4>Flujo del deseo personal</h4>
-                    <p class="panel-muted">Siempre inicia con la palabra “Deseo…”.</p>
-                  </div>
-                </div>
-
-                <label class="modal-label" for="personalWishText">Descripción del deseo</label>
-                <textarea class="modal-textarea wish-prefix-input" id="personalWishText" rows="3"
-                  data-prefix="Deseo ">Deseo tener una nueva computadora</textarea>
-                <div class="wish-helper">
-                  El cajón de texto acepta texto libre, números y símbolos. La palabra “Deseo” no se borra.
-                </div>
-
-                <label class="modal-label" for="personalWishType">Tipo de deseo</label>
-                <select class="modal-select" id="personalWishType">
-                  <option>Espiritual</option>
-                  <option>Material</option>
-                  <option>Monetario</option>
-                  <option>Profesional</option>
-                  <option>Salud y cuerpo</option>
-                  <option>Relacional</option>
-                  <option>Vivencial</option>
-                </select>
-
-                <div class="wish-warning">
-                  <span class="wish-warning-icon">!</span>
-                  <span>
-                    Los deseos monetarios no pueden ser concedidos por otras personas. Funcionan como objetivos de
-                    ahorro, disciplina y logro individual.
                   </span>
-                </div>
-
-                <label class="modal-label" for="personalWishMedia">Agregar imagen</label>
-                <input class="modal-input" id="personalWishMedia" type="file" accept="image/*" />
-
-                <label class="modal-label">¿Es un deseo acumulativo y abierto a los demás?</label>
-                <div class="wish-radio-group">
-                  <label class="wish-radio">
-                    <input type="radio" name="personalOpen" checked />
-                    Sí
-                  </label>
-                  <label class="wish-radio">
-                    <input type="radio" name="personalOpen" />
-                    No
-                  </label>
-                </div>
-
-                <div class="wish-form-actions">
-                  <button class="btn btn-primary btn-compact btn-icon" type="button">
-                    <img src="/css/icons/iconsave.webp" alt="Guardar deseo" />
-                    Guardar deseo
-                  </button>
-                </div>
-              </article>
-
-              <article class="wish-config-card">
-                <div class="wish-config-head">
-                  <div class="wish-config-icon">
+                  <span>¿Es un deseo individual?</span>
+                </button>
+                <button class="wish-choice-card wish-choice-btn" type="button" data-choice="cooperative">
+                  <span class="wish-config-icon">
                     <img src="/css/icons/iconcooperative.webp" alt="Deseo cooperativo" />
-                  </div>
-                  <div>
-                    <h4>Flujo del deseo cooperativo</h4>
-                    <p class="panel-muted">Incluye participantes y un texto guía para completar.</p>
-                  </div>
-                </div>
-
-                <label class="modal-label" for="cooperativeWishText">Descripción del deseo cooperativo</label>
-                <textarea class="modal-textarea wish-prefix-input" id="cooperativeWishText" rows="3"
-                  data-prefix="Deseo ">Deseo nivelar a 50 personajes del videojuego Dofus, del servidor Tal Kasha, a nivel 200 en Anutropia</textarea>
-
-                <label class="modal-label" for="cooperativeWishCount">Número máximo de personas participantes</label>
-                <input class="modal-input" id="cooperativeWishCount" type="number" min="1" value="50" />
-
-                <label class="modal-label" for="cooperativeWishTemplate">Configuración del deseo abierto</label>
-                <textarea class="modal-textarea" id="cooperativeWishTemplate" rows="3">Deseo que el Team Guardian nivele, en el servidor Tal Kasha, a mi personaje *marca aquí el nombre de tu personaje*</textarea>
-                <div class="wish-helper">
-                  Siempre deja una marca final que deba rellenarse con convicción por quien participa.
-                </div>
-
-                <label class="modal-label" for="cooperativeWishMedia">Agregar imagen</label>
-                <input class="modal-input" id="cooperativeWishMedia" type="file" accept="image/*" />
-
-                <div class="wish-form-actions">
-                  <button class="btn btn-primary btn-compact btn-icon" type="button">
-                    <img src="/css/icons/iconsave.webp" alt="Guardar deseo cooperativo" />
-                    Guardar deseo cooperativo
-                  </button>
-                </div>
-              </article>
+                  </span>
+                  <span>¿Es un deseo cooperativo?</span>
+                </button>
+                <button class="wish-choice-card wish-choice-cancel" type="button" aria-label="Cancelar">
+                  <span class="wish-choice-cancel-icon">✕</span>
+                </button>
+              </div>
             </div>
-          </section>
+          </template>
+
+          <div class="modal-overlay hidden" id="personalWishModal" aria-hidden="true">
+            <div class="modal modal-wide personal-wish-modal" role="dialog" aria-modal="true"
+              aria-label="Configurar deseo personal">
+              <div class="modal-head">
+                <h3>Configurar deseo personal</h3>
+                <button class="modal-close" type="button" id="closePersonalWishModal">✕</button>
+              </div>
+              <div class="modal-body personal-wish-body">
+
+
+                <div class="wish-modal-grid">
+                  <div class="wish-modal-col">
+                    <div class="wish-config-icon personal-wish-hero">
+                      <img src="/css/icons/iconpersonal.webp" alt="Deseo personal" />
+                    </div>
+                    <h2 class="modal-label modal-label-center">Descripción del deseo</h2>
+                    <label class="modal-label hidden" for="personalWishText">Descripción del deseo</label>
+                    <textarea class="modal-textarea wish-prefix-input wish-textarea-compact" id="personalWishText"
+                      rows="3" maxlength="80" data-prefix="Deseo " data-counter="personalWishCounter"></textarea>
+                    <div class="wish-counter" id="personalWishCounter" aria-live="polite">0/80</div>
+                    <div class="wish-error" id="personalWishError" role="alert">No has descrito tu deseo</div>
+                    <div class="wish-warning">
+                      <span class="wish-warning-icon">!</span>
+                      <span id="personalWishTypeHint">
+                        Deseos relacionados con el sentido de vida, la conciencia, la fe, la paz interior y el
+                        crecimiento
+                        espiritual. Ejemplo: perseverar en el hábito de la meditación, leer libros sobre espiritualidad,
+                        asistir a misa.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="wish-modal-col">
+                    <fieldset class="wish-type-fieldset">
+
+                      <div class="wish-type-selected">
+                        <img id="personalWishTypeIcon" src="/css/icons/Espiritual.webp" alt="Espiritual" />
+                      </div>
+                      <h2 class="modal-label modal-label-center">Tipo de deseo</h2>
+                      <div class="wish-type-grid">
+                        <label class="wish-type-option">
+                          <input type="radio" name="personalWishType" value="Espiritual" checked />
+                          <span class="wish-type-visual">
+                            <span>Espiritual</span>
+                          </span>
+                        </label>
+                        <label class="wish-type-option">
+                          <input type="radio" name="personalWishType" value="Material" />
+                          <span class="wish-type-visual">
+                            <span>Material</span>
+                          </span>
+                        </label>
+                        <label class="wish-type-option">
+                          <input type="radio" name="personalWishType" value="Monetario" />
+                          <span class="wish-type-visual">
+                            <span>Monetario</span>
+                          </span>
+                        </label>
+                        <label class="wish-type-option">
+                          <input type="radio" name="personalWishType" value="Profesional" />
+                          <span class="wish-type-visual">
+                            <span>Profesional</span>
+                          </span>
+                        </label>
+                        <label class="wish-type-option">
+                          <input type="radio" name="personalWishType" value="Salud y cuerpo" />
+                          <span class="wish-type-visual">
+                            <span>Salud y cuerpo</span>
+                          </span>
+                        </label>
+                        <label class="wish-type-option">
+                          <input type="radio" name="personalWishType" value="Relacional" />
+                          <span class="wish-type-visual">
+                            <span>Relacional</span>
+                          </span>
+                        </label>
+                        <label class="wish-type-option">
+                          <input type="radio" name="personalWishType" value="Vivencial" />
+                          <span class="wish-type-visual">
+                            <span>Vivencial</span>
+                          </span>
+                        </label>
+                      </div>
+                    </fieldset>
+
+
+                  </div>
+
+                  <div class="wish-modal-col">
+                    <h2 class="modal-label modal-label-center">Agregar imagen</h2>
+                    <label class="modal-label hidden" for="personalWishMedia">Agregar imagen</label>
+                    <input class="modal-input hidden" id="personalWishMedia" type="file" accept="image/*" />
+                    <div class="wish-image-preview" id="personalWishPreview" aria-live="polite">
+                      <label class="wish-image-btn" for="personalWishMedia" aria-label="Seleccionar imagen">+</label>
+                      <div class="wish-preview-content">
+                        <span class="wish-preview-placeholder">Seleccionar imagen</span>
+                        <span class="wish-preview-name" id="personalWishFileName">Sin imagen seleccionada</span>
+                      </div>
+                    </div>
+                    <div class="wish-config-icon personal-wish-hero">
+                      <img src="/css/icons/iconsave.webp" alt="guardar" />
+                    </div>
+                    <div class="wish-form-actions wish-form-actions-center">
+
+
+                      <br>
+                      <button class="btn btn-primary btn-compact btn-icon" type="button" id="confirmPersonalWish">
+                        ¡Confirmar mi deseo!
+                      </button>
+
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-overlay hidden" id="cooperativeWishModal" aria-hidden="true">
+            <div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="Configurar deseo cooperativo">
+              <div class="modal-head">
+                <h3>Configurar deseo cooperativo</h3>
+                <button class="modal-close" type="button" id="closeCooperativeWishModal">✕</button>
+              </div>
+              <div class="modal-body">
+                <article class="wish-config-card">
+                  <div class="wish-config-head">
+                    <div class="wish-config-icon">
+                      <img src="/css/icons/iconcooperative.webp" alt="Deseo cooperativo" />
+                    </div>
+                    <div>
+                      <h4>Flujo del deseo cooperativo</h4>
+                      <p class="panel-muted">Incluye participantes y un texto guía para completar.</p>
+                    </div>
+                  </div>
+
+                  <label class="modal-label" for="cooperativeWishText">Descripción del deseo cooperativo</label>
+                  <textarea class="modal-textarea wish-prefix-input" id="cooperativeWishText" rows="3"
+                    data-prefix="Deseo ">Deseo nivelar a 50 personajes del videojuego Dofus, del servidor Tal Kasha, a nivel 200 en Anutropia</textarea>
+
+                  <label class="modal-label" for="cooperativeWishCount">Número máximo de personas participantes</label>
+                  <input class="modal-input" id="cooperativeWishCount" type="number" min="1" value="50" />
+
+                  <label class="modal-label" for="cooperativeWishTemplate">Configuración del deseo abierto</label>
+                  <textarea class="modal-textarea" id="cooperativeWishTemplate"
+                    rows="3">Deseo que el Team Guardian nivele, en el servidor Tal Kasha, a mi personaje *marca aquí el nombre de tu personaje*</textarea>
+                  <div class="wish-helper">
+                    Siempre deja una marca final que deba rellenarse con convicción por quien participa.
+                  </div>
+
+                  <label class="modal-label" for="cooperativeWishMedia">Agregar imagen</label>
+                  <input class="modal-input" id="cooperativeWishMedia" type="file" accept="image/*" />
+
+                  <div class="wish-form-actions">
+                    <button class="btn btn-primary btn-compact btn-icon" type="button">
+                      <img src="/css/icons/iconsave.webp" alt="Guardar deseo cooperativo" />
+                      Guardar deseo cooperativo
+                    </button>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </div>
+
+
 
           <!-- =========================
            *  ACCIONES Y MODALES
@@ -555,8 +472,7 @@
                         <strong>*marca aquí el nombre de tu personaje*</strong>”
                       </div>
                       <label class="modal-label" for="cooperativeCharacter">Nombre del personaje</label>
-                      <input class="modal-input" id="cooperativeCharacter" type="text"
-                        placeholder="Ej: Zenejim" />
+                      <input class="modal-input" id="cooperativeCharacter" type="text" placeholder="Ej: Zenejim" />
                     </div>
                     <div class="modal-actions">
                       <button class="btn btn-primary btn-compact" type="button">Ayudar a cumplir este deseo</button>
@@ -649,9 +565,28 @@
 
     prefixInputs.forEach((input) => {
       const prefix = input.dataset.prefix || "Deseo ";
+      const counterId = input.dataset.counter;
+      const counterEl = counterId ? document.getElementById(counterId) : null;
+      const maxLength = input.maxLength > 0 ? input.maxLength : null;
+
+      const clampToMax = () => {
+        if (maxLength && input.value.length > maxLength) {
+          input.value = input.value.slice(0, maxLength);
+        }
+      };
+
+      const updateCounter = () => {
+        if (!counterEl) return;
+        const current = input.value.length;
+        const limit = maxLength || current;
+        counterEl.textContent = `${current}/${limit}`;
+      };
+
       if (!input.value.startsWith(prefix)) {
         input.value = `${prefix}${input.value}`;
       }
+      clampToMax();
+      updateCounter();
 
       const ensurePrefix = () => {
         if (!input.value.startsWith(prefix)) {
@@ -661,6 +596,8 @@
         if (input.value.length < prefix.length) {
           input.value = prefix;
         }
+        clampToMax();
+        updateCounter();
       };
 
       input.addEventListener("input", ensurePrefix);
@@ -674,20 +611,384 @@
       });
     });
 
-    const emptySlotTemplate = document.getElementById("wishEmptySlotTemplate");
+    const lampSlotTemplate = document.getElementById("wishLampSlotTemplate");
+    const choiceInlineTemplate = document.getElementById("wishChoiceInlineTemplate");
+    const personalWishList = document.getElementById("personalWishList");
+    const personalWishAdd = document.getElementById("personalWishAdd");
+    const personalWishCount = document.getElementById("personalWishCount");
+    const personalWishModal = document.getElementById("personalWishModal");
+    const closePersonalWishModal = document.getElementById("closePersonalWishModal");
+    const cooperativeWishModal = document.getElementById("cooperativeWishModal");
+    const closeCooperativeWishModal = document.getElementById("closeCooperativeWishModal");
+    const personalWishText = document.getElementById("personalWishText");
+    const personalWishError = document.getElementById("personalWishError");
+    const confirmPersonalWish = document.getElementById("confirmPersonalWish");
+    const personalWishMedia = document.getElementById("personalWishMedia");
+    const personalWishPreview = document.getElementById("personalWishPreview");
+    const personalWishFileName = document.getElementById("personalWishFileName");
+    const personalWishTypeIcon = document.getElementById("personalWishTypeIcon");
+    const personalWishTypeInputs = document.querySelectorAll('input[name="personalWishType"]');
+    const personalWishTypeHint = document.getElementById("personalWishTypeHint");
+    const personalMax = 50;
+    const personalMin = 7;
+    let personalTotal = 0;
+    let personalPreviewUrl = null;
+    let personalPreviewImage = null;
+    let activePersonalSlot = null;
 
-    document.querySelectorAll(".wish-slot-list[data-total]").forEach((list) => {
-      const total = Number.parseInt(list.dataset.total || "0", 10);
-      const current = list.querySelectorAll("li").length;
-      if (!emptySlotTemplate || Number.isNaN(total)) return;
+    const addLampSlot = () => {
+      if (!lampSlotTemplate || !personalWishList) return;
+      if (personalTotal >= personalMax) return;
 
-      for (let i = current; i < total; i += 1) {
-        const li = document.createElement("li");
-        li.className = "wish-slot is-empty";
-        li.appendChild(emptySlotTemplate.content.cloneNode(true));
-        list.appendChild(li);
+      const li = document.createElement("li");
+      li.className = "wish-slot is-empty";
+      li.appendChild(lampSlotTemplate.content.cloneNode(true));
+      personalWishList.appendChild(li);
+      personalTotal += 1;
+
+      if (personalWishCount) {
+        personalWishCount.textContent = `${personalTotal}`;
       }
+
+      if (personalWishAdd) {
+        personalWishAdd.disabled = personalTotal >= personalMax;
+      }
+    };
+
+    for (let i = 0; i < personalMin; i += 1) {
+      addLampSlot();
+    }
+
+    const updateModalScrollLock = () => {
+      const hasOpenModal = document.querySelector(".modal-overlay:not(.hidden)");
+      document.body.classList.toggle("modal-open", Boolean(hasOpenModal));
+    };
+
+    const openPersonalWishModal = () => {
+      if (!personalWishModal) return;
+      personalWishModal.classList.remove("hidden");
+      personalWishModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+      if (personalWishError) {
+        personalWishError.classList.remove("is-visible");
+      }
+    };
+
+    const closePersonalWishModalFn = () => {
+      if (!personalWishModal) return;
+      personalWishModal.classList.add("hidden");
+      personalWishModal.setAttribute("aria-hidden", "true");
+      updateModalScrollLock();
+    };
+
+    const openCooperativeWishModal = () => {
+      if (!cooperativeWishModal) return;
+      cooperativeWishModal.classList.remove("hidden");
+      cooperativeWishModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+    };
+
+    const closeCooperativeWishModalFn = () => {
+      if (!cooperativeWishModal) return;
+      cooperativeWishModal.classList.add("hidden");
+      cooperativeWishModal.setAttribute("aria-hidden", "true");
+      updateModalScrollLock();
+    };
+
+    if (closePersonalWishModal) {
+      closePersonalWishModal.addEventListener("click", closePersonalWishModalFn);
+    }
+
+    if (personalWishModal) {
+      personalWishModal.addEventListener("click", (event) => {
+        if (event.target === personalWishModal) closePersonalWishModalFn();
+      });
+    }
+
+    if (closeCooperativeWishModal) {
+      closeCooperativeWishModal.addEventListener("click", closeCooperativeWishModalFn);
+    }
+
+    if (cooperativeWishModal) {
+      cooperativeWishModal.addEventListener("click", (event) => {
+        if (event.target === cooperativeWishModal) closeCooperativeWishModalFn();
+      });
+    }
+
+    if (personalWishAdd) {
+      personalWishAdd.addEventListener("click", () => {
+        addLampSlot();
+      });
+    }
+
+    const updatePersonalPreview = (file) => {
+      if (!personalWishPreview) return;
+      const previewPlaceholder = personalWishPreview.querySelector(".wish-preview-placeholder");
+
+      if (personalPreviewUrl) {
+        URL.revokeObjectURL(personalPreviewUrl);
+        personalPreviewUrl = null;
+      }
+
+      if (!file) {
+        personalWishPreview.classList.remove("has-image");
+        if (personalPreviewImage) {
+          personalPreviewImage.remove();
+          personalPreviewImage = null;
+        }
+        if (previewPlaceholder) {
+          previewPlaceholder.textContent = "Seleccionar imagen";
+        }
+        if (personalWishFileName) {
+          personalWishFileName.textContent = "Sin imagen seleccionada";
+        }
+        return;
+      }
+
+      personalPreviewUrl = URL.createObjectURL(file);
+      personalWishPreview.classList.add("has-image");
+      if (!personalPreviewImage) {
+        personalPreviewImage = document.createElement("img");
+        personalPreviewImage.className = "wish-preview-image";
+        personalPreviewImage.alt = "Vista previa de la imagen seleccionada";
+        personalWishPreview.insertBefore(personalPreviewImage, personalWishPreview.firstChild);
+      }
+      personalPreviewImage.src = personalPreviewUrl;
+      if (previewPlaceholder) {
+        previewPlaceholder.textContent = "Imagen seleccionada";
+      }
+      if (personalWishFileName) {
+        personalWishFileName.textContent = file.name;
+      }
+    };
+
+    if (personalWishMedia) {
+      personalWishMedia.addEventListener("change", () => {
+        const file = personalWishMedia.files && personalWishMedia.files[0];
+        updatePersonalPreview(file || null);
+      });
+    }
+
+    const getPersonalWishDescription = () => {
+      if (!personalWishText) return "";
+      const prefix = personalWishText.dataset.prefix || "";
+      const value = personalWishText.value || "";
+      if (prefix && value.startsWith(prefix)) {
+        return value.slice(prefix.length).trim();
+      }
+      return value.trim();
+    };
+
+    const isPersonalWishValid = () => getPersonalWishDescription().length > 0;
+
+    const setPersonalWishError = (show) => {
+      if (!personalWishError) return;
+      personalWishError.classList.toggle("is-visible", show);
+    };
+
+    if (personalWishText) {
+      personalWishText.addEventListener("input", () => {
+        setPersonalWishError(!isPersonalWishValid());
+      });
+    }
+
+    const createWishActionBtn = (src, label) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "wish-icon-btn";
+      button.title = label;
+      const img = document.createElement("img");
+      img.src = src;
+      img.alt = label;
+      button.appendChild(img);
+      return button;
+    };
+
+    const renderPersonalWishSlot = (slot, description, imageUrl) => {
+      if (!slot) return;
+      if (slot.dataset.imageUrl) {
+        URL.revokeObjectURL(slot.dataset.imageUrl);
+        delete slot.dataset.imageUrl;
+      }
+
+      slot.classList.remove("is-empty", "is-choosing");
+      slot.classList.add("is-filled");
+      slot.innerHTML = "";
+
+      const row = document.createElement("div");
+      row.className = "wish-slot-row";
+
+      const body = document.createElement("div");
+      body.className = "wish-slot-body";
+
+      const leftCol = document.createElement("div");
+      leftCol.className = "wish-slot-left";
+
+      const header = document.createElement("div");
+      header.className = "wish-slot-header";
+
+      const selectedType = Array.from(personalWishTypeInputs).find((input) => input.checked)?.value || "Espiritual";
+      const categoryIconSrc = personalTypeIconMap[selectedType] || personalTypeIconMap["Espiritual"];
+      const categoryIcon = document.createElement("img");
+      categoryIcon.className = "wish-slot-category-icon";
+      categoryIcon.src = categoryIconSrc;
+      categoryIcon.alt = selectedType;
+      header.appendChild(categoryIcon);
+
+      const title = document.createElement("div");
+      title.className = "wish-slot-title";
+      title.textContent = description;
+      header.appendChild(document.createElement("br"));
+      header.appendChild(title);
+
+      leftCol.appendChild(header);
+
+      const actions = document.createElement("div");
+      actions.className = "wish-slot-actions wish-slot-actions-inline";
+      actions.appendChild(createWishActionBtn("/css/icons/iconedit.webp", "Editar deseo"));
+      actions.appendChild(createWishActionBtn("/css/icons/iconfulfill.webp", "Marcar como cumplido"));
+      actions.appendChild(createWishActionBtn("/css/icons/icondelete.webp", "Borrar deseo"));
+      leftCol.appendChild(actions);
+      body.appendChild(leftCol);
+
+      if (imageUrl) {
+        const imageWrap = document.createElement("div");
+        imageWrap.className = "wish-slot-image-wrap";
+        const img = document.createElement("img");
+        img.className = "wish-slot-image";
+        img.src = imageUrl;
+        img.alt = "Imagen del deseo";
+        imageWrap.appendChild(img);
+        body.appendChild(imageWrap);
+        slot.dataset.imageUrl = imageUrl;
+      } else {
+        body.classList.add("single");
+      }
+
+      row.appendChild(body);
+      slot.appendChild(row);
+    };
+
+    const resetPersonalWishForm = () => {
+      if (personalWishText) {
+        const prefix = personalWishText.dataset.prefix || "Deseo ";
+        personalWishText.value = prefix;
+        personalWishText.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (personalWishMedia) {
+        personalWishMedia.value = "";
+      }
+      updatePersonalPreview(null);
+      setPersonalWishError(false);
+    };
+
+    const personalTypeIconMap = {
+      "Espiritual": "/css/icons/Espiritual.webp",
+      "Material": "/css/icons/Material.webp",
+      "Monetario": "/css/icons/Monetario.webp",
+      "Profesional": "/css/icons/Profesional.webp",
+      "Salud y cuerpo": "/css/icons/Salud.webp",
+      "Relacional": "/css/icons/Relacional.webp",
+      "Vivencial": "/css/icons/Vivencial.webp"
+    };
+
+    const personalTypeHintMap = {
+      "Espiritual": "Deseos relacionados con el sentido de vida, la conciencia, la fe, la paz interior y el crecimiento espiritual. Ejemplo: perseverar en el hábito de la meditación, leer libros sobre espiritualidad, asistir a misa.",
+      "Material": "Deseos vinculados a bienes, objetos o condiciones tangibles que mejoran la calidad de vida. Pueden involucrar recursos externos y, en algunos casos, la ayuda o participación de otras personas. Ejemplo: tener una cafetera nueva, un nuevo auto, una nueva computadora.",
+      "Monetario": "Deseos relacionados exclusivamente con metas económicas personales. No pueden ser concedidos por otras personas y funcionan como objetivos de ahorro, disciplina y logro individual. Solo el propio usuario puede cumplirlos.",
+      "Profesional": "Deseos asociados al desarrollo laboral, académico o creativo. Incluyen proyectos, estudios, reconocimiento, impacto profesional y crecimiento en la vocación personal. Ejemplo: estudiar arquitectura y graduarme de la Universidad Politécnico de Milán.",
+      "Salud y cuerpo": "Deseos enfocados en el bienestar físico, la energía vital, la recuperación y la relación consciente con el cuerpo. No sustituyen atención médica ni tratamientos profesionales. Ejemplo: mantener la disciplina de ejercitar tu cuerpo a diario, correr 1 km diario, alimentarte bien.",
+      "Relacional": "Deseos relacionados con vínculos humanos: familia, pareja, amistades y comunidad. Incluyen encuentros, reconciliaciones, fortalecimiento de relaciones y construcción de lazos significativos. Ejemplo: tomarse una cerveza con Lars Ulrich, ir a un concierto con tu hermano, disfrutar de un día en familia en el Restaurante La Matriarca.",
+      "Vivencial": "Deseos orientados a experiencias, momentos únicos y vivencias significativas. No se definen por la posesión, sino por el hecho de vivir algo que deje huella en la memoria y la conciencia. Ejemplo: lanzarse en paracaídas, visitar Las Islas Maldivas, viajar en helicóptero."
+    };
+
+    const syncPersonalTypeIcon = (value) => {
+      if (!personalWishTypeIcon) return;
+      const src = personalTypeIconMap[value] || personalTypeIconMap["Espiritual"];
+      personalWishTypeIcon.src = src;
+      personalWishTypeIcon.alt = value;
+    };
+
+    const syncPersonalTypeHint = (value) => {
+      if (!personalWishTypeHint) return;
+      const hint = personalTypeHintMap[value] || personalTypeHintMap["Espiritual"];
+      personalWishTypeHint.textContent = hint;
+    };
+
+    personalWishTypeInputs.forEach((input) => {
+      input.addEventListener("change", () => {
+        if (input.checked) {
+          syncPersonalTypeIcon(input.value);
+          syncPersonalTypeHint(input.value);
+        }
+      });
     });
+
+    const checkedInput = Array.from(personalWishTypeInputs).find((input) => input.checked);
+    if (checkedInput) {
+      syncPersonalTypeIcon(checkedInput.value);
+      syncPersonalTypeHint(checkedInput.value);
+    }
+
+    const handleConfirmPersonalWish = () => {
+      if (!activePersonalSlot) return;
+      if (!personalWishText) return;
+      if (!isPersonalWishValid()) {
+        setPersonalWishError(true);
+        return;
+      }
+
+      const description = personalWishText.value.trim();
+      const file = personalWishMedia && personalWishMedia.files ? personalWishMedia.files[0] : null;
+      const imageUrl = file ? URL.createObjectURL(file) : null;
+
+      renderPersonalWishSlot(activePersonalSlot, description, imageUrl);
+      closePersonalWishModalFn();
+      resetPersonalWishForm();
+      activePersonalSlot = null;
+    };
+
+    if (confirmPersonalWish) {
+      confirmPersonalWish.addEventListener("click", handleConfirmPersonalWish);
+    }
+
+    if (personalWishList) {
+      personalWishList.addEventListener("click", (event) => {
+        const lampBtn = event.target.closest(".wish-lamp-btn");
+        const cancelBtn = event.target.closest(".wish-choice-cancel");
+        const choiceBtn = event.target.closest(".wish-choice-btn");
+
+        if (cancelBtn) {
+          const slot = cancelBtn.closest(".wish-slot");
+          if (!slot || !lampSlotTemplate) return;
+          slot.classList.remove("is-choosing");
+          slot.innerHTML = "";
+          slot.appendChild(lampSlotTemplate.content.cloneNode(true));
+          activePersonalSlot = null;
+          return;
+        }
+
+        if (choiceBtn) {
+          const slot = choiceBtn.closest(".wish-slot");
+          if (choiceBtn.dataset.choice === "personal") {
+            activePersonalSlot = slot;
+            openPersonalWishModal();
+          } else if (choiceBtn.dataset.choice === "cooperative") {
+            activePersonalSlot = null;
+            openCooperativeWishModal();
+          }
+          return;
+        }
+
+        if (!lampBtn) return;
+        const slot = lampBtn.closest(".wish-slot");
+        if (!slot || !choiceInlineTemplate) return;
+        if (slot.classList.contains("is-choosing")) return;
+        slot.classList.add("is-choosing");
+        slot.innerHTML = "";
+        slot.appendChild(choiceInlineTemplate.content.cloneNode(true));
+      });
+    }
   </script>
 </body>
 

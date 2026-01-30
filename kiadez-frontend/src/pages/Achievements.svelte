@@ -136,10 +136,10 @@
               <h4 class="badge-subtitle">I. Primer contacto con la luz</h4>
               <div class="badge-grid">
                 <div class="badge-item is-unlocked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star1/1a.webp" alt="Insignia Alumbramiento" />
                     <span class="badge-label">Alumbramiento</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Alumbramiento</div>
                     <div class="badge-desc">Has alcanzado 1 estrella por tus publicaciones</div>
@@ -147,10 +147,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star1/1b.webp" alt="Insignia Estelar" />
                     <span class="badge-label">Estelar</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Estelar</div>
                     <div class="badge-desc">Has alcanzado 5 estrellas por tus publicaciones</div>
@@ -158,10 +158,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star1/1c.webp" alt="Insignia Astral" />
                     <span class="badge-label">Astral</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Astral</div>
                     <div class="badge-desc">Has alcanzado 10 estrellas por tus publicaciones</div>
@@ -169,10 +169,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star1/1d.webp" alt="Insignia Coleccionista de Estrellas" />
                     <span class="badge-label">Coleccionista de Estrellas</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Coleccionista de Estrellas</div>
                     <div class="badge-desc">Has alcanzado 30 estrellas por tus publicaciones</div>
@@ -180,10 +180,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star1/1e.webp" alt="Insignia Astrónomo" />
                     <span class="badge-label">Astrónomo</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Astrónomo</div>
                     <div class="badge-desc">Has alcanzado 100 estrellas por tus publicaciones</div>
@@ -196,10 +196,10 @@
               <h4 class="badge-subtitle">II. Observador del firmamento</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star2/2a.webp" alt="Insignia Cartógrafo del Cielo" />
                     <span class="badge-label">Cartógrafo del Cielo</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Cartógrafo del Cielo</div>
                     <div class="badge-desc">Has alcanzado 200 estrellas por tus publicaciones</div>
@@ -207,10 +207,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star2/2b.webp" alt="Insignia Vigilante del Firmamento" />
                     <span class="badge-label">Vigilante del Firmamento</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Vigilante del Firmamento</div>
                     <div class="badge-desc">Has alcanzado 300 estrellas por tus publicaciones</div>
@@ -218,10 +218,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star2/2c.webp" alt="Insignia Tejedor de Constelaciones" />
                     <span class="badge-label">Tejedor de Constelaciones</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Tejedor de Constelaciones</div>
                     <div class="badge-desc">Has alcanzado 500 estrellas por tus publicaciones</div>
@@ -229,10 +229,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star2/2d.webp" alt="Insignia Cronista Celeste" />
                     <span class="badge-label">Cronista Celeste</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Cronista Celeste</div>
                     <div class="badge-desc">Has alcanzado 800 estrellas por tus publicaciones</div>
@@ -240,10 +240,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star2/2e.webp" alt="Insignia Intérprete de las Estrellas" />
                     <span class="badge-label">Intérprete de las Estrellas</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Intérprete de las Estrellas</div>
                     <div class="badge-desc">Has alcanzado 1.000 estrellas por tus publicaciones</div>
@@ -256,10 +256,10 @@
               <h4 class="badge-subtitle">III. Dominio celeste</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star3/3a.webp" alt="Insignia Arquitecto de Constelaciones" />
                     <span class="badge-label">Arquitecto de Constelaciones</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Arquitecto de Constelaciones</div>
                     <div class="badge-desc">Has alcanzado 1.500 estrellas por tus publicaciones</div>
@@ -267,10 +267,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star3/3b.webp" alt="Insignia Guardián del Cielo Nocturno" />
                     <span class="badge-label">Guardián del Cielo Nocturno</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián del Cielo Nocturno</div>
                     <div class="badge-desc">Has alcanzado 2.000 estrellas por tus publicaciones</div>
@@ -278,10 +278,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star3/3c.webp" alt="Insignia Sabio del Firmamento" />
                     <span class="badge-label">Sabio del Firmamento</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Sabio del Firmamento</div>
                     <div class="badge-desc">Has alcanzado 2.500 estrellas por tus publicaciones</div>
@@ -289,10 +289,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star3/3d.webp" alt="Insignia Navegante Astral" />
                     <span class="badge-label">Navegante Astral</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Navegante Astral</div>
                     <div class="badge-desc">Has alcanzado 3.000 estrellas por tus publicaciones</div>
@@ -300,10 +300,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star3/3e.webp" alt="Insignia Custodio de la Luz" />
                     <span class="badge-label">Custodio de la Luz</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Custodio de la Luz</div>
                     <div class="badge-desc">Has alcanzado 4.000 estrellas por tus publicaciones</div>
@@ -316,10 +316,10 @@
               <h4 class="badge-subtitle">IV. Expansión cósmica</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star4/4a.webp" alt="Insignia Heraldo Estelar" />
                     <span class="badge-label">Heraldo Estelar</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Heraldo Estelar</div>
                     <div class="badge-desc">Has alcanzado 5.000 estrellas por tus publicaciones</div>
@@ -327,10 +327,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star4/4b.webp" alt="Insignia Señor de las Constelaciones" />
                     <span class="badge-label">Señor de las Constelaciones</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Señor de las Constelaciones</div>
                     <div class="badge-desc">Has alcanzado 10.000 estrellas por tus publicaciones</div>
@@ -338,10 +338,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star4/4c.webp" alt="Insignia Maestro del Cielo Profundo" />
                     <span class="badge-label">Maestro del Cielo Profundo</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Maestro del Cielo Profundo</div>
                     <div class="badge-desc">Has alcanzado 20.000 estrellas por tus publicaciones</div>
@@ -349,10 +349,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star4/4d.webp" alt="Insignia Orquestador de Astros" />
                     <span class="badge-label">Orquestador de Astros</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Orquestador de Astros</div>
                     <div class="badge-desc">Has alcanzado 30.000 estrellas por tus publicaciones</div>
@@ -360,10 +360,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star4/4e.webp" alt="Insignia Regente del Firmamento" />
                     <span class="badge-label">Regente del Firmamento</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Regente del Firmamento</div>
                     <div class="badge-desc">Has alcanzado 50.000 estrellas por tus publicaciones</div>
@@ -376,10 +376,10 @@
               <h4 class="badge-subtitle">V. Trascendencia estelar</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star5/5a.webp" alt="Insignia Forjador de Universos" />
                     <span class="badge-label">Forjador de Universos</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Forjador de Universos</div>
                     <div class="badge-desc">Has alcanzado 70.000 estrellas por tus publicaciones</div>
@@ -387,10 +387,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star5/5b.webp" alt="Insignia Portador del Cielo" />
                     <span class="badge-label">Portador del Cielo</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Portador del Cielo</div>
                     <div class="badge-desc">Has alcanzado 100.000 estrellas por tus publicaciones</div>
@@ -398,10 +398,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star5/5c.webp" alt="Insignia Soberano de las Estrellas" />
                     <span class="badge-label">Soberano de las Estrellas</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Soberano de las Estrellas</div>
                     <div class="badge-desc">Has alcanzado 150.000 estrellas por tus publicaciones</div>
@@ -409,10 +409,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star5/5d.webp" alt="Insignia Arquitecto del Cosmos" />
                     <span class="badge-label">Arquitecto del Cosmos</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Arquitecto del Cosmos</div>
                     <div class="badge-desc">Has alcanzado 200.000 estrellas por tus publicaciones</div>
@@ -420,10 +420,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star5/5e.webp" alt="Insignia Vigía del Infinito" />
                     <span class="badge-label">Vigía del Infinito</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Vigía del Infinito</div>
                     <div class="badge-desc">Has alcanzado 300.000 estrellas por tus publicaciones</div>
@@ -436,10 +436,10 @@
               <h4 class="badge-subtitle">VI. Eternidad</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star6/6a.webp" alt="Insignia Hijo del Cosmos" />
                     <span class="badge-label">Hijo del Cosmos</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Hijo del Cosmos</div>
                     <div class="badge-desc">Has alcanzado 600.000 estrellas por tus publicaciones</div>
@@ -447,10 +447,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star6/6b.webp" alt="Insignia Conciencia Estelar" />
                     <span class="badge-label">Conciencia Estelar</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Conciencia Estelar</div>
                     <div class="badge-desc">Has alcanzado 1.000.000 estrellas por tus publicaciones</div>
@@ -458,10 +458,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star6/6c.webp" alt="Insignia Alma del Firmamento" />
                     <span class="badge-label">Alma del Firmamento</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Alma del Firmamento</div>
                     <div class="badge-desc">Has alcanzado 1.500.000 estrellas por tus publicaciones</div>
@@ -469,10 +469,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star6/6d.webp" alt="Insignia Trono de las Estrellas" />
                     <span class="badge-label">Trono de las Estrellas</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Trono de las Estrellas</div>
                     <div class="badge-desc">Has alcanzado 2.000.000 estrellas por tus publicaciones</div>
@@ -480,10 +480,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Astral/Star6/6e.webp" alt="Insignia Estrella Eterna" />
                     <span class="badge-label">Estrella Eterna</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Estrella Eterna</div>
                     <div class="badge-desc">Has alcanzado 5.000.000 estrellas por tus publicaciones</div>
@@ -506,10 +506,10 @@
               <h4 class="badge-subtitle">I. Despertar de la acción</h4>
               <div class="badge-grid">
                 <div class="badge-item is-unlocked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish1/1a.webp" alt="Insignia Realizador" />
                     <span class="badge-label">Realizador</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Realizador</div>
                     <div class="badge-desc">Has cumplido 1 deseo</div>
@@ -517,10 +517,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish1/1b.webp" alt="Insignia Comprometido" />
                     <span class="badge-label">Comprometido</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Comprometido</div>
                     <div class="badge-desc">Has cumplido 3 deseos</div>
@@ -528,10 +528,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish1/1c.webp" alt="Insignia Constante" />
                     <span class="badge-label">Constante</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Constante</div>
                     <div class="badge-desc">Has cumplido 7 deseos</div>
@@ -539,10 +539,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish1/1d.webp" alt="Insignia Visionario" />
                     <span class="badge-label">Visionario</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Visionario</div>
                     <div class="badge-desc">Has cumplido 10 deseos</div>
@@ -550,10 +550,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish1/1e.webp" alt="Insignia Ejecutor" />
                     <span class="badge-label">Ejecutor</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Ejecutor</div>
                     <div class="badge-desc">Has cumplido 20 deseos</div>
@@ -566,10 +566,10 @@
               <h4 class="badge-subtitle">II. Dominio personal</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish2/2a.webp" alt="Insignia Constructor de Metas" />
                     <span class="badge-label">Constructor de Metas</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Constructor de Metas</div>
                     <div class="badge-desc">Has cumplido 30 deseos</div>
@@ -577,10 +577,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish2/2b.webp" alt="Insignia Voluntad Activa" />
                     <span class="badge-label">Voluntad Activa</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Voluntad Activa</div>
                     <div class="badge-desc">Has cumplido 50 deseos</div>
@@ -588,10 +588,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish2/2c.webp" alt="Insignia Forjador de Logros" />
                     <span class="badge-label">Forjador de Logros</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Forjador de Logros</div>
                     <div class="badge-desc">Has cumplido 100 deseos</div>
@@ -599,10 +599,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish2/2d.webp" alt="Insignia Arquitecto de Deseos" />
                     <span class="badge-label">Arquitecto de Deseos</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Arquitecto de Deseos</div>
                     <div class="badge-desc">Has cumplido 200 deseos</div>
@@ -610,10 +610,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish2/2e.webp" alt="Insignia Gestor de Propósito" />
                     <span class="badge-label">Gestor de Propósito</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Gestor de Propósito</div>
                     <div class="badge-desc">Has cumplido 300 deseos</div>
@@ -626,10 +626,10 @@
               <h4 class="badge-subtitle">III. Solidez y coherencia</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish3/3a.webp" alt="Insignia Hacedor Consistente" />
                     <span class="badge-label">Hacedor Consistente</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Hacedor Consistente</div>
                     <div class="badge-desc">Has cumplido 400 deseos</div>
@@ -637,10 +637,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish3/3b.webp" alt="Insignia Custodio de su Palabra" />
                     <span class="badge-label">Custodio de su Palabra</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Custodio de su Palabra</div>
                     <div class="badge-desc">Has cumplido 500 deseos</div>
@@ -648,10 +648,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish3/3c.webp" alt="Insignia Maestro de la Acción" />
                     <span class="badge-label">Maestro de la Acción</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Maestro de la Acción</div>
                     <div class="badge-desc">Has cumplido 600 deseos</div>
@@ -659,10 +659,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish3/3d.webp" alt="Insignia Consolidador" />
                     <span class="badge-label">Consolidador</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Consolidador</div>
                     <div class="badge-desc">Has cumplido 700 deseos</div>
@@ -670,10 +670,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish3/3e.webp" alt="Insignia Autor de su Camino" />
                     <span class="badge-label">Autor de su Camino</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Autor de su Camino</div>
                     <div class="badge-desc">Has cumplido 1.000 deseos</div>
@@ -686,10 +686,10 @@
               <h4 class="badge-subtitle">IV. Ejemplo visible</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Fulfilled/Wish4/4a.webp" alt="Insignia Referente de Coherencia" />
                     <span class="badge-label">Referente de Coherencia</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Referente de Coherencia</div>
                     <div class="badge-desc">Has cumplido 1.200 deseos</div>
@@ -712,10 +712,10 @@
               <h4 class="badge-subtitle">Etapa I — Bondad consciente</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill1/1a.webp" alt="Insignia Amable" />
                     <span class="badge-label">Amable</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Amable</div>
                     <div class="badge-desc">Has ayudado a cumplir 1 deseo</div>
@@ -723,10 +723,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill1/1b.webp" alt="Insignia Generoso" />
                     <span class="badge-label">Generoso</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Generoso</div>
                     <div class="badge-desc">Has ayudado a cumplir 3 deseos</div>
@@ -734,10 +734,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill1/1c.webp" alt="Insignia Mano Abierta" />
                     <span class="badge-label">Mano Abierta</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Mano Abierta</div>
                     <div class="badge-desc">Has ayudado a cumplir 7 deseos</div>
@@ -745,10 +745,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill1/1d.webp" alt="Insignia Buen Samaritano" />
                     <span class="badge-label">Buen Samaritano</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Buen Samaritano</div>
                     <div class="badge-desc">Has ayudado a cumplir 10 deseos</div>
@@ -761,10 +761,10 @@
               <h4 class="badge-subtitle">Etapa II — Virtud activa</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill2/2a.webp" alt="Insignia Caballero de la Virtud" />
                     <span class="badge-label">Caballero de la Virtud</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Caballero de la Virtud</div>
                     <div class="badge-desc">Has ayudado a cumplir 20 deseos</div>
@@ -772,10 +772,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill2/2b.webp" alt="Insignia Servidor del Bien" />
                     <span class="badge-label">Servidor del Bien</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Servidor del Bien</div>
                     <div class="badge-desc">Has ayudado a cumplir 30 deseos</div>
@@ -783,10 +783,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill2/2c.webp" alt="Insignia Corazón Firme" />
                     <span class="badge-label">Corazón Firme</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Corazón Firme</div>
                     <div class="badge-desc">Has ayudado a cumplir 50 deseos</div>
@@ -794,10 +794,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill2/2d.webp" alt="Insignia Aliado de la Verdad" />
                     <span class="badge-label">Aliado de la Verdad</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Aliado de la Verdad</div>
                     <div class="badge-desc">Has ayudado a cumplir 70 deseos</div>
@@ -810,10 +810,10 @@
               <h4 class="badge-subtitle">Etapa III — Servicio constante</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill3/3a.webp" alt="Insignia Benefactor" />
                     <span class="badge-label">Benefactor</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Benefactor</div>
                     <div class="badge-desc">Has ayudado a cumplir 100 deseos</div>
@@ -821,10 +821,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill3/3b.webp" alt="Insignia Pilar de Apoyo" />
                     <span class="badge-label">Pilar de Apoyo</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Pilar de Apoyo</div>
                     <div class="badge-desc">Has ayudado a cumplir 150 deseos</div>
@@ -832,10 +832,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill3/3c.webp" alt="Insignia Guardián Solidario" />
                     <span class="badge-label">Guardián Solidario</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián Solidario</div>
                     <div class="badge-desc">Has ayudado a cumplir 200 deseos</div>
@@ -843,10 +843,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill3/3d.webp" alt="Insignia Manantial de Ayuda" />
                     <span class="badge-label">Manantial de Ayuda</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Manantial de Ayuda</div>
                     <div class="badge-desc">Has ayudado a cumplir 300 deseos</div>
@@ -859,10 +859,10 @@
               <h4 class="badge-subtitle">Etapa IV — Custodia y responsabilidad</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill4/4a.webp" alt="Insignia Custodio del Bien" />
                     <span class="badge-label">Custodio del Bien</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Custodio del Bien</div>
                     <div class="badge-desc">Has ayudado a cumplir 400 deseos</div>
@@ -870,10 +870,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill4/4b.webp" alt="Insignia Protector de Sueños" />
                     <span class="badge-label">Protector de Sueños</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Protector de Sueños</div>
                     <div class="badge-desc">Has ayudado a cumplir 500 deseos</div>
@@ -881,10 +881,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill4/4c.webp" alt="Insignia Arquitecto de la Verdad" />
                     <span class="badge-label">Arquitecto de la Verdad</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Arquitecto de la Verdad</div>
                     <div class="badge-desc">Has ayudado a cumplir 600 deseos</div>
@@ -892,10 +892,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill4/4d.webp" alt="Insignia Guía por el Ejemplo" />
                     <span class="badge-label">Guía por el Ejemplo</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Guía por el Ejemplo</div>
                     <div class="badge-desc">Has ayudado a cumplir 700 deseos</div>
@@ -908,10 +908,10 @@
               <h4 class="badge-subtitle">Etapa V — Trascendencia del acto</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill5/5a.webp" alt="Insignia Heraldo de la Generosidad" />
                     <span class="badge-label">Heraldo de la Generosidad</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Heraldo de la Generosidad</div>
                     <div class="badge-desc">Has ayudado a cumplir 1.000 deseos</div>
@@ -919,10 +919,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill5/5b.webp" alt="Insignia Tejedor de Destinos" />
                     <span class="badge-label">Tejedor de Destinos</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Tejedor de Destinos</div>
                     <div class="badge-desc">Has ayudado a cumplir 2.000 deseos</div>
@@ -930,10 +930,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill5/5c.webp" alt="Insignia Columna de la Comunidad" />
                     <span class="badge-label">Columna de la Comunidad</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Columna de la Comunidad</div>
                     <div class="badge-desc">Has ayudado a cumplir 3.000 deseos</div>
@@ -941,10 +941,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Granted/Fullfill5/5d.webp" alt="Insignia Benefactor Eterno" />
                     <span class="badge-label">Benefactor Eterno</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Benefactor Eterno</div>
                     <div class="badge-desc">Has ayudado a cumplir 5.000 deseos</div>
@@ -967,10 +967,10 @@
               <h4 class="badge-subtitle">Etapa I — El inicio (descubrimiento)</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar1/1a.webp" alt="Insignia Aficionado" />
                     <span class="badge-label">Aficionado</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Aficionado</div>
                     <div class="badge-desc">Has hecho tu 1° publicación en el calendario</div>
@@ -978,10 +978,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar1/1b.webp" alt="Insignia Inspirado" />
                     <span class="badge-label">Inspirado</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Inspirado</div>
                     <div class="badge-desc">Has publicado 3 días consecutivos</div>
@@ -989,10 +989,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar1/1c.webp" alt="Insignia Disciplinado" />
                     <span class="badge-label">Disciplinado</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Disciplinado</div>
                     <div class="badge-desc">Has tenido una racha de 7 días de publicaciones</div>
@@ -1005,10 +1005,10 @@
               <h4 class="badge-subtitle">Etapa II — El hábito (estructura)</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar2/2a.webp" alt="Insignia Constante" />
                     <span class="badge-label">Constante</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Constante</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 15
@@ -1017,10 +1017,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar2/2b.webp" alt="Insignia Comprometido" />
                     <span class="badge-label">Comprometido</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Comprometido</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 21
@@ -1029,10 +1029,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar2/2c.webp" alt="Insignia Persistente" />
                     <span class="badge-label">Persistente</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Persistente</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 30
@@ -1046,10 +1046,10 @@
               <h4 class="badge-subtitle">Etapa III — La identidad (arraigo)</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar3/3a.webp" alt="Insignia Forjador del Hábito" />
                     <span class="badge-label">Forjador del Hábito</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Forjador del Hábito</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 90
@@ -1058,10 +1058,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar3/3b.webp" alt="Insignia Vinculado al Ritmo" />
                     <span class="badge-label">Vinculado al Ritmo</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Vinculado al Ritmo</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 120
@@ -1070,10 +1070,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar3/3c.webp" alt="Insignia Fiel al Proceso" />
                     <span class="badge-label">Fiel al Proceso</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Fiel al Proceso</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 150
@@ -1087,10 +1087,10 @@
               <h4 class="badge-subtitle">Etapa IV — La madurez (resistencia)</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar4/4a.webp" alt="Insignia Inquebrantable" />
                     <span class="badge-label">Inquebrantable</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Inquebrantable</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 180
@@ -1099,10 +1099,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar4/4b.webp" alt="Insignia Custodio del Ritmo" />
                     <span class="badge-label">Custodio del Ritmo</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Custodio del Ritmo</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 220
@@ -1111,10 +1111,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar4/4c.webp" alt="Insignia Arquitecto del Tiempo" />
                     <span class="badge-label">Arquitecto del Tiempo</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Arquitecto del Tiempo</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 250
@@ -1128,10 +1128,10 @@
               <h4 class="badge-subtitle">Etapa V — La maestría (ejemplo)</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar5/5a.webp" alt="Insignia Ejemplo Vivo" />
                     <span class="badge-label">Ejemplo Vivo</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Ejemplo Vivo</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 280
@@ -1140,10 +1140,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar5/5b.webp" alt="Insignia Pilar de la Comunidad" />
                     <span class="badge-label">Pilar de la Comunidad</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Pilar de la Comunidad</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 310
@@ -1152,10 +1152,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar5/5c.webp" alt="Insignia Testimonio de Perseverancia" />
                     <span class="badge-label">Testimonio de Perseverancia</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Testimonio de Perseverancia</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 340
@@ -1169,10 +1169,10 @@
               <h4 class="badge-subtitle">Etapa VI — La consagración (año completo)</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Calendar/Calendar6/6a.webp" alt="Insignia Guardián del Tiempo" />
                     <span class="badge-label">Guardián del Tiempo</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián del Tiempo</div>
                     <div class="badge-desc">Has publicado activamente en esta red social, manteniendo una racha de 365
@@ -1194,10 +1194,10 @@
 
             <div class="badge-grid badge-grid-5">
               <div class="badge-item is-locked">
-                <div class="badge-figure" tabindex="0">
+                <button class="badge-figure" type="button">
                   <img src="/css/AKI/Donation/1.webp" alt="Insignia Explorador del Misterio" />
                   <span class="badge-label">Explorador del Misterio</span>
-                </div>
+                </button>
                 <div class="badge-body">
                   <div class="badge-tier">Nivel I — Primer desprendimiento</div>
                   <div class="badge-name">Explorador del Misterio</div>
@@ -1207,10 +1207,10 @@
               </div>
 
               <div class="badge-item is-locked">
-                <div class="badge-figure" tabindex="0">
+                <button class="badge-figure" type="button">
                   <img src="/css/AKI/Donation/2.webp" alt="Insignia Confiado en el Universo" />
                   <span class="badge-label">Confiado en el Universo</span>
-                </div>
+                </button>
                 <div class="badge-body">
                   <div class="badge-tier">Nivel II — Confianza inicial</div>
                   <div class="badge-name">Confiado en el Universo</div>
@@ -1220,10 +1220,10 @@
               </div>
 
               <div class="badge-item is-locked">
-                <div class="badge-figure" tabindex="0">
+                <button class="badge-figure" type="button">
                   <img src="/css/AKI/Donation/3.webp" alt="Insignia Creyente de las Nebulosas" />
                   <span class="badge-label">Creyente de las Nebulosas</span>
-                </div>
+                </button>
                 <div class="badge-body">
                   <div class="badge-tier">Nivel III — Fe cósmica</div>
                   <div class="badge-name">Creyente de las Nebulosas</div>
@@ -1233,10 +1233,10 @@
               </div>
 
               <div class="badge-item is-locked">
-                <div class="badge-figure" tabindex="0">
+                <button class="badge-figure" type="button">
                   <img src="/css/AKI/Donation/4.webp" alt="Insignia Guardián del Flujo Estelar" />
                   <span class="badge-label">Guardián del Flujo Estelar</span>
-                </div>
+                </button>
                 <div class="badge-body">
                   <div class="badge-tier">Nivel IV — Comprensión del flujo</div>
                   <div class="badge-name">Guardián del Flujo Estelar</div>
@@ -1246,10 +1246,10 @@
               </div>
 
               <div class="badge-item is-locked">
-                <div class="badge-figure" tabindex="0">
+                <button class="badge-figure" type="button">
                   <img src="/css/AKI/Donation/5.webp" alt="Insignia Portador del Vacío Fértil" />
                   <span class="badge-label">Portador del Vacío Fértil</span>
-                </div>
+                </button>
                 <div class="badge-body">
                   <div class="badge-tier">Nivel V — Entrega consciente</div>
                   <div class="badge-name">Portador del Vacío Fértil</div>
@@ -1259,10 +1259,10 @@
               </div>
 
               <div class="badge-item is-locked">
-                <div class="badge-figure" tabindex="0">
+                <button class="badge-figure" type="button">
                   <img src="/css/AKI/Donation/6.webp" alt="Insignia Custodio del Fondo Común" />
                   <span class="badge-label">Custodio del Fondo Común</span>
-                </div>
+                </button>
                 <div class="badge-body">
                   <div class="badge-tier">Nivel VI — Servicio silencioso</div>
                   <div class="badge-name">Custodio del Fondo Común</div>
@@ -1272,10 +1272,10 @@
               </div>
 
               <div class="badge-item is-locked">
-                <div class="badge-figure" tabindex="0">
+                <button class="badge-figure" type="button">
                   <img src="/css/AKI/Donation/7.webp" alt="Insignia Tejedor de Constelaciones" />
                   <span class="badge-label">Tejedor de Constelaciones</span>
-                </div>
+                </button>
                 <div class="badge-body">
                   <div class="badge-tier">Nivel VII — Sabiduría del compartir</div>
                   <div class="badge-name">Tejedor de Constelaciones</div>
@@ -1285,10 +1285,10 @@
               </div>
 
               <div class="badge-item is-locked">
-                <div class="badge-figure" tabindex="0">
+                <button class="badge-figure" type="button">
                   <img src="/css/AKI/Donation/8.webp" alt="Insignia Voz del Silencio Cósmico" />
                   <span class="badge-label">Voz del Silencio Cósmico</span>
-                </div>
+                </button>
                 <div class="badge-body">
                   <div class="badge-tier">Nivel VIII — Donación como lenguaje</div>
                   <div class="badge-name">Voz del Silencio Cósmico</div>
@@ -1298,10 +1298,10 @@
               </div>
 
               <div class="badge-item is-locked">
-                <div class="badge-figure" tabindex="0">
+                <button class="badge-figure" type="button">
                   <img src="/css/AKI/Donation/9.webp" alt="Insignia Arquitecto del Bien Común" />
                   <span class="badge-label">Arquitecto del Bien Común</span>
-                </div>
+                </button>
                 <div class="badge-body">
                   <div class="badge-tier">Nivel IX — Trascendencia colectiva</div>
                   <div class="badge-name">Arquitecto del Bien Común</div>
@@ -1311,10 +1311,10 @@
               </div>
 
               <div class="badge-item is-locked">
-                <div class="badge-figure" tabindex="0">
+                <button class="badge-figure" type="button">
                   <img src="/css/AKI/Donation/10.webp" alt="Insignia Semilla del Infinito" />
                   <span class="badge-label">Semilla del Infinito</span>
-                </div>
+                </button>
                 <div class="badge-body">
                   <div class="badge-tier">Nivel X — Mito</div>
                   <div class="badge-name">Semilla del Infinito</div>
@@ -1338,10 +1338,10 @@
               <h4 class="badge-subtitle">Rangos de Guardianes</h4>
               <div class="badge-grid">
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Ranks/1.webp" alt="Insignia Aspirante" />
                     <span class="badge-label">Aspirante</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Aspirante</div>
                     <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres
@@ -1350,10 +1350,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Ranks/2.webp" alt="Insignia Aprendiz" />
                     <span class="badge-label">Aprendiz</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Aprendiz</div>
                     <div class="badge-desc">Has ascendido al Rango 2 de la Jerarquía de Guardianes: ¡Ahora eres
@@ -1362,10 +1362,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Ranks/3.webp" alt="Insignia Guardián" />
                     <span class="badge-label">Guardián</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián</div>
                     <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres
@@ -1374,10 +1374,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Ranks/4.webp" alt="Insignia Guardián Consagrado" />
                     <span class="badge-label">Guardián Consagrado</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián Consagrado</div>
                     <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
@@ -1386,10 +1386,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Ranks/5.webp" alt="Insignia Guardián Mayor" />
                     <span class="badge-label">Guardián Mayor</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián Mayor</div>
                     <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
@@ -1398,10 +1398,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Ranks/6.webp" alt="Insignia Guardián del Logos" />
                     <span class="badge-label">Guardián del Logos</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián del Logos</div>
                     <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
@@ -1410,10 +1410,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Ranks/7.webp" alt="Insignia Guardián del Umbral" />
                     <span class="badge-label">Guardián del Umbral</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián del Umbral</div>
                     <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
@@ -1422,10 +1422,10 @@
                 </div>
 
                 <div class="badge-item is-locked">
-                  <div class="badge-figure" tabindex="0">
+                  <button class="badge-figure" type="button">
                     <img src="/css/AKI/Ranks/8.webp" alt="Insignia Guardián de Guardianes" />
                     <span class="badge-label">Guardián de Guardianes</span>
-                  </div>
+                  </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián de Guardianes</div>
                     <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres Guardián

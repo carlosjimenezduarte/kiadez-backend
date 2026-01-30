@@ -68,40 +68,40 @@
       <section class="panel">
         <div class="badge-grid">
           <div class="badge-item is-unlocked">
-            <div class="badge-figure" tabindex="0">
+            <button class="badge-figure" type="button">
               <img src="/css/star.webp" alt="Momento estelar" />
               <span class="badge-label">Momento estelar</span>
-            </div>
+            </button>
             <div class="badge-body">
               <div class="badge-name">Noche de revelación</div>
               <div class="badge-desc">Imagen · 2 días</div>
             </div>
           </div>
           <div class="badge-item is-unlocked">
-            <div class="badge-figure" tabindex="0">
+            <button class="badge-figure" type="button">
               <img src="/css/astral.webp" alt="Viaje astral" />
               <span class="badge-label">Viaje astral</span>
-            </div>
+            </button>
             <div class="badge-body">
               <div class="badge-name">Testimonio del camino</div>
               <div class="badge-desc">Video · 5 días</div>
             </div>
           </div>
           <div class="badge-item is-unlocked">
-            <div class="badge-figure" tabindex="0">
+            <button class="badge-figure" type="button">
               <img src="/css/fundstar.webp" alt="Fondo común" />
               <span class="badge-label">Fondo común</span>
-            </div>
+            </button>
             <div class="badge-body">
               <div class="badge-name">Donación significativa</div>
               <div class="badge-desc">Imagen · 1 semana</div>
             </div>
           </div>
           <div class="badge-item is-unlocked">
-            <div class="badge-figure" tabindex="0">
+            <button class="badge-figure" type="button">
               <img src="/css/star2.webp" alt="Ritual" />
               <span class="badge-label">Ritual</span>
-            </div>
+            </button>
             <div class="badge-body">
               <div class="badge-name">Ritual de propósito</div>
               <div class="badge-desc">Imagen · 2 semanas</div>
