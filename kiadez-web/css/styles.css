@@ -3921,6 +3921,10 @@ body[data-visitor="true"] .visitor-only {
     animation: private-wish-rise 0.6s ease both;
 }
 
+.private-wishes-content {
+    position: relative;
+}
+
 .private-wishes-body .profile-nav {
     margin-top: 0;
 }
@@ -3976,6 +3980,125 @@ body[data-visitor="true"] .visitor-only {
 
 .private-wishes-page .nav-pill {
     color: var(--private-ink);
+}
+
+.private-wishes-page.private-locked .private-wishes-content {
+    filter: blur(16px) grayscale(0.2);
+    pointer-events: none;
+    user-select: none;
+}
+
+.private-security-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 12, 18, 0.78);
+    backdrop-filter: blur(6px);
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    z-index: 20;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.private-wishes-page.private-locked .private-security-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.private-security-card {
+    width: min(760px, 92vw);
+    background: rgba(242, 239, 231, 0.98);
+    border-radius: 26px;
+    padding: 26px 24px 22px;
+    border: 1px solid rgba(195, 161, 91, 0.4);
+    box-shadow: 0 30px 70px rgba(5, 8, 12, 0.45);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+}
+
+.private-security-hero {
+    width: 120px;
+    height: 120px;
+    border-radius: 999px;
+    object-fit: cover;
+    margin: 0 auto;
+    border: 2px solid rgba(195, 161, 91, 0.55);
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.private-security-title {
+    margin: 0;
+    color: var(--private-ink);
+    font-size: 1.25rem;
+}
+
+.private-security-input-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+}
+
+.private-security-input {
+    text-align: center;
+    font-size: 1.05rem;
+    letter-spacing: 0.08em;
+}
+
+.private-security-btn {
+    width: 74px;
+    height: 74px;
+    border-radius: 999px;
+    border: 1px solid rgba(47, 72, 88, 0.25);
+    background: rgba(255, 255, 255, 0.9);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 10px 22px rgba(27, 40, 54, 0.2);
+}
+
+.private-security-btn img {
+    width: 44px;
+    height: 44px;
+}
+
+.private-security-unlock {
+    background: linear-gradient(135deg, #27394a, #3d5a71);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.private-security-unlock img {
+    filter: brightness(1.2);
+}
+
+.private-security-actions {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 6px;
+}
+
+.private-security-error {
+    margin: 0;
+    color: #8a1f1f;
+    font-size: 0.9rem;
+    display: none;
+}
+
+.private-security-error.is-visible {
+    display: block;
+}
+
+.private-security-note {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: rgba(31, 42, 56, 0.85);
 }
 
 .private-wishes-page .wish-slot::before {

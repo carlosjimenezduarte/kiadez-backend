@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 
-<body data-visitor="false" class="private-wishes-page">
+<body data-visitor="false" class="private-wishes-page private-locked">
   <div class="page-background page-background-user private-wishes-background">
 
     <main class="user-home">
@@ -51,7 +51,7 @@
         </div>
       </section>
 
-      <div class="private-wishes-body">
+      <div class="private-wishes-body private-wishes-content">
         <!-- =========================
          *  NAV / LINKS
          *  ========================= -->
@@ -369,6 +369,50 @@
         </p>
       </div>
 
+      <!-- =========================
+       *  SEGURIDAD / PRIVATE LOCK
+       *  ========================= -->
+      <section class="private-security-overlay" aria-label="Seguridad de deseos privados">
+        <div class="private-security-card" role="dialog" aria-modal="true" aria-live="polite">
+          <img class="private-security-hero" src="css/cpp-key.webp" alt="Clave privada" />
+
+          <h2 class="private-security-title">Digita tu contraseña privada personal:</h2>
+
+          <div class="private-security-input-row">
+            <label class="modal-label hidden" for="private-security-password">Contraseña privada</label>
+            <input class="modal-input private-security-input" id="private-security-password" type="password"
+              autocomplete="off" inputmode="text" placeholder="••••••••••••••" />
+            <button class="private-security-btn private-security-unlock" type="button" id="private-security-unlock"
+              aria-label="Ingresar">
+              <img src="css/icons/iconlock.webp" alt="Ingresar" />
+            </button>
+          </div>
+
+          <p class="private-security-error" id="private-security-error" role="alert">
+            Contraseña incorrecta. Inténtalo de nuevo.
+          </p>
+
+          <div class="private-security-actions">
+            <button class="private-security-btn" type="button" aria-label="Cambiar contraseña">
+              <img src="css/icons/iconedit.webp" alt="Cambiar contraseña" />
+            </button>
+            <button class="private-security-btn" type="button" aria-label="Reiniciar contraseña">
+              <img src="css/icons/icondelete.webp" alt="Reiniciar contraseña" />
+            </button>
+          </div>
+
+          <p class="private-security-note">
+            Tu clave secreta personal protege toda la información privada que declares en esta red social: deseos,
+            propósitos y datos confidenciales. Si la pierdes, no podrás recuperar el acceso a esa información. En caso
+            de olvido, podrás reiniciar la clave, pero esto implicará la eliminación definitiva de todos tus deseos
+            privados y datos confidenciales, los cuales deberán configurarse nuevamente. Sin esta clave, nadie puede
+            acceder a tu información privada: ni el Guardián Supremo Absoluto ni las bases de datos de la red social
+            tienen visibilidad sobre lo que has decidido mantener en secreto. Se recomienda guardar tu clave secreta
+            —de forma digital o física— en un lugar seguro.
+          </p>
+        </div>
+      </section>
+
       <div class="footer-columns">
         <div class="footer-column">
           <h4>Sobre nuestra red social</h4>
@@ -409,6 +453,11 @@
 
   <script>
     const prefixInputs = document.querySelectorAll(".wish-prefix-input");
+    const privateUnlockBtn = document.getElementById("private-security-unlock");
+    const privatePasswordInput = document.getElementById("private-security-password");
+    const privateSecurityError = document.getElementById("private-security-error");
+    const privateLockBody = document.body;
+    const PRIVATE_PASSWORD = "LibertadSuprema1986*";
     const suffixInputs = document.querySelectorAll("[data-suffix]");
 
     prefixInputs.forEach((input) => {
@@ -458,6 +507,31 @@
         }
       });
     });
+
+    const attemptPrivateUnlock = () => {
+      if (!privatePasswordInput || !privateLockBody) return;
+      const value = privatePasswordInput.value || "";
+      const isValid = value === PRIVATE_PASSWORD;
+      if (privateSecurityError) {
+        privateSecurityError.classList.toggle("is-visible", !isValid);
+      }
+      if (!isValid) return;
+      privateLockBody.classList.remove("private-locked");
+      privatePasswordInput.value = "";
+    };
+
+    if (privateUnlockBtn) {
+      privateUnlockBtn.addEventListener("click", attemptPrivateUnlock);
+    }
+
+    if (privatePasswordInput) {
+      privatePasswordInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          attemptPrivateUnlock();
+        }
+      });
+    }
 
     suffixInputs.forEach((input) => {
       const suffix = input.dataset.suffix || "";

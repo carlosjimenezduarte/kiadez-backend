@@ -26,6 +26,8 @@
   import ForgotPassword from './pages/ForgotPassword.svelte';
   import FulfilledWishes from './pages/FulfilledWishes.svelte';
   import ResetPassword from './pages/ResetPassword.svelte';
+  import Feed from './pages/Feed.svelte';
+  import MyPrivateWhishes from './pages/MyPrivateWhishes.svelte';
 
   const path = typeof window !== 'undefined' ? window.location.pathname : '/';
   const route = path.replace(/\/+$/, '') || '/';
@@ -86,6 +88,10 @@
     '/fulfilled-wishes.html': FulfilledWishes,
     '/reset-password': ResetPassword,
     '/reset-password.html': ResetPassword,
+    '/feed': Feed,
+    '/feed.html': Feed,
+    '/my-private-whishes': MyPrivateWhishes,
+    '/my-private-whishes.html': MyPrivateWhishes,
   };
 
   const Component = routes[route] || Landing;
