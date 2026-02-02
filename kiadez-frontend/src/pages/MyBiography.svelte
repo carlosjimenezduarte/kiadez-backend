@@ -423,7 +423,7 @@
             </div>
 
             <figure class="infobox-photo">
-              <img id="profilePhoto" src="logo.png" alt="Foto del usuario" />
+              <img id="profilePhoto" src="/css/logo-kiadez.webp" alt="Foto del usuario" />
               <figcaption id="photoCaption">Jiménez en 2025.</figcaption>
             </figure>
 
@@ -626,7 +626,7 @@
             <div class="infobox-section">
               <div class="infobox-section-title">Emblema</div>
               <div class="infobox-emblem">
-                <img src="logo.png" alt="Emblema" />
+                <img src="/css/logo-kiadez.webp" alt="Emblema" />
               </div>
             </div>
 

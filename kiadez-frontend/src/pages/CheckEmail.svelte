@@ -119,7 +119,7 @@
                 </p>
 
                 <div class="auth-brand">
-                    <img src="logo.png" alt="Kiadez" />
+                    <img src="/css/logo-kiadez.webp" alt="Kiadez" />
                     <span>Kiadez</span>
                 </div>
 

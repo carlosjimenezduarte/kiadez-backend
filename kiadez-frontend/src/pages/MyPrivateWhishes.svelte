@@ -10,53 +10,66 @@
     const privateUnlockBtn = document.getElementById("private-security-unlock");
     const privatePasswordInput = document.getElementById("private-security-password");
     const privateSecurityError = document.getElementById("private-security-error");
+    const privateChangePasswordBtn = document.getElementById("private-security-change-password");
+    const privateChangePasswordModal = document.getElementById("private-change-password-modal");
+    const privateChangePasswordCancel = document.getElementById("private-change-password-cancel");
+    const privateChangePasswordCancelFooter = document.getElementById("private-change-password-cancel-footer");
+    const privateResetPasswordBtn = document.getElementById("private-security-reset-password");
+    const privateResetPasswordModal = document.getElementById("private-reset-password-modal");
+    const privateResetPasswordCancel = document.getElementById("private-reset-password-cancel");
+    const privateResetPasswordCancelFooter = document.getElementById("private-reset-password-cancel-footer");
+    const privateResetPasswordConfirm = document.getElementById("private-reset-password-confirm");
+    const privateResetPasswordFinalModal = document.getElementById("private-reset-password-final-modal");
+    const privateResetPasswordFinalCancel = document.getElementById("private-reset-password-final-cancel");
+    const privateResetPasswordFinalCancelFooter = document.getElementById("private-reset-password-final-cancel-footer");
     const PRIVATE_PASSWORD = "LibertadSuprema1986*";
     const suffixInputs = document.querySelectorAll("[data-suffix]");
 
     prefixInputs.forEach((input) => {
-      const prefix = input.dataset.prefix || "Deseo ";
-      const counterId = input.dataset.counter;
+      const field = /** @type {HTMLInputElement | HTMLTextAreaElement} */ (input);
+      const prefix = field.dataset.prefix || "Deseo ";
+      const counterId = field.dataset.counter;
       const counterEl = counterId ? document.getElementById(counterId) : null;
-      const maxLength = input.maxLength > 0 ? input.maxLength : null;
+      const maxLength = field.maxLength > 0 ? field.maxLength : null;
 
       const clampToMax = () => {
-        if (maxLength && input.value.length > maxLength) {
-          input.value = input.value.slice(0, maxLength);
+        if (maxLength && field.value.length > maxLength) {
+          field.value = field.value.slice(0, maxLength);
         }
       };
 
       const updateCounter = () => {
         if (!counterEl) return;
-        const current = input.value.length;
+        const current = field.value.length;
         const limit = maxLength || current;
         counterEl.textContent = `${current}/${limit}`;
       };
 
-      if (!input.value.startsWith(prefix)) {
-        input.value = `${prefix}${input.value}`;
+      if (!field.value.startsWith(prefix)) {
+        field.value = `${prefix}${field.value}`;
       }
       clampToMax();
       updateCounter();
 
       const ensurePrefix = () => {
-        if (!input.value.startsWith(prefix)) {
-          const cleaned = input.value.replace(prefix, "");
-          input.value = `${prefix}${cleaned}`;
+        if (!field.value.startsWith(prefix)) {
+          const cleaned = field.value.replace(prefix, "");
+          field.value = `${prefix}${cleaned}`;
         }
-        if (input.value.length < prefix.length) {
-          input.value = prefix;
+        if (field.value.length < prefix.length) {
+          field.value = prefix;
         }
         clampToMax();
         updateCounter();
       };
 
-      input.addEventListener("input", ensurePrefix);
+      field.addEventListener("input", ensurePrefix);
 
-      input.addEventListener("keydown", (event) => {
-        const cursorStart = input.selectionStart || 0;
+      field.addEventListener("keydown", (event) => {
+        const cursorStart = field.selectionStart || 0;
         if ((event.key === "Backspace" || event.key === "Delete") && cursorStart <= prefix.length) {
           event.preventDefault();
-          input.setSelectionRange(prefix.length, prefix.length);
+          field.setSelectionRange(prefix.length, prefix.length);
         }
       });
     });
@@ -86,62 +99,123 @@
       });
     }
 
+    const setChangePasswordModal = (isOpen) => {
+      if (!privateChangePasswordModal) return;
+      privateChangePasswordModal.classList.toggle("hidden", !isOpen);
+      privateChangePasswordModal.setAttribute("aria-hidden", String(!isOpen));
+      document.body.classList.toggle("modal-open", Boolean(isOpen));
+    };
+
+    if (privateChangePasswordBtn) {
+      privateChangePasswordBtn.addEventListener("click", () => setChangePasswordModal(true));
+    }
+
+    if (privateChangePasswordCancel) {
+      privateChangePasswordCancel.addEventListener("click", () => setChangePasswordModal(false));
+    }
+
+    if (privateChangePasswordCancelFooter) {
+      privateChangePasswordCancelFooter.addEventListener("click", () => setChangePasswordModal(false));
+    }
+
+    const setResetPasswordModal = (isOpen) => {
+      if (!privateResetPasswordModal) return;
+      privateResetPasswordModal.classList.toggle("hidden", !isOpen);
+      privateResetPasswordModal.setAttribute("aria-hidden", String(!isOpen));
+      document.body.classList.toggle("modal-open", Boolean(isOpen));
+    };
+
+    if (privateResetPasswordBtn) {
+      privateResetPasswordBtn.addEventListener("click", () => setResetPasswordModal(true));
+    }
+
+    if (privateResetPasswordCancel) {
+      privateResetPasswordCancel.addEventListener("click", () => setResetPasswordModal(false));
+    }
+
+    if (privateResetPasswordCancelFooter) {
+      privateResetPasswordCancelFooter.addEventListener("click", () => setResetPasswordModal(false));
+    }
+
+    const setResetPasswordFinalModal = (isOpen) => {
+      if (!privateResetPasswordFinalModal) return;
+      privateResetPasswordFinalModal.classList.toggle("hidden", !isOpen);
+      privateResetPasswordFinalModal.setAttribute("aria-hidden", String(!isOpen));
+      document.body.classList.toggle("modal-open", Boolean(isOpen));
+    };
+
+    if (privateResetPasswordConfirm) {
+      privateResetPasswordConfirm.addEventListener("click", () => {
+        setResetPasswordModal(false);
+        setResetPasswordFinalModal(true);
+      });
+    }
+
+    if (privateResetPasswordFinalCancel) {
+      privateResetPasswordFinalCancel.addEventListener("click", () => setResetPasswordFinalModal(false));
+    }
+
+    if (privateResetPasswordFinalCancelFooter) {
+      privateResetPasswordFinalCancelFooter.addEventListener("click", () => setResetPasswordFinalModal(false));
+    }
+
     suffixInputs.forEach((input) => {
-      const suffix = input.dataset.suffix || "";
+      const field = /** @type {HTMLInputElement | HTMLTextAreaElement} */ (input);
+      const suffix = field.dataset.suffix || "";
       if (!suffix) return;
 
       const normalizeSuffix = () => {
-        const current = input.value || "";
+        const current = field.value || "";
         const suffixIndex = current.indexOf(suffix);
         if (suffixIndex === -1) {
-          input.value = `${current}${suffix}`;
+          field.value = `${current}${suffix}`;
           return;
         }
         const editablePart = current.slice(0, suffixIndex);
-        input.value = `${editablePart}${suffix}`;
+        field.value = `${editablePart}${suffix}`;
       };
 
       const clampCaret = () => {
-        const current = input.value || "";
+        const current = field.value || "";
         const suffixIndex = current.indexOf(suffix);
         if (suffixIndex === -1) return;
         const maxPos = suffixIndex;
-        const cursorStart = input.selectionStart ?? 0;
-        const cursorEnd = input.selectionEnd ?? 0;
+        const cursorStart = field.selectionStart ?? 0;
+        const cursorEnd = field.selectionEnd ?? 0;
         if (cursorStart > maxPos || cursorEnd > maxPos) {
-          input.setSelectionRange(maxPos, maxPos);
+          field.setSelectionRange(maxPos, maxPos);
         }
       };
 
       normalizeSuffix();
 
-      input.addEventListener("input", () => {
+      field.addEventListener("input", () => {
         normalizeSuffix();
         clampCaret();
       });
 
-      input.addEventListener("keydown", (event) => {
-        const current = input.value || "";
+      field.addEventListener("keydown", (event) => {
+        const current = field.value || "";
         const suffixIndex = current.indexOf(suffix);
         if (suffixIndex === -1) return;
         const maxPos = suffixIndex;
-        const cursorStart = input.selectionStart ?? 0;
-        const cursorEnd = input.selectionEnd ?? 0;
+        const cursorStart = field.selectionStart ?? 0;
+        const cursorEnd = field.selectionEnd ?? 0;
 
         if ((event.key === "Backspace" || event.key === "Delete") && cursorStart >= maxPos) {
           event.preventDefault();
-          input.setSelectionRange(maxPos, maxPos);
+          field.setSelectionRange(maxPos, maxPos);
         }
 
         if (cursorEnd > maxPos) {
           event.preventDefault();
-          input.setSelectionRange(maxPos, maxPos);
+          field.setSelectionRange(maxPos, maxPos);
         }
       });
 
-      input.addEventListener("click", clampCaret);
-      input.addEventListener("focus", clampCaret);
-      input.addEventListener("mouseup", clampCaret);
+      field.addEventListener("click", clampCaret);
+      field.addEventListener("focus", clampCaret);
+      field.addEventListener("mouseup", clampCaret);
     });
 
     const lampSlotTemplate = document.getElementById("private-wish-lamp-slot-template");
@@ -838,6 +912,7 @@
       </section>
 
       <div class="private-wishes-body private-wishes-content">
+        <div class="private-wishes-surface">
         <!-- =========================
          *  NAV / LINKS
          *  ========================= -->
@@ -1115,52 +1190,123 @@
             </div>
           </div>
 
-          <!-- =========================
-           *  SEGURIDAD / PRIVATE LOCK
-           *  ========================= -->
-          <section class="private-security-overlay" aria-label="Seguridad de deseos privados">
-            <div class="private-security-card" role="dialog" aria-modal="true" aria-live="polite">
-              <img class="private-security-hero" src="/css/cpp-key.webp" alt="Clave privada" />
+        </section>
+        </div>
 
-              <h2 class="private-security-title">Digita tu contraseña privada personal:</h2>
+        <!-- =========================
+         *  SEGURIDAD / PRIVATE LOCK
+         *  ========================= -->
+        <section class="private-security-overlay" aria-label="Seguridad de deseos privados">
+          <div class="private-security-card" role="dialog" aria-modal="true" aria-live="polite">
+            <img class="private-security-hero" src="/css/cpp-key.webp" alt="Clave privada" />
 
-              <div class="private-security-input-row">
-                <label class="modal-label hidden" for="private-security-password">Contraseña privada</label>
-                <input class="modal-input private-security-input" id="private-security-password" type="password"
-                  autocomplete="off" inputmode="text" placeholder="••••••••••••••" />
-                <button class="private-security-btn private-security-unlock" type="button" id="private-security-unlock"
-                  aria-label="Ingresar">
-                  <img src="/css/icons/iconlock.webp" alt="Ingresar" />
-                </button>
-              </div>
+            <h2 class="private-security-title">Digita tu contraseña privada personal:</h2>
 
-              <p class="private-security-error" id="private-security-error" role="alert">
-                Contraseña incorrecta. Inténtalo de nuevo.
-              </p>
-
-              <div class="private-security-actions">
-                <button class="private-security-btn" type="button" aria-label="Cambiar contraseña">
-                  <img src="/css/icons/iconedit.webp" alt="Cambiar contraseña" />
-                </button>
-                <button class="private-security-btn" type="button" aria-label="Reiniciar contraseña">
-                  <img src="/css/icons/icondelete.webp" alt="Reiniciar contraseña" />
-                </button>
-              </div>
-
-              <p class="private-security-note">
-                Tu clave secreta personal protege toda la información privada que declares en esta red social: deseos,
-                propósitos y datos confidenciales. Si la pierdes, no podrás recuperar el acceso a esa información. En caso
-                de olvido, podrás reiniciar la clave, pero esto implicará la eliminación definitiva de todos tus deseos
-                privados y datos confidenciales, los cuales deberán configurarse nuevamente. Sin esta clave, nadie puede
-                acceder a tu información privada: ni el Guardián Supremo Absoluto ni las bases de datos de la red social
-                tienen visibilidad sobre lo que has decidido mantener en secreto. Se recomienda guardar tu clave secreta
-                —de forma digital o física— en un lugar seguro.
-              </p>
+            <div class="private-security-input-row">
+              <label class="modal-label hidden" for="private-security-password">Contraseña privada</label>
+              <input class="modal-input private-security-input" id="private-security-password" type="password"
+                autocomplete="off" inputmode="text" placeholder="••••••••••••••" />
+              <button class="private-security-btn private-security-unlock" type="button" id="private-security-unlock"
+                aria-label="Ingresar" title="Ingresar">
+                <img src="/css/icons/icondoor.webp" alt="Ingresar" />
+              </button>
             </div>
-          </section>
+
+            <p class="private-security-error" id="private-security-error" role="alert">
+              Contraseña incorrecta. Inténtalo de nuevo.
+            </p>
+
+            <div class="private-security-actions">
+              <button class="private-security-btn" type="button" aria-label="Modificar contraseña privada personal"
+                id="private-security-change-password" title="Modificar contraseña privada personal">
+                <img src="/css/icons/iconedit.webp" alt="Cambiar contraseña" />
+              </button>
+              <button class="private-security-btn" type="button" aria-label="Reiniciar contraseña"
+                id="private-security-reset-password" title="Reiniciar contraseña">
+                <img src="/css/icons/icondelete.webp" alt="Reiniciar contraseña" />
+              </button>
+            </div>
+
+            <p class="private-security-note">
+              Tu clave secreta personal protege toda la información privada que declares en esta red social: deseos,
+              propósitos y datos confidenciales. Si la pierdes, no podrás recuperar el acceso a esa información. En caso
+              de olvido, podrás reiniciar la clave, pero esto implicará la eliminación definitiva de todos tus deseos
+              privados y datos confidenciales, los cuales deberán configurarse nuevamente. Sin esta clave, nadie puede
+              acceder a tu información privada: ni el Guardián Supremo Absoluto ni las bases de datos de la red social
+              tienen visibilidad sobre lo que has decidido mantener en secreto. Se recomienda guardar tu clave secreta
+              —de forma digital o física— en un lugar seguro.
+            </p>
+          </div>
         </section>
       </div>
     </main>
+
+    <div class="modal-overlay hidden" id="private-change-password-modal" aria-hidden="true">
+      <div class="modal wish-modal private-change-password-modal" role="dialog" aria-modal="true" aria-label="Modificar contraseña privada personal">
+        <div class="modal-head">
+          <h3>Modificar contraseña privada personal</h3>
+          <button class="modal-close" type="button" id="private-change-password-cancel">✕</button>
+        </div>
+        <div class="modal-body">
+          <label class="modal-label" for="private-current-password">Digita tu actual contraseña privada personal</label>
+          <input class="modal-input" id="private-current-password" type="password" autocomplete="off" />
+
+          <label class="modal-label" for="private-new-password">Digita tu nueva contraseña privada personal</label>
+          <input class="modal-input" id="private-new-password" type="password" autocomplete="off" />
+
+          <label class="modal-label" for="private-confirm-password">Confirma tu nueva contraseña privada actual</label>
+          <input class="modal-input" id="private-confirm-password" type="password" autocomplete="off" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-primary btn-compact" type="button">Confirmar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="private-change-password-cancel-footer">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="private-reset-password-modal" aria-hidden="true">
+      <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label="Restaurar contraseña privada personal">
+        <div class="modal-head">
+          <h3>Restaurar contraseña privada personal</h3>
+          <button class="modal-close" type="button" id="private-reset-password-cancel">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="private-reset-text">
+            Estás a punto de reiniciar tu clave secreta personal porque la has olvidado.
+          </p>
+          <p class="private-reset-text">
+            Esta acción eliminará de forma permanente todos tus deseos privados y tu información cifrada.
+          </p>
+          <p class="private-reset-text private-reset-question">
+            ¿Estás seguro de que deseas continuar?
+          </p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-primary btn-compact" type="button" id="private-reset-password-confirm">Sí, continuar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="private-reset-password-cancel-footer">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="private-reset-password-final-modal" aria-hidden="true">
+      <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label="Confirmación final de restauración">
+        <div class="modal-head">
+          <h3>Confirmación final</h3>
+          <button class="modal-close" type="button" id="private-reset-password-final-cancel">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="private-reset-text">
+            Para confirmar la restauración de tu clave secreta personal, escribe la siguiente palabra exactamente como se muestra:
+          </p>
+          <p class="private-reset-text private-reset-keyword">RESTAURACIÓN</p>
+          <input class="modal-input" id="private-reset-password-keyword" type="text" autocomplete="off" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-primary btn-compact" type="button">Restaurar clave</button>
+          <button class="btn btn-outline btn-compact" type="button" id="private-reset-password-final-cancel-footer">Cancelar</button>
+        </div>
+      </div>
+    </div>
 
     <!-- FOOTER reutilizado -->
     <footer class="kiadez-footer">

@@ -4063,8 +4063,8 @@ body[data-visitor="true"] .visitor-only {
 }
 
 .private-security-btn img {
-    width: 44px;
-    height: 44px;
+    width: 96px;
+    height: 96px;
 }
 
 .private-security-unlock {
@@ -4228,6 +4228,7 @@ body[data-visitor="true"] .visitor-only {
 }
 
 @media (max-width: 900px) {
+
     .public-wishes-head,
     .private-wishes-head {
         flex-direction: column;

@@ -135,7 +135,7 @@
   <header class="feed-topbar">
     <div class="feed-topbar-zone feed-topbar-left">
       <a class="topbar-logo" href="/home_user.html" aria-label="Kiadez">
-        <img src="/logo-kiadez.png" alt="Kiadez" />
+        <img src="/css/logo-kiadez.webp" alt="Kiadez" />
       </a>
       <form class="topbar-search" role="search">
         <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
