@@ -697,7 +697,7 @@ body {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transform: translate(0px, 0px);
+    object-position: 50% 50%;
     user-select: none;
     -webkit-user-drag: none;
     cursor: grab;
@@ -712,6 +712,93 @@ body {
     z-index: 5;
 }
 
+.cover-menu {
+    position: relative;
+}
+
+.cover-menu summary {
+    list-style: none;
+}
+
+.cover-menu summary::-webkit-details-marker {
+    display: none;
+}
+
+.cover-menu-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 220px;
+    background: rgba(255, 255, 255, 0.96);
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    padding: 10px;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 6;
+}
+
+.cover-menu-item {
+    border: none;
+    background: rgba(11, 95, 42, 0.08);
+    color: #0b5f2a;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: 'Liberation Serif', serif;
+    text-align: left;
+}
+
+.cover-menu-item:hover {
+    background: rgba(11, 95, 42, 0.16);
+}
+
+#coverMove.is-active {
+    background: rgba(11, 95, 42, 0.2);
+}
+
+.cover-media.is-move-mode .cover-img {
+    cursor: grab;
+}
+
+.cover-save-actions {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    z-index: 5;
+    display: flex;
+    gap: 10px;
+}
+
+.cover-select-modal {
+    width: min(720px, 92vw);
+}
+
+.cover-select-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+.cover-select-item {
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+}
+
+.cover-select-item img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    display: block;
+}
 .icon-btn {
     border: 1px solid rgba(255, 255, 255, 0.55);
     background: rgba(255, 255, 255, 0.70);
@@ -733,6 +820,28 @@ body {
     position: absolute;
     inset: 0;
     z-index: 4;
+}
+
+.purpose-stack {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+}
+
+.purpose-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+}
+
+.purpose-list .purpose-pill {
+    position: static;
 }
 
 .purpose-pill {
@@ -784,6 +893,11 @@ body {
     border-radius: 999px;
     font-size: 0.9rem;
     backdrop-filter: blur(6px);
+}
+
+.purpose-edit-btn img {
+    width: 24px;
+    height: 24px;
 }
 
 /* NAV */
@@ -3052,6 +3166,39 @@ body[data-visitor="true"] .visitor-only {
     width: 100%;
 }
 
+.wish-slot-description-coop {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.wish-security-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    text-align: center;
+    margin-top: 8px;
+}
+
+.wish-security-label {
+    font-size: 0.85rem;
+    color: rgba(0, 0, 0, 0.6);
+}
+
+.wish-security-input {
+    width: min(220px, 100%);
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    background: rgba(255, 255, 255, 0.85);
+    text-align: center;
+    letter-spacing: 0.22em;
+    font-weight: 700;
+    font-size: 0.95rem;
+    font-family: 'Liberation Serif', serif;
+}
+
 .wish-slot-category-icon {
     width: 200px;
     height: 200px;
@@ -3402,8 +3549,8 @@ body[data-visitor="true"] .visitor-only {
 }
 
 .wish-config-icon {
-    width: 54px;
-    height: 54px;
+    width: 96px;
+    height: 96px;
     border-radius: 999px;
     background: rgba(11, 95, 42, 0.1);
     border: 1px solid rgba(11, 95, 42, 0.18);
@@ -3413,8 +3560,16 @@ body[data-visitor="true"] .visitor-only {
 }
 
 .wish-config-icon img {
-    width: 26px;
-    height: 26px;
+    width: 140px;
+    height: 140px;
+}
+
+.cooperative-wish-body .wish-config-icon {
+    margin: 0 auto;
+}
+
+.personal-wish-body .wish-config-icon {
+    margin: 0 auto;
 }
 
 .wish-helper {
@@ -3969,6 +4124,7 @@ body[data-visitor="true"] .visitor-only {
 .private-security-actions {
     display: flex;
     justify-content: center;
+    align-items: center;
     gap: 18px;
     margin-top: 6px;
 }

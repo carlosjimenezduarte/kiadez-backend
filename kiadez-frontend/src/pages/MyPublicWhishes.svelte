@@ -142,6 +142,19 @@
     const cooperativeWishTemplate = document.getElementById("cooperativeWishTemplate");
     const cooperativeWishText = document.getElementById("cooperativeWishText");
     const cooperativeWishCount = document.getElementById("cooperativeWishCount");
+    const cooperativeWishSecurityCode = document.getElementById("cooperativeWishSecurityCode");
+    const coverMedia = document.getElementById("coverMedia");
+    const coverImg = document.getElementById("coverImg");
+    const coverFile = document.getElementById("coverFile");
+    const coverUploadBtn = document.getElementById("coverUpload");
+    const coverMoveBtn = document.getElementById("coverMove");
+    const coverMenu = document.querySelector(".cover-menu");
+    const coverSelectExisting = document.getElementById("coverSelectExisting");
+    const coverSelectModal = document.getElementById("coverSelectModal");
+    const coverSelectCancel = document.getElementById("coverSelectCancel");
+    const coverSaveActions = document.getElementById("coverSaveActions");
+    const coverSaveBtn = document.getElementById("coverSaveBtn");
+    const coverCancelBtn = document.getElementById("coverCancelBtn");
     const confirmCooperativeWish = document.getElementById("confirmCooperativeWish");
     const icanConfirmModal = document.getElementById("icanConfirmModal");
     const icanConfirmYes = document.getElementById("icanConfirmYes");
@@ -153,6 +166,11 @@
     const cooperativeParticipateQuote = document.getElementById("cooperativeParticipateQuote");
     const cancelCooperativeParticipate = document.getElementById("cancelCooperativeParticipate");
     const confirmCooperativeParticipate = document.getElementById("confirmCooperativeParticipate");
+    const cooperativeSecurityModal = document.getElementById("cooperativeSecurityModal");
+    const cooperativeSecurityCodeInput = document.getElementById("cooperativeSecurityCodeInput");
+    const cooperativeSecurityError = document.getElementById("cooperativeSecurityError");
+    const confirmCooperativeSecurity = document.getElementById("confirmCooperativeSecurity");
+    const cancelCooperativeSecurity = document.getElementById("cancelCooperativeSecurity");
     const cooperativeCharacter = document.getElementById("cooperativeCharacter");
     const personalWishText = document.getElementById("personalWishText");
     const personalWishError = document.getElementById("personalWishError");
@@ -181,6 +199,20 @@
     let activeParticipateSource = null;
     let activeParticipateMode = "create";
     let activeParticipateSlot = null;
+    let activeSecuritySlot = null;
+    let coverMoveEnabled = false;
+    let coverDragActive = false;
+    let coverStartX = 0;
+    let coverStartY = 0;
+    let coverOffsetX = 0;
+    let coverOffsetY = 0;
+    let coverMaxOffsetX = 0;
+    let coverMaxOffsetY = 0;
+    let coverDirty = false;
+    let coverSavedSrc = "";
+    let coverSavedOffsetX = 0;
+    let coverSavedOffsetY = 0;
+    let coverPendingUrl = null;
     let isVisitorView = false;
     let fulfillEvidenceUrl = null;
 
@@ -257,6 +289,9 @@
       cooperativeWishModal.classList.remove("hidden");
       cooperativeWishModal.setAttribute("aria-hidden", "false");
       updateModalScrollLock();
+      if (cooperativeWishSecurityCode) {
+        cooperativeWishSecurityCode.value = activeCooperativeSlot?.dataset?.securityCode || "";
+      }
     };
 
     const closeCooperativeWishModalFn = () => {
@@ -363,6 +398,28 @@
       activeParticipateMode = "create";
     };
 
+    const openCooperativeSecurityModal = (slot) => {
+      if (!cooperativeSecurityModal) return;
+      activeSecuritySlot = slot;
+      cooperativeSecurityModal.classList.remove("hidden");
+      cooperativeSecurityModal.setAttribute("aria-hidden", "false");
+      if (cooperativeSecurityCodeInput) {
+        cooperativeSecurityCodeInput.value = "";
+      }
+      if (cooperativeSecurityError) {
+        cooperativeSecurityError.classList.remove("is-visible");
+      }
+      updateModalScrollLock();
+    };
+
+    const closeCooperativeSecurityModal = () => {
+      if (!cooperativeSecurityModal) return;
+      cooperativeSecurityModal.classList.add("hidden");
+      cooperativeSecurityModal.setAttribute("aria-hidden", "true");
+      activeSecuritySlot = null;
+      updateModalScrollLock();
+    };
+
     if (closePersonalWishModal) {
       closePersonalWishModal.addEventListener("click", closePersonalWishModalFn);
     }
@@ -437,6 +494,12 @@
     if (cooperativeParticipateModal) {
       cooperativeParticipateModal.addEventListener("click", (event) => {
         if (event.target === cooperativeParticipateModal) closeCooperativeParticipateModalFn();
+      });
+    }
+
+    if (cooperativeSecurityModal) {
+      cooperativeSecurityModal.addEventListener("click", (event) => {
+        if (event.target === cooperativeSecurityModal) closeCooperativeSecurityModal();
       });
     }
 
@@ -811,7 +874,7 @@
       slot.appendChild(row);
     };
 
-    const renderCooperativeWishSlot = (slot, description, imageUrl, type, current, goal, template) => {
+    const renderCooperativeWishSlot = (slot, description, imageUrl, type, current, goal, template, securityCode) => {
       if (!slot) return;
       if (slot.dataset.imageUrl && slot.dataset.imageUrl !== imageUrl) {
         URL.revokeObjectURL(slot.dataset.imageUrl);
@@ -855,11 +918,29 @@
       iconWrap.appendChild(categoryIcon);
 
       const descWrap = document.createElement("div");
-      descWrap.className = "wish-slot-description";
+      descWrap.className = "wish-slot-description wish-slot-description-coop";
       const title = document.createElement("div");
       title.className = "wish-slot-title";
       title.textContent = description;
       descWrap.appendChild(title);
+      if (!isVisitorView) {
+        const securityField = document.createElement("div");
+        securityField.className = "wish-security-field";
+        const securityLabel = document.createElement("span");
+        securityLabel.className = "wish-security-label";
+        securityLabel.textContent = "Código de seguridad";
+        const securityInput = document.createElement("input");
+        securityInput.className = "wish-security-input";
+        securityInput.type = "text";
+        securityInput.inputMode = "numeric";
+        securityInput.maxLength = 6;
+        securityInput.placeholder = "000000";
+        securityInput.readOnly = true;
+        securityInput.value = securityCode || slot.dataset.securityCode || "";
+        securityField.appendChild(securityLabel);
+        securityField.appendChild(securityInput);
+        descWrap.appendChild(securityField);
+      }
 
       const counter = document.createElement("div");
       counter.className = "wish-slot-counter";
@@ -942,7 +1023,29 @@
       const title = document.createElement("div");
       title.className = "wish-slot-title";
       title.textContent = participationText;
+      const typePill = document.createElement("span");
+      typePill.className = "wish-type-pill";
+      typePill.textContent = "Cooperativo";
       descWrap.appendChild(title);
+      descWrap.appendChild(typePill);
+      if (!isVisitorView) {
+        const securityField = document.createElement("div");
+        securityField.className = "wish-security-field";
+        const securityLabel = document.createElement("span");
+        securityLabel.className = "wish-security-label";
+        securityLabel.textContent = "Código de seguridad";
+        const securityInput = document.createElement("input");
+        securityInput.className = "wish-security-input";
+        securityInput.type = "text";
+        securityInput.inputMode = "numeric";
+        securityInput.maxLength = 6;
+        securityInput.placeholder = "000000";
+        securityInput.readOnly = true;
+        securityInput.value = slot.dataset.securityCode || "";
+        securityField.appendChild(securityLabel);
+        securityField.appendChild(securityInput);
+        descWrap.appendChild(securityField);
+      }
 
       const actions = document.createElement("div");
       actions.className = "wish-slot-actions wish-slot-actions-inline";
@@ -1076,6 +1179,15 @@
       syncCooperativeTypeHint(checkedCoopInput.value);
     }
 
+    if (cooperativeWishSecurityCode) {
+      cooperativeWishSecurityCode.addEventListener("input", () => {
+        const cleaned = cooperativeWishSecurityCode.value.replace(/\D/g, "").slice(0, 6);
+        if (cooperativeWishSecurityCode.value !== cleaned) {
+          cooperativeWishSecurityCode.value = cleaned;
+        }
+      });
+    }
+
     const handleConfirmPersonalWish = () => {
       if (!activePersonalSlot) return;
       if (!personalWishText) return;
@@ -1108,11 +1220,14 @@
         const selectedType = Array.from(cooperativeWishTypeInputs).find((input) => input.checked)?.value || "Espiritual";
         const goal = cooperativeWishCount ? Number(cooperativeWishCount.value) || 0 : 0;
         const template = cooperativeWishTemplate ? cooperativeWishTemplate.value : "";
+        const securityCodeRaw = cooperativeWishSecurityCode ? cooperativeWishSecurityCode.value : "";
+        const securityCode = securityCodeRaw.replace(/\D/g, "").slice(0, 6);
         const file = cooperativeWishMedia && cooperativeWishMedia.files ? cooperativeWishMedia.files[0] : null;
         const imageUrl = file ? URL.createObjectURL(file) : activeCooperativeSlot?.dataset.imageUrl || null;
 
         const slot = activeCooperativeSlot;
-        renderCooperativeWishSlot(slot, description, imageUrl, selectedType, 0, goal, template);
+        slot.dataset.securityCode = securityCode;
+        renderCooperativeWishSlot(slot, description, imageUrl, selectedType, 0, goal, template, securityCode);
         activeCooperativeSlot = null;
         closeCooperativeWishModalFn();
       });
@@ -1144,6 +1259,254 @@
         closeCooperativeParticipateModalFn();
       });
     }
+
+    if (cooperativeSecurityCodeInput) {
+      cooperativeSecurityCodeInput.addEventListener("input", () => {
+        const cleaned = cooperativeSecurityCodeInput.value.replace(/\D/g, "").slice(0, 6);
+        if (cooperativeSecurityCodeInput.value !== cleaned) {
+          cooperativeSecurityCodeInput.value = cleaned;
+        }
+      });
+    }
+
+    if (confirmCooperativeSecurity) {
+      confirmCooperativeSecurity.addEventListener("click", () => {
+        if (!activeSecuritySlot) return;
+        const expected = activeSecuritySlot.dataset.securityCode || "";
+        const entered = cooperativeSecurityCodeInput ? cooperativeSecurityCodeInput.value.trim() : "";
+        const isValid = expected && entered === expected;
+        if (!isValid) {
+          if (cooperativeSecurityError) {
+            cooperativeSecurityError.classList.add("is-visible");
+          }
+          return;
+        }
+        if (cooperativeSecurityError) {
+          cooperativeSecurityError.classList.remove("is-visible");
+        }
+        const slot = activeSecuritySlot;
+        closeCooperativeSecurityModal();
+        openCooperativeParticipateModal(slot);
+      });
+    }
+
+    if (cancelCooperativeSecurity) {
+      cancelCooperativeSecurity.addEventListener("click", closeCooperativeSecurityModal);
+    }
+
+    const closeCoverMenu = () => {
+      if (coverMenu && coverMenu.hasAttribute("open")) {
+        coverMenu.removeAttribute("open");
+      }
+    };
+
+    const markCoverDirty = () => {
+      coverDirty = true;
+      if (coverSaveActions) {
+        coverSaveActions.classList.remove("hidden");
+      }
+    };
+
+    const hideCoverActions = () => {
+      if (coverSaveActions) {
+        coverSaveActions.classList.add("hidden");
+      }
+    };
+
+    const setCoverMoveState = (enabled) => {
+      coverMoveEnabled = enabled;
+      if (coverMedia) {
+        coverMedia.classList.toggle("is-move-mode", coverMoveEnabled);
+      }
+      if (coverMoveBtn) {
+        coverMoveBtn.classList.toggle("is-active", coverMoveEnabled);
+      }
+      updateCoverTransform(coverOffsetX, coverOffsetY);
+    };
+
+    const commitCoverState = () => {
+      if (!coverImg) return;
+      coverSavedSrc = coverImg.src;
+      coverSavedOffsetX = coverOffsetX;
+      coverSavedOffsetY = coverOffsetY;
+      coverDirty = false;
+      coverPendingUrl = null;
+      setCoverMoveState(false);
+      hideCoverActions();
+    };
+
+    const revertCoverState = () => {
+      if (!coverImg) return;
+      if (coverPendingUrl) {
+        URL.revokeObjectURL(coverPendingUrl);
+        coverPendingUrl = null;
+      }
+      coverOffsetX = coverSavedOffsetX;
+      coverOffsetY = coverSavedOffsetY;
+      if (coverSavedSrc) {
+        coverImg.src = coverSavedSrc;
+      }
+      coverDirty = false;
+      setCoverMoveState(false);
+      hideCoverActions();
+    };
+
+    const updateCoverTransform = (x, y) => {
+      if (!coverImg || !coverMedia) return { x, y };
+      const clampedX = Math.min(coverMaxOffsetX, Math.max(-coverMaxOffsetX, x));
+      const clampedY = Math.min(coverMaxOffsetY, Math.max(-coverMaxOffsetY, y));
+      coverImg.style.transform = "none";
+      coverImg.style.objectPosition = `calc(50% + ${clampedX}px) calc(50% + ${clampedY}px)`;
+      return { x: clampedX, y: clampedY };
+    };
+
+    const recalcCoverBounds = () => {
+      if (!coverImg || !coverMedia || !coverImg.naturalWidth || !coverImg.naturalHeight) return;
+      const rect = coverMedia.getBoundingClientRect();
+      const scale = Math.max(rect.width / coverImg.naturalWidth, rect.height / coverImg.naturalHeight);
+      const renderedWidth = coverImg.naturalWidth * scale;
+      const renderedHeight = coverImg.naturalHeight * scale;
+      coverMaxOffsetX = Math.max(0, (renderedWidth - rect.width) / 2);
+      coverMaxOffsetY = Math.max(0, (renderedHeight - rect.height) / 2);
+      const clamped = updateCoverTransform(coverOffsetX, coverOffsetY);
+      coverOffsetX = clamped.x;
+      coverOffsetY = clamped.y;
+    };
+
+    const openCoverSelectModal = () => {
+      if (!coverSelectModal) return;
+      coverSelectModal.classList.remove("hidden");
+      coverSelectModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+    };
+
+    const closeCoverSelectModal = () => {
+      if (!coverSelectModal) return;
+      coverSelectModal.classList.add("hidden");
+      coverSelectModal.setAttribute("aria-hidden", "true");
+      updateModalScrollLock();
+    };
+
+    if (coverUploadBtn && coverFile) {
+      coverUploadBtn.addEventListener("click", () => coverFile.click());
+    }
+
+    if (coverFile && coverImg) {
+      coverFile.addEventListener("change", (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        if (coverPendingUrl) {
+          URL.revokeObjectURL(coverPendingUrl);
+        }
+        const url = URL.createObjectURL(file);
+        coverPendingUrl = url;
+        coverImg.src = url;
+        coverOffsetX = 0;
+        coverOffsetY = 0;
+        markCoverDirty();
+        closeCoverMenu();
+        setCoverMoveState(true);
+        recalcCoverBounds();
+      });
+    }
+
+    if (coverMoveBtn && coverMedia) {
+      coverMoveBtn.addEventListener("click", () => {
+        setCoverMoveState(!coverMoveEnabled);
+        markCoverDirty();
+        closeCoverMenu();
+      });
+    }
+
+    if (coverSelectExisting) {
+      coverSelectExisting.addEventListener("click", () => {
+        openCoverSelectModal();
+        closeCoverMenu();
+      });
+    }
+
+    if (coverSelectCancel) {
+      coverSelectCancel.addEventListener("click", closeCoverSelectModal);
+    }
+
+    if (coverSelectModal) {
+      coverSelectModal.addEventListener("click", (event) => {
+        if (event.target === coverSelectModal) closeCoverSelectModal();
+      });
+    }
+
+    if (coverSelectModal && coverImg) {
+      coverSelectModal.addEventListener("click", (event) => {
+        const button = event.target.closest(".cover-select-item");
+        if (!button) return;
+        const src = button.dataset.coverSrc;
+        if (!src) return;
+        if (coverPendingUrl) {
+          URL.revokeObjectURL(coverPendingUrl);
+          coverPendingUrl = null;
+        }
+        coverImg.src = src;
+        coverOffsetX = 0;
+        coverOffsetY = 0;
+        markCoverDirty();
+        closeCoverSelectModal();
+        setCoverMoveState(true);
+        recalcCoverBounds();
+      });
+    }
+
+    if (coverSaveBtn) {
+      coverSaveBtn.addEventListener("click", commitCoverState);
+    }
+
+    if (coverCancelBtn) {
+      coverCancelBtn.addEventListener("click", revertCoverState);
+    }
+
+    if (coverMedia && coverImg) {
+      coverMedia.addEventListener("mousedown", (event) => {
+        if (!coverMoveEnabled) return;
+        if (event.target.closest(".cover-actions")) return;
+        coverDragActive = true;
+        coverStartX = event.clientX;
+        coverStartY = event.clientY;
+        coverMedia.classList.add("is-dragging");
+      });
+
+      window.addEventListener("mousemove", (event) => {
+        if (!coverDragActive) return;
+        const dx = event.clientX - coverStartX;
+        const dy = event.clientY - coverStartY;
+        const nextX = coverOffsetX + dx;
+        const nextY = coverOffsetY + dy;
+        updateCoverTransform(nextX, nextY);
+      });
+
+      window.addEventListener("mouseup", (event) => {
+        if (!coverDragActive) return;
+        const dx = event.clientX - coverStartX;
+        const dy = event.clientY - coverStartY;
+        const nextX = coverOffsetX + dx;
+        const nextY = coverOffsetY + dy;
+        const clamped = updateCoverTransform(nextX, nextY);
+        coverOffsetX = clamped.x;
+        coverOffsetY = clamped.y;
+        coverDragActive = false;
+        coverMedia.classList.remove("is-dragging");
+      });
+    }
+
+    if (coverImg) {
+      coverImg.addEventListener("load", () => {
+        if (!coverSavedSrc) {
+          coverSavedSrc = coverImg.src;
+          coverSavedOffsetX = coverOffsetX;
+          coverSavedOffsetY = coverOffsetY;
+        }
+        recalcCoverBounds();
+      });
+    }
+    window.addEventListener("resize", recalcCoverBounds);
 
     if (confirmDeleteWish) {
       confirmDeleteWish.addEventListener("click", () => {
@@ -1191,7 +1554,8 @@
         const current = Number(slot.dataset.current || 0);
         const goal = Number(slot.dataset.goal || 0);
         const template = slot.dataset.template || "";
-        renderCooperativeWishSlot(slot, description, imageUrl, type, current, goal, template);
+        const securityCode = slot.dataset.securityCode || "";
+        renderCooperativeWishSlot(slot, description, imageUrl, type, current, goal, template, securityCode);
       });
     };
 
@@ -1262,6 +1626,9 @@
                 cooperativeWishTemplate.value = slot.dataset.template || cooperativeWishTemplate.value;
                 cooperativeWishTemplate.dispatchEvent(new Event("input", { bubbles: true }));
               }
+              if (cooperativeWishSecurityCode) {
+                cooperativeWishSecurityCode.value = slot.dataset.securityCode || "";
+              }
               const typeValue = slot.dataset.type;
               if (typeValue) {
                 const typeInput = Array.from(cooperativeWishTypeInputs).find((input) => input.value === typeValue);
@@ -1302,7 +1669,11 @@
           } else if (actionBtn.dataset.action === "ican") {
             openIcanConfirmModal(slot);
           } else if (actionBtn.dataset.action === "help-coop") {
-            openCooperativeParticipateModal(slot);
+            if (isVisitorView) {
+              openCooperativeSecurityModal(slot);
+            } else {
+              openCooperativeParticipateModal(slot);
+            }
           }
           return;
         }
@@ -1345,6 +1716,9 @@
             cooperativeWishTemplate.value = slot.dataset.template || cooperativeWishTemplate.value;
             cooperativeWishTemplate.dispatchEvent(new Event("input", { bubbles: true }));
           }
+          if (cooperativeWishSecurityCode) {
+            cooperativeWishSecurityCode.value = slot.dataset.securityCode || "";
+          }
           const typeValue = slot.dataset.type;
           if (typeValue) {
             const typeInput = Array.from(cooperativeWishTypeInputs).find((input) => input.value === typeValue);
@@ -1360,7 +1734,11 @@
           activeParticipateSlot = slot;
           openCooperativeParticipateModal(slot, "edit");
         } else if (actionBtn.dataset.action === "help-coop") {
-          openCooperativeParticipateModal(slot);
+          if (isVisitorView) {
+            openCooperativeSecurityModal(slot);
+          } else {
+            openCooperativeParticipateModal(slot);
+          }
         }
       });
     }
@@ -1384,35 +1762,81 @@
         <img id="coverImg" class="cover-img" src="/assets/cover-default.jpg" alt="Portada" />
 
         <div class="cover-actions">
-          <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
-            Cambiar portada
-          </button>
-          <button class="icon-btn" id="btnEditPurposes" type="button" title="Editar deseos de propósito">
-            Editar propósito
-          </button>
+          <details class="cover-menu">
+            <summary class="icon-btn" id="btnChangeCover" title="Editar imagen de portada">
+              Editar imagen de portada
+            </summary>
+            <div class="cover-menu-panel">
+              <button class="cover-menu-item" type="button" id="coverSelectExisting">
+                Seleccionar imagen
+              </button>
+              <button class="cover-menu-item" type="button" id="coverUpload">
+                Subir imagen
+              </button>
+              <button class="cover-menu-item" type="button" id="coverMove">
+                Mover imagen
+              </button>
+            </div>
+          </details>
 
-        <input id="coverFile" type="file" accept="image/*" class="hidden" />
+          <input id="coverFile" type="file" accept="image/*" class="hidden" />
         </div>
 
-        <div class="purpose-triangle" aria-label="Deseos de propósito">
-          <button class="purpose-pill purpose-top" type="button" id="purpose1">
+        <div class="cover-save-actions hidden" id="coverSaveActions">
+          <button class="btn btn-primary btn-compact" type="button" id="coverSaveBtn">
+            Guardar cambios
+          </button>
+          <button class="btn btn-outline btn-compact" type="button" id="coverCancelBtn">
+            Cancelar
+          </button>
+        </div>
+
+        <div class="purpose-stack" aria-label="Deseos de propósito">
+          <div class="purpose-list">
+            <button class="purpose-pill" type="button" id="purpose1">
             Deseo #1: Secreto
-          </button>
+            </button>
 
-          <button class="purpose-pill purpose-left" type="button" id="purpose2">
+            <button class="purpose-pill" type="button" id="purpose2">
             Deseo construir el Reino de Combray
-          </button>
+            </button>
 
-          <button class="purpose-pill purpose-right" type="button" id="purpose3">
+            <button class="purpose-pill" type="button" id="purpose3">
             Deseo estar unido a Jesús
-          </button>
-        </div>
+            </button>
+          </div>
 
-        <div class="cover-hint" id="coverHint">
-          Arrastra la portada para encuadrarla
+          <button class="icon-btn purpose-edit-btn" id="btnEditPurposes" type="button" title="Modificar deseo">
+            <img src="/css/icons/iconedit.webp" alt="Modificar deseo" />
+          </button>
         </div>
       </div>
     </section>
+
+    <div class="modal-overlay hidden" id="coverSelectModal" aria-hidden="true">
+      <div class="modal wish-modal cover-select-modal" role="dialog" aria-modal="true"
+        aria-label="Seleccionar imagen de portada">
+        <div class="modal-head">
+          <h3>Seleccionar imagen</h3>
+        </div>
+        <div class="modal-body">
+          <div class="cover-select-grid">
+            <button class="cover-select-item" type="button" data-cover-src="/assets/cover-default.jpg">
+              <img src="/assets/cover-default.jpg" alt="Portada 1" />
+            </button>
+            <button class="cover-select-item" type="button" data-cover-src="/assets/post-1.jpg">
+              <img src="/assets/post-1.jpg" alt="Portada 2" />
+            </button>
+            <button class="cover-select-item" type="button" data-cover-src="/assets/post-2.jpg">
+              <img src="/assets/post-2.jpg" alt="Portada 3" />
+            </button>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-compact" type="button" id="coverSelectCancel">Cancelar</button>
+        </div>
+      </div>
+    </div>
 
     <div class="public-wishes-body">
       <!-- =========================
@@ -1650,6 +2074,9 @@
                       espiritualidad, asistir a misa.
                     </span>
                   </div>
+                  <label class="modal-label" for="cooperativeWishSecurityCode">Código de seguridad</label>
+                  <input class="modal-input" id="cooperativeWishSecurityCode" type="text" inputmode="numeric"
+                    maxlength="6" placeholder="000000" />
                 </div>
 
                 <div class="wish-modal-col">
@@ -1846,6 +2273,30 @@
             <div class="modal-actions">
               <button class="btn btn-primary btn-compact" type="button">Enviar</button>
               <button class="btn btn-outline btn-compact" type="button" id="cancelGuardianModal">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-overlay hidden" id="cooperativeSecurityModal" aria-hidden="true">
+          <div class="modal wish-modal cooperative-participate-modal" role="dialog" aria-modal="true"
+            aria-label="Confirmación de deseo cooperativo">
+            <div class="modal-head">
+              <h3>Confirmación de deseo cooperativo</h3>
+            </div>
+            <div class="modal-body">
+              <p class="panel-muted">
+                Escribe el código de seguridad que estableció el creador de este deseo cooperativo
+              </p>
+              <label class="modal-label hidden" for="cooperativeSecurityCodeInput">Código de seguridad</label>
+              <input class="modal-input" id="cooperativeSecurityCodeInput" type="text" inputmode="numeric"
+                maxlength="6" placeholder="000000" />
+              <div class="wish-error" id="cooperativeSecurityError" role="alert">
+                El código de seguridad no coincide.
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-primary btn-compact" type="button" id="confirmCooperativeSecurity">Confirmar</button>
+              <button class="btn btn-outline btn-compact" type="button" id="cancelCooperativeSecurity">Cancelar</button>
             </div>
           </div>
         </div>
