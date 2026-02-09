@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kiadez — Mis deseos privados</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body data-visitor="false" class="private-wishes-page private-locked">
+  <div class="page-background page-background-user private-wishes-background">
+
+    <main class="user-home">
+
+      <!-- =========================
+       *  PORTADA / COVER
+       *  ========================= -->
+      <section class="cover private-cover" id="private-cover">
+        <div class="cover-media" id="private-cover-media">
+          <img id="private-cover-img" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
+
+          <div class="cover-actions">
+            <button class="icon-btn" id="private-btn-change-cover" type="button" title="Cambiar portada">
+              Cambiar portada
+            </button>
+            <button class="icon-btn" id="private-btn-edit-purposes" type="button" title="Editar deseos de propósito">
+              Editar propósito
+            </button>
+
+            <input id="private-cover-file" type="file" accept="image/*" class="hidden" />
+          </div>
+
+          <div class="purpose-triangle" aria-label="Deseos de propósito">
+            <button class="purpose-pill purpose-top" type="button" id="private-purpose-1">
+              Deseo #1: Secreto
+            </button>
+
+            <button class="purpose-pill purpose-left" type="button" id="private-purpose-2">
+              Deseo construir el Reino de Combray
+            </button>
+
+            <button class="purpose-pill purpose-right" type="button" id="private-purpose-3">
+              Deseo estar unido a Jesús
+            </button>
+          </div>
+
+          <div class="cover-hint" id="private-cover-hint">
+            Arrastra la portada para encuadrarla
+          </div>
+        </div>
+      </section>
+
+      <div class="private-wishes-body private-wishes-content">
+        <!-- =========================
+         *  NAV / LINKS
+         *  ========================= -->
+        <nav class="profile-nav" aria-label="Navegación de perfil">
+          <a class="nav-pill" href="home_user.html" title="Home">Home</a>
+          <a class="nav-pill" href="#" title="Estrellas">
+            <span class="nav-icon">⭐</span>
+            <span><strong>5.000.000</strong> estrellas</span>
+          </a>
+          <a class="nav-pill" href="#" title="Seguidores">Seguidores</a>
+          <a class="nav-pill" href="achievements.html" title="Logros recientes">Logros recientes</a>
+          <a class="nav-pill" href="#" title="Galería">Galería</a>
+          <a class="nav-pill" href="calendar.html" title="Calendario">Calendario</a>
+          <a class="nav-pill" href="my-biography.html" title="Mi biografía">Mi biografía</a>
+        </nav>
+
+        <!-- =========================
+         *  MIS DESEOS PRIVADOS
+         *  ========================= -->
+        <section class="private-wishes-shell" aria-label="Mis deseos privados">
+          <header class="private-wishes-head">
+            <div>
+              <h2 class="private-wishes-title">Mis deseos privados</h2>
+
+            </div>
+
+          </header>
+
+
+
+          <!-- =========================
+           *  LISTAS DE DESEOS
+           *  ========================= -->
+          <section class="wish-lists-grid" aria-label="Listas de deseos">
+            <article class="panel wish-list-panel">
+              <div class="panel-head">
+                <h3 class="panel-title">Deseos privados</h3>
+                <div class="panel-actions">
+                  <button class="btn btn-outline btn-compact" type="button" id="private-toggle-visitor-view">
+                    Ver como visitante
+                  </button>
+                </div>
+                <span class="panel-badge"><span id="private-personal-wish-count">7</span> / 50</span>
+              </div>
+
+              <ol class="wish-slot-list" id="private-personal-wish-list" data-total="50" aria-label="Deseos personales">
+              </ol>
+              <div class="wish-add-row">
+                <button class="wish-add-btn" id="private-personal-wish-add" type="button" title="Agregar deseo">
+                  <span class="wish-add-plus">+</span>
+                </button>
+              </div>
+            </article>
+
+
+          </section>
+
+          <template id="private-wish-lamp-slot-template">
+            <div class="wish-slot-row wish-slot-row-empty">
+              <button class="wish-add-btn wish-lamp-btn" type="button" title="Agregar deseo">
+                <img class="wish-lamp-icon" src="/css/icons/iconlamp.webp" alt="Agregar deseo" />
+              </button>
+            </div>
+          </template>
+
+          <div class="modal-overlay hidden" id="private-personal-wish-modal" aria-hidden="true">
+            <div class="modal modal-wide personal-wish-modal" role="dialog" aria-modal="true"
+              aria-label="Configurar deseo personal">
+              <div class="modal-head">
+                <h3>Configurar deseo personal</h3>
+                <button class="modal-close" type="button" id="private-close-personal-wish-modal">✕</button>
+              </div>
+              <div class="modal-body personal-wish-body">
+
+
+                <div class="wish-modal-grid">
+                  <div class="wish-modal-col">
+                    <div class="wish-config-icon personal-wish-hero">
+                      <img src="/css/icons/iconpersonal.webp" alt="Deseo personal" />
+                    </div>
+                    <h2 class="modal-label modal-label-center">Descripción del deseo</h2>
+                    <label class="modal-label hidden" for="private-personal-wish-text">Descripción del deseo</label>
+                    <textarea class="modal-textarea wish-prefix-input wish-textarea-compact" id="private-personal-wish-text"
+                      rows="3" maxlength="80" data-prefix="Deseo " data-counter="private-personal-wish-counter"></textarea>
+                    <div class="wish-counter" id="private-personal-wish-counter" aria-live="polite">0/80</div>
+                    <div class="wish-error" id="private-personal-wish-error" role="alert">No has descrito tu deseo</div>
+                    <div class="wish-warning">
+                      <span class="wish-warning-icon">!</span>
+                      <span id="private-personal-wish-type-hint">
+                        Deseos relacionados con el sentido de vida, la conciencia, la fe, la paz interior y el
+                        crecimiento
+                        espiritual. Ejemplo: perseverar en el hábito de la meditación, leer libros sobre espiritualidad,
+                        asistir a misa.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="wish-modal-col">
+                    <fieldset class="wish-type-fieldset">
+
+                      <div class="wish-type-selected">
+                        <img id="private-personal-wish-type-icon" src="/css/icons/Espiritual.webp" alt="Espiritual" />
+                      </div>
+                      <h2 class="modal-label modal-label-center">Tipo de deseo</h2>
+                      <div class="wish-type-grid">
+                        <label class="wish-type-option">
+                          <input type="radio" name="private-personal-wish-type" value="Espiritual" checked />
+                          <span class="wish-type-visual">
+                            <span>Espiritual</span>
+                          </span>
+                        </label>
+                        <label class="wish-type-option">
+                          <input type="radio" name="private-personal-wish-type" value="Material" />
+                          <span class="wish-type-visual">
+                            <span>Material</span>
+                          </span>
+                        </label>
+                        <label class="wish-type-option">
+                          <input type="radio" name="private-personal-wish-type" value="Monetario" />
+                          <span class="wish-type-visual">
+                            <span>Monetario</span>
+                          </span>
+                        </label>
+                        <label class="wish-type-option">
+                          <input type="radio" name="private-personal-wish-type" value="Profesional" />
+                          <span class="wish-type-visual">
+                            <span>Profesional</span>
+                          </span>
+                        </label>
+                        <label class="wish-type-option">
+                          <input type="radio" name="private-personal-wish-type" value="Salud y cuerpo" />
+                          <span class="wish-type-visual">
+                            <span>Salud y cuerpo</span>
+                          </span>
+                        </label>
+                        <label class="wish-type-option">
+                          <input type="radio" name="private-personal-wish-type" value="Relacional" />
+                          <span class="wish-type-visual">
+                            <span>Relacional</span>
+                          </span>
+                        </label>
+                        <label class="wish-type-option">
+                          <input type="radio" name="private-personal-wish-type" value="Vivencial" />
+                          <span class="wish-type-visual">
+                            <span>Vivencial</span>
+                          </span>
+                        </label>
+                      </div>
+                    </fieldset>
+
+
+                  </div>
+
+                  <div class="wish-modal-col">
+                    <h2 class="modal-label modal-label-center">Agregar imagen</h2>
+                    <label class="modal-label hidden" for="private-personal-wish-media">Agregar imagen</label>
+                    <input class="modal-input hidden" id="private-personal-wish-media" type="file" accept="image/*" />
+                    <div class="wish-image-preview" id="private-personal-wish-preview" aria-live="polite">
+                      <label class="wish-image-btn" for="private-personal-wish-media" aria-label="Seleccionar imagen">+</label>
+                      <div class="wish-preview-content">
+                        <span class="wish-preview-placeholder">Seleccionar imagen</span>
+                        <span class="wish-preview-name" id="private-personal-wish-file-name">Sin imagen seleccionada</span>
+                      </div>
+                    </div>
+                    <div class="wish-config-icon personal-wish-hero">
+                      <img src="/css/icons/iconsave.webp" alt="guardar" />
+                    </div>
+                    <div class="wish-form-actions wish-form-actions-center">
+
+
+                      <br>
+                      <button class="btn btn-primary btn-compact btn-icon" type="button" id="private-confirm-personal-wish">
+                        ¡Confirmar mi deseo!
+                      </button>
+
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-overlay hidden" id="private-delete-wish-modal" aria-hidden="true">
+            <div class="modal wish-modal delete-wish-modal" role="dialog" aria-modal="true" aria-label="Borrar deseo">
+              <div class="modal-head">
+                <h3>¿Estás seguro de que deseas borrar este deseo?</h3>
+              </div>
+              <div class="modal-actions">
+                <button class="btn btn-primary btn-compact" type="button" id="private-confirm-delete-wish">Sí</button>
+                <button class="btn btn-outline btn-compact" type="button" id="private-cancel-delete-wish">No</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-overlay hidden" id="private-fulfill-wish-modal" aria-hidden="true">
+            <div class="modal wish-modal fulfill-wish-modal" role="dialog" aria-modal="true"
+              aria-label="Subir evidencia">
+              <div class="modal-head">
+                <h3>¡Sube la evidencia!</h3>
+              </div>
+              <div class="modal-body">
+                <input id="private-fulfill-evidence" type="file" accept="image/*" class="hidden" />
+                <div class="wish-evidence-preview" id="private-fulfill-evidence-preview" aria-live="polite">
+                  <label class="wish-image-btn" for="private-fulfill-evidence" aria-label="Sube la evidencia visual">+</label>
+                  <div class="wish-preview-content">
+                    <span class="wish-preview-placeholder">Sube la evidencia visual.</span>
+                    <span class="wish-preview-name">PNG, WEBP, JPEG, etc.</span>
+                  </div>
+                </div>
+                <p class="panel-muted">
+                  <strong>¿Declaras bajo verdad de juramento que este deseo se ha cumplido?</strong>
+                </p>
+              </div>
+              <div class="modal-actions">
+                <button class="btn btn-primary btn-compact" type="button">
+                  Juro bajo verdad de juramento que este deseo se ha cumplido
+                </button>
+              </div>
+              <div class="modal-actions">
+                <button class="btn btn-outline btn-compact" type="button" id="private-cancel-fulfill-wish">Cancelar</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-overlay hidden" id="private-ican-confirm-modal" aria-hidden="true">
+            <div class="modal wish-modal ican-confirm-modal" role="dialog" aria-modal="true"
+              aria-label="Conceder deseo">
+              <div class="modal-head">
+                <h3>Yo puedo conceder ese deseo</h3>
+              </div>
+              <div class="modal-body">
+                <p class="panel-muted">¿Estás seguro de que deseas cumplir este deseo?</p>
+              </div>
+              <div class="modal-actions">
+                <button class="btn btn-primary btn-compact" type="button" id="private-ican-confirm-yes">Sí</button>
+                <button class="btn btn-outline btn-compact" type="button" id="private-ican-confirm-no">No</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-overlay hidden" id="private-guardian-contact-modal" aria-hidden="true">
+            <div class="modal wish-modal guardian-contact-modal" role="dialog" aria-modal="true"
+              aria-label="Contactar a un Guardián">
+              <div class="modal-head">
+                <h3>Contactar a un Guardián</h3>
+              </div>
+              <div class="modal-body">
+                <h2 class="guardian-section-title">Selecciona a un Guardián</h2>
+                <div class="guardian-row guardian-select">
+                  <button class="guardian-option" type="button" aria-pressed="false">
+                    <img class="guardian-avatar" src="css/icons/Guardian1.png" alt="Guardián 1" />
+                  </button>
+                  <button class="guardian-option" type="button" aria-pressed="false">
+                    <img class="guardian-avatar" src="css/icons/Guardian2.png" alt="Guardián 2" />
+                  </button>
+                  <button class="guardian-option" type="button" aria-pressed="false">
+                    <img class="guardian-avatar" src="css/icons/Guardian3.png" alt="Guardián 3" />
+                  </button>
+                  <button class="guardian-option" type="button" aria-pressed="false">
+                    <img class="guardian-avatar" src="css/icons/Guardian4.png" alt="Guardián 4" />
+                  </button>
+                </div>
+
+                <h2 class="guardian-section-title">Describe por qué deseas conceder ese deseo</h2>
+                <label class="modal-label hidden" for="private-guardian-reason-visitor">Describe por qué deseas conceder ese
+                  deseo</label>
+                <textarea class="modal-textarea" id="private-guardian-reason-visitor" rows="3"></textarea>
+
+                <h2 class="guardian-section-title">Número telefónico</h2>
+                <label class="modal-label hidden" for="private-guardian-phone-visitor">Número telefónico</label>
+                <input class="modal-input" id="private-guardian-phone-visitor" type="tel" inputmode="tel"
+                  placeholder="+57 300 000 0000" />
+
+                <h2 class="guardian-section-title">E-mail</h2>
+                <label class="modal-label hidden" for="private-guardian-email-visitor">E-mail</label>
+                <input class="modal-input" id="private-guardian-email-visitor" type="email" placeholder="correo@ejemplo.com" />
+
+                <h2 class="guardian-section-title">Evidencia</h2>
+                <div class="upload-row">
+                  <label class="upload-btn" for="private-guardian-evidence-visitor">Adjuntar imagen o video</label>
+                  <input id="private-guardian-evidence-visitor" type="file" accept="image/*,video/*" class="hidden" />
+                  <div class="upload-hint">Envíanos una evidencia de tu buena intención</div>
+                </div>
+              </div>
+              <div class="modal-actions">
+                <button class="btn btn-primary btn-compact" type="button">Enviar</button>
+                <button class="btn btn-outline btn-compact" type="button" id="private-cancel-guardian-modal">Cancelar</button>
+              </div>
+            </div>
+          </div>
+
+
+
+
+
+
+
+
+
+
+      </div>
+      </article>
+  </div>
+  </section>
+
+  <!-- FOOTER reutilizado -->
+  <footer class="kiadez-footer">
+    <div class="footer-main">
+
+      <div class="footer-column footer-origin">
+        <p class="footer-poem">
+          Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br>
+          No para dominar, sino para orientar.<br>
+          Su luz no deslumbra: acompaña.
+        </p>
+      </div>
+
+      <!-- =========================
+       *  SEGURIDAD / PRIVATE LOCK
+       *  ========================= -->
+      <section class="private-security-overlay" aria-label="Seguridad de deseos privados">
+        <div class="private-security-card" role="dialog" aria-modal="true" aria-live="polite">
+          <img class="private-security-hero" src="css/cpp-key.webp" alt="Clave privada" />
+
+          <h2 class="private-security-title">Digita tu contraseña privada personal:</h2>
+
+          <div class="private-security-input-row">
+            <label class="modal-label hidden" for="private-security-password">Contraseña privada</label>
+            <input class="modal-input private-security-input" id="private-security-password" type="password"
+              autocomplete="off" inputmode="text" placeholder="••••••••••••••" />
+            <button class="private-security-btn private-security-unlock" type="button" id="private-security-unlock"
+              aria-label="Ingresar">
+              <img src="css/icons/iconlock.webp" alt="Ingresar" />
+            </button>
+          </div>
+
+          <p class="private-security-error" id="private-security-error" role="alert">
+            Contraseña incorrecta. Inténtalo de nuevo.
+          </p>
+
+          <div class="private-security-actions">
+            <button class="private-security-btn" type="button" aria-label="Cambiar contraseña">
+              <img src="css/icons/iconedit.webp" alt="Cambiar contraseña" />
+            </button>
+            <button class="private-security-btn" type="button" aria-label="Reiniciar contraseña">
+              <img src="css/icons/icondelete.webp" alt="Reiniciar contraseña" />
+            </button>
+          </div>
+
+          <p class="private-security-note">
+            Tu clave secreta personal protege toda la información privada que declares en esta red social: deseos,
+            propósitos y datos confidenciales. Si la pierdes, no podrás recuperar el acceso a esa información. En caso
+            de olvido, podrás reiniciar la clave, pero esto implicará la eliminación definitiva de todos tus deseos
+            privados y datos confidenciales, los cuales deberán configurarse nuevamente. Sin esta clave, nadie puede
+            acceder a tu información privada: ni el Guardián Supremo Absoluto ni las bases de datos de la red social
+            tienen visibilidad sobre lo que has decidido mantener en secreto. Se recomienda guardar tu clave secreta
+            —de forma digital o física— en un lugar seguro.
+          </p>
+        </div>
+      </section>
+
+      <div class="footer-columns">
+        <div class="footer-column">
+          <h4>Sobre nuestra red social</h4>
+          <ul>
+            <li><a href="#">Qué es Kiadez</a></li>
+            <li><a href="#">Rangos de Guardianes</a></li>
+            <li><a href="#">Ser Guardián</a></li>
+            <li><a href="#">Contacto</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h4>Idiomas</h4>
+          <ul>
+            <li><a href="#">Español</a></li>
+            <li><a href="#">English</a></li>
+            <li><a href="#">Français</a></li>
+            <li><a href="#">Português</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h4>Información legal</h4>
+          <ul>
+            <li><a href="#">Términos y condiciones</a></li>
+            <li><a href="#">Privacidad</a></li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="footer-bottom">
+      © 2026 Kiadez — Una red social para cumplir deseos.
+    </div>
+  </footer>
+  </div>
+
+  <script>
+    const prefixInputs = document.querySelectorAll(".wish-prefix-input");
+    const privateUnlockBtn = document.getElementById("private-security-unlock");
+    const privatePasswordInput = document.getElementById("private-security-password");
+    const privateSecurityError = document.getElementById("private-security-error");
+    const privateLockBody = document.body;
+    const PRIVATE_PASSWORD = "LibertadSuprema1986*";
+    const suffixInputs = document.querySelectorAll("[data-suffix]");
+
+    prefixInputs.forEach((input) => {
+      const prefix = input.dataset.prefix || "Deseo ";
+      const counterId = input.dataset.counter;
+      const counterEl = counterId ? document.getElementById(counterId) : null;
+      const maxLength = input.maxLength > 0 ? input.maxLength : null;
+
+      const clampToMax = () => {
+        if (maxLength && input.value.length > maxLength) {
+          input.value = input.value.slice(0, maxLength);
+        }
+      };
+
+      const updateCounter = () => {
+        if (!counterEl) return;
+        const current = input.value.length;
+        const limit = maxLength || current;
+        counterEl.textContent = `${current}/${limit}`;
+      };
+
+      if (!input.value.startsWith(prefix)) {
+        input.value = `${prefix}${input.value}`;
+      }
+      clampToMax();
+      updateCounter();
+
+      const ensurePrefix = () => {
+        if (!input.value.startsWith(prefix)) {
+          const cleaned = input.value.replace(prefix, "");
+          input.value = `${prefix}${cleaned}`;
+        }
+        if (input.value.length < prefix.length) {
+          input.value = prefix;
+        }
+        clampToMax();
+        updateCounter();
+      };
+
+      input.addEventListener("input", ensurePrefix);
+
+      input.addEventListener("keydown", (event) => {
+        const cursorStart = input.selectionStart || 0;
+        if ((event.key === "Backspace" || event.key === "Delete") && cursorStart <= prefix.length) {
+          event.preventDefault();
+          input.setSelectionRange(prefix.length, prefix.length);
+        }
+      });
+    });
+
+    const attemptPrivateUnlock = () => {
+      if (!privatePasswordInput || !privateLockBody) return;
+      const value = privatePasswordInput.value || "";
+      const isValid = value === PRIVATE_PASSWORD;
+      if (privateSecurityError) {
+        privateSecurityError.classList.toggle("is-visible", !isValid);
+      }
+      if (!isValid) return;
+      privateLockBody.classList.remove("private-locked");
+      privatePasswordInput.value = "";
+    };
+
+    if (privateUnlockBtn) {
+      privateUnlockBtn.addEventListener("click", attemptPrivateUnlock);
+    }
+
+    if (privatePasswordInput) {
+      privatePasswordInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          attemptPrivateUnlock();
+        }
+      });
+    }
+
+    suffixInputs.forEach((input) => {
+      const suffix = input.dataset.suffix || "";
+      if (!suffix) return;
+
+      const normalizeSuffix = () => {
+        const current = input.value || "";
+        const suffixIndex = current.indexOf(suffix);
+        if (suffixIndex === -1) {
+          input.value = `${current}${suffix}`;
+          return;
+        }
+        const editablePart = current.slice(0, suffixIndex);
+        input.value = `${editablePart}${suffix}`;
+      };
+
+      const clampCaret = () => {
+        const current = input.value || "";
+        const suffixIndex = current.indexOf(suffix);
+        if (suffixIndex === -1) return;
+        const maxPos = suffixIndex;
+        const cursorStart = input.selectionStart ?? 0;
+        const cursorEnd = input.selectionEnd ?? 0;
+        if (cursorStart > maxPos || cursorEnd > maxPos) {
+          input.setSelectionRange(maxPos, maxPos);
+        }
+      };
+
+      normalizeSuffix();
+
+      input.addEventListener("input", () => {
+        normalizeSuffix();
+        clampCaret();
+      });
+
+      input.addEventListener("keydown", (event) => {
+        const current = input.value || "";
+        const suffixIndex = current.indexOf(suffix);
+        if (suffixIndex === -1) return;
+        const maxPos = suffixIndex;
+        const cursorStart = input.selectionStart ?? 0;
+        const cursorEnd = input.selectionEnd ?? 0;
+
+        if ((event.key === "Backspace" || event.key === "Delete") && cursorStart >= maxPos) {
+          event.preventDefault();
+          input.setSelectionRange(maxPos, maxPos);
+        }
+
+        if (cursorEnd > maxPos) {
+          event.preventDefault();
+          input.setSelectionRange(maxPos, maxPos);
+        }
+      });
+
+      input.addEventListener("click", clampCaret);
+      input.addEventListener("focus", clampCaret);
+      input.addEventListener("mouseup", clampCaret);
+    });
+
+    const lampSlotTemplate = document.getElementById("private-wish-lamp-slot-template");
+    const personalWishList = document.getElementById("private-personal-wish-list");
+    const personalWishAdd = document.getElementById("private-personal-wish-add");
+    const personalWishCount = document.getElementById("private-personal-wish-count");
+    const toggleVisitorView = document.getElementById("private-toggle-visitor-view");
+    const personalWishModal = document.getElementById("private-personal-wish-modal");
+    const closePersonalWishModal = document.getElementById("private-close-personal-wish-modal");
+    const deleteWishModal = document.getElementById("private-delete-wish-modal");
+    const confirmDeleteWish = document.getElementById("private-confirm-delete-wish");
+    const cancelDeleteWish = document.getElementById("private-cancel-delete-wish");
+    const fulfillWishModal = document.getElementById("private-fulfill-wish-modal");
+    const cancelFulfillWish = document.getElementById("private-cancel-fulfill-wish");
+    const fulfillEvidence = document.getElementById("private-fulfill-evidence");
+    const fulfillEvidencePreview = document.getElementById("private-fulfill-evidence-preview");
+    const icanConfirmModal = document.getElementById("private-ican-confirm-modal");
+    const icanConfirmYes = document.getElementById("private-ican-confirm-yes");
+    const icanConfirmNo = document.getElementById("private-ican-confirm-no");
+    const guardianContactModal = document.getElementById("private-guardian-contact-modal");
+    const cancelGuardianModal = document.getElementById("private-cancel-guardian-modal");
+    const personalWishText = document.getElementById("private-personal-wish-text");
+    const personalWishError = document.getElementById("private-personal-wish-error");
+    const confirmPersonalWish = document.getElementById("private-confirm-personal-wish");
+    const personalWishMedia = document.getElementById("private-personal-wish-media");
+    const personalWishPreview = document.getElementById("private-personal-wish-preview");
+    const personalWishFileName = document.getElementById("private-personal-wish-file-name");
+    const personalWishTypeIcon = document.getElementById("private-personal-wish-type-icon");
+    const personalWishTypeInputs = document.querySelectorAll('input[name="private-personal-wish-type"]');
+    const personalWishTypeHint = document.getElementById("private-personal-wish-type-hint");
+    const personalMax = 50;
+    const personalMin = 7;
+    let personalTotal = 0;
+    let personalPreviewUrl = null;
+    let personalPreviewImage = null;
+    let activePersonalSlot = null;
+    let activeDeleteSlot = null;
+    let activeFulfillSlot = null;
+    let activeIcanSlot = null;
+    let isVisitorView = false;
+    let fulfillEvidenceUrl = null;
+
+    const addLampSlot = () => {
+      if (!lampSlotTemplate || !personalWishList) return;
+      if (personalTotal >= personalMax) return;
+
+      const li = document.createElement("li");
+      li.className = "wish-slot is-empty";
+      li.appendChild(lampSlotTemplate.content.cloneNode(true));
+      personalWishList.appendChild(li);
+      personalTotal += 1;
+
+      if (personalWishCount) {
+        personalWishCount.textContent = `${personalTotal}`;
+      }
+
+      if (personalWishAdd) {
+        personalWishAdd.disabled = personalTotal >= personalMax;
+      }
+    };
+
+    for (let i = 0; i < personalMin; i += 1) {
+      addLampSlot();
+    }
+
+    const updateModalScrollLock = () => {
+      const hasOpenModal = document.querySelector(".modal-overlay:not(.hidden)");
+      document.body.classList.toggle("modal-open", Boolean(hasOpenModal));
+    };
+
+    const openPersonalWishModal = () => {
+      if (!personalWishModal) return;
+      personalWishModal.classList.remove("hidden");
+      personalWishModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+      if (personalWishError) {
+        personalWishError.classList.remove("is-visible");
+      }
+    };
+
+    const closePersonalWishModalFn = () => {
+      if (!personalWishModal) return;
+      personalWishModal.classList.add("hidden");
+      personalWishModal.setAttribute("aria-hidden", "true");
+      updateModalScrollLock();
+    };
+
+    const openDeleteWishModal = (slot) => {
+      if (!deleteWishModal) return;
+      activeDeleteSlot = slot;
+      deleteWishModal.classList.remove("hidden");
+      deleteWishModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+    };
+
+    const closeDeleteWishModalFn = () => {
+      if (!deleteWishModal) return;
+      deleteWishModal.classList.add("hidden");
+      deleteWishModal.setAttribute("aria-hidden", "true");
+      updateModalScrollLock();
+      activeDeleteSlot = null;
+    };
+
+    const openFulfillWishModal = (slot) => {
+      if (!fulfillWishModal) return;
+      activeFulfillSlot = slot;
+      fulfillWishModal.classList.remove("hidden");
+      fulfillWishModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+      updateFulfillEvidencePreview(null);
+    };
+
+    const closeFulfillWishModalFn = () => {
+      if (!fulfillWishModal) return;
+      fulfillWishModal.classList.add("hidden");
+      fulfillWishModal.setAttribute("aria-hidden", "true");
+      updateModalScrollLock();
+      activeFulfillSlot = null;
+    };
+
+    const openIcanConfirmModal = (slot) => {
+      if (!icanConfirmModal) return;
+      activeIcanSlot = slot;
+      icanConfirmModal.classList.remove("hidden");
+      icanConfirmModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+    };
+
+    const closeIcanConfirmModalFn = () => {
+      if (!icanConfirmModal) return;
+      icanConfirmModal.classList.add("hidden");
+      icanConfirmModal.setAttribute("aria-hidden", "true");
+      updateModalScrollLock();
+      activeIcanSlot = null;
+    };
+
+    const openGuardianContactModal = () => {
+      if (!guardianContactModal) return;
+      guardianContactModal.classList.remove("hidden");
+      guardianContactModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+    };
+
+    const closeGuardianContactModalFn = () => {
+      if (!guardianContactModal) return;
+      guardianContactModal.classList.add("hidden");
+      guardianContactModal.setAttribute("aria-hidden", "true");
+      updateModalScrollLock();
+    };
+
+    if (closePersonalWishModal) {
+      closePersonalWishModal.addEventListener("click", closePersonalWishModalFn);
+    }
+
+    if (personalWishModal) {
+      personalWishModal.addEventListener("click", (event) => {
+        if (event.target === personalWishModal) closePersonalWishModalFn();
+      });
+    }
+
+    if (cancelDeleteWish) {
+      cancelDeleteWish.addEventListener("click", closeDeleteWishModalFn);
+    }
+
+    if (deleteWishModal) {
+      deleteWishModal.addEventListener("click", (event) => {
+        if (event.target === deleteWishModal) closeDeleteWishModalFn();
+      });
+    }
+
+    if (cancelFulfillWish) {
+      cancelFulfillWish.addEventListener("click", closeFulfillWishModalFn);
+    }
+
+    if (fulfillWishModal) {
+      fulfillWishModal.addEventListener("click", (event) => {
+        if (event.target === fulfillWishModal) closeFulfillWishModalFn();
+      });
+    }
+
+    if (icanConfirmNo) {
+      icanConfirmNo.addEventListener("click", closeIcanConfirmModalFn);
+    }
+
+    if (icanConfirmYes) {
+      icanConfirmYes.addEventListener("click", () => {
+        closeIcanConfirmModalFn();
+        openGuardianContactModal();
+      });
+    }
+
+    if (icanConfirmModal) {
+      icanConfirmModal.addEventListener("click", (event) => {
+        if (event.target === icanConfirmModal) closeIcanConfirmModalFn();
+      });
+    }
+
+    if (cancelGuardianModal) {
+      cancelGuardianModal.addEventListener("click", closeGuardianContactModalFn);
+    }
+
+    if (guardianContactModal) {
+      guardianContactModal.addEventListener("click", (event) => {
+        if (event.target === guardianContactModal) closeGuardianContactModalFn();
+      });
+    }
+
+    const guardianOptions = document.querySelectorAll(".guardian-option");
+    if (guardianOptions.length) {
+      guardianOptions.forEach((option) => {
+        option.addEventListener("click", () => {
+          guardianOptions.forEach((btn) => btn.classList.remove("is-selected"));
+          option.classList.add("is-selected");
+          guardianOptions.forEach((btn) => btn.setAttribute("aria-pressed", "false"));
+          option.setAttribute("aria-pressed", "true");
+        });
+      });
+    }
+
+    const updateFulfillEvidencePreview = (file) => {
+      if (!fulfillEvidencePreview) return;
+
+      if (fulfillEvidenceUrl) {
+        URL.revokeObjectURL(fulfillEvidenceUrl);
+        fulfillEvidenceUrl = null;
+      }
+
+      fulfillEvidencePreview.innerHTML = "";
+
+      if (!file) {
+        fulfillEvidencePreview.innerHTML = `
+          <label class="wish-image-btn" for="private-fulfill-evidence" aria-label="Sube la evidencia visual">+</label>
+          <div class="wish-preview-content">
+            <span class="wish-preview-placeholder">Sube la evidencia visual.</span>
+            <span class="wish-preview-name">PNG, WEBP, JPEG, etc.</span>
+          </div>
+        `;
+        return;
+      }
+
+      fulfillEvidenceUrl = URL.createObjectURL(file);
+      const img = document.createElement("img");
+      img.src = fulfillEvidenceUrl;
+      img.alt = "Evidencia seleccionada";
+      img.className = "wish-evidence-image";
+      fulfillEvidencePreview.appendChild(img);
+    };
+
+    if (fulfillEvidence) {
+      fulfillEvidence.addEventListener("change", () => {
+        const file = fulfillEvidence.files && fulfillEvidence.files[0];
+        updateFulfillEvidencePreview(file || null);
+      });
+    }
+
+    if (personalWishAdd) {
+      personalWishAdd.addEventListener("click", () => {
+        addLampSlot();
+      });
+    }
+
+    const updatePersonalPreview = (file) => {
+      if (!personalWishPreview) return;
+      const previewPlaceholder = personalWishPreview.querySelector(".wish-preview-placeholder");
+
+      if (personalPreviewUrl) {
+        URL.revokeObjectURL(personalPreviewUrl);
+        personalPreviewUrl = null;
+      }
+
+      if (!file) {
+        personalWishPreview.classList.remove("has-image");
+        if (personalPreviewImage) {
+          personalPreviewImage.remove();
+          personalPreviewImage = null;
+        }
+        if (previewPlaceholder) {
+          previewPlaceholder.textContent = "Seleccionar imagen";
+        }
+        if (personalWishFileName) {
+          personalWishFileName.textContent = "Sin imagen seleccionada";
+        }
+        return;
+      }
+
+      personalPreviewUrl = URL.createObjectURL(file);
+      personalWishPreview.classList.add("has-image");
+      if (!personalPreviewImage) {
+        personalPreviewImage = document.createElement("img");
+        personalPreviewImage.className = "wish-preview-image";
+        personalPreviewImage.alt = "Vista previa de la imagen seleccionada";
+        personalWishPreview.insertBefore(personalPreviewImage, personalWishPreview.firstChild);
+      }
+      personalPreviewImage.src = personalPreviewUrl;
+      if (previewPlaceholder) {
+        previewPlaceholder.textContent = "Imagen seleccionada";
+      }
+      if (personalWishFileName) {
+        personalWishFileName.textContent = file.name;
+      }
+    };
+
+    const setPersonalPreviewFromUrl = (url, label) => {
+      if (!personalWishPreview) return;
+      const previewPlaceholder = personalWishPreview.querySelector(".wish-preview-placeholder");
+
+      if (personalPreviewUrl) {
+        URL.revokeObjectURL(personalPreviewUrl);
+        personalPreviewUrl = null;
+      }
+
+      if (!url) {
+        updatePersonalPreview(null);
+        return;
+      }
+
+      personalWishPreview.classList.add("has-image");
+      if (!personalPreviewImage) {
+        personalPreviewImage = document.createElement("img");
+        personalPreviewImage.className = "wish-preview-image";
+        personalPreviewImage.alt = "Vista previa de la imagen seleccionada";
+        personalWishPreview.insertBefore(personalPreviewImage, personalWishPreview.firstChild);
+      }
+      personalPreviewImage.src = url;
+      if (previewPlaceholder) {
+        previewPlaceholder.textContent = "Imagen seleccionada";
+      }
+      if (personalWishFileName) {
+        personalWishFileName.textContent = label || "Imagen actual";
+      }
+    };
+
+    if (personalWishMedia) {
+      personalWishMedia.addEventListener("change", () => {
+        const file = personalWishMedia.files && personalWishMedia.files[0];
+        updatePersonalPreview(file || null);
+      });
+    }
+
+    const getPersonalWishDescription = () => {
+      if (!personalWishText) return "";
+      const prefix = personalWishText.dataset.prefix || "";
+      const value = personalWishText.value || "";
+      if (prefix && value.startsWith(prefix)) {
+        return value.slice(prefix.length).trim();
+      }
+      return value.trim();
+    };
+
+    const isPersonalWishValid = () => getPersonalWishDescription().length > 0;
+
+    const setPersonalWishError = (show) => {
+      if (!personalWishError) return;
+      personalWishError.classList.toggle("is-visible", show);
+    };
+
+    if (personalWishText) {
+      personalWishText.addEventListener("input", () => {
+        setPersonalWishError(!isPersonalWishValid());
+      });
+    }
+
+    const createWishActionBtn = (src, label, action) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "wish-icon-btn";
+      button.title = label;
+      if (action) {
+        button.dataset.action = action;
+        button.setAttribute("aria-label", label);
+      }
+      const img = document.createElement("img");
+      img.src = src;
+      img.alt = label;
+      button.appendChild(img);
+      return button;
+    };
+
+    const createVisitorIcon = () => {
+      const icon = document.createElement("div");
+      icon.className = "wish-icon-btn wish-icon-static";
+      icon.dataset.action = "ican";
+      icon.setAttribute("aria-label", "Yo puedo cumplir ese deseo");
+      icon.title = "Yo puedo cumplir ese deseo";
+      const img = document.createElement("img");
+      img.src = "/css/icons/iconican.webp";
+      img.alt = "Yo puedo cumplir ese deseo";
+      icon.appendChild(img);
+      return icon;
+    };
+
+    const resetSlotToEmpty = (slot) => {
+      if (!slot || !lampSlotTemplate) return;
+      if (slot.dataset.imageUrl) {
+        URL.revokeObjectURL(slot.dataset.imageUrl);
+        delete slot.dataset.imageUrl;
+      }
+      delete slot.dataset.description;
+      delete slot.dataset.type;
+      delete slot.dataset.goal;
+      delete slot.dataset.current;
+      delete slot.dataset.template;
+      slot.classList.remove("is-choosing", "is-filled");
+      slot.classList.add("is-empty");
+      slot.innerHTML = "";
+      slot.appendChild(lampSlotTemplate.content.cloneNode(true));
+    };
+
+    const renderPersonalWishSlot = (slot, description, imageUrl, type) => {
+      if (!slot) return;
+      if (slot.dataset.imageUrl) {
+        URL.revokeObjectURL(slot.dataset.imageUrl);
+        delete slot.dataset.imageUrl;
+      }
+
+      slot.classList.remove("is-empty", "is-choosing");
+      slot.classList.add("is-filled");
+      slot.innerHTML = "";
+      slot.dataset.description = description;
+      if (type) {
+        slot.dataset.type = type;
+      }
+
+      const row = document.createElement("div");
+      row.className = "wish-slot-row";
+
+      const body = document.createElement("div");
+      body.className = "wish-slot-body";
+
+      const leftCol = document.createElement("div");
+      leftCol.className = "wish-slot-left";
+
+      const header = document.createElement("div");
+      header.className = "wish-slot-header";
+
+      const selectedType = type || Array.from(personalWishTypeInputs).find((input) => input.checked)?.value || "Espiritual";
+      const categoryIconSrc = personalTypeIconMap[selectedType] || personalTypeIconMap["Espiritual"];
+      const categoryIcon = document.createElement("img");
+      categoryIcon.className = "wish-slot-category-icon";
+      categoryIcon.src = categoryIconSrc;
+      categoryIcon.alt = selectedType;
+      header.appendChild(categoryIcon);
+
+      const title = document.createElement("div");
+      title.className = "wish-slot-title";
+      title.textContent = description;
+      header.appendChild(document.createElement("br"));
+      header.appendChild(title);
+
+      leftCol.appendChild(header);
+
+      const actions = document.createElement("div");
+      actions.className = "wish-slot-actions wish-slot-actions-inline";
+      if (isVisitorView) {
+        actions.appendChild(createVisitorIcon());
+      } else {
+        actions.appendChild(createWishActionBtn("/css/icons/iconedit.webp", "Editar deseo", "edit"));
+        actions.appendChild(createWishActionBtn("/css/icons/iconfulfill.webp", "Marcar como cumplido", "fulfill"));
+        actions.appendChild(createWishActionBtn("/css/icons/icondelete.webp", "Borrar deseo", "delete"));
+      }
+      leftCol.appendChild(actions);
+      body.appendChild(leftCol);
+
+      if (imageUrl) {
+        const imageWrap = document.createElement("div");
+        imageWrap.className = "wish-slot-image-wrap";
+        const img = document.createElement("img");
+        img.className = "wish-slot-image";
+        img.src = imageUrl;
+        img.alt = "Imagen del deseo";
+        imageWrap.appendChild(img);
+        body.appendChild(imageWrap);
+        slot.dataset.imageUrl = imageUrl;
+      } else {
+        body.classList.add("single");
+      }
+
+      row.appendChild(body);
+      slot.appendChild(row);
+    };
+
+    const resetPersonalWishForm = () => {
+      if (personalWishText) {
+        const prefix = personalWishText.dataset.prefix || "Deseo ";
+        personalWishText.value = prefix;
+        personalWishText.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (personalWishMedia) {
+        personalWishMedia.value = "";
+      }
+      updatePersonalPreview(null);
+      setPersonalWishError(false);
+    };
+
+    const personalTypeIconMap = {
+      "Espiritual": "/css/icons/Espiritual.webp",
+      "Material": "/css/icons/Material.webp",
+      "Monetario": "/css/icons/Monetario.webp",
+      "Profesional": "/css/icons/Profesional.webp",
+      "Salud y cuerpo": "/css/icons/Salud.webp",
+      "Relacional": "/css/icons/Relacional.webp",
+      "Vivencial": "/css/icons/Vivencial.webp"
+    };
+
+    const personalTypeHintMap = {
+      "Espiritual": "Deseos relacionados con el sentido de vida, la conciencia, la fe, la paz interior y el crecimiento espiritual. Ejemplo: perseverar en el hábito de la meditación, leer libros sobre espiritualidad, asistir a misa.",
+      "Material": "Deseos vinculados a bienes, objetos o condiciones tangibles que mejoran la calidad de vida. Pueden involucrar recursos externos y, en algunos casos, la ayuda o participación de otras personas. Ejemplo: tener una cafetera nueva, un nuevo auto, una nueva computadora.",
+      "Monetario": "Deseos relacionados exclusivamente con metas económicas personales. No pueden ser concedidos por otras personas y funcionan como objetivos de ahorro, disciplina y logro individual. Solo el propio usuario puede cumplirlos.",
+      "Profesional": "Deseos asociados al desarrollo laboral, académico o creativo. Incluyen proyectos, estudios, reconocimiento, impacto profesional y crecimiento en la vocación personal. Ejemplo: estudiar arquitectura y graduarme de la Universidad Politécnico de Milán.",
+      "Salud y cuerpo": "Deseos enfocados en el bienestar físico, la energía vital, la recuperación y la relación consciente con el cuerpo. No sustituyen atención médica ni tratamientos profesionales. Ejemplo: mantener la disciplina de ejercitar tu cuerpo a diario, correr 1 km diario, alimentarte bien.",
+      "Relacional": "Deseos relacionados con vínculos humanos: familia, pareja, amistades y comunidad. Incluyen encuentros, reconciliaciones, fortalecimiento de relaciones y construcción de lazos significativos. Ejemplo: tomarse una cerveza con Lars Ulrich, ir a un concierto con tu hermano, disfrutar de un día en familia en el Restaurante La Matriarca.",
+      "Vivencial": "Deseos orientados a experiencias, momentos únicos y vivencias significativas. No se definen por la posesión, sino por el hecho de vivir algo que deje huella en la memoria y la conciencia. Ejemplo: lanzarse en paracaídas, visitar Las Islas Maldivas, viajar en helicóptero."
+    };
+
+    const syncPersonalTypeIcon = (value) => {
+      if (!personalWishTypeIcon) return;
+      const src = personalTypeIconMap[value] || personalTypeIconMap["Espiritual"];
+      personalWishTypeIcon.src = src;
+      personalWishTypeIcon.alt = value;
+    };
+
+    const syncPersonalTypeHint = (value) => {
+      if (!personalWishTypeHint) return;
+      const hint = personalTypeHintMap[value] || personalTypeHintMap["Espiritual"];
+      personalWishTypeHint.textContent = hint;
+    };
+
+    personalWishTypeInputs.forEach((input) => {
+      input.addEventListener("change", () => {
+        if (input.checked) {
+          syncPersonalTypeIcon(input.value);
+          syncPersonalTypeHint(input.value);
+        }
+      });
+    });
+
+    const checkedInput = Array.from(personalWishTypeInputs).find((input) => input.checked);
+    if (checkedInput) {
+      syncPersonalTypeIcon(checkedInput.value);
+      syncPersonalTypeHint(checkedInput.value);
+    }
+
+    const handleConfirmPersonalWish = () => {
+      if (!activePersonalSlot) return;
+      if (!personalWishText) return;
+      if (!isPersonalWishValid()) {
+        setPersonalWishError(true);
+        return;
+      }
+
+      const description = personalWishText.value.trim();
+      const file = personalWishMedia && personalWishMedia.files ? personalWishMedia.files[0] : null;
+      const imageUrl = file ? URL.createObjectURL(file) : activePersonalSlot.dataset.imageUrl || null;
+      const selectedType = Array.from(personalWishTypeInputs).find((input) => input.checked)?.value || "Espiritual";
+
+      renderPersonalWishSlot(activePersonalSlot, description, imageUrl, selectedType);
+      closePersonalWishModalFn();
+      resetPersonalWishForm();
+      activePersonalSlot = null;
+    };
+
+    if (confirmPersonalWish) {
+      confirmPersonalWish.addEventListener("click", handleConfirmPersonalWish);
+    }
+
+    if (confirmDeleteWish) {
+      confirmDeleteWish.addEventListener("click", () => {
+        if (activeDeleteSlot) {
+          resetSlotToEmpty(activeDeleteSlot);
+        }
+        closeDeleteWishModalFn();
+      });
+    }
+
+    const rerenderPersonalSlots = () => {
+      if (!personalWishList) return;
+      const slots = Array.from(personalWishList.querySelectorAll(".wish-slot.is-filled"));
+      slots.forEach((slot) => {
+        const description = slot.dataset.description || "";
+        const type = slot.dataset.type || "Espiritual";
+        const imageUrl = slot.dataset.imageUrl || null;
+        renderPersonalWishSlot(slot, description, imageUrl, type);
+      });
+    };
+
+    if (toggleVisitorView) {
+      toggleVisitorView.addEventListener("click", () => {
+        isVisitorView = !isVisitorView;
+        toggleVisitorView.textContent = isVisitorView ? "Ver como propietario" : "Ver como visitante";
+        rerenderPersonalSlots();
+      });
+    }
+
+    if (personalWishList) {
+      personalWishList.addEventListener("click", (event) => {
+        const lampBtn = event.target.closest(".wish-lamp-btn");
+        const actionBtn = event.target.closest(".wish-icon-btn");
+
+        if (lampBtn) {
+          const slot = lampBtn.closest(".wish-slot");
+          if (!slot) return;
+          activePersonalSlot = slot;
+          openPersonalWishModal();
+          return;
+        }
+
+        if (actionBtn) {
+          if (isVisitorView && actionBtn.dataset.action !== "ican") return;
+          const slot = actionBtn.closest(".wish-slot");
+          if (!slot) return;
+          if (actionBtn.dataset.action === "delete") {
+            openDeleteWishModal(slot);
+          } else if (actionBtn.dataset.action === "edit") {
+            activePersonalSlot = slot;
+            const existingDescription = slot.dataset.description || "";
+            const prefix = personalWishText ? personalWishText.dataset.prefix || "Deseo " : "Deseo ";
+            if (personalWishText) {
+              personalWishText.value = existingDescription
+                ? `${prefix}${existingDescription.replace(prefix, "").trim()}`
+                : prefix;
+              personalWishText.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+
+            const typeValue = slot.dataset.type;
+            if (typeValue) {
+              const typeInput = Array.from(personalWishTypeInputs).find((input) => input.value === typeValue);
+              if (typeInput) {
+                typeInput.checked = true;
+                syncPersonalTypeIcon(typeValue);
+                syncPersonalTypeHint(typeValue);
+              }
+            }
+
+            setPersonalPreviewFromUrl(slot.dataset.imageUrl || null, "Imagen actual");
+            openPersonalWishModal();
+          } else if (actionBtn.dataset.action === "fulfill") {
+            openFulfillWishModal(slot);
+          } else if (actionBtn.dataset.action === "ican") {
+            openIcanConfirmModal(slot);
+          }
+          return;
+        }
+
+        if (!lampBtn) return;
+      });
+    }
+
+  </script>
+</body>
+
+</html>

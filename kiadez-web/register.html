@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Kiadez — Registro</title>
+    <link rel="stylesheet" href="/css/register.css" />
+</head>
+
+<body>
+
+    <div class="page-background">
+
+        <main class="hero">
+
+            <!-- FORMULARIO -->
+            <section class="hero-left">
+
+                <div class="auth-card">
+                    <h2 class="auth-title">Crear cuenta en Kiadez</h2>
+
+                    <form id="register-form">
+
+                        <input type="text" name="first_name" placeholder="Nombre" required />
+                        <input type="text" name="last_name" placeholder="Apellido" required />
+                        <input type="email" name="email" placeholder="Correo electrónico" required />
+
+
+
+                        <input type="date" name="birth_date" id="birthdate" required />
+
+                        <select name="gender" required>
+                            <option value="">Género</option>
+                            <option value="male">Hombre</option>
+                            <option value="female">Mujer</option>
+                        </select>
+
+                        <input type="password" name="password" placeholder="Contraseña" required />
+                        <input type="password" name="password_confirm" placeholder="Confirmar contraseña" required />
+
+                        <p id="age-warning" class="age-warning hidden">
+                            Si eres menor de edad, tu cuenta tendrá restricciones hasta que un padre o tutor la
+                            autorice.
+                        </p>
+
+                        <button type="submit" class="btn btn-primary">
+                            Crear cuenta
+                        </button>
+
+                    </form>
+
+                    <a href="index.html" class="auth-link">
+                        ¿Ya tienes cuenta? Inicia sesión
+                    </a>
+
+                    <div class="auth-brand">
+                        <img src="logo.png" alt="Kiadez" />
+                        <span>Kiadez</span>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- VISIÓN -->
+            <section class="hero-right">
+                <h1 class="hero-title">Kiadez</h1>
+
+                <p class="hero-subtitle">
+                    El primer paso para cumplir tus deseos
+                </p>
+
+                <blockquote class="hero-quote">
+                    Todo gran viaje comienza cuando alguien se atreve a decir “sí”.
+                </blockquote>
+            </section>
+
+        </main>
+
+        <!-- FOOTER (idéntico al Home) -->
+        <footer class="kiadez-footer">
+
+            <div class="footer-main">
+
+                <div class="footer-column footer-origin">
+                    <p class="footer-poem">
+                        Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br>
+                        No para dominar, sino para orientar.<br>
+                        Su luz no deslumbra: acompaña.
+                    </p>
+                </div>
+
+                <div class="footer-columns">
+
+                    <div class="footer-column">
+                        <h4>Sobre nuestra red social</h4>
+                        <ul>
+                            <li><a href="#">Qué es Kiadez</a></li>
+                            <li><a href="#">Rangos de Guardianes</a></li>
+                            <li><a href="#">Ser Guardián</a></li>
+                            <li><a href="#">Contacto</a></li>
+
+                        </ul>
+                    </div>
+
+                    <div class="footer-column">
+                        <h4>Idiomas</h4>
+                        <ul>
+                            <li><a href="#">Español</a></li>
+                            <li><a href="#">English</a></li>
+                            <li><a href="#">Français</a></li>
+                        </ul>
+                    </div>
+
+                    <div class="footer-column">
+                        <h4>Contacto</h4>
+                        <ul>
+                            <li>info@kiadez.com</li>
+                            <li>+57 333 225 6078</li>
+                        </ul>
+                    </div>
+
+                    <div class="footer-column">
+                        <h4>Información legal</h4>
+                        <ul>
+                            <li><a href="#">Términos y condiciones</a></li>
+                            <li><a href="#">Privacidad</a></li>
+                        </ul>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="footer-bottom">
+                © 2026 Kiadez — Una red social para cumplir deseos.
+            </div>
+
+        </footer>
+
+    </div>
+
+    <script>
+        const form = document.getElementById("register-form");
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const data = new FormData(form);
+
+            // Validación básica frontend
+            if (data.get("password") !== data.get("password_confirm")) {
+                alert("Las contraseñas no coinciden.");
+                return;
+            }
+
+            const payload = {
+                first_name: data.get("first_name"),
+                last_name: data.get("last_name"),
+                email: data.get("email"),
+                birth_date: data.get("birth_date"),
+                gender: data.get("gender"),
+                password: data.get("password"),
+            };
+
+            try {
+                const response = await fetch("http://127.0.0.1:8000/auth/register", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    alert(result.detail || "Error al registrar usuario.");
+                    return;
+                }
+
+                // 🎉 Registro exitoso
+                // ✅ Registro exitoso → lo mandamos a check-email
+                window.location.href = `check-email.html?email=${encodeURIComponent(payload.email)}`;
+
+
+            } catch (error) {
+                console.error(error);
+                alert("No se pudo conectar con el servidor.");
+            }
+        });
+    </script>
+
+
+</body>
+
+</html>

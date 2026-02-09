@@ -4,6 +4,10 @@
   onMount(() => {
     document.body.dataset.visitor = "false";
 
+    const LS = {
+      purpose: "kiadez_user_purpose"
+    };
+
     const prefixInputs = document.querySelectorAll(".wish-prefix-input");
     const suffixInputs = document.querySelectorAll("[data-suffix]");
 
@@ -155,6 +159,18 @@
     const coverSaveActions = document.getElementById("coverSaveActions");
     const coverSaveBtn = document.getElementById("coverSaveBtn");
     const coverCancelBtn = document.getElementById("coverCancelBtn");
+    const btnEditPurposes = document.getElementById("btnEditPurposes");
+    const lifeProposalOverlay = document.getElementById("lifeProposalOverlay");
+    const lifeProposalClose = document.getElementById("lifeProposalClose");
+    const lifeProposalCloseFooter = document.getElementById("lifeProposalCloseFooter");
+    const lifeConfirmOverlay = document.getElementById("lifeConfirmOverlay");
+    const lifeConfirmClose = document.getElementById("lifeConfirmClose");
+    const lifeConfirmCancel = document.getElementById("lifeConfirmCancel");
+    const lifeConfirmOk = document.getElementById("lifeConfirmOk");
+    const lifeConfirmText = document.getElementById("lifeConfirmText");
+    const purpose1 = document.getElementById("purpose1");
+    const purpose2 = document.getElementById("purpose2");
+    const purpose3 = document.getElementById("purpose3");
     const confirmCooperativeWish = document.getElementById("confirmCooperativeWish");
     const icanConfirmModal = document.getElementById("icanConfirmModal");
     const icanConfirmYes = document.getElementById("icanConfirmYes");
@@ -266,6 +282,89 @@
       const hasOpenModal = document.querySelector(".modal-overlay:not(.hidden)");
       document.body.classList.toggle("modal-open", Boolean(hasOpenModal));
     };
+
+    const PURPOSE_PREFIX = "Deseo ";
+
+    const normalizePurposeText = (value) => {
+      const trimmed = (value || "").trim();
+      if (!trimmed) return "";
+      if (trimmed === PURPOSE_PREFIX.trim()) return "";
+      if (trimmed.startsWith(PURPOSE_PREFIX)) {
+        const rest = trimmed.slice(PURPOSE_PREFIX.length).trim();
+        return rest ? `${PURPOSE_PREFIX}${rest}` : "";
+      }
+      return `${PURPOSE_PREFIX}${trimmed}`;
+    };
+
+    const readPurposeStorage = () => {
+      const raw = localStorage.getItem(LS.purpose);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    };
+
+    const syncPurposePills = (values) => {
+      if (purpose1 && values[0]) purpose1.textContent = values[0];
+      if (purpose2 && values[1]) purpose2.textContent = values[1];
+      if (purpose3 && values[2]) purpose3.textContent = values[2];
+    };
+
+    const storePurposeValues = (values) => {
+      localStorage.setItem(LS.purpose, JSON.stringify({
+        one: values[0],
+        two: values[1],
+        three: values[2]
+      }));
+    };
+
+    const loadPurposeFromStorage = () => {
+      const stored = readPurposeStorage();
+      if (!stored) return;
+      syncPurposePills([stored.one, stored.two, stored.three]);
+    };
+
+    const setLifeInputValue = (input, value) => {
+      if (!input) return;
+      const normalized = normalizePurposeText(value || "");
+      input.value = normalized || PURPOSE_PREFIX;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+
+    const openLifeProposalModal = () => {
+      if (!lifeProposalOverlay) return;
+      const stored = readPurposeStorage();
+      const input1 = lifeProposalOverlay.querySelector("#p1");
+      const input2 = lifeProposalOverlay.querySelector("#p2");
+      const input3 = lifeProposalOverlay.querySelector("#p3");
+      const fallback1 = stored?.one || (purpose1?.textContent?.trim() || "");
+      const fallback2 = stored?.two || (purpose2?.textContent?.trim() || "");
+      const fallback3 = stored?.three || (purpose3?.textContent?.trim() || "");
+
+      setLifeInputValue(input1, fallback1);
+      setLifeInputValue(input2, fallback2);
+      setLifeInputValue(input3, fallback3);
+
+      lifeProposalOverlay.classList.remove("hidden");
+      lifeProposalOverlay.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+    };
+
+    const closeLifeProposalModal = () => {
+      if (!lifeProposalOverlay) return;
+      lifeProposalOverlay.classList.add("hidden");
+      lifeProposalOverlay.setAttribute("aria-hidden", "true");
+      updateModalScrollLock();
+    };
+
+    btnEditPurposes?.addEventListener("click", openLifeProposalModal);
+    lifeProposalClose?.addEventListener("click", closeLifeProposalModal);
+    lifeProposalCloseFooter?.addEventListener("click", closeLifeProposalModal);
+    lifeProposalOverlay?.addEventListener("click", (event) => {
+      if (event.target === lifeProposalOverlay) closeLifeProposalModal();
+    });
 
     const openPersonalWishModal = () => {
       if (!personalWishModal) return;
@@ -439,6 +538,259 @@
         if (event.target === cooperativeWishModal) closeCooperativeWishModalFn();
       });
     }
+
+    const initLifeProposalModal = () => {
+      if (!lifeProposalOverlay) return;
+
+      const API = "http://127.0.0.1:8000";
+      const AAD_PURPOSE = new TextEncoder().encode("kiadez-life-purpose-v1");
+
+      const bufToHex = (buf) => {
+        return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      };
+
+      const hexToBuf = (hex) => {
+        const bytes = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < bytes.length; i += 1) {
+          bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+        }
+        return bytes.buffer;
+      };
+
+      const importDekFromSession = async () => {
+        const dekHex = sessionStorage.getItem("dek_hex");
+        if (!dekHex) {
+          throw new Error("Vault no desbloqueado. Crea tu clave privada o desbloquéala primero.");
+        }
+        const dekRaw = hexToBuf(dekHex);
+        return crypto.subtle.importKey("raw", dekRaw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+      };
+
+      const aesGcmEncrypt = async (key, plaintext, aadBuf) => {
+        const nonce = crypto.getRandomValues(new Uint8Array(12));
+        const ptBuf = new TextEncoder().encode(plaintext).buffer;
+        const ct = await crypto.subtle.encrypt(
+          { name: "AES-GCM", iv: nonce, additionalData: aadBuf },
+          key,
+          ptBuf
+        );
+        return { nonce_hex: bufToHex(nonce.buffer), ciphertext_hex: bufToHex(ct) };
+      };
+
+      const setPurposeStatus = (groupEl, text) => {
+        const statusEl = groupEl.querySelector(".purpose-status");
+        if (statusEl) statusEl.textContent = text;
+      };
+
+      const getIconLabel = (iconKey) => {
+        if (iconKey === "air") return "Aire";
+        if (iconKey === "earth") return "Tierra";
+        if (iconKey === "water") return "Agua";
+        if (iconKey === "fire") return "Fuego";
+        return "Icono";
+      };
+
+      const getIconSrc = (iconKey) => `assets/${iconKey}.png`;
+
+      let pendingConfirmGroup = null;
+
+      const openConfirmModal = (groupEl) => {
+        pendingConfirmGroup = groupEl;
+        if (lifeConfirmText) {
+          const number = groupEl?.dataset?.purpose;
+          lifeConfirmText.textContent = number
+            ? `¿Confirmar el propósito ${number} como público?`
+            : "¿Confirmar este deseo como público?";
+        }
+        lifeConfirmOverlay?.classList.remove("hidden");
+        lifeConfirmOverlay?.setAttribute("aria-hidden", "false");
+        updateModalScrollLock();
+      };
+
+      const closeConfirmModal = () => {
+        lifeConfirmOverlay?.classList.add("hidden");
+        lifeConfirmOverlay?.setAttribute("aria-hidden", "true");
+        pendingConfirmGroup = null;
+        updateModalScrollLock();
+      };
+
+      lifeConfirmClose?.addEventListener("click", closeConfirmModal);
+      lifeConfirmCancel?.addEventListener("click", closeConfirmModal);
+      lifeConfirmOverlay?.addEventListener("click", (event) => {
+        if (event.target === lifeConfirmOverlay) closeConfirmModal();
+      });
+
+      lifeConfirmOk?.addEventListener("click", () => {
+        if (!pendingConfirmGroup) {
+          closeConfirmModal();
+          return;
+        }
+        pendingConfirmGroup.dataset.isPrivate = "false";
+        setPurposeStatus(pendingConfirmGroup, "Estado: confirmado (publico).");
+        closeConfirmModal();
+      });
+
+      lifeProposalOverlay.querySelectorAll(".purpose-group").forEach((groupEl) => {
+        if (!groupEl.dataset.isPrivate) groupEl.dataset.isPrivate = "false";
+      });
+
+      lifeProposalOverlay.querySelectorAll(".purpose-actions").forEach((actionRow) => {
+        actionRow.addEventListener("click", (event) => {
+          const btn = event.target.closest(".purpose-action");
+          if (!btn) return;
+
+          const groupEl = btn.closest(".purpose-group");
+          const action = btn.dataset.action;
+
+          if (action === "confirm") {
+            openConfirmModal(groupEl);
+            return;
+          }
+
+          if (action === "secret") {
+            groupEl.dataset.isPrivate = "true";
+            setPurposeStatus(groupEl, "Estado: marcado como secreto.");
+            return;
+          }
+
+          if (action === "reveal") {
+            const dateInput = groupEl.querySelector(".purpose-date");
+            if (dateInput) {
+              if (typeof dateInput.showPicker === "function") {
+                dateInput.showPicker();
+              } else {
+                dateInput.focus();
+                dateInput.click();
+              }
+            }
+            return;
+          }
+
+          if (action === "icon") {
+            const panel = groupEl.querySelector(".purpose-icon-panel");
+            if (panel) panel.classList.toggle("is-open");
+          }
+        });
+      });
+
+      lifeProposalOverlay.querySelectorAll(".purpose-icon-panel").forEach((panel) => {
+        panel.addEventListener("click", (event) => {
+          const iconBtn = event.target.closest(".purpose-icon");
+          if (!iconBtn) return;
+
+          const groupEl = panel.closest(".purpose-group");
+          const iconKey = iconBtn.dataset.icon;
+          const label = getIconLabel(iconKey);
+          groupEl.dataset.iconKey = iconKey;
+
+          panel.querySelectorAll(".purpose-icon").forEach((btn) => {
+            btn.classList.toggle("is-selected", btn === iconBtn);
+          });
+
+          const actionBtn = groupEl.querySelector(".purpose-action[data-action=\"icon\"]");
+          if (actionBtn) {
+            actionBtn.innerHTML = `<img src="${getIconSrc(iconKey)}" alt="${label}">`;
+            actionBtn.title = `Icono: ${label}`;
+          }
+
+          setPurposeStatus(groupEl, `Estado: icono asociado: ${label}.`);
+          panel.classList.remove("is-open");
+        });
+      });
+
+      lifeProposalOverlay.querySelectorAll(".purpose-date").forEach((dateInput) => {
+        dateInput.addEventListener("change", () => {
+          const groupEl = dateInput.closest(".purpose-group");
+          groupEl.dataset.revealAt = dateInput.value || "";
+          if (!dateInput.value) return;
+          const formatted = dateInput.value.split("-").reverse().join("/");
+          setPurposeStatus(groupEl, `Estado: se revelara el dia ${formatted}.`);
+        });
+      });
+
+      const lifeForm = lifeProposalOverlay.querySelector("#life-form");
+      lifeForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const groups = [...lifeProposalOverlay.querySelectorAll(".purpose-group")];
+        const values = groups.map((groupEl) => {
+          const textarea = groupEl.querySelector("textarea");
+          return normalizePurposeText(textarea?.value || "");
+        });
+        if (values.some((value) => !value)) {
+          alert("Completa los tres propósitos.");
+          return;
+        }
+
+        const needsDek = groups.some((groupEl) => groupEl.dataset.isPrivate === "true");
+
+        let dekKey = null;
+        if (needsDek) {
+          try {
+            dekKey = await importDekFromSession();
+          } catch (err) {
+            alert(err.message);
+            return;
+          }
+        }
+
+        const slots = [];
+        for (const [index, groupEl] of groups.entries()) {
+          const text = values[index];
+          const slotNumber = Number(groupEl.dataset.purpose);
+          const isPrivate = groupEl.dataset.isPrivate === "true";
+          const revealAt = groupEl.dataset.revealAt || null;
+          const iconKey = groupEl.dataset.iconKey || null;
+
+          if (isPrivate) {
+            const encrypted = await aesGcmEncrypt(dekKey, text, AAD_PURPOSE);
+            slots.push({
+              slot_number: slotNumber,
+              is_private: true,
+              ciphertext_hex: encrypted.ciphertext_hex,
+              nonce_hex: encrypted.nonce_hex,
+              reveal_at: revealAt,
+              icon_key: iconKey
+            });
+          } else {
+            slots.push({
+              slot_number: slotNumber,
+              is_private: false,
+              text_public: text,
+              reveal_at: revealAt,
+              icon_key: iconKey
+            });
+          }
+        }
+
+        const payload = { slots };
+
+        syncPurposePills(values);
+        storePurposeValues(values);
+
+        let savedRemote = false;
+        try {
+          const res = await fetch(`${API}/life-purpose/save`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${localStorage.getItem("access_token")}`
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (res.ok) {
+            savedRemote = true;
+          }
+        } catch (err) {
+          console.error(err);
+        }
+        closeLifeProposalModal();
+      });
+    };
+
+    initLifeProposalModal();
+    loadPurposeFromStorage();
 
     if (cancelDeleteWish) {
       cancelDeleteWish.addEventListener("click", closeDeleteWishModalFn);
@@ -1812,6 +2164,183 @@
         </div>
       </div>
     </section>
+
+    <div class="modal-overlay hidden" id="lifeProposalOverlay" aria-hidden="true">
+      <div class="modal modal-wide life-proposal-modal" role="dialog" aria-modal="true"
+        aria-label="Propósito de vida">
+        <div class="modal-head">
+          <h3>Propósito de vida</h3>
+          <button class="modal-close" type="button" id="lifeProposalClose">✕</button>
+        </div>
+
+        <div class="modal-body life-proposal-body">
+          <div class="auth-card auth-card--wide auth-card--life life-proposal-card">
+            <h2 class="auth-title">Tu propósito de vida</h2>
+
+            <div class="auth-message">
+              <p>
+                Escribe tres deseos que orienten tu camino.
+                <br>
+                Son brújula, no presión.
+              </p>
+              <p class="muted">
+                Estos propósitos se guardan cifrados con tu clave privada personal.
+              </p>
+            </div>
+
+            <form id="life-form">
+              <div class="purpose-group" data-purpose="1">
+                <textarea id="p1" class="wish-prefix-input" data-prefix="Deseo " rows="1" maxlength="80"
+                  placeholder="Deseo 1" required>Deseo </textarea>
+                <div class="purpose-actions" role="group" aria-label="Acciones para propósito 1">
+                  <button type="button" class="purpose-action" data-action="confirm"
+                    title="Confirmar deseo de propósito" aria-label="Confirmar deseo de propósito">
+                    <img src="/css/icons/iconsave.webp" alt="Guardar propósito">
+                  </button>
+                  <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto"
+                    aria-label="Convertir en secreto">
+                    <img src="/css/icons/iconkey.webp" alt="Marcar como secreto">
+                  </button>
+                  <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha"
+                    aria-label="Revelar en fecha">
+                    <img src="/css/icons/iconcalendar.webp" alt="Programar fecha">
+                  </button>
+                  <button type="button" class="purpose-action" data-action="icon" title="Elegir icono"
+                    aria-label="Elegir icono">
+                    <img src="/css/icons/iconelemental.webp" alt="Elegir icono">
+                  </button>
+                </div>
+                <input type="date" class="purpose-date" aria-label="Fecha de revelacion para proposito 1">
+                <div class="purpose-icon-panel" aria-label="Selector de iconos">
+                  <button type="button" class="purpose-icon" data-icon="air" title="Aire">
+                    <img src="assets/air.png" alt="Aire">
+                  </button>
+                  <button type="button" class="purpose-icon" data-icon="earth" title="Tierra">
+                    <img src="assets/earth.png" alt="Tierra">
+                  </button>
+                  <button type="button" class="purpose-icon" data-icon="water" title="Agua">
+                    <img src="assets/water.png" alt="Agua">
+                  </button>
+                  <button type="button" class="purpose-icon" data-icon="fire" title="Fuego">
+                    <img src="assets/fire.png" alt="Fuego">
+                  </button>
+                </div>
+                <div class="purpose-status" aria-live="polite">Estado: público por defecto.</div>
+              </div>
+
+              <div class="purpose-group" data-purpose="2">
+                <textarea id="p2" class="wish-prefix-input" data-prefix="Deseo " rows="1" maxlength="80"
+                  placeholder="Deseo 2" required>Deseo </textarea>
+                <div class="purpose-actions" role="group" aria-label="Acciones para propósito 2">
+                  <button type="button" class="purpose-action" data-action="confirm"
+                    title="Confirmar deseo de propósito" aria-label="Confirmar deseo de propósito">
+                    <img src="/css/icons/iconsave.webp" alt="Guardar propósito">
+                  </button>
+                  <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto"
+                    aria-label="Convertir en secreto">
+                    <img src="/css/icons/iconkey.webp" alt="Marcar como secreto">
+                  </button>
+                  <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha"
+                    aria-label="Revelar en fecha">
+                    <img src="/css/icons/iconcalendar.webp" alt="Programar fecha">
+                  </button>
+                  <button type="button" class="purpose-action" data-action="icon" title="Elegir icono"
+                    aria-label="Elegir icono">
+                    <img src="/css/icons/iconelemental.webp" alt="Elegir icono">
+                  </button>
+                </div>
+                <input type="date" class="purpose-date" aria-label="Fecha de revelacion para proposito 2">
+                <div class="purpose-icon-panel" aria-label="Selector de iconos">
+                  <button type="button" class="purpose-icon" data-icon="air" title="Aire">
+                    <img src="assets/air.png" alt="Aire">
+                  </button>
+                  <button type="button" class="purpose-icon" data-icon="earth" title="Tierra">
+                    <img src="assets/earth.png" alt="Tierra">
+                  </button>
+                  <button type="button" class="purpose-icon" data-icon="water" title="Agua">
+                    <img src="assets/water.png" alt="Agua">
+                  </button>
+                  <button type="button" class="purpose-icon" data-icon="fire" title="Fuego">
+                    <img src="assets/fire.png" alt="Fuego">
+                  </button>
+                </div>
+                <div class="purpose-status" aria-live="polite">Estado: público por defecto.</div>
+              </div>
+
+              <div class="purpose-group" data-purpose="3">
+                <textarea id="p3" class="wish-prefix-input" data-prefix="Deseo " rows="1" maxlength="80"
+                  placeholder="Deseo 3" required>Deseo </textarea>
+                <div class="purpose-actions" role="group" aria-label="Acciones para propósito 3">
+                  <button type="button" class="purpose-action" data-action="confirm"
+                    title="Confirmar deseo de propósito" aria-label="Confirmar deseo de propósito">
+                    <img src="/css/icons/iconsave.webp" alt="Guardar propósito">
+                  </button>
+                  <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto"
+                    aria-label="Convertir en secreto">
+                    <img src="/css/icons/iconkey.webp" alt="Marcar como secreto">
+                  </button>
+                  <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha"
+                    aria-label="Revelar en fecha">
+                    <img src="/css/icons/iconcalendar.webp" alt="Programar fecha">
+                  </button>
+                  <button type="button" class="purpose-action" data-action="icon" title="Elegir icono"
+                    aria-label="Elegir icono">
+                    <img src="/css/icons/iconelemental.webp" alt="Elegir icono">
+                  </button>
+                </div>
+                <input type="date" class="purpose-date" aria-label="Fecha de revelacion para proposito 3">
+                <div class="purpose-icon-panel" aria-label="Selector de iconos">
+                  <button type="button" class="purpose-icon" data-icon="air" title="Aire">
+                    <img src="assets/air.png" alt="Aire">
+                  </button>
+                  <button type="button" class="purpose-icon" data-icon="earth" title="Tierra">
+                    <img src="assets/earth.png" alt="Tierra">
+                  </button>
+                  <button type="button" class="purpose-icon" data-icon="water" title="Agua">
+                    <img src="assets/water.png" alt="Agua">
+                  </button>
+                  <button type="button" class="purpose-icon" data-icon="fire" title="Fuego">
+                    <img src="assets/fire.png" alt="Fuego">
+                  </button>
+                </div>
+                <div class="purpose-status" aria-live="polite">Estado: público por defecto.</div>
+              </div>
+
+              <button type="submit" class="btn btn-primary">Guardar propósito</button>
+              <button type="button" class="btn btn-outline" id="lifeProposalCloseFooter">Volver</button>
+            </form>
+
+            <div class="auth-brand">
+              <img src="/css/logo-kiadez.webp" alt="Kiadez" />
+              <span>Kiadez</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="lifeConfirmOverlay" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-label="Confirmar propósito público">
+        <div class="modal-head">
+          <h3>Confirmar propósito</h3>
+          <button class="modal-close" type="button" id="lifeConfirmClose">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <p class="modal-label-center" id="lifeConfirmText">
+            ¿Confirmar este deseo como público?
+          </p>
+          <p class="modal-label-center muted">
+            Se guardará como público.
+          </p>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-compact" type="button" id="lifeConfirmCancel">Cancelar</button>
+          <button class="btn btn-primary btn-compact" type="button" id="lifeConfirmOk">Confirmar</button>
+        </div>
+      </div>
+    </div>
 
     <div class="modal-overlay hidden" id="coverSelectModal" aria-hidden="true">
       <div class="modal wish-modal cover-select-modal" role="dialog" aria-modal="true"

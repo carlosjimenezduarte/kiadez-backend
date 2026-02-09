@@ -58,7 +58,90 @@
         function getIconSrc(iconKey) {
           return `assets/${iconKey}.png`;
         }
-    
+
+        const prefixInputs = document.querySelectorAll(".wish-prefix-input");
+        prefixInputs.forEach((input) => {
+          const field = /** @type {HTMLTextAreaElement} */ (input);
+          const prefix = field.dataset.prefix || "Deseo ";
+          const maxLength = field.maxLength > 0 ? field.maxLength : null;
+
+          const clampToMax = () => {
+            if (maxLength && field.value.length > maxLength) {
+              field.value = field.value.slice(0, maxLength);
+            }
+          };
+
+          const ensurePrefix = () => {
+            if (!field.value.startsWith(prefix)) {
+              const cleaned = field.value.replace(prefix, "");
+              field.value = `${prefix}${cleaned}`;
+            }
+            if (field.value.length < prefix.length) {
+              field.value = prefix;
+            }
+            clampToMax();
+          };
+
+          ensurePrefix();
+
+          field.addEventListener("focus", () => {
+            if (field.value === prefix) {
+              field.setSelectionRange(prefix.length, prefix.length);
+            }
+          });
+
+          field.addEventListener("input", ensurePrefix);
+
+          field.addEventListener("keydown", (event) => {
+            const cursorStart = field.selectionStart || 0;
+            if ((event.key === "Backspace" || event.key === "Delete") && cursorStart <= prefix.length) {
+              event.preventDefault();
+              field.setSelectionRange(prefix.length, prefix.length);
+            }
+          });
+        });
+
+        const confirmOverlay = document.getElementById("lifeConfirmOverlay");
+        const confirmClose = document.getElementById("lifeConfirmClose");
+        const confirmCancel = document.getElementById("lifeConfirmCancel");
+        const confirmOk = document.getElementById("lifeConfirmOk");
+        const confirmText = document.getElementById("lifeConfirmText");
+        let pendingConfirmGroup = null;
+
+        const openConfirmModal = (groupEl) => {
+          pendingConfirmGroup = groupEl;
+          if (confirmText) {
+            const number = groupEl?.dataset?.purpose;
+            confirmText.textContent = number
+              ? `¿Confirmar el propósito ${number} como público?`
+              : "¿Confirmar este deseo como público?";
+          }
+          confirmOverlay?.classList.remove("hidden");
+          confirmOverlay?.setAttribute("aria-hidden", "false");
+        };
+
+        const closeConfirmModal = () => {
+          confirmOverlay?.classList.add("hidden");
+          confirmOverlay?.setAttribute("aria-hidden", "true");
+          pendingConfirmGroup = null;
+        };
+
+        confirmClose?.addEventListener("click", closeConfirmModal);
+        confirmCancel?.addEventListener("click", closeConfirmModal);
+        confirmOverlay?.addEventListener("click", (event) => {
+          if (event.target === confirmOverlay) closeConfirmModal();
+        });
+
+        confirmOk?.addEventListener("click", () => {
+          if (!pendingConfirmGroup) {
+            closeConfirmModal();
+            return;
+          }
+          pendingConfirmGroup.dataset.isPrivate = "false";
+          setPurposeStatus(pendingConfirmGroup, "Estado: confirmado (publico).");
+          closeConfirmModal();
+        });
+
         document.querySelectorAll(".purpose-group").forEach((groupEl) => {
           if (!groupEl.dataset.isPrivate) groupEl.dataset.isPrivate = "false";
         });
@@ -72,11 +155,7 @@
             const action = btn.dataset.action;
     
             if (action === "confirm") {
-              const ok = confirm("Estas seguro de confirmar este deseo como publico?");
-              if (ok) {
-                groupEl.dataset.isPrivate = "false";
-                setPurposeStatus(groupEl, "Estado: confirmado (publico).");
-              }
+              openConfirmModal(groupEl);
               return;
             }
     
@@ -233,7 +312,7 @@
 <div class="page-backgroundlogin">
 
     <main class="auth-center">
-      <div class="auth-card auth-card--wide">
+      <div class="auth-card auth-card--wide auth-card--life">
 
         <h2 class="auth-title">Tu propósito de vida</h2>
 
@@ -250,12 +329,20 @@
 
         <form id="life-form">
           <div class="purpose-group" data-purpose="1">
-            <textarea id="p1" rows="1" maxlength="75" placeholder="Propósito 1" required></textarea>
+            <textarea id="p1" class="wish-prefix-input" data-prefix="Deseo " rows="1" maxlength="80" placeholder="Deseo 1" required>Deseo </textarea>
             <div class="purpose-actions" role="group" aria-label="Acciones para propósito 1">
-              <button type="button" class="purpose-action" data-action="confirm" title="Confirmar deseo de propósito">OK</button>
-              <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto">KEY</button>
-              <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha">DATE</button>
-              <button type="button" class="purpose-action" data-action="icon" title="Elegir icono">ICON</button>
+              <button type="button" class="purpose-action" data-action="confirm" title="Confirmar deseo de propósito" aria-label="Confirmar deseo de propósito">
+                <img src="/css/icons/iconsave.webp" alt="Guardar propósito">
+              </button>
+              <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto" aria-label="Convertir en secreto">
+                <img src="/css/icons/iconkey.webp" alt="Marcar como secreto">
+              </button>
+              <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha" aria-label="Revelar en fecha">
+                <img src="/css/icons/iconcalendar.webp" alt="Programar fecha">
+              </button>
+              <button type="button" class="purpose-action" data-action="icon" title="Elegir icono" aria-label="Elegir icono">
+                <img src="/css/icons/iconelemental.webp" alt="Elegir icono">
+              </button>
             </div>
             <input type="date" class="purpose-date" aria-label="Fecha de revelacion para proposito 1">
             <div class="purpose-icon-panel" aria-label="Selector de iconos">
@@ -276,12 +363,20 @@
           </div>
 
           <div class="purpose-group" data-purpose="2">
-            <textarea id="p2" rows="1" maxlength="75" placeholder="Propósito 2" required></textarea>
+            <textarea id="p2" class="wish-prefix-input" data-prefix="Deseo " rows="1" maxlength="80" placeholder="Deseo 2" required>Deseo </textarea>
             <div class="purpose-actions" role="group" aria-label="Acciones para propósito 2">
-              <button type="button" class="purpose-action" data-action="confirm" title="Confirmar deseo de propósito">OK</button>
-              <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto">KEY</button>
-              <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha">DATE</button>
-              <button type="button" class="purpose-action" data-action="icon" title="Elegir icono">ICON</button>
+              <button type="button" class="purpose-action" data-action="confirm" title="Confirmar deseo de propósito" aria-label="Confirmar deseo de propósito">
+                <img src="/css/icons/iconsave.webp" alt="Guardar propósito">
+              </button>
+              <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto" aria-label="Convertir en secreto">
+                <img src="/css/icons/iconkey.webp" alt="Marcar como secreto">
+              </button>
+              <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha" aria-label="Revelar en fecha">
+                <img src="/css/icons/iconcalendar.webp" alt="Programar fecha">
+              </button>
+              <button type="button" class="purpose-action" data-action="icon" title="Elegir icono" aria-label="Elegir icono">
+                <img src="/css/icons/iconelemental.webp" alt="Elegir icono">
+              </button>
             </div>
             <input type="date" class="purpose-date" aria-label="Fecha de revelacion para proposito 2">
             <div class="purpose-icon-panel" aria-label="Selector de iconos">
@@ -302,12 +397,20 @@
           </div>
 
           <div class="purpose-group" data-purpose="3">
-            <textarea id="p3" rows="1" maxlength="75" placeholder="Propósito 3" required></textarea>
+            <textarea id="p3" class="wish-prefix-input" data-prefix="Deseo " rows="1" maxlength="80" placeholder="Deseo 3" required>Deseo </textarea>
             <div class="purpose-actions" role="group" aria-label="Acciones para propósito 3">
-              <button type="button" class="purpose-action" data-action="confirm" title="Confirmar deseo de propósito">OK</button>
-              <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto">KEY</button>
-              <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha">DATE</button>
-              <button type="button" class="purpose-action" data-action="icon" title="Elegir icono">ICON</button>
+              <button type="button" class="purpose-action" data-action="confirm" title="Confirmar deseo de propósito" aria-label="Confirmar deseo de propósito">
+                <img src="/css/icons/iconsave.webp" alt="Guardar propósito">
+              </button>
+              <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto" aria-label="Convertir en secreto">
+                <img src="/css/icons/iconkey.webp" alt="Marcar como secreto">
+              </button>
+              <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha" aria-label="Revelar en fecha">
+                <img src="/css/icons/iconcalendar.webp" alt="Programar fecha">
+              </button>
+              <button type="button" class="purpose-action" data-action="icon" title="Elegir icono" aria-label="Elegir icono">
+                <img src="/css/icons/iconelemental.webp" alt="Elegir icono">
+              </button>
             </div>
             <input type="date" class="purpose-date" aria-label="Fecha de revelacion para proposito 3">
             <div class="purpose-icon-panel" aria-label="Selector de iconos">
@@ -338,6 +441,29 @@
 
       </div>
     </main>
+
+    <div class="modal-overlay hidden" id="lifeConfirmOverlay" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-label="Confirmar propósito público">
+        <div class="modal-head">
+          <h3>Confirmar propósito</h3>
+          <button class="modal-close" type="button" id="lifeConfirmClose">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <p class="modal-label-center" id="lifeConfirmText">
+            ¿Confirmar este deseo como público?
+          </p>
+          <p class="modal-label-center muted">
+            Se guardará como público.
+          </p>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-compact" type="button" id="lifeConfirmCancel">Cancelar</button>
+          <button class="btn btn-primary btn-compact" type="button" id="lifeConfirmOk">Confirmar</button>
+        </div>
+      </div>
+    </div>
 
     <footer class="kiadez-footer">
       <div class="footer-bottom">
