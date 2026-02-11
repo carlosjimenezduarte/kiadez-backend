@@ -290,9 +290,7 @@
               return;
             }
     
-            alert("Propósitos guardados.");
-            // Siguiente paso: home-user.html (cuando lo tengas)
-            // window.location.href = "/home-user.html";
+            window.location.href = "/home_user.html";
     
           } catch (err) {
             console.error(err);

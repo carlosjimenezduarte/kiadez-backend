@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { initPurposeCoverModule } from "../lib/purposeCover";
 
   onMount(() => {
     // =========================
@@ -8,7 +9,6 @@
         const LS = {
           coverImg: "kiadez_user_cover_img",
           coverPos: "kiadez_user_cover_pos",
-          purpose: "kiadez_user_purpose"
         };
     
         // =========================
@@ -86,73 +86,10 @@
         });
     
         // =========================
-        // PURPOSE MODAL (misma UX de Home) + persistencia
-        // =========================
-        const purposeModalOverlay = document.getElementById("purposeModalOverlay");
-        const btnEditPurposes = document.getElementById("btnEditPurposes");
-        const closePurposeModal = document.getElementById("closePurposeModal");
-        const cancelPurposeModal = document.getElementById("cancelPurposeModal");
-        const savePurposeModal = document.getElementById("savePurposeModal");
-    
-        const p1 = document.getElementById("purpose1");
-        const p2 = document.getElementById("purpose2");
-        const p3 = document.getElementById("purpose3");
-    
-        const purposeInput1 = document.getElementById("purposeInput1");
-        const purposeInput2 = document.getElementById("purposeInput2");
-        const purposeInput3 = document.getElementById("purposeInput3");
-    
-        const loadPurpose = () => {
-          const raw = localStorage.getItem(LS.purpose);
-          if (!raw) return;
-          try {
-            const p = JSON.parse(raw);
-            if (p.one) p1.textContent = p.one;
-            if (p.two) p2.textContent = p.two;
-            if (p.three) p3.textContent = p.three;
-          } catch { /* noop */ }
-        };
-    
-        const openPurposeModal = () => {
-          purposeInput1.value = p1.textContent.trim();
-          purposeInput2.value = p2.textContent.trim();
-          purposeInput3.value = p3.textContent.trim();
-    
-          purposeModalOverlay.classList.remove("hidden");
-          purposeModalOverlay.setAttribute("aria-hidden", "false");
-        };
-    
-        const closePurpose = () => {
-          purposeModalOverlay.classList.add("hidden");
-          purposeModalOverlay.setAttribute("aria-hidden", "true");
-        };
-    
-        btnEditPurposes?.addEventListener("click", openPurposeModal);
-        closePurposeModal?.addEventListener("click", closePurpose);
-        cancelPurposeModal?.addEventListener("click", closePurpose);
-    
-        savePurposeModal?.addEventListener("click", () => {
-          const one = purposeInput1.value.trim() || p1.textContent;
-          const two = purposeInput2.value.trim() || p2.textContent;
-          const three = purposeInput3.value.trim() || p3.textContent;
-    
-          p1.textContent = one;
-          p2.textContent = two;
-          p3.textContent = three;
-    
-          localStorage.setItem(LS.purpose, JSON.stringify({ one, two, three }));
-          closePurpose();
-        });
-    
-        purposeModalOverlay?.addEventListener("click", (e) => {
-          if (e.target === purposeModalOverlay) closePurpose();
-        });
-    
-        // =========================
         // INIT
         // =========================
         loadCover();
-        loadPurpose();
+        initPurposeCoverModule();
     
         // (deja aquí tu init del resto de biografía: loadSectionData(), applyPrivacy(), etc.)
   });
@@ -178,8 +115,8 @@
             <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
               Cambiar portada
             </button>
-            <button class="icon-btn" id="btnEditPurposes" type="button" title="Editar deseos de propósito">
-              Editar propósito
+            <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title="Editar mi propósito de vida">
+              Editar mi propósito de vida
             </button>
 
             <input id="coverFile" type="file" accept="image/*" class="hidden" />
@@ -208,6 +145,7 @@
       <div class="biography-body">
       <!-- NAV (YA LO TIENES IGUAL) -->
       <nav class="profile-nav" aria-label="Navegación de perfil">
+        <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
         <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
           <span class="nav-icon">⭐</span>
           <span><strong>5.000.000</strong> estrellas</span>
@@ -219,34 +157,6 @@
         <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
         <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
       </nav>
-
-      <!-- MODAL DE PROPÓSITO (MISMO DE HOME) -->
-      <div class="modal-overlay hidden" id="purposeModalOverlay" aria-hidden="true">
-        <div class="modal" role="dialog" aria-modal="true" aria-label="Editar deseos de propósito">
-          <div class="modal-head">
-            <h3>Editar deseos de propósito</h3>
-            <button class="modal-close" type="button" id="closePurposeModal">✕</button>
-          </div>
-
-          <div class="modal-body">
-            <label class="modal-label" for="purposeInput1">Deseo 1</label>
-            <input class="modal-input" id="purposeInput1" type="text" />
-
-            <label class="modal-label" for="purposeInput2">Deseo 2</label>
-            <input class="modal-input" id="purposeInput2" type="text" />
-
-            <label class="modal-label" for="purposeInput3">Deseo 3</label>
-            <input class="modal-input" id="purposeInput3" type="text" />
-          </div>
-
-          <div class="modal-actions">
-            <button class="btn btn-outline btn-compact" type="button" id="cancelPurposeModal">Cancelar</button>
-            <button class="btn btn-primary btn-compact" type="button" id="savePurposeModal">Guardar</button>
-          </div>
-        </div>
-      </div>
-
-
       <!-- ======= CUERPO (3 columnas) ======= -->
       <section class="bio-shell">
 

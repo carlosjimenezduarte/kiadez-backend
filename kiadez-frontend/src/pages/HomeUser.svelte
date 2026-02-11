@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { initPurposeCoverModule } from '../lib/purposeCover';
 
   onMount(() => {
     // COVER: upload + drag to position
@@ -64,53 +65,10 @@
     window.addEventListener('mousemove', handleCoverMouseMove);
     window.addEventListener('mouseup', handleCoverMouseUp);
 
-    // PURPOSE MODAL
-    const purposeModalOverlay = document.getElementById('purposeModalOverlay');
-    const btnEditPurposes = document.getElementById('btnEditPurposes');
-    const closePurposeModal = document.getElementById('closePurposeModal');
-    const cancelPurposeModal = document.getElementById('cancelPurposeModal');
-    const savePurposeModal = document.getElementById('savePurposeModal');
+    initPurposeCoverModule();
 
-    const p1 = document.getElementById('purpose1');
-    const p2 = document.getElementById('purpose2');
-    const p3 = document.getElementById('purpose3');
-
-    const purposeInput1 = document.getElementById('purposeInput1');
-    const purposeInput2 = document.getElementById('purposeInput2');
-    const purposeInput3 = document.getElementById('purposeInput3');
-
-    const openPurposeModal = () => {
-      if (purposeInput1 && p1) purposeInput1.value = p1.textContent.trim();
-      if (purposeInput2 && p2) purposeInput2.value = p2.textContent.trim();
-      if (purposeInput3 && p3) purposeInput3.value = p3.textContent.trim();
-
-      purposeModalOverlay?.classList.remove('hidden');
-      purposeModalOverlay?.setAttribute('aria-hidden', 'false');
-    };
-
-    const closePurpose = () => {
-      purposeModalOverlay?.classList.add('hidden');
-      purposeModalOverlay?.setAttribute('aria-hidden', 'true');
-    };
-
-    const handleSavePurpose = () => {
-      if (p1 && purposeInput1?.value?.trim()) p1.textContent = purposeInput1.value.trim();
-      if (p2 && purposeInput2?.value?.trim()) p2.textContent = purposeInput2.value.trim();
-      if (p3 && purposeInput3?.value?.trim()) p3.textContent = purposeInput3.value.trim();
-      closePurpose();
-    };
-
-    const handlePurposeOverlayClick = (event) => {
-      if (event.target === purposeModalOverlay) closePurpose();
-    };
-
-    btnEditPurposes?.addEventListener('click', openPurposeModal);
-    closePurposeModal?.addEventListener('click', closePurpose);
-    cancelPurposeModal?.addEventListener('click', closePurpose);
-    savePurposeModal?.addEventListener('click', handleSavePurpose);
-    purposeModalOverlay?.addEventListener('click', handlePurposeOverlayClick);
-
-    // POST MODAL
+    // POSTS
+    const API = 'http://127.0.0.1:8000';
     const postModalOverlay = document.getElementById('postModalOverlay');
     const openPostModal = document.getElementById('openPostModal');
     const closePostModal = document.getElementById('closePostModal');
@@ -121,6 +79,166 @@
     const publishPost = document.getElementById('publishPost');
     const postText = document.getElementById('postText');
     const postVisibility = document.getElementById('postVisibility');
+    const postsList = document.getElementById('homePostsList');
+    const postsStatus = document.getElementById('postsStatus');
+    const starsTotalLabel = document.getElementById('homeStarsTotal');
+
+    const deletePostOverlay = document.getElementById('deletePostModalOverlay');
+    const closeDeletePostModal = document.getElementById('closeDeletePostModal');
+    const cancelDeletePost = document.getElementById('cancelDeletePost');
+    const confirmDeletePost = document.getElementById('confirmDeletePost');
+
+    const reportPostOverlay = document.getElementById('reportPostModalOverlay');
+    const closeReportPostModal = document.getElementById('closeReportPostModal');
+    const cancelReportPost = document.getElementById('cancelReportPost');
+    const submitReportPost = document.getElementById('submitReportPost');
+    const reportReasonOtherWrap = document.getElementById('reportReasonOtherWrap');
+    const reportReasonOther = document.getElementById('reportReasonOther');
+
+    const commentsOverlay = document.getElementById('postCommentsModalOverlay');
+    const closeCommentsModal = document.getElementById('closePostCommentsModal');
+    const cancelCommentsModal = document.getElementById('cancelPostCommentsModal');
+    const commentsList = document.getElementById('postCommentsList');
+    const commentsStatus = document.getElementById('postCommentsStatus');
+    const commentInput = document.getElementById('postCommentInput');
+    const sendComment = document.getElementById('sendPostComment');
+    const commentsTitle = document.getElementById('postCommentsTitle');
+
+    let selectedFile = null;
+    let selectedFileURL = null;
+    let selectedCommentPostId = null;
+    let selectedDeletePostId = null;
+    let selectedReportPostId = null;
+
+    const getAccessToken = () => localStorage.getItem('access_token') || '';
+
+    const escapeHtml = (value) =>
+      (value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
+    const setPostsStatus = (message, isError = false) => {
+      if (!postsStatus) return;
+      postsStatus.textContent = message || '';
+      postsStatus.classList.toggle('posts-status-error', Boolean(isError));
+    };
+
+    const relativeTime = (isoDate) => {
+      const ts = Date.parse(isoDate);
+      if (Number.isNaN(ts)) return 'ahora';
+      const minutes = Math.floor((Date.now() - ts) / 60000);
+      if (minutes < 1) return 'ahora';
+      if (minutes < 60) return `hace ${minutes} min`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `hace ${hours} h`;
+      const days = Math.floor(hours / 24);
+      return `hace ${days} dia${days > 1 ? 's' : ''}`;
+    };
+
+    const apiFetch = async (path, options = {}) => {
+      const token = getAccessToken();
+      if (!token) {
+        window.location.href = '/login.html';
+        throw new Error('No hay sesion activa');
+      }
+      const headers = {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`
+      };
+      const res = await fetch(`${API}${path}`, { ...options, headers });
+      if (res.status === 401) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        window.location.href = '/login.html';
+        throw new Error('Sesion expirada');
+      }
+      return res;
+    };
+
+    const renderPosts = (posts) => {
+      if (!postsList) return;
+      if (!Array.isArray(posts) || posts.length === 0) {
+        postsList.innerHTML = `
+          <article class="panel post post-empty">
+            <p class="post-text">Aun no hay publicaciones. Crea la primera desde el boton "Que estas pensando?".</p>
+          </article>
+        `;
+        return;
+      }
+
+      postsList.innerHTML = posts
+        .map((post) => {
+          const mediaHtml = post.media_url
+            ? post.media_kind === 'video'
+              ? `<div class="post-media"><video src="${post.media_url}" controls></video></div>`
+              : `<div class="post-media"><img src="${post.media_url}" alt="Media de la publicacion" /></div>`
+            : '';
+          const starDisabled = post.starred_by_me ? 'disabled' : '';
+          const starLabel = post.starred_by_me
+            ? `⭐ Estrella donada (${post.star_count})`
+            : `⭐ Donar estrella (${post.star_count})`;
+          const reportBtn = post.is_mine
+            ? ''
+            : `<button class="post-head-btn" type="button" data-action="report-post" data-post-id="${post.id}" title="Reportar publicacion">🚩</button>`;
+          const deleteBtn = post.is_mine
+            ? `<button class="post-head-btn" type="button" data-action="delete-post" data-post-id="${post.id}" title="Eliminar publicacion">🗑</button>`
+            : '';
+
+          return `
+            <article class="panel post" data-post-id="${post.id}">
+              <div class="post-head">
+                <div>
+                  <strong>${escapeHtml(post.author.name)}</strong>
+                  <span class="post-meta">· ${relativeTime(post.created_at)} · ${post.visibility === 'private' ? 'Privado' : 'Publico'}</span>
+                </div>
+                <div class="post-head-actions">
+                  ${reportBtn}
+                  ${deleteBtn}
+                </div>
+              </div>
+              ${post.text ? `<p class="post-text">${escapeHtml(post.text)}</p>` : ''}
+              ${mediaHtml}
+              <p class="post-warning">La donacion de estrella es irreversible.</p>
+              <div class="post-actions">
+                <button class="post-btn" type="button" data-action="star-post" data-post-id="${post.id}" ${starDisabled}>${starLabel}</button>
+                <button class="post-btn" type="button" data-action="comment-post" data-post-id="${post.id}">💬 Comentar (${post.comment_count})</button>
+                <button class="post-btn" type="button" data-action="share-post" data-post-id="${post.id}">🔁 Compartir (${post.share_count})</button>
+              </div>
+            </article>
+          `;
+        })
+        .join('');
+    };
+
+    const loadMyStats = async () => {
+      try {
+        const res = await apiFetch('/posts/me/stats');
+        const data = await res.json();
+        if (res.ok && starsTotalLabel) {
+          starsTotalLabel.textContent = Number(data.my_received_stars_total || 0).toLocaleString('es-CO');
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const loadFeed = async () => {
+      try {
+        const res = await apiFetch('/posts/feed?limit=40');
+        const data = await res.json();
+        if (!res.ok) {
+          setPostsStatus(data.detail || 'No se pudo cargar el feed.', true);
+          return;
+        }
+        renderPosts(data);
+        setPostsStatus('');
+      } catch (error) {
+        setPostsStatus('No se pudo conectar con el servidor de publicaciones.', true);
+      }
+    };
 
     const openPost = () => {
       postModalOverlay?.classList.remove('hidden');
@@ -135,6 +253,11 @@
         postPreview.innerHTML = '';
         postPreview.classList.add('hidden');
       }
+      if (selectedFileURL) {
+        URL.revokeObjectURL(selectedFileURL);
+        selectedFileURL = null;
+      }
+      selectedFile = null;
       if (postFile) postFile.value = '';
       if (postText) postText.value = '';
       if (postVisibility) postVisibility.value = 'public';
@@ -146,26 +269,300 @@
 
     const handlePostFileChange = (event) => {
       const file = event?.target?.files?.[0];
+      selectedFile = file || null;
       if (!file) return;
       if (uploadHint) uploadHint.textContent = file.name;
 
-      const url = URL.createObjectURL(file);
+      if (selectedFileURL) URL.revokeObjectURL(selectedFileURL);
+      selectedFileURL = URL.createObjectURL(file);
       if (!postPreview) return;
       postPreview.classList.remove('hidden');
 
       if (file.type.startsWith('image/')) {
-        postPreview.innerHTML = `<img src="${url}" alt="Previsualización" />`;
+        postPreview.innerHTML = `<img src="${selectedFileURL}" alt="Previsualizacion" />`;
       } else if (file.type.startsWith('video/')) {
-        postPreview.innerHTML = `<video src="${url}" controls></video>`;
+        postPreview.innerHTML = `<video src="${selectedFileURL}" controls></video>`;
       } else {
+        selectedFile = null;
         postPreview.innerHTML = '';
         postPreview.classList.add('hidden');
+        setPostsStatus('Solo se permiten archivos de imagen o video.', true);
       }
     };
 
-    const handlePublishPost = () => {
-      alert('Publicación creada (mock). En backend luego la guardamos en DB.');
-      closePost();
+    const uploadMediaIfNeeded = async (visibilityValue) => {
+      if (!selectedFile) return null;
+
+      const presignRes = await apiFetch('/media/presign/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: selectedFile.name,
+          content_type: selectedFile.type,
+          size_bytes: selectedFile.size,
+          visibility: visibilityValue
+        })
+      });
+      const presignData = await presignRes.json();
+      if (!presignRes.ok) {
+        throw new Error(presignData.detail || 'No se pudo preparar la carga de media.');
+      }
+
+      const uploadRes = await fetch(presignData.upload_url, {
+        method: 'PUT',
+        headers: presignData.required_headers || { 'Content-Type': selectedFile.type },
+        body: selectedFile
+      });
+      if (!uploadRes.ok) {
+        throw new Error('No se pudo subir el archivo.');
+      }
+
+      const confirmRes = await apiFetch('/media/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ media_id: presignData.media_id })
+      });
+      const confirmData = await confirmRes.json();
+      if (!confirmRes.ok) {
+        throw new Error(confirmData.detail || 'No se pudo confirmar la media.');
+      }
+
+      const mediaKind = selectedFile.type.startsWith('video/') ? 'video' : 'image';
+      return { media_id: presignData.media_id, media_kind: mediaKind };
+    };
+
+    const handlePublishPost = async () => {
+      const text = (postText?.value || '').trim();
+      if (!text && !selectedFile) {
+        setPostsStatus('Debes escribir texto o adjuntar imagen/video.', true);
+        return;
+      }
+
+      const oldLabel = publishPost?.textContent || 'Publicar';
+      if (publishPost) {
+        publishPost.disabled = true;
+        publishPost.textContent = 'Publicando...';
+      }
+
+      try {
+        const visibilityValue = (postVisibility?.value || 'public').toLowerCase();
+        const mediaData = await uploadMediaIfNeeded(visibilityValue);
+        const payload = {
+          text: text || null,
+          visibility: visibilityValue,
+          media_id: mediaData?.media_id ?? null,
+          media_kind: mediaData?.media_kind ?? null
+        };
+
+        const res = await apiFetch('/posts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'No se pudo crear la publicacion.');
+        }
+
+        setPostsStatus('Publicacion creada correctamente.');
+        closePost();
+        await Promise.all([loadFeed(), loadMyStats()]);
+      } catch (error) {
+        setPostsStatus(error.message || 'No se pudo publicar.', true);
+      } finally {
+        if (publishPost) {
+          publishPost.disabled = false;
+          publishPost.textContent = oldLabel;
+        }
+      }
+    };
+
+    const closeDeleteModal = () => {
+      deletePostOverlay?.classList.add('hidden');
+      deletePostOverlay?.setAttribute('aria-hidden', 'true');
+      selectedDeletePostId = null;
+    };
+
+    const closeReportModal = () => {
+      reportPostOverlay?.classList.add('hidden');
+      reportPostOverlay?.setAttribute('aria-hidden', 'true');
+      selectedReportPostId = null;
+      if (reportReasonOther) reportReasonOther.value = '';
+      if (reportReasonOtherWrap) reportReasonOtherWrap.classList.add('hidden');
+      const defaultOption = document.querySelector('input[name="postReportReason"][value="violent"]');
+      if (defaultOption) defaultOption.checked = true;
+    };
+
+    const closeComments = () => {
+      commentsOverlay?.classList.add('hidden');
+      commentsOverlay?.setAttribute('aria-hidden', 'true');
+      selectedCommentPostId = null;
+      if (commentInput) commentInput.value = '';
+      if (commentsList) commentsList.innerHTML = '';
+    };
+
+    const loadComments = async () => {
+      if (!selectedCommentPostId || !commentsList) return;
+      commentsList.innerHTML = '';
+      if (commentsStatus) commentsStatus.textContent = 'Cargando comentarios...';
+      try {
+        const res = await apiFetch(`/posts/${selectedCommentPostId}/comments?limit=200`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar comentarios.');
+        if (!Array.isArray(data) || data.length === 0) {
+          commentsList.innerHTML = '<p class="post-comments-empty">Aun no hay comentarios.</p>';
+        } else {
+          commentsList.innerHTML = data
+            .map(
+              (comment) => `
+                <article class="post-comment-item">
+                  <div class="post-comment-head">
+                    <strong>${escapeHtml(comment.author.name)}</strong>
+                    <span>${relativeTime(comment.created_at)}</span>
+                  </div>
+                  <p>${escapeHtml(comment.text)}</p>
+                </article>
+              `
+            )
+            .join('');
+        }
+        if (commentsStatus) commentsStatus.textContent = '';
+      } catch (error) {
+        if (commentsStatus) commentsStatus.textContent = error.message || 'No se pudieron cargar comentarios.';
+      }
+    };
+
+    const handlePostsClick = async (event) => {
+      const button = event.target.closest('[data-action][data-post-id]');
+      if (!button) return;
+      const action = button.dataset.action;
+      const postId = Number(button.dataset.postId);
+      if (!postId) return;
+
+      if (action === 'star-post') {
+        try {
+          const res = await apiFetch(`/posts/${postId}/stars`, { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || 'No se pudo donar la estrella.');
+          setPostsStatus('Estrella donada. Esta accion es irreversible.');
+          await Promise.all([loadFeed(), loadMyStats()]);
+        } catch (error) {
+          setPostsStatus(error.message || 'No se pudo donar la estrella.', true);
+        }
+        return;
+      }
+
+      if (action === 'comment-post') {
+        selectedCommentPostId = postId;
+        if (commentsTitle) commentsTitle.textContent = `Comentarios de la publicacion #${postId}`;
+        commentsOverlay?.classList.remove('hidden');
+        commentsOverlay?.setAttribute('aria-hidden', 'false');
+        await loadComments();
+        return;
+      }
+
+      if (action === 'share-post') {
+        try {
+          await apiFetch(`/posts/${postId}/share`, { method: 'POST' });
+          const shareUrl = `${window.location.origin}/home_user.html?post=${postId}`;
+          if (navigator.share) {
+            await navigator.share({ title: 'Kiadez', text: 'Mira esta publicacion', url: shareUrl });
+          } else if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(shareUrl);
+          }
+          setPostsStatus('Publicacion compartida.');
+          await loadFeed();
+        } catch (error) {
+          setPostsStatus(error.message || 'No se pudo compartir.', true);
+        }
+        return;
+      }
+
+      if (action === 'delete-post') {
+        selectedDeletePostId = postId;
+        deletePostOverlay?.classList.remove('hidden');
+        deletePostOverlay?.setAttribute('aria-hidden', 'false');
+        return;
+      }
+
+      if (action === 'report-post') {
+        selectedReportPostId = postId;
+        reportPostOverlay?.classList.remove('hidden');
+        reportPostOverlay?.setAttribute('aria-hidden', 'false');
+      }
+    };
+
+    const handleConfirmDeletePost = async () => {
+      if (!selectedDeletePostId) return;
+      try {
+        const res = await apiFetch(`/posts/${selectedDeletePostId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudo eliminar la publicacion.');
+        setPostsStatus(`Publicacion eliminada. Se restaron ${data.removed_stars || 0} estrellas asociadas.`);
+        closeDeleteModal();
+        await Promise.all([loadFeed(), loadMyStats()]);
+      } catch (error) {
+        setPostsStatus(error.message || 'No se pudo eliminar la publicacion.', true);
+      }
+    };
+
+    const handleReportReasonChange = (event) => {
+      const selected = event.target?.value || '';
+      if (!reportReasonOtherWrap) return;
+      if (selected === 'other') reportReasonOtherWrap.classList.remove('hidden');
+      else reportReasonOtherWrap.classList.add('hidden');
+    };
+
+    const handleSubmitReport = async () => {
+      if (!selectedReportPostId) return;
+      const selected = document.querySelector('input[name="postReportReason"]:checked');
+      const reason = selected?.value;
+      if (!reason) {
+        setPostsStatus('Debes elegir una razon de reporte.', true);
+        return;
+      }
+      const otherReason = (reportReasonOther?.value || '').trim();
+      if (reason === 'other' && !otherReason) {
+        setPostsStatus('Debes escribir la razon cuando eliges "Otra razon".', true);
+        return;
+      }
+
+      try {
+        const res = await apiFetch(`/posts/${selectedReportPostId}/reports`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason, other_reason: otherReason || null })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudo enviar el reporte.');
+        setPostsStatus('Reporte enviado correctamente.');
+        closeReportModal();
+      } catch (error) {
+        setPostsStatus(error.message || 'No se pudo enviar el reporte.', true);
+      }
+    };
+
+    const handleSendComment = async () => {
+      if (!selectedCommentPostId) return;
+      const text = (commentInput?.value || '').trim();
+      if (!text) {
+        if (commentsStatus) commentsStatus.textContent = 'Escribe un comentario antes de enviar.';
+        return;
+      }
+      try {
+        const res = await apiFetch(`/posts/${selectedCommentPostId}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudo crear el comentario.');
+        if (commentInput) commentInput.value = '';
+        if (commentsStatus) commentsStatus.textContent = '';
+        await Promise.all([loadComments(), loadFeed()]);
+      } catch (error) {
+        if (commentsStatus) commentsStatus.textContent = error.message || 'No se pudo guardar el comentario.';
+      }
     };
 
     openPostModal?.addEventListener('click', openPost);
@@ -174,19 +571,42 @@
     postModalOverlay?.addEventListener('click', handlePostOverlayClick);
     postFile?.addEventListener('change', handlePostFileChange);
     publishPost?.addEventListener('click', handlePublishPost);
+    postsList?.addEventListener('click', handlePostsClick);
+
+    closeDeletePostModal?.addEventListener('click', closeDeleteModal);
+    cancelDeletePost?.addEventListener('click', closeDeleteModal);
+    confirmDeletePost?.addEventListener('click', handleConfirmDeletePost);
+    deletePostOverlay?.addEventListener('click', (event) => {
+      if (event.target === deletePostOverlay) closeDeleteModal();
+    });
+
+    closeReportPostModal?.addEventListener('click', closeReportModal);
+    cancelReportPost?.addEventListener('click', closeReportModal);
+    submitReportPost?.addEventListener('click', handleSubmitReport);
+    reportPostOverlay?.addEventListener('click', (event) => {
+      if (event.target === reportPostOverlay) closeReportModal();
+    });
+    document
+      .querySelectorAll('input[name="postReportReason"]')
+      .forEach((input) => input.addEventListener('change', handleReportReasonChange));
+
+    closeCommentsModal?.addEventListener('click', closeComments);
+    cancelCommentsModal?.addEventListener('click', closeComments);
+    sendComment?.addEventListener('click', handleSendComment);
+    commentsOverlay?.addEventListener('click', (event) => {
+      if (event.target === commentsOverlay) closeComments();
+    });
+
+    void Promise.all([loadFeed(), loadMyStats()]);
 
     return () => {
+      if (selectedFileURL) URL.revokeObjectURL(selectedFileURL);
+
       btnChangeCover?.removeEventListener('click', handleChangeCover);
       coverFile?.removeEventListener('change', handleCoverFileChange);
       coverMedia?.removeEventListener('mousedown', handleCoverMouseDown);
       window.removeEventListener('mousemove', handleCoverMouseMove);
       window.removeEventListener('mouseup', handleCoverMouseUp);
-
-      btnEditPurposes?.removeEventListener('click', openPurposeModal);
-      closePurposeModal?.removeEventListener('click', closePurpose);
-      cancelPurposeModal?.removeEventListener('click', closePurpose);
-      savePurposeModal?.removeEventListener('click', handleSavePurpose);
-      purposeModalOverlay?.removeEventListener('click', handlePurposeOverlayClick);
 
       openPostModal?.removeEventListener('click', openPost);
       closePostModal?.removeEventListener('click', closePost);
@@ -194,7 +614,24 @@
       postModalOverlay?.removeEventListener('click', handlePostOverlayClick);
       postFile?.removeEventListener('change', handlePostFileChange);
       publishPost?.removeEventListener('click', handlePublishPost);
+      postsList?.removeEventListener('click', handlePostsClick);
+
+      closeDeletePostModal?.removeEventListener('click', closeDeleteModal);
+      cancelDeletePost?.removeEventListener('click', closeDeleteModal);
+      confirmDeletePost?.removeEventListener('click', handleConfirmDeletePost);
+
+      closeReportPostModal?.removeEventListener('click', closeReportModal);
+      cancelReportPost?.removeEventListener('click', closeReportModal);
+      submitReportPost?.removeEventListener('click', handleSubmitReport);
+      document
+        .querySelectorAll('input[name="postReportReason"]')
+        .forEach((input) => input.removeEventListener('change', handleReportReasonChange));
+
+      closeCommentsModal?.removeEventListener('click', closeComments);
+      cancelCommentsModal?.removeEventListener('click', closeComments);
+      sendComment?.removeEventListener('click', handleSendComment);
     };
+
   });
 </script>
 
@@ -215,8 +652,8 @@
           <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
             Cambiar portada
           </button>
-          <button class="icon-btn" id="btnEditPurposes" type="button" title="Editar deseos de propósito">
-            Editar propósito
+          <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title="Editar mi propósito de vida">
+            Editar mi propósito de vida
           </button>
 
           <input id="coverFile" type="file" accept="image/*" class="hidden" />
@@ -244,9 +681,10 @@
 
     <div class="home-body">
       <nav class="profile-nav" aria-label="Navegación de perfil">
+        <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
         <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
           <span class="nav-icon">⭐</span>
-          <span><strong>5.000.000</strong> estrellas</span>
+          <span><strong id="homeStarsTotal">0</strong> estrellas</span>
         </a>
 
         <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
@@ -398,93 +836,8 @@
             </div>
           </article>
 
-          <article class="panel post">
-            <div class="post-head">
-              <div>
-                <strong>Carlos Jiménez Duarte</strong>
-                <span class="post-meta">· hace 2 horas · Público</span>
-              </div>
-            </div>
-
-            <p class="post-text">
-              Las mejores cosas llegan sin ser esperadas. #propósito #constancia #vida
-            </p>
-
-            <div class="post-actions">
-              <button class="post-btn" type="button">⭐ Estrella</button>
-              <button class="post-btn" type="button">💬 Comentar</button>
-              <button class="post-btn" type="button">🔁 Compartir</button>
-            </div>
-          </article>
-
-          <article class="panel post">
-            <div class="post-head">
-              <div>
-                <strong>Carlos Jiménez Duarte</strong>
-                <span class="post-meta">· ayer · Público</span>
-              </div>
-            </div>
-
-            <p class="post-text">
-              Hoy estuve desarrollando el mockup de mi red social.
-            </p>
-
-            <div class="post-media">
-              <img src="assets/post-1.jpg" alt="Post con imagen" />
-            </div>
-
-            <div class="post-actions">
-              <button class="post-btn" type="button">⭐ Estrella</button>
-              <button class="post-btn" type="button">💬 Comentar</button>
-              <button class="post-btn" type="button">🔁 Compartir</button>
-            </div>
-          </article>
-
-          <article class="panel post">
-            <div class="post-head">
-              <div>
-                <strong>Carlos Jiménez Duarte</strong>
-                <span class="post-meta">· hace 3 días · Público</span>
-              </div>
-            </div>
-
-            <p class="post-text">
-              Oh, my God, I’m sharing my soda with Lars Ulrich 😄
-            </p>
-
-            <div class="post-media">
-              <img src="assets/post-2.jpg" alt="Post con imagen" />
-            </div>
-
-            <div class="post-actions">
-              <button class="post-btn" type="button">⭐ Estrella</button>
-              <button class="post-btn" type="button">💬 Comentar</button>
-              <button class="post-btn" type="button">🔁 Compartir</button>
-            </div>
-          </article>
-
-          <article class="panel post">
-            <div class="post-head">
-              <div>
-                <strong>Carlos Jiménez Duarte</strong>
-                <span class="post-meta">· hace 1 semana · Público</span>
-              </div>
-            </div>
-
-            <p class="post-text">
-              Los paseos con Willow siempre me relajan.
-            </p>
-
-            <div class="post-media">
-              <img src="assets/post-3.jpg" alt="Post con imagen" />
-            </div>
-
-            <div class="post-actions">
-              <button class="post-btn" type="button">⭐ Estrella</button>
-              <button class="post-btn" type="button">💬 Comentar</button>
-              <button class="post-btn" type="button">🔁 Compartir</button>
-            </div>
-          </article>
+          <p class="posts-status" id="postsStatus"></p>
+          <div class="posts-list" id="homePostsList"></div>
         </section>
       </section>
     </div>
@@ -544,31 +897,6 @@
   </footer>
 </div>
 
-<div class="modal-overlay hidden" id="purposeModalOverlay" aria-hidden="true">
-  <div class="modal" role="dialog" aria-modal="true" aria-label="Editar deseos de propósito">
-    <div class="modal-head">
-      <h3>Editar deseos de propósito</h3>
-      <button class="modal-close" type="button" id="closePurposeModal">✕</button>
-    </div>
-
-    <div class="modal-body">
-      <label class="modal-label" for="purposeInput1">Deseo 1</label>
-      <input class="modal-input" id="purposeInput1" type="text" />
-
-      <label class="modal-label" for="purposeInput2">Deseo 2</label>
-      <input class="modal-input" id="purposeInput2" type="text" />
-
-      <label class="modal-label" for="purposeInput3">Deseo 3</label>
-      <input class="modal-input" id="purposeInput3" type="text" />
-    </div>
-
-    <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelPurposeModal">Cancelar</button>
-      <button class="btn btn-primary btn-compact" type="button" id="savePurposeModal">Guardar</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay hidden" id="postModalOverlay" aria-hidden="true">
   <div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="Crear publicación">
     <div class="modal-head">
@@ -602,6 +930,72 @@
     <div class="modal-actions">
       <button class="btn btn-outline btn-compact" type="button" id="cancelPost">Cancelar</button>
       <button class="btn btn-primary btn-compact" type="button" id="publishPost">Publicar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="deletePostModalOverlay" aria-hidden="true">
+  <div class="modal wish-modal delete-wish-modal" role="dialog" aria-modal="true" aria-label="Eliminar publicación">
+    <div class="modal-head">
+      <h3>Eliminar publicación</h3>
+      <button class="modal-close" type="button" id="closeDeletePostModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-label-center">
+        Esta acción eliminará la publicación y restará permanentemente las estrellas asociadas a ella.
+      </p>
+      <p class="modal-label-center muted">Esta acción no se puede deshacer.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-compact" type="button" id="cancelDeletePost">Cancelar</button>
+      <button class="btn btn-primary btn-compact" type="button" id="confirmDeletePost">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="reportPostModalOverlay" aria-hidden="true">
+  <div class="modal wish-modal fulfill-wish-modal" role="dialog" aria-modal="true" aria-label="Reportar publicación">
+    <div class="modal-head">
+      <h3>Reportar publicación</h3>
+      <button class="modal-close" type="button" id="closeReportPostModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-label-center">
+        Selecciona la razón por la cual deseas reportar esta publicación.
+      </p>
+      <div class="report-reasons">
+        <label class="report-option"><input type="radio" name="postReportReason" value="violent" checked /> Contenido violento o perturbador</label>
+        <label class="report-option"><input type="radio" name="postReportReason" value="divisive" /> Contenido que promueve confrontación o división excesiva</label>
+        <label class="report-option"><input type="radio" name="postReportReason" value="sexual" /> Contenido sexual explícito o inapropiado</label>
+        <label class="report-option"><input type="radio" name="postReportReason" value="other" /> Otra razón</label>
+      </div>
+      <div id="reportReasonOtherWrap" class="report-other-wrap hidden">
+        <label class="modal-label" for="reportReasonOther">Describe la razón</label>
+        <textarea class="modal-textarea" id="reportReasonOther" rows="3" placeholder="Escribe tu razón"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-compact" type="button" id="cancelReportPost">Cancelar</button>
+      <button class="btn btn-primary btn-compact" type="button" id="submitReportPost">Enviar reporte</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="postCommentsModalOverlay" aria-hidden="true">
+  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="Comentarios de publicación">
+    <div class="modal-head">
+      <h3 id="postCommentsTitle">Comentarios</h3>
+      <button class="modal-close" type="button" id="closePostCommentsModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="posts-status" id="postCommentsStatus"></p>
+      <div class="post-comments-list" id="postCommentsList"></div>
+      <label class="modal-label" for="postCommentInput">Agregar comentario</label>
+      <textarea class="modal-textarea" id="postCommentInput" rows="3" maxlength="1200" placeholder="Escribe un comentario"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-compact" type="button" id="cancelPostCommentsModal">Cerrar</button>
+      <button class="btn btn-primary btn-compact" type="button" id="sendPostComment">Comentar</button>
     </div>
   </div>
 </div>

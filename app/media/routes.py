@@ -11,6 +11,8 @@ from app.auth.models import UserPublic
 from app.core.config import settings
 from app.core.security import decode_token
 from app.core.storage import (
+    S3NotConfiguredError,
+    ensure_s3_configured,
     delete_object,
     generate_presigned_get_url,
     generate_presigned_put_url,
@@ -29,6 +31,16 @@ from app.media.schemas import (
 
 router = APIRouter(prefix="/media", tags=["media"])
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
+
+def _ensure_media_storage_ready() -> None:
+    try:
+        ensure_s3_configured()
+    except S3NotConfiguredError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Storage de media no configurado ({exc}).",
+        ) from exc
 
 
 def _normalize_content_type(content_type: str) -> str:
@@ -84,6 +96,7 @@ def presign_upload(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _ensure_media_storage_ready()
     _validate_media_size(payload.content_type, payload.size_bytes)
 
     object_key = _build_object_key(
@@ -135,6 +148,7 @@ def confirm_upload(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _ensure_media_storage_ready()
     media = db.query(Media).filter(Media.id == payload.media_id).one_or_none()
     if not media:
         raise HTTPException(status_code=404, detail="Media no encontrada.")
@@ -183,6 +197,7 @@ def get_media_url(
     token: str | None = Depends(oauth2_scheme_optional),
     db: Session = Depends(get_db),
 ):
+    _ensure_media_storage_ready()
     media = db.query(Media).filter(Media.id == media_id).one_or_none()
     if not media:
         raise HTTPException(status_code=404, detail="Media no encontrada.")
@@ -206,6 +221,7 @@ def delete_media(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _ensure_media_storage_ready()
     media = db.query(Media).filter(Media.id == media_id).one_or_none()
     if not media:
         raise HTTPException(status_code=404, detail="Media no encontrada.")

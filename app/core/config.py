@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -35,6 +36,11 @@ class Settings(BaseSettings):
         "https://www.kiadez.com"
     )
 
+    # 🧪 Dev tools
+    APP_ENV: str = "dev"
+    DEV_LOGIN_AS_ENABLED: bool = False
+    DEV_LOGIN_AS_SECRET: str | None = None
+
     # 📧 SMTP
     SMTP_HOST: str
     SMTP_PORT: int
@@ -49,11 +55,13 @@ class Settings(BaseSettings):
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 60
 
     # ☁️ S3 (Backblaze B2)
-    S3_ENDPOINT: str
-    S3_REGION: str
-    S3_BUCKET: str
-    S3_ACCESS_KEY_ID: str
-    S3_SECRET_ACCESS_KEY: str
+    # In dev/test these can be omitted to unblock local work that does not touch media uploads.
+    # In production they are still enforced by validate_s3_for_environment.
+    S3_ENDPOINT: str | None = None
+    S3_REGION: str | None = None
+    S3_BUCKET: str | None = None
+    S3_ACCESS_KEY_ID: str | None = None
+    S3_SECRET_ACCESS_KEY: str | None = None
     S3_FORCE_PATH_STYLE: bool = True
 
     # 🎞️ Media
@@ -61,5 +69,24 @@ class Settings(BaseSettings):
     MEDIA_DOWNLOAD_EXPIRE_HOURS: int = 24
     MEDIA_MAX_IMAGE_MB: int = 10
     MEDIA_MAX_VIDEO_MB: int = 100
+
+    @model_validator(mode="after")
+    def validate_s3_for_environment(self):
+        app_env = (self.APP_ENV or "").strip().lower()
+        if app_env in {"prod", "production"}:
+            required = {
+                "S3_ENDPOINT": self.S3_ENDPOINT,
+                "S3_REGION": self.S3_REGION,
+                "S3_BUCKET": self.S3_BUCKET,
+                "S3_ACCESS_KEY_ID": self.S3_ACCESS_KEY_ID,
+                "S3_SECRET_ACCESS_KEY": self.S3_SECRET_ACCESS_KEY,
+            }
+            missing = [key for key, value in required.items() if not value]
+            if missing:
+                raise ValueError(
+                    "Missing required S3 settings for production: "
+                    + ", ".join(missing)
+                )
+        return self
 
 settings = Settings()

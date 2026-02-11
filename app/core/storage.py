@@ -6,8 +6,28 @@ from botocore.config import Config
 from app.core.config import settings
 
 
+class S3NotConfiguredError(RuntimeError):
+    pass
+
+
+def ensure_s3_configured() -> None:
+    required = {
+        "S3_ENDPOINT": settings.S3_ENDPOINT,
+        "S3_REGION": settings.S3_REGION,
+        "S3_BUCKET": settings.S3_BUCKET,
+        "S3_ACCESS_KEY_ID": settings.S3_ACCESS_KEY_ID,
+        "S3_SECRET_ACCESS_KEY": settings.S3_SECRET_ACCESS_KEY,
+    }
+    missing = [key for key, value in required.items() if not value]
+    if missing:
+        raise S3NotConfiguredError(
+            "S3 is not configured. Missing: " + ", ".join(missing)
+        )
+
+
 @lru_cache
 def get_s3_client():
+    ensure_s3_configured()
     addressing_style = "path" if settings.S3_FORCE_PATH_STYLE else "virtual"
     config = Config(
         signature_version="s3v4",

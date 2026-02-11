@@ -1,3 +1,12 @@
+<script>
+  import { onMount } from "svelte";
+  import { initPurposeCoverModule } from "../lib/purposeCover";
+
+  onMount(() => {
+    initPurposeCoverModule();
+  });
+</script>
+
 <svelte:head>
 <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -20,8 +29,8 @@
             <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
               Cambiar portada
             </button>
-            <button class="icon-btn" id="btnEditPurposes" type="button" title="Editar deseos de propósito">
-              Editar propósito
+            <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title="Editar mi propósito de vida">
+              Editar mi propósito de vida
             </button>
 
             <input id="coverFile" type="file" accept="image/*" class="hidden" />

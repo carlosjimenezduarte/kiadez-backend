@@ -171,6 +171,17 @@
     const purpose1 = document.getElementById("purpose1");
     const purpose2 = document.getElementById("purpose2");
     const purpose3 = document.getElementById("purpose3");
+    const purposeUnlock1 = document.getElementById("purposeUnlock1");
+    const purposeUnlock2 = document.getElementById("purposeUnlock2");
+    const purposeUnlock3 = document.getElementById("purposeUnlock3");
+    const purposeUnlockOverlay = document.getElementById("purposeUnlockOverlay");
+    const purposeUnlockClose = document.getElementById("purposeUnlockClose");
+    const purposeUnlockCancel = document.getElementById("purposeUnlockCancel");
+    const purposeUnlockConfirm = document.getElementById("purposeUnlockConfirm");
+    const purposeUnlockPassword = document.getElementById("purposeUnlockPassword");
+    const purposeUnlockError = document.getElementById("purposeUnlockError");
+    const purposeUnlockText = document.getElementById("purposeUnlockText");
+    const purposeFulfillBtns = document.querySelectorAll(".purpose-fulfill-btn");
     const confirmCooperativeWish = document.getElementById("confirmCooperativeWish");
     const icanConfirmModal = document.getElementById("icanConfirmModal");
     const icanConfirmYes = document.getElementById("icanConfirmYes");
@@ -284,6 +295,60 @@
     };
 
     const PURPOSE_PREFIX = "Deseo ";
+    const PURPOSE_SECRET_TEXT = "Deseo marcado como secreto";
+    const PURPOSE_REVEAL_PREFIX = "Este deseo será revelado";
+    const PURPOSE_STORAGE_VERSION = 2;
+    const API = "http://127.0.0.1:8000";
+    const AAD_PURPOSE = new TextEncoder().encode("kiadez-life-purpose-v1");
+    const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
+
+    const purposePillBySlot = {
+      1: purpose1,
+      2: purpose2,
+      3: purpose3
+    };
+    const purposeUnlockBySlot = {
+      1: purposeUnlock1,
+      2: purposeUnlock2,
+      3: purposeUnlock3
+    };
+    const defaultPurposeTextBySlot = {
+      1: purpose1?.textContent?.trim() || "Deseo #1: Secreto",
+      2: purpose2?.textContent?.trim() || "Deseo construir el Reino de Combray",
+      3: purpose3?.textContent?.trim() || "Deseo estar unido a Jesús"
+    };
+    let purposeSlots = [];
+    let activePurposeUnlockSlot = null;
+
+    const bufToHex = (buf) => {
+      return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    };
+
+    const hexToBuf = (hex) => {
+      const bytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < bytes.length; i += 1) {
+        bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+      }
+      return bytes.buffer;
+    };
+
+    const getTodayAtMidnight = () => {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      return now;
+    };
+
+    const formatRevealDate = (isoDate) => {
+      const parts = (isoDate || "").split("-");
+      if (parts.length !== 3) return isoDate || "";
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    };
+
+    const isRevealPending = (isoDate) => {
+      if (!isoDate) return false;
+      const revealDate = new Date(`${isoDate}T00:00:00`);
+      return revealDate.getTime() > getTodayAtMidnight().getTime();
+    };
 
     const normalizePurposeText = (value) => {
       const trimmed = (value || "").trim();
@@ -296,6 +361,63 @@
       return `${PURPOSE_PREFIX}${trimmed}`;
     };
 
+    const getIconLabel = (iconKey) => {
+      if (iconKey === "air") return "Aire";
+      if (iconKey === "earth") return "Tierra";
+      if (iconKey === "water") return "Agua";
+      if (iconKey === "fire") return "Fuego";
+      return "Icono";
+    };
+
+    const getIconSrc = (iconKey) => `assets/${iconKey}.png`;
+
+    const setPurposeStatus = (groupEl, text) => {
+      const statusEl = groupEl.querySelector(".purpose-status");
+      if (statusEl) statusEl.textContent = text;
+    };
+
+    const getPurposeSlotMap = (slots) => new Map(
+      (slots || []).map((slot) => [Number(slot.slot_number), slot])
+    );
+
+    const normalizePurposeSlot = (slot, fallbackSlotNumber) => {
+      const slotNumber = Number(slot?.slot_number || fallbackSlotNumber);
+      return {
+        slot_number: slotNumber,
+        is_private: Boolean(slot?.is_private),
+        status: slot?.status || "active",
+        reveal_at: slot?.reveal_at || null,
+        icon_key: slot?.icon_key || null,
+        text_public: slot?.text_public || null,
+        text_input: slot?.text_input || slot?.text_public || "",
+        ciphertext_hex: slot?.ciphertext_hex || null,
+        nonce_hex: slot?.nonce_hex || null
+      };
+    };
+
+    const normalizePurposeState = (raw) => {
+      if (!raw) return [];
+      if (Array.isArray(raw.slots)) {
+        return raw.slots
+          .map((slot, index) => normalizePurposeSlot(slot, index + 1))
+          .filter((slot) => slot.slot_number >= 1 && slot.slot_number <= 3);
+      }
+
+      const legacyValues = [raw.one, raw.two, raw.three];
+      return legacyValues
+        .map((value, index) => {
+          const normalizedText = normalizePurposeText(value || "");
+          if (!normalizedText) return null;
+          return normalizePurposeSlot({
+            slot_number: index + 1,
+            is_private: false,
+            text_public: normalizedText,
+            text_input: normalizedText
+          }, index + 1);
+        })
+        .filter(Boolean);
+    };
+
     const readPurposeStorage = () => {
       const raw = localStorage.getItem(LS.purpose);
       if (!raw) return null;
@@ -306,24 +428,122 @@
       }
     };
 
-    const syncPurposePills = (values) => {
-      if (purpose1 && values[0]) purpose1.textContent = values[0];
-      if (purpose2 && values[1]) purpose2.textContent = values[1];
-      if (purpose3 && values[2]) purpose3.textContent = values[2];
-    };
+    const storePurposeValues = (slots) => {
+      const slotMap = getPurposeSlotMap(slots);
+      const normalizedSlots = [1, 2, 3]
+        .map((slotNumber) => {
+          const slot = slotMap.get(slotNumber);
+          if (!slot) return null;
+          return normalizePurposeSlot(slot, slotNumber);
+        })
+        .filter(Boolean);
 
-    const storePurposeValues = (values) => {
       localStorage.setItem(LS.purpose, JSON.stringify({
-        one: values[0],
-        two: values[1],
-        three: values[2]
+        version: PURPOSE_STORAGE_VERSION,
+        slots: normalizedSlots
       }));
     };
 
-    const loadPurposeFromStorage = () => {
-      const stored = readPurposeStorage();
-      if (!stored) return;
-      syncPurposePills([stored.one, stored.two, stored.three]);
+    const getPurposePresentation = (slot) => {
+      if (!slot) {
+        return { text: "", showUnlock: false };
+      }
+
+      if (slot.reveal_at && isRevealPending(slot.reveal_at)) {
+        return {
+          text: `${PURPOSE_REVEAL_PREFIX} ${formatRevealDate(slot.reveal_at)}`,
+          showUnlock: false
+        };
+      }
+
+      if (slot.is_private) {
+        return {
+          text: PURPOSE_SECRET_TEXT,
+          showUnlock: true
+        };
+      }
+
+      return {
+        text: slot.text_public || slot.text_input || "",
+        showUnlock: false
+      };
+    };
+
+    const renderPurposeSlots = (slots) => {
+      const slotMap = getPurposeSlotMap(slots);
+      [1, 2, 3].forEach((slotNumber) => {
+        const slot = slotMap.get(slotNumber);
+        const pill = purposePillBySlot[slotNumber];
+        const unlockBtn = purposeUnlockBySlot[slotNumber];
+        if (!pill) return;
+
+        if (!slot) {
+          pill.textContent = defaultPurposeTextBySlot[slotNumber];
+          unlockBtn?.classList.add("hidden");
+          return;
+        }
+
+        const view = getPurposePresentation(slot);
+        pill.textContent = view.text || defaultPurposeTextBySlot[slotNumber];
+        unlockBtn?.classList.toggle("hidden", !view.showUnlock);
+      });
+    };
+
+    const mergePurposeSlots = (remoteSlots, localSlots) => {
+      const remoteMap = getPurposeSlotMap(remoteSlots);
+      const localMap = getPurposeSlotMap(localSlots);
+      return [1, 2, 3]
+        .map((slotNumber) => {
+          const remoteSlot = remoteMap.get(slotNumber);
+          const localSlot = localMap.get(slotNumber);
+          if (remoteSlot) {
+            return normalizePurposeSlot({
+              ...remoteSlot,
+              text_input: remoteSlot.text_public || localSlot?.text_input || ""
+            }, slotNumber);
+          }
+          if (localSlot) {
+            return normalizePurposeSlot(localSlot, slotNumber);
+          }
+          return null;
+        })
+        .filter(Boolean);
+    };
+
+    const getAccessToken = () => localStorage.getItem("access_token") || "";
+
+    const fetchPurposeSlotsFromApi = async () => {
+      const token = getAccessToken();
+      if (!token) return [];
+      try {
+        const res = await fetch(`${API}/life-purpose/mine`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) return [];
+        const data = await res.json();
+        if (!Array.isArray(data?.slots)) return [];
+        return data.slots
+          .map((slot, index) => normalizePurposeSlot(slot, index + 1))
+          .filter((slot) => slot.slot_number >= 1 && slot.slot_number <= 3);
+      } catch (err) {
+        console.error(err);
+        return [];
+      }
+    };
+
+    const loadPurposeFromStorage = async () => {
+      const storedSlots = normalizePurposeState(readPurposeStorage());
+      if (storedSlots.length) {
+        purposeSlots = storedSlots;
+        renderPurposeSlots(purposeSlots);
+      }
+
+      const remoteSlots = await fetchPurposeSlotsFromApi();
+      if (!remoteSlots.length) return;
+
+      purposeSlots = mergePurposeSlots(remoteSlots, storedSlots);
+      renderPurposeSlots(purposeSlots);
+      storePurposeValues(purposeSlots);
     };
 
     const setLifeInputValue = (input, value) => {
@@ -333,19 +553,79 @@
       input.dispatchEvent(new Event("input", { bubbles: true }));
     };
 
+    const applyPurposeStateToForm = (groupEl, slotData) => {
+      if (!groupEl) return;
+
+      const isPrivate = slotData?.is_private === true;
+      const revealAt = slotData?.reveal_at || "";
+      const iconKey = slotData?.icon_key || "";
+
+      groupEl.dataset.isPrivate = isPrivate ? "true" : "false";
+      groupEl.dataset.revealAt = revealAt;
+      if (iconKey) {
+        groupEl.dataset.iconKey = iconKey;
+      } else {
+        delete groupEl.dataset.iconKey;
+      }
+
+      const dateInput = groupEl.querySelector(".purpose-date");
+      if (dateInput) dateInput.value = revealAt;
+
+      const iconPanel = groupEl.querySelector(".purpose-icon-panel");
+      iconPanel?.querySelectorAll(".purpose-icon").forEach((iconBtn) => {
+        iconBtn.classList.toggle("is-selected", iconBtn.dataset.icon === iconKey);
+      });
+
+      const iconActionBtn = groupEl.querySelector(".purpose-action[data-action=\"icon\"]");
+      if (iconActionBtn) {
+        if (iconKey) {
+          const iconLabel = getIconLabel(iconKey);
+          iconActionBtn.innerHTML = `<img src="${getIconSrc(iconKey)}" alt="${iconLabel}">`;
+          iconActionBtn.title = `Icono: ${iconLabel}`;
+        } else {
+          iconActionBtn.innerHTML = "<img src=\"/css/icons/iconelemental.webp\" alt=\"Elegir icono\">";
+          iconActionBtn.title = "Elegir icono";
+        }
+      }
+
+      if (!slotData) {
+        setPurposeStatus(groupEl, "Estado: público por defecto.");
+        return;
+      }
+
+      if (slotData.reveal_at && isRevealPending(slotData.reveal_at)) {
+        setPurposeStatus(groupEl, `Estado: se revelará el día ${formatRevealDate(slotData.reveal_at)}.`);
+        return;
+      }
+
+      if (isPrivate) {
+        setPurposeStatus(groupEl, "Estado: marcado como secreto.");
+        return;
+      }
+
+      setPurposeStatus(groupEl, "Estado: confirmado (publico).");
+    };
+
     const openLifeProposalModal = () => {
       if (!lifeProposalOverlay) return;
-      const stored = readPurposeStorage();
+
+      const fallbackSlots = purposeSlots.length
+        ? purposeSlots
+        : normalizePurposeState(readPurposeStorage());
+      const fallbackMap = getPurposeSlotMap(fallbackSlots);
+
       const input1 = lifeProposalOverlay.querySelector("#p1");
       const input2 = lifeProposalOverlay.querySelector("#p2");
       const input3 = lifeProposalOverlay.querySelector("#p3");
-      const fallback1 = stored?.one || (purpose1?.textContent?.trim() || "");
-      const fallback2 = stored?.two || (purpose2?.textContent?.trim() || "");
-      const fallback3 = stored?.three || (purpose3?.textContent?.trim() || "");
 
-      setLifeInputValue(input1, fallback1);
-      setLifeInputValue(input2, fallback2);
-      setLifeInputValue(input3, fallback3);
+      setLifeInputValue(input1, fallbackMap.get(1)?.text_input || fallbackMap.get(1)?.text_public || "");
+      setLifeInputValue(input2, fallbackMap.get(2)?.text_input || fallbackMap.get(2)?.text_public || "");
+      setLifeInputValue(input3, fallbackMap.get(3)?.text_input || fallbackMap.get(3)?.text_public || "");
+
+      lifeProposalOverlay.querySelectorAll(".purpose-group").forEach((groupEl) => {
+        const slotNumber = Number(groupEl.dataset.purpose || "0");
+        applyPurposeStateToForm(groupEl, fallbackMap.get(slotNumber));
+      });
 
       lifeProposalOverlay.classList.remove("hidden");
       lifeProposalOverlay.setAttribute("aria-hidden", "false");
@@ -359,11 +639,213 @@
       updateModalScrollLock();
     };
 
+    const closePurposeUnlockModal = () => {
+      if (!purposeUnlockOverlay) return;
+      purposeUnlockOverlay.classList.add("hidden");
+      purposeUnlockOverlay.setAttribute("aria-hidden", "true");
+      if (purposeUnlockPassword) purposeUnlockPassword.value = "";
+      if (purposeUnlockError) {
+        purposeUnlockError.textContent = "";
+        purposeUnlockError.classList.remove("is-visible");
+      }
+      activePurposeUnlockSlot = null;
+      updateModalScrollLock();
+    };
+
+    const openPurposeUnlockModal = (slotNumber) => {
+      const slotMap = getPurposeSlotMap(purposeSlots);
+      const slotData = slotMap.get(slotNumber);
+      if (!slotData || !slotData.is_private || isRevealPending(slotData.reveal_at)) return;
+
+      activePurposeUnlockSlot = slotNumber;
+      if (purposeUnlockText) {
+        purposeUnlockText.textContent = `Si confirmas tu clave privada, el deseo ${slotNumber} se volverá público.`;
+      }
+      if (purposeUnlockError) {
+        purposeUnlockError.textContent = "";
+        purposeUnlockError.classList.remove("is-visible");
+      }
+      if (purposeUnlockPassword) purposeUnlockPassword.value = "";
+
+      purposeUnlockOverlay?.classList.remove("hidden");
+      purposeUnlockOverlay?.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+    };
+
+    const pbkdf2Key = async (password, saltBuf, iters) => {
+      const baseKey = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(password),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+      );
+      return crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: saltBuf,
+          iterations: iters,
+          hash: "SHA-256"
+        },
+        baseKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    };
+
+    const decryptDekFromPassword = async (privatePassword, token) => {
+      const vaultRes = await fetch(`${API}/vault/record`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const vaultData = await vaultRes.json();
+      if (!vaultRes.ok) {
+        throw new Error(vaultData.detail || "No se pudo leer el vault.");
+      }
+
+      const kdfSalt = hexToBuf(vaultData.kdf_salt_b64 || "");
+      const wrappedDekNonce = new Uint8Array(hexToBuf(vaultData.wrapped_dek_nonce_b64 || ""));
+      const wrappedDek = hexToBuf(vaultData.wrapped_dek_b64 || "");
+      const iters = Number(vaultData.kdf_iters || 310000);
+      const kek = await pbkdf2Key(privatePassword, kdfSalt, iters);
+      const dekRaw = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: wrappedDekNonce, additionalData: AAD_VAULT },
+        kek,
+        wrappedDek
+      );
+      sessionStorage.setItem("dek_hex", bufToHex(dekRaw));
+      return crypto.subtle.importKey("raw", dekRaw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    };
+
+    const importDekFromSession = async () => {
+      const dekHex = sessionStorage.getItem("dek_hex");
+      if (!dekHex) {
+        throw new Error("Vault no desbloqueado. Crea tu clave privada o desbloquéala primero.");
+      }
+      const dekRaw = hexToBuf(dekHex);
+      return crypto.subtle.importKey("raw", dekRaw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    };
+
+    const aesGcmDecryptText = async (key, ciphertextHex, nonceHex, aadBuf) => {
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: new Uint8Array(hexToBuf(nonceHex)), additionalData: aadBuf },
+        key,
+        hexToBuf(ciphertextHex)
+      );
+      return new TextDecoder().decode(decrypted);
+    };
+
+    const revealPurposeFromPrivateKey = async () => {
+      if (!activePurposeUnlockSlot) return;
+      const password = purposeUnlockPassword?.value || "";
+      if (!password.trim()) {
+        if (purposeUnlockError) {
+          purposeUnlockError.textContent = "Debes digitar tu clave privada personal.";
+          purposeUnlockError.classList.add("is-visible");
+        }
+        return;
+      }
+
+      const slotMap = getPurposeSlotMap(purposeSlots);
+      const slotData = slotMap.get(activePurposeUnlockSlot);
+      if (!slotData?.ciphertext_hex || !slotData?.nonce_hex) {
+        if (purposeUnlockError) {
+          purposeUnlockError.textContent = "No hay datos cifrados para este deseo.";
+          purposeUnlockError.classList.add("is-visible");
+        }
+        return;
+      }
+
+      const token = getAccessToken();
+      if (!token) {
+        if (purposeUnlockError) {
+          purposeUnlockError.textContent = "No hay sesión activa.";
+          purposeUnlockError.classList.add("is-visible");
+        }
+        return;
+      }
+
+      try {
+        const dekKey = await decryptDekFromPassword(password, token);
+        const plainText = await aesGcmDecryptText(
+          dekKey,
+          slotData.ciphertext_hex,
+          slotData.nonce_hex,
+          AAD_PURPOSE
+        );
+
+        const revealRes = await fetch(`${API}/life-purpose/reveal`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            slot_number: activePurposeUnlockSlot,
+            text_public: plainText
+          })
+        });
+        const revealData = await revealRes.json().catch(() => ({}));
+        if (!revealRes.ok) {
+          throw new Error(revealData.detail || "No se pudo revelar el deseo.");
+        }
+
+        purposeSlots = purposeSlots.map((slot) => {
+          if (Number(slot.slot_number) !== Number(activePurposeUnlockSlot)) return slot;
+          return {
+            ...slot,
+            is_private: false,
+            text_public: plainText,
+            text_input: plainText,
+            ciphertext_hex: null,
+            nonce_hex: null,
+            status: "active"
+          };
+        });
+        renderPurposeSlots(purposeSlots);
+        storePurposeValues(purposeSlots);
+        closePurposeUnlockModal();
+      } catch (err) {
+        if (purposeUnlockError) {
+          purposeUnlockError.textContent = err?.message || "No se pudo desbloquear el deseo.";
+          purposeUnlockError.classList.add("is-visible");
+        }
+      }
+    };
+
     btnEditPurposes?.addEventListener("click", openLifeProposalModal);
     lifeProposalClose?.addEventListener("click", closeLifeProposalModal);
     lifeProposalCloseFooter?.addEventListener("click", closeLifeProposalModal);
     lifeProposalOverlay?.addEventListener("click", (event) => {
       if (event.target === lifeProposalOverlay) closeLifeProposalModal();
+    });
+
+    [purposeUnlock1, purposeUnlock2, purposeUnlock3].forEach((unlockBtn) => {
+      unlockBtn?.addEventListener("click", () => {
+        const slotNumber = Number(unlockBtn.dataset.slot || "0");
+        if (!slotNumber) return;
+        openPurposeUnlockModal(slotNumber);
+      });
+    });
+
+    purposeUnlockClose?.addEventListener("click", closePurposeUnlockModal);
+    purposeUnlockCancel?.addEventListener("click", closePurposeUnlockModal);
+    purposeUnlockOverlay?.addEventListener("click", (event) => {
+      if (event.target === purposeUnlockOverlay) closePurposeUnlockModal();
+    });
+    purposeUnlockConfirm?.addEventListener("click", revealPurposeFromPrivateKey);
+    purposeUnlockPassword?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        revealPurposeFromPrivateKey();
+      }
+    });
+
+    purposeFulfillBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        btn.classList.add("is-marked");
+        btn.setAttribute("title", "Deseo marcado como cumplido (demo)");
+      });
     });
 
     const openPersonalWishModal = () => {
@@ -542,30 +1024,6 @@
     const initLifeProposalModal = () => {
       if (!lifeProposalOverlay) return;
 
-      const API = "http://127.0.0.1:8000";
-      const AAD_PURPOSE = new TextEncoder().encode("kiadez-life-purpose-v1");
-
-      const bufToHex = (buf) => {
-        return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-      };
-
-      const hexToBuf = (hex) => {
-        const bytes = new Uint8Array(hex.length / 2);
-        for (let i = 0; i < bytes.length; i += 1) {
-          bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
-        }
-        return bytes.buffer;
-      };
-
-      const importDekFromSession = async () => {
-        const dekHex = sessionStorage.getItem("dek_hex");
-        if (!dekHex) {
-          throw new Error("Vault no desbloqueado. Crea tu clave privada o desbloquéala primero.");
-        }
-        const dekRaw = hexToBuf(dekHex);
-        return crypto.subtle.importKey("raw", dekRaw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
-      };
-
       const aesGcmEncrypt = async (key, plaintext, aadBuf) => {
         const nonce = crypto.getRandomValues(new Uint8Array(12));
         const ptBuf = new TextEncoder().encode(plaintext).buffer;
@@ -576,21 +1034,6 @@
         );
         return { nonce_hex: bufToHex(nonce.buffer), ciphertext_hex: bufToHex(ct) };
       };
-
-      const setPurposeStatus = (groupEl, text) => {
-        const statusEl = groupEl.querySelector(".purpose-status");
-        if (statusEl) statusEl.textContent = text;
-      };
-
-      const getIconLabel = (iconKey) => {
-        if (iconKey === "air") return "Aire";
-        if (iconKey === "earth") return "Tierra";
-        if (iconKey === "water") return "Agua";
-        if (iconKey === "fire") return "Fuego";
-        return "Icono";
-      };
-
-      const getIconSrc = (iconKey) => `assets/${iconKey}.png`;
 
       let pendingConfirmGroup = null;
 
@@ -718,7 +1161,11 @@
           return normalizePurposeText(textarea?.value || "");
         });
         if (values.some((value) => !value)) {
-          alert("Completa los tres propósitos.");
+          groups.forEach((groupEl, index) => {
+            if (!values[index]) {
+              setPurposeStatus(groupEl, "Completa este propósito antes de guardar.");
+            }
+          });
           return;
         }
 
@@ -729,12 +1176,17 @@
           try {
             dekKey = await importDekFromSession();
           } catch (err) {
-            alert(err.message);
+            groups.forEach((groupEl) => {
+              if (groupEl.dataset.isPrivate === "true") {
+                setPurposeStatus(groupEl, err.message || "No se pudo desbloquear el vault.");
+              }
+            });
             return;
           }
         }
 
         const slots = [];
+        const localSlots = [];
         for (const [index, groupEl] of groups.entries()) {
           const text = values[index];
           const slotNumber = Number(groupEl.dataset.purpose);
@@ -752,6 +1204,17 @@
               reveal_at: revealAt,
               icon_key: iconKey
             });
+            localSlots.push({
+              slot_number: slotNumber,
+              is_private: true,
+              reveal_at: revealAt,
+              icon_key: iconKey,
+              text_input: text,
+              text_public: null,
+              ciphertext_hex: encrypted.ciphertext_hex,
+              nonce_hex: encrypted.nonce_hex,
+              status: "active"
+            });
           } else {
             slots.push({
               slot_number: slotNumber,
@@ -760,15 +1223,27 @@
               reveal_at: revealAt,
               icon_key: iconKey
             });
+            localSlots.push({
+              slot_number: slotNumber,
+              is_private: false,
+              reveal_at: revealAt,
+              icon_key: iconKey,
+              text_input: text,
+              text_public: text,
+              ciphertext_hex: null,
+              nonce_hex: null,
+              status: "active"
+            });
           }
         }
 
         const payload = { slots };
+        purposeSlots = localSlots
+          .map((slot) => normalizePurposeSlot(slot, Number(slot.slot_number)))
+          .sort((a, b) => a.slot_number - b.slot_number);
+        renderPurposeSlots(purposeSlots);
+        storePurposeValues(purposeSlots);
 
-        syncPurposePills(values);
-        storePurposeValues(values);
-
-        let savedRemote = false;
         try {
           const res = await fetch(`${API}/life-purpose/save`, {
             method: "POST",
@@ -779,9 +1254,6 @@
             body: JSON.stringify(payload)
           });
 
-          if (res.ok) {
-            savedRemote = true;
-          }
         } catch (err) {
           console.error(err);
         }
@@ -790,7 +1262,7 @@
     };
 
     initLifeProposalModal();
-    loadPurposeFromStorage();
+    void loadPurposeFromStorage();
 
     if (cancelDeleteWish) {
       cancelDeleteWish.addEventListener("click", closeDeleteWishModalFn);
@@ -2130,6 +2602,10 @@
               </button>
             </div>
           </details>
+          <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button"
+            title="Editar mi propósito de vida">
+            Editar mi propósito de vida
+          </button>
 
           <input id="coverFile" type="file" accept="image/*" class="hidden" />
         </div>
@@ -2145,22 +2621,48 @@
 
         <div class="purpose-stack" aria-label="Deseos de propósito">
           <div class="purpose-list">
-            <button class="purpose-pill" type="button" id="purpose1">
-            Deseo #1: Secreto
-            </button>
+            <div class="purpose-pill-row">
+              <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="1"
+                title="Marcar deseo 1 como cumplido">
+                <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+              </button>
+              <button class="purpose-pill" type="button" id="purpose1">
+                Deseo #1: Secreto
+              </button>
+              <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock1"
+                data-slot="1" title="Desbloquear deseo 1">
+                <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+              </button>
+            </div>
 
-            <button class="purpose-pill" type="button" id="purpose2">
-            Deseo construir el Reino de Combray
-            </button>
+            <div class="purpose-pill-row">
+              <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="2"
+                title="Marcar deseo 2 como cumplido">
+                <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+              </button>
+              <button class="purpose-pill" type="button" id="purpose2">
+                Deseo construir el Reino de Combray
+              </button>
+              <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock2"
+                data-slot="2" title="Desbloquear deseo 2">
+                <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+              </button>
+            </div>
 
-            <button class="purpose-pill" type="button" id="purpose3">
-            Deseo estar unido a Jesús
-            </button>
+            <div class="purpose-pill-row">
+              <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="3"
+                title="Marcar deseo 3 como cumplido">
+                <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+              </button>
+              <button class="purpose-pill" type="button" id="purpose3">
+                Deseo estar unido a Jesús
+              </button>
+              <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock3"
+                data-slot="3" title="Desbloquear deseo 3">
+                <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+              </button>
+            </div>
           </div>
-
-          <button class="icon-btn purpose-edit-btn" id="btnEditPurposes" type="button" title="Modificar deseo">
-            <img src="/css/icons/iconedit.webp" alt="Modificar deseo" />
-          </button>
         </div>
       </div>
     </section>
@@ -2338,6 +2840,29 @@
         <div class="modal-actions">
           <button class="btn btn-outline btn-compact" type="button" id="lifeConfirmCancel">Cancelar</button>
           <button class="btn btn-primary btn-compact" type="button" id="lifeConfirmOk">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="purposeUnlockOverlay" aria-hidden="true">
+      <div class="modal wish-modal purpose-unlock-modal" role="dialog" aria-modal="true"
+        aria-label="Desbloquear deseo secreto">
+        <div class="modal-head">
+          <h3>Desbloquear deseo secreto</h3>
+          <button class="modal-close" type="button" id="purposeUnlockClose">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-label-center" id="purposeUnlockText">
+            Si confirmas tu clave privada, este deseo se volverá público.
+          </p>
+          <label class="modal-label hidden" for="purposeUnlockPassword">Clave privada personal</label>
+          <input class="modal-input" id="purposeUnlockPassword" type="password" autocomplete="off"
+            placeholder="Clave privada personal" />
+          <p class="purpose-unlock-error" id="purposeUnlockError" aria-live="polite"></p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-compact" type="button" id="purposeUnlockCancel">Cancelar</button>
+          <button class="btn btn-primary btn-compact" type="button" id="purposeUnlockConfirm">Desbloquear</button>
         </div>
       </div>
     </div>

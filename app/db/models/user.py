@@ -61,6 +61,12 @@ class User(Base):
         nullable=True,
     )
 
+    received_stars_total: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,

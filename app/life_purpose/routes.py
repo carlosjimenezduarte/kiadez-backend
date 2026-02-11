@@ -5,10 +5,44 @@ from app.auth.routes import get_current_user
 from app.auth.models import UserPublic
 from app.db.database import get_db
 from app.db.models.life_purpose import LifePurpose
-from app.life_purpose.schemas import LifePurposeSaveRequest
+from app.life_purpose.schemas import (
+    LifePurposeListResponse,
+    LifePurposeRevealRequest,
+    LifePurposeSaveRequest,
+)
 
 
 router = APIRouter(prefix="/life-purpose", tags=["life-purpose"])
+
+
+@router.get("/mine", response_model=LifePurposeListResponse)
+def get_my_life_purposes(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    records = (
+        db.query(LifePurpose)
+        .filter(LifePurpose.user_id == current.user_number)
+        .order_by(LifePurpose.slot_number.asc())
+        .all()
+    )
+
+    slots = []
+    for record in records:
+        slots.append(
+            {
+                "slot_number": record.slot_number,
+                "is_private": record.is_private,
+                "status": record.status,
+                "reveal_at": record.reveal_at,
+                "text_public": record.text_public,
+                "ciphertext_hex": record.ciphertext.hex() if record.ciphertext else None,
+                "nonce_hex": record.nonce.hex() if record.nonce else None,
+                "icon_key": record.icon_key,
+            }
+        )
+
+    return {"slots": slots}
 
 
 @router.post("/save")
@@ -67,3 +101,30 @@ def save_life_purposes(
 
     db.commit()
     return {"saved": len(payload.slots)}
+
+
+@router.post("/reveal")
+def reveal_life_purpose(
+    payload: LifePurposeRevealRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    record = (
+        db.query(LifePurpose)
+        .filter(
+            LifePurpose.user_id == current.user_number,
+            LifePurpose.slot_number == payload.slot_number,
+        )
+        .one_or_none()
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="Propósito no encontrado.")
+
+    record.is_private = False
+    record.status = "active"
+    record.text_public = payload.text_public
+    record.ciphertext = None
+    record.nonce = None
+    db.commit()
+
+    return {"revealed": True, "slot_number": payload.slot_number}

@@ -7,6 +7,8 @@ from app.media.routes import router as media_router
 from app.vault.routes import router as vault_router
 from app.core.config import settings
 from app.support.routes import router as support_router
+from app.dev.routes import router as dev_router
+from app.posts.routes import router as posts_router
 
 
 app = FastAPI(
@@ -30,6 +32,10 @@ app.include_router(life_purpose_router)
 app.include_router(media_router)
 app.include_router(vault_router)
 app.include_router(support_router)
+app.include_router(posts_router)
+
+if settings.APP_ENV.lower() in {"dev", "local", "test"} and settings.DEV_LOGIN_AS_ENABLED:
+    app.include_router(dev_router)
 
 
 @app.get("/health")

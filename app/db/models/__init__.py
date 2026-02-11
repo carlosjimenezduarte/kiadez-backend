@@ -8,3 +8,4 @@ from .user_vault import UserVault  # noqa
 from .life_purpose import LifePurpose  # noqa
 from .media import Media  # noqa
 from .password_reset_token import PasswordResetToken  # noqa
+from .post import Post, PostComment, PostMediaKind, PostReport, PostReportReason, PostStar, PostVisibility  # noqa

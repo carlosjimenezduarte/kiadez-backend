@@ -328,6 +328,31 @@ body {
     width: 100%;
 }
 
+.dev-login-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+.dev-login-title {
+    text-align: center;
+    color: rgba(0, 0, 0, 0.7);
+    font-size: 0.9rem;
+}
+
+.dev-login-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+@media (max-width: 560px) {
+    .dev-login-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .muted {
     opacity: 0.75;
     font-size: 0.95rem;
@@ -883,6 +908,36 @@ body {
     z-index: 5;
 }
 
+.cover-actions.cover-actions-purpose {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.cover-actions.cover-actions-purpose .cover-purpose-btn {
+    min-width: 232px;
+    text-align: center;
+    font-family: 'Liberation Serif', serif;
+    font-size: 0.9rem;
+    font-weight: 400;
+    line-height: 1.2;
+}
+
+.public-wishes-background .cover-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.public-wishes-background .cover-purpose-btn {
+    min-width: 232px;
+    text-align: center;
+    font-family: 'Liberation Serif', serif;
+    font-size: 0.9rem;
+    font-weight: 400;
+    line-height: 1.2;
+}
+
 .cover-menu {
     position: relative;
 }
@@ -1010,6 +1065,124 @@ body {
     flex-direction: column;
     gap: 12px;
     align-items: center;
+}
+
+.purpose-stack-modern .purpose-list {
+    width: min(660px, 88vw);
+    gap: 14px;
+}
+
+.purpose-stack-modern .purpose-pill-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 80px minmax(0, 1fr) 80px;
+    gap: 12px;
+    align-items: center;
+}
+
+.purpose-stack-modern .purpose-pill {
+    position: static;
+    width: 100%;
+    max-width: none;
+    min-height: 56px;
+    padding: 14px 18px;
+    font-size: 1rem;
+    line-height: 1.3;
+}
+
+.purpose-stack-modern .purpose-side-btn {
+    width: 74px;
+    height: 74px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    background: rgba(255, 255, 255, 0.82);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.purpose-stack-modern .purpose-side-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 26px rgba(0, 0, 0, 0.2);
+}
+
+.purpose-stack-modern .purpose-side-btn img {
+    width: 52px;
+    height: 52px;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.purpose-stack-modern .purpose-fulfill-btn.is-marked {
+    border-color: rgba(11, 95, 42, 0.6);
+    background: rgba(211, 242, 223, 0.94);
+}
+
+.purpose-stack-modern .purpose-unlock-btn {
+    border-color: rgba(11, 95, 42, 0.45);
+    background: rgba(222, 244, 232, 0.96);
+}
+
+.public-wishes-background .purpose-list {
+    width: min(660px, 88vw);
+    gap: 14px;
+}
+
+.public-wishes-background .purpose-pill-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 80px minmax(0, 1fr) 80px;
+    gap: 12px;
+    align-items: center;
+}
+
+.public-wishes-background .purpose-pill {
+    position: static;
+    width: 100%;
+    max-width: none;
+    min-height: 56px;
+    padding: 14px 18px;
+    font-size: 1rem;
+    line-height: 1.3;
+}
+
+.public-wishes-background .purpose-side-btn {
+    width: 74px;
+    height: 74px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    background: rgba(255, 255, 255, 0.82);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.public-wishes-background .purpose-side-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 26px rgba(0, 0, 0, 0.2);
+}
+
+.public-wishes-background .purpose-side-btn img {
+    width: 52px;
+    height: 52px;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.public-wishes-background .purpose-fulfill-btn.is-marked {
+    border-color: rgba(11, 95, 42, 0.6);
+    background: rgba(211, 242, 223, 0.94);
+}
+
+.public-wishes-background .purpose-unlock-btn {
+    border-color: rgba(11, 95, 42, 0.45);
+    background: rgba(222, 244, 232, 0.96);
 }
 
 .purpose-list .purpose-pill {
@@ -1422,6 +1595,111 @@ body {
     background: rgba(0, 0, 0, 0.06);
 }
 
+.post-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.posts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.posts-status {
+    min-height: 1.25rem;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    color: rgba(0, 0, 0, 0.72);
+}
+
+.posts-status.posts-status-error {
+    color: #9d1c1c;
+}
+
+.post-empty {
+    text-align: center;
+}
+
+.post-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.post-head-btn {
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: rgba(255, 255, 255, 0.66);
+    color: #174f32;
+    border-radius: 999px;
+    width: 34px;
+    height: 34px;
+    cursor: pointer;
+}
+
+.post-head-btn:hover {
+    background: rgba(11, 95, 42, 0.10);
+}
+
+.post-warning {
+    margin-top: 10px;
+    color: rgba(31, 107, 69, 0.9);
+    font-size: 0.92rem;
+}
+
+.report-reasons {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.report-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.35;
+    color: rgba(0, 0, 0, 0.8);
+}
+
+.report-option input[type="radio"] {
+    margin-top: 3px;
+}
+
+.report-other-wrap {
+    margin-top: 12px;
+}
+
+.post-comments-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.post-comments-empty {
+    color: rgba(0, 0, 0, 0.62);
+}
+
+.post-comment-item {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.72);
+    border-radius: 12px;
+    padding: 10px 12px;
+}
+
+.post-comment-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    color: rgba(0, 0, 0, 0.68);
+    font-size: 0.9rem;
+}
+
 /* MODALS */
 .modal-overlay {
     position: fixed;
@@ -1514,6 +1792,28 @@ body {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
+}
+
+.purpose-unlock-modal {
+    width: min(620px, 94vw);
+}
+
+.purpose-unlock-modal .modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.purpose-unlock-error {
+    margin: 0;
+    color: #8a1f1f;
+    font-size: 0.92rem;
+    text-align: center;
+    display: none;
+}
+
+.purpose-unlock-error.is-visible {
+    display: block;
 }
 
 .modal-label {
@@ -1626,6 +1926,98 @@ body {
 
     .user-home {
         width: min(980px, 94vw);
+    }
+
+    .cover-actions.cover-actions-purpose .cover-purpose-btn {
+        min-width: 0;
+        max-width: 82vw;
+    }
+
+    .purpose-stack-modern .purpose-list {
+        width: min(96vw, 640px);
+    }
+
+    .purpose-stack-modern .purpose-pill-row {
+        grid-template-columns: 66px minmax(0, 1fr) 66px;
+        gap: 8px;
+    }
+
+    .purpose-stack-modern .purpose-side-btn {
+        width: 60px;
+        height: 60px;
+    }
+
+    .purpose-stack-modern .purpose-side-btn img {
+        width: 44px;
+        height: 44px;
+    }
+
+    .public-wishes-background .purpose-list {
+        width: min(96vw, 640px);
+    }
+
+    .public-wishes-background .cover-purpose-btn {
+        min-width: 0;
+        max-width: 82vw;
+    }
+
+    .public-wishes-background .purpose-pill-row {
+        grid-template-columns: 66px minmax(0, 1fr) 66px;
+        gap: 8px;
+    }
+
+    .public-wishes-background .purpose-side-btn {
+        width: 60px;
+        height: 60px;
+    }
+
+    .public-wishes-background .purpose-side-btn img {
+        width: 44px;
+        height: 44px;
+    }
+}
+
+@media (max-width: 640px) {
+    .purpose-stack-modern .purpose-pill {
+        font-size: 0.9rem;
+        padding: 12px 14px;
+        min-height: 50px;
+    }
+
+    .purpose-stack-modern .purpose-pill-row {
+        grid-template-columns: 56px minmax(0, 1fr) 56px;
+        gap: 6px;
+    }
+
+    .purpose-stack-modern .purpose-side-btn {
+        width: 52px;
+        height: 52px;
+    }
+
+    .purpose-stack-modern .purpose-side-btn img {
+        width: 38px;
+        height: 38px;
+    }
+
+    .public-wishes-background .purpose-pill {
+        font-size: 0.9rem;
+        padding: 12px 14px;
+        min-height: 50px;
+    }
+
+    .public-wishes-background .purpose-pill-row {
+        grid-template-columns: 56px minmax(0, 1fr) 56px;
+        gap: 6px;
+    }
+
+    .public-wishes-background .purpose-side-btn {
+        width: 52px;
+        height: 52px;
+    }
+
+    .public-wishes-background .purpose-side-btn img {
+        width: 38px;
+        height: 38px;
     }
 }
 

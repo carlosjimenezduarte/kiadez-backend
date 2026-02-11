@@ -3,8 +3,29 @@
 
   onMount(() => {
     const API = "http://127.0.0.1:8000";
+    const DEV_LOGIN_SECRET = (import.meta.env.VITE_DEV_LOGIN_SECRET || "").trim();
+    const isLocalHost =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
+    const isDevUI = Boolean(import.meta.env.DEV) || isLocalHost;
     
             const form = document.getElementById("auth-form");
+            const demoLoginBox = document.getElementById("dev-login-box");
+            const demoCarlosBtn = document.getElementById("demo-login-carlos");
+            const demoDavidBtn = document.getElementById("demo-login-david");
+
+            if (!isDevUI) {
+                demoLoginBox?.remove();
+            }
+
+            function persistTokens(data) {
+                if (data?.access_token) {
+                    localStorage.setItem("access_token", data.access_token);
+                }
+                if (data?.refresh_token) {
+                    localStorage.setItem("refresh_token", data.refresh_token);
+                }
+            }
     
             async function login(email, password) {
                 const res = await fetch(`${API}/auth/login`, {
@@ -20,7 +41,33 @@
                     throw new Error(data.detail || "Error al iniciar sesión");
                 }
     
-                localStorage.setItem("access_token", data.access_token);
+                persistTokens(data);
+                return data.access_token;
+            }
+
+            async function devLoginAs(email) {
+                const headers = {
+                    "Content-Type": "application/json",
+                };
+                if (DEV_LOGIN_SECRET) {
+                    headers["X-Dev-Secret"] = DEV_LOGIN_SECRET;
+                }
+
+                const res = await fetch(`${API}/dev/login-as`, {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify({ email }),
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    if (res.status === 404) {
+                        throw new Error("Dev login no está habilitado en backend.");
+                    }
+                    throw new Error(data.detail || "No se pudo iniciar sesión demo");
+                }
+
+                persistTokens(data);
                 return data.access_token;
             }
     
@@ -38,6 +85,15 @@
     
                 return data.has_vault;
             }
+
+            async function continueAfterLogin(token) {
+                const hasVault = await checkVault(token);
+                if (hasVault) {
+                    window.location.href = "/life-proposal.html";
+                } else {
+                    window.location.href = "/create-private-key.html";
+                }
+            }
     
             form.addEventListener("submit", async (e) => {
                 e.preventDefault();
@@ -47,13 +103,27 @@
     
                 try {
                     const token = await login(email, password);
-                    const hasVault = await checkVault(token);
-    
-                    if (hasVault) {
-                        window.location.href = "/life-proposal.html";
-                    } else {
-                        window.location.href = "/create-private-key.html";
-                    }
+                    await continueAfterLogin(token);
+                } catch (err) {
+                    alert(err.message);
+                    console.error(err);
+                }
+            });
+
+            demoCarlosBtn?.addEventListener("click", async () => {
+                try {
+                    const token = await devLoginAs("carlos.demo@example.com");
+                    await continueAfterLogin(token);
+                } catch (err) {
+                    alert(err.message);
+                    console.error(err);
+                }
+            });
+
+            demoDavidBtn?.addEventListener("click", async () => {
+                try {
+                    const token = await devLoginAs("david.demo@example.com");
+                    await continueAfterLogin(token);
                 } catch (err) {
                     alert(err.message);
                     console.error(err);
@@ -100,6 +170,20 @@
                     <a href="/register.html" class="btn btn-outline">
                         Crear una cuenta nueva
                     </a>
+
+                    <div class="auth-divider"></div>
+
+                    <div class="dev-login-box" id="dev-login-box" aria-label="Acceso demo para desarrollo">
+                        <p class="dev-login-title">Acceso demo</p>
+                        <div class="dev-login-grid">
+                            <button type="button" class="btn btn-outline" id="demo-login-carlos">
+                                Entrar como Carlos
+                            </button>
+                            <button type="button" class="btn btn-outline" id="demo-login-david">
+                                Entrar como David
+                            </button>
+                        </div>
+                    </div>
                 </form>
 
                 <div class="auth-brand">
