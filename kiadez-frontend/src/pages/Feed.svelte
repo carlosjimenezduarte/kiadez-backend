@@ -134,12 +134,11 @@
    *  ========================= -->
   <header class="feed-topbar">
     <div class="feed-topbar-zone feed-topbar-left">
-      <a class="topbar-logo" href="/home_user.html" aria-label="Kiadez">
+      <a class="topbar-logo" href="/feed.html" aria-label="Kiadez">
         <img src="/css/logo-kiadez.webp" alt="Kiadez" />
       </a>
-      <form class="topbar-search" role="search">
+      <form class="topbar-search" role="search" on:submit|preventDefault>
         <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
-        <button type="submit" aria-label="Buscar">Buscar</button>
       </form>
     </div>
 
@@ -166,7 +165,8 @@
 
       <details class="topbar-dropdown" id="menuDropdown">
         <summary class="topbar-menu-btn" aria-label="Abrir menú">
-          ☰ Menú
+          <span class="topbar-menu-icon" aria-hidden="true">☰</span>
+          <span class="topbar-menu-label">Menú</span>
         </summary>
         <div class="dropdown-menu" role="menu">
           <button class="dropdown-action" id="menuPublishBtn" type="button" role="menuitem">

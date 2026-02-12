@@ -2,7 +2,7 @@
 from datetime import datetime, timezone, date
 
 # SQLAlchemy
-from sqlalchemy import String, Boolean, Integer, DateTime, Date
+from sqlalchemy import String, Boolean, Integer, DateTime, Date, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -59,6 +59,18 @@ class User(Base):
     guardian_rank: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
+    )
+
+    profile_photo_media_id: Mapped[int | None] = mapped_column(
+        ForeignKey("media.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    emblem_media_id: Mapped[int | None] = mapped_column(
+        ForeignKey("media.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     received_stars_total: Mapped[int] = mapped_column(

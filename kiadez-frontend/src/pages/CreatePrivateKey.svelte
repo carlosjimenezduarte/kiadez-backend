@@ -104,6 +104,31 @@
     }
   }
 
+  async function checkLifePurposeConfigured() {
+    const token = getAccessToken();
+    if (!token) {
+      return { configured: false, ok: false };
+    }
+
+    try {
+      const res = await fetch(`${API}/life-purpose/mine`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showStatus(data.detail || "No se pudo consultar tu propósito de vida.");
+        return { configured: false, ok: false };
+      }
+
+      const slots = Array.isArray(data?.slots) ? data.slots : [];
+      const activeSlots = slots.filter((slot) => slot?.status === "active");
+      return { configured: activeSlots.length >= 3, ok: true };
+    } catch (e) {
+      showStatus("No se pudo conectar con el servidor.");
+      return { configured: false, ok: false };
+    }
+  }
+
   async function createVault(privatePassword) {
     const iters = 310000;
     const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -151,7 +176,8 @@
 
     const st = await checkVaultStatus();
     if (st.ok && st.has_vault) {
-      window.location.href = "/life-proposal.html";
+      const purposeState = await checkLifePurposeConfigured();
+      window.location.href = purposeState.configured ? "/home_user.html" : "/life-proposal.html";
       return;
     }
 
@@ -194,8 +220,14 @@
   onMount(async () => {
     const st = await checkVaultStatus();
     if (st.ok && st.has_vault) {
-      showStatus("Ya tienes una clave privada configurada. Próximo paso: tu propósito de vida.");
-      submitLabel = "Continuar";
+      const purposeState = await checkLifePurposeConfigured();
+      if (purposeState.configured) {
+        showStatus("Ya tienes clave privada y propósito configurados. Puedes continuar a tu Home.");
+        submitLabel = "Ir a mi Home";
+      } else {
+        showStatus("Ya tienes una clave privada configurada. Próximo paso: tu propósito de vida.");
+        submitLabel = "Continuar";
+      }
     }
   });
 </script>

@@ -40,3 +40,25 @@ class MediaURLResponse(BaseModel):
 
 class MediaDeleteResponse(BaseModel):
     deleted: bool
+
+
+class MediaImageOption(BaseModel):
+    media_id: int
+    url: str
+    created_at: datetime
+    original_filename: Optional[str] = None
+
+
+class MediaImageOptionListResponse(BaseModel):
+    items: list[MediaImageOption]
+    expires_in: int
+
+
+class ProfilePhotoSetRequest(BaseModel):
+    media_id: Optional[int] = Field(default=None, gt=0)
+
+
+class ProfilePhotoResponse(BaseModel):
+    media_id: Optional[int] = None
+    url: Optional[str] = None
+    expires_in: int = 0

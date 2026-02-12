@@ -2,7 +2,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from botocore.exceptions import ClientError
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.security import decode_token
 from app.core.storage import (
     S3NotConfiguredError,
+    get_s3_client,
     ensure_s3_configured,
     delete_object,
     generate_presigned_get_url,
@@ -20,13 +21,18 @@ from app.core.storage import (
 )
 from app.db.database import get_db
 from app.db.models.media import Media, MediaVisibility
+from app.db.models.user import User
 from app.db.repositories.user_repository import UserRepository
 from app.media.schemas import (
     MediaConfirmRequest,
     MediaDeleteResponse,
+    MediaImageOption,
+    MediaImageOptionListResponse,
     MediaPresignRequest,
     MediaPresignResponse,
     MediaURLResponse,
+    ProfilePhotoResponse,
+    ProfilePhotoSetRequest,
 )
 
 router = APIRouter(prefix="/media", tags=["media"])
@@ -189,6 +195,220 @@ def confirm_upload(
     expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
     url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
     return MediaURLResponse(media_id=media.id, url=url, expires_in=expires_in)
+
+
+@router.post("/upload/direct", response_model=MediaURLResponse)
+async def upload_direct(
+    file: UploadFile = File(...),
+    visibility: MediaVisibility = Form(default=MediaVisibility.private),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _ensure_media_storage_ready()
+
+    content_type = _normalize_content_type(file.content_type or "")
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Solo se permiten imágenes en esta subida.")
+
+    content = await file.read()
+    size_bytes = len(content)
+    _validate_media_size(content_type, size_bytes)
+
+    object_key = _build_object_key(
+        user_id=current.user_number,
+        visibility=visibility,
+        filename=file.filename,
+    )
+
+    media = Media(
+        owner_id=current.user_number,
+        visibility=visibility,
+        status="pending",
+        bucket=settings.S3_BUCKET,
+        object_key=object_key,
+        original_filename=file.filename,
+        mime_type=content_type,
+        size_bytes=size_bytes,
+    )
+    db.add(media)
+    db.flush()
+
+    try:
+        client = get_s3_client()
+        client.put_object(
+            Bucket=settings.S3_BUCKET,
+            Key=object_key,
+            Body=content,
+            ContentType=content_type,
+        )
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="No se pudo subir la imagen al storage.")
+
+    media.status = "ready"
+    db.commit()
+    db.refresh(media)
+
+    expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
+    url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
+    return MediaURLResponse(media_id=media.id, url=url, expires_in=expires_in)
+
+
+@router.get("/mine/images", response_model=MediaImageOptionListResponse)
+def list_my_images(
+    limit: int = Query(default=24, ge=1, le=100),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _ensure_media_storage_ready()
+    medias = (
+        db.query(Media)
+        .filter(Media.owner_id == current.user_number)
+        .filter(Media.status == "ready")
+        .filter(Media.mime_type.like("image/%"))
+        .order_by(Media.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
+    return MediaImageOptionListResponse(
+        items=[
+            MediaImageOption(
+                media_id=media.id,
+                url=generate_presigned_get_url(key=media.object_key, expires_in=expires_in),
+                created_at=media.created_at,
+                original_filename=media.original_filename,
+            )
+            for media in medias
+        ],
+        expires_in=expires_in,
+    )
+
+
+@router.get("/profile-photo", response_model=ProfilePhotoResponse)
+def get_profile_photo(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == current.user_number).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if user.profile_photo_media_id is None:
+        return ProfilePhotoResponse()
+
+    media = db.query(Media).filter(Media.id == user.profile_photo_media_id).one_or_none()
+    if not media:
+        user.profile_photo_media_id = None
+        db.commit()
+        return ProfilePhotoResponse()
+    if media.owner_id != current.user_number:
+        return ProfilePhotoResponse()
+    if media.status != "ready":
+        return ProfilePhotoResponse()
+    if not (media.mime_type or "").lower().startswith("image/"):
+        return ProfilePhotoResponse()
+
+    _ensure_media_storage_ready()
+    expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
+    url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
+    return ProfilePhotoResponse(media_id=media.id, url=url, expires_in=expires_in)
+
+
+@router.post("/profile-photo", response_model=ProfilePhotoResponse)
+def set_profile_photo(
+    payload: ProfilePhotoSetRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == current.user_number).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    if payload.media_id is None:
+        user.profile_photo_media_id = None
+        db.commit()
+        return ProfilePhotoResponse()
+
+    media = db.query(Media).filter(Media.id == payload.media_id).one_or_none()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media no encontrada.")
+    if media.owner_id != current.user_number:
+        raise HTTPException(status_code=403, detail="No autorizado.")
+    if media.status != "ready":
+        raise HTTPException(status_code=409, detail="Media aún no disponible.")
+    if not (media.mime_type or "").lower().startswith("image/"):
+        raise HTTPException(status_code=400, detail="Solo puedes asignar imágenes.")
+
+    user.profile_photo_media_id = media.id
+    db.commit()
+
+    _ensure_media_storage_ready()
+    expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
+    url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
+    return ProfilePhotoResponse(media_id=media.id, url=url, expires_in=expires_in)
+
+
+@router.get("/emblem", response_model=ProfilePhotoResponse)
+def get_emblem(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == current.user_number).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if user.emblem_media_id is None:
+        return ProfilePhotoResponse()
+
+    media = db.query(Media).filter(Media.id == user.emblem_media_id).one_or_none()
+    if not media:
+        user.emblem_media_id = None
+        db.commit()
+        return ProfilePhotoResponse()
+    if media.owner_id != current.user_number:
+        return ProfilePhotoResponse()
+    if media.status != "ready":
+        return ProfilePhotoResponse()
+    if not (media.mime_type or "").lower().startswith("image/"):
+        return ProfilePhotoResponse()
+
+    _ensure_media_storage_ready()
+    expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
+    url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
+    return ProfilePhotoResponse(media_id=media.id, url=url, expires_in=expires_in)
+
+
+@router.post("/emblem", response_model=ProfilePhotoResponse)
+def set_emblem(
+    payload: ProfilePhotoSetRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == current.user_number).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    if payload.media_id is None:
+        user.emblem_media_id = None
+        db.commit()
+        return ProfilePhotoResponse()
+
+    media = db.query(Media).filter(Media.id == payload.media_id).one_or_none()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media no encontrada.")
+    if media.owner_id != current.user_number:
+        raise HTTPException(status_code=403, detail="No autorizado.")
+    if media.status != "ready":
+        raise HTTPException(status_code=409, detail="Media aún no disponible.")
+    if not (media.mime_type or "").lower().startswith("image/"):
+        raise HTTPException(status_code=400, detail="Solo puedes asignar imágenes.")
+
+    user.emblem_media_id = media.id
+    db.commit()
+
+    _ensure_media_storage_ready()
+    expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
+    url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
+    return ProfilePhotoResponse(media_id=media.id, url=url, expires_in=expires_in)
 
 
 @router.get("/{media_id}", response_model=MediaURLResponse)

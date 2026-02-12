@@ -9,6 +9,8 @@ from app.core.config import settings
 from app.support.routes import router as support_router
 from app.dev.routes import router as dev_router
 from app.posts.routes import router as posts_router
+from app.biography.routes import router as biography_router
+from app.public_wishes.routes import router as public_wishes_router
 
 
 app = FastAPI(
@@ -33,6 +35,8 @@ app.include_router(media_router)
 app.include_router(vault_router)
 app.include_router(support_router)
 app.include_router(posts_router)
+app.include_router(biography_router)
+app.include_router(public_wishes_router)
 
 if settings.APP_ENV.lower() in {"dev", "local", "test"} and settings.DEV_LOGIN_AS_ENABLED:
     app.include_router(dev_router)

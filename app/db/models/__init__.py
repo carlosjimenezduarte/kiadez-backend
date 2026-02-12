@@ -9,3 +9,14 @@ from .life_purpose import LifePurpose  # noqa
 from .media import Media  # noqa
 from .password_reset_token import PasswordResetToken  # noqa
 from .post import Post, PostComment, PostMediaKind, PostReport, PostReportReason, PostStar, PostVisibility  # noqa
+from .biography_personal_info import BiographyPersonalInfo  # noqa
+from .biography_physical_traits import BiographyPhysicalTraits  # noqa
+from .biography_education import BiographyEducation  # noqa
+from .biography_curiosities import BiographyCuriosities  # noqa
+from .biography_professional_info import BiographyProfessionalInfo  # noqa
+from .biography_about import BiographyAbout  # noqa
+from .biography_dream import BiographyDream  # noqa
+from .biography_professional_achievements import BiographyProfessionalAchievements  # noqa
+from .biography_life_achievements import BiographyLifeAchievements  # noqa
+from .biography_favorite_quotes import BiographyFavoriteQuotes  # noqa
+from .public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus  # noqa

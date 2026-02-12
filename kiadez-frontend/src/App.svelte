@@ -14,6 +14,7 @@
   import LifeProposal from './pages/LifeProposal.svelte';
   import Login from './pages/Login.svelte';
   import MyBiography from './pages/MyBiography.svelte';
+  import MyFulfilledWhises from './pages/MyFulfilledWhises.svelte';
   import MyPublicWhishes from './pages/MyPublicWhishes.svelte';
   import Oracle from './pages/Oracle.svelte';
   import Register from './pages/Register.svelte';
@@ -64,6 +65,8 @@
     '/login.html': Login,
     '/my-biography': MyBiography,
     '/my-biography.html': MyBiography,
+    '/my-fulfilled-whises': MyFulfilledWhises,
+    '/my-fulfilled-whises.html': MyFulfilledWhises,
     '/my-public-whishes': MyPublicWhishes,
     '/my-public-whishes.html': MyPublicWhishes,
     '/oracle': Oracle,

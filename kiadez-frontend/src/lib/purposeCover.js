@@ -6,8 +6,15 @@ const PURPOSE_SECRET_TEXT = "Deseo marcado como secreto";
 const PURPOSE_REVEAL_PREFIX = "Este deseo será revelado";
 const PURPOSE_STORAGE_VERSION = 2;
 const LS = {
-  purpose: "kiadez_user_purpose"
+  purpose: "kiadez_user_purpose",
+  coverImg: "kiadez_user_cover_img",
+  coverPos: "kiadez_user_cover_pos"
 };
+const COVER_PRESETS = [
+  "/assets/cover-default.jpg",
+  "/assets/post-1.jpg",
+  "/assets/post-2.jpg"
+];
 
 const DEFAULT_PURPOSE_TEXT = {
   1: "Deseo #1: Secreto",
@@ -143,6 +150,378 @@ const setLifeInputValue = (input, value) => {
 const updateModalScrollLock = () => {
   const hasOpenModal = document.querySelector(".modal-overlay:not(.hidden)");
   document.body.classList.toggle("modal-open", Boolean(hasOpenModal));
+};
+
+const readCoverPosition = () => {
+  const raw = localStorage.getItem(LS.coverPos);
+  if (!raw) return { x: 0, y: 0 };
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      x: Number(parsed?.x) || 0,
+      y: Number(parsed?.y) || 0
+    };
+  } catch {
+    return { x: 0, y: 0 };
+  }
+};
+
+const storeCoverState = (src, x, y) => {
+  if (src) localStorage.setItem(LS.coverImg, src);
+  localStorage.setItem(LS.coverPos, JSON.stringify({ x, y }));
+};
+
+const ensureCoverSelectModal = () => {
+  if (document.getElementById("coverSelectModal")) return;
+
+  document.body.insertAdjacentHTML("beforeend", `
+    <div class="modal-overlay hidden" id="coverSelectModal" aria-hidden="true">
+      <div class="modal wish-modal cover-select-modal" role="dialog" aria-modal="true" aria-label="Seleccionar imagen de portada">
+        <div class="modal-head">
+          <h3>Seleccionar imagen</h3>
+        </div>
+        <div class="modal-body">
+          <div class="cover-select-grid">
+            ${COVER_PRESETS.map((src, idx) => `
+              <button class="cover-select-item" type="button" data-cover-src="${src}">
+                <img src="${src}" alt="Portada ${idx + 1}" />
+              </button>
+            `).join("")}
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-compact" type="button" id="coverSelectCancel">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  `);
+};
+
+const ensureCoverLayout = () => {
+  const coverMedia = document.getElementById("coverMedia");
+  const coverImg = document.getElementById("coverImg");
+  const coverActions = coverMedia?.querySelector(".cover-actions");
+  if (!coverMedia || !coverImg || !coverActions) return null;
+
+  let coverMenu = coverActions.querySelector(".cover-menu");
+  if (!coverMenu) {
+    const legacyBtn = coverActions.querySelector("#btnChangeCover");
+    const menuEl = document.createElement("details");
+    menuEl.className = "cover-menu";
+    menuEl.innerHTML = `
+      <summary class="icon-btn" id="btnChangeCover" title="Editar imagen de portada">Editar imagen de portada</summary>
+      <div class="cover-menu-panel">
+        <button class="cover-menu-item" type="button" id="coverSelectExisting">Seleccionar imagen</button>
+        <button class="cover-menu-item" type="button" id="coverUpload">Subir imagen</button>
+        <button class="cover-menu-item" type="button" id="coverMove">Mover imagen</button>
+      </div>
+    `;
+    if (legacyBtn) {
+      legacyBtn.replaceWith(menuEl);
+    } else {
+      coverActions.prepend(menuEl);
+    }
+    coverMenu = menuEl;
+  }
+
+  const coverSummary = coverMenu.querySelector("#btnChangeCover");
+  if (coverSummary) {
+    coverSummary.textContent = "Editar imagen de portada";
+    coverSummary.title = "Editar imagen de portada";
+  }
+
+  if (!coverMenu.querySelector("#coverSelectExisting")) {
+    const panel = coverMenu.querySelector(".cover-menu-panel");
+    panel?.insertAdjacentHTML("afterbegin", `
+      <button class="cover-menu-item" type="button" id="coverSelectExisting">Seleccionar imagen</button>
+    `);
+  }
+  if (!coverMenu.querySelector("#coverUpload")) {
+    const panel = coverMenu.querySelector(".cover-menu-panel");
+    panel?.insertAdjacentHTML("beforeend", `
+      <button class="cover-menu-item" type="button" id="coverUpload">Subir imagen</button>
+    `);
+  }
+  if (!coverMenu.querySelector("#coverMove")) {
+    const panel = coverMenu.querySelector(".cover-menu-panel");
+    panel?.insertAdjacentHTML("beforeend", `
+      <button class="cover-menu-item" type="button" id="coverMove">Mover imagen</button>
+    `);
+  }
+
+  let coverFile = document.getElementById("coverFile");
+  if (!coverFile) {
+    coverFile = document.createElement("input");
+    coverFile.id = "coverFile";
+    coverFile.type = "file";
+    coverFile.accept = "image/*";
+    coverFile.className = "hidden";
+    coverActions.appendChild(coverFile);
+  }
+
+  let coverSaveActions = document.getElementById("coverSaveActions");
+  if (!coverSaveActions) {
+    coverSaveActions = document.createElement("div");
+    coverSaveActions.id = "coverSaveActions";
+    coverSaveActions.className = "cover-save-actions hidden";
+    coverSaveActions.innerHTML = `
+      <button class="btn btn-primary btn-compact" type="button" id="coverSaveBtn">Guardar cambios</button>
+      <button class="btn btn-outline btn-compact" type="button" id="coverCancelBtn">Cancelar</button>
+    `;
+    coverMedia.appendChild(coverSaveActions);
+  }
+
+  ensureCoverSelectModal();
+  return {
+    coverMedia,
+    coverImg,
+    coverMenu,
+    coverFile,
+    coverSelectExisting: document.getElementById("coverSelectExisting"),
+    coverUploadBtn: document.getElementById("coverUpload"),
+    coverMoveBtn: document.getElementById("coverMove"),
+    coverSaveActions: document.getElementById("coverSaveActions"),
+    coverSaveBtn: document.getElementById("coverSaveBtn"),
+    coverCancelBtn: document.getElementById("coverCancelBtn"),
+    coverSelectModal: document.getElementById("coverSelectModal"),
+    coverSelectCancel: document.getElementById("coverSelectCancel")
+  };
+};
+
+const initCoverEditor = () => {
+  const refs = ensureCoverLayout();
+  if (!refs) return () => {};
+
+  const {
+    coverMedia,
+    coverImg,
+    coverMenu,
+    coverFile,
+    coverSelectExisting,
+    coverUploadBtn,
+    coverMoveBtn,
+    coverSaveActions,
+    coverSaveBtn,
+    coverCancelBtn,
+    coverSelectModal,
+    coverSelectCancel
+  } = refs;
+
+  if (coverMedia.dataset.coverEditorBound === "true") return () => {};
+  coverMedia.dataset.coverEditorBound = "true";
+
+  let coverMoveEnabled = false;
+  let coverDragActive = false;
+  let coverStartX = 0;
+  let coverStartY = 0;
+  let coverOffsetX = 0;
+  let coverOffsetY = 0;
+  let coverMaxOffsetX = 0;
+  let coverMaxOffsetY = 0;
+  let coverSavedSrc = "";
+  let coverSavedOffsetX = 0;
+  let coverSavedOffsetY = 0;
+  let coverDirty = false;
+
+  const closeCoverMenu = () => {
+    if (coverMenu && coverMenu.hasAttribute("open")) {
+      coverMenu.removeAttribute("open");
+    }
+  };
+
+  const showCoverActions = () => {
+    coverSaveActions?.classList.remove("hidden");
+  };
+
+  const hideCoverActions = () => {
+    coverSaveActions?.classList.add("hidden");
+  };
+
+  const updateCoverTransform = (x, y) => {
+    const clampedX = Math.min(coverMaxOffsetX, Math.max(-coverMaxOffsetX, x));
+    const clampedY = Math.min(coverMaxOffsetY, Math.max(-coverMaxOffsetY, y));
+    coverImg.style.transform = "none";
+    coverImg.style.objectPosition = `calc(50% + ${clampedX}px) calc(50% + ${clampedY}px)`;
+    return { x: clampedX, y: clampedY };
+  };
+
+  const recalcCoverBounds = () => {
+    if (!coverImg.naturalWidth || !coverImg.naturalHeight) return;
+    const rect = coverMedia.getBoundingClientRect();
+    const scale = Math.max(rect.width / coverImg.naturalWidth, rect.height / coverImg.naturalHeight);
+    const renderedWidth = coverImg.naturalWidth * scale;
+    const renderedHeight = coverImg.naturalHeight * scale;
+    coverMaxOffsetX = Math.max(0, (renderedWidth - rect.width) / 2);
+    coverMaxOffsetY = Math.max(0, (renderedHeight - rect.height) / 2);
+    const clamped = updateCoverTransform(coverOffsetX, coverOffsetY);
+    coverOffsetX = clamped.x;
+    coverOffsetY = clamped.y;
+  };
+
+  const setCoverMoveState = (enabled) => {
+    coverMoveEnabled = enabled;
+    coverMedia.classList.toggle("is-move-mode", enabled);
+    coverMoveBtn?.classList.toggle("is-active", enabled);
+    updateCoverTransform(coverOffsetX, coverOffsetY);
+  };
+
+  const markCoverDirty = () => {
+    coverDirty = true;
+    showCoverActions();
+  };
+
+  const commitCoverState = () => {
+    coverSavedSrc = coverImg.src;
+    coverSavedOffsetX = coverOffsetX;
+    coverSavedOffsetY = coverOffsetY;
+    coverDirty = false;
+    setCoverMoveState(false);
+    hideCoverActions();
+    storeCoverState(coverSavedSrc, coverSavedOffsetX, coverSavedOffsetY);
+  };
+
+  const revertCoverState = () => {
+    coverOffsetX = coverSavedOffsetX;
+    coverOffsetY = coverSavedOffsetY;
+    if (coverSavedSrc) coverImg.src = coverSavedSrc;
+    coverDirty = false;
+    setCoverMoveState(false);
+    hideCoverActions();
+    updateCoverTransform(coverOffsetX, coverOffsetY);
+  };
+
+  const openCoverSelectModal = () => {
+    if (!coverSelectModal) return;
+    coverSelectModal.classList.remove("hidden");
+    coverSelectModal.setAttribute("aria-hidden", "false");
+    updateModalScrollLock();
+  };
+
+  const closeCoverSelectModal = () => {
+    if (!coverSelectModal) return;
+    coverSelectModal.classList.add("hidden");
+    coverSelectModal.setAttribute("aria-hidden", "true");
+    updateModalScrollLock();
+  };
+
+  const loadCoverFromStorage = () => {
+    const savedImg = localStorage.getItem(LS.coverImg);
+    const savedPos = readCoverPosition();
+    coverOffsetX = savedPos.x;
+    coverOffsetY = savedPos.y;
+    coverSavedOffsetX = savedPos.x;
+    coverSavedOffsetY = savedPos.y;
+    if (savedImg) {
+      coverSavedSrc = savedImg;
+      coverImg.src = savedImg;
+      return;
+    }
+    coverSavedSrc = coverImg.src;
+    updateCoverTransform(coverOffsetX, coverOffsetY);
+  };
+
+  const handleCoverUpload = () => coverFile?.click();
+  const handleCoverFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") return;
+      coverImg.src = reader.result;
+      coverOffsetX = 0;
+      coverOffsetY = 0;
+      markCoverDirty();
+      closeCoverMenu();
+      setCoverMoveState(true);
+      recalcCoverBounds();
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+
+  const handleToggleMove = () => {
+    setCoverMoveState(!coverMoveEnabled);
+    markCoverDirty();
+    closeCoverMenu();
+  };
+
+  const handleOpenSelect = () => {
+    openCoverSelectModal();
+    closeCoverMenu();
+  };
+
+  const handleSelectModalClick = (event) => {
+    if (event.target === coverSelectModal) {
+      closeCoverSelectModal();
+      return;
+    }
+    const button = event.target.closest(".cover-select-item");
+    if (!button) return;
+    const src = button.dataset.coverSrc;
+    if (!src) return;
+    coverImg.src = src;
+    coverOffsetX = 0;
+    coverOffsetY = 0;
+    markCoverDirty();
+    closeCoverSelectModal();
+    setCoverMoveState(true);
+    recalcCoverBounds();
+  };
+
+  const handleCoverMouseDown = (event) => {
+    if (!coverMoveEnabled) return;
+    if (event.target.closest(".cover-actions")) return;
+    if (event.target.closest(".cover-save-actions")) return;
+    coverDragActive = true;
+    coverStartX = event.clientX;
+    coverStartY = event.clientY;
+    coverMedia.classList.add("is-dragging");
+  };
+
+  const handleCoverMouseMove = (event) => {
+    if (!coverDragActive) return;
+    const dx = event.clientX - coverStartX;
+    const dy = event.clientY - coverStartY;
+    updateCoverTransform(coverOffsetX + dx, coverOffsetY + dy);
+  };
+
+  const handleCoverMouseUp = (event) => {
+    if (!coverDragActive) return;
+    const dx = event.clientX - coverStartX;
+    const dy = event.clientY - coverStartY;
+    const clamped = updateCoverTransform(coverOffsetX + dx, coverOffsetY + dy);
+    coverOffsetX = clamped.x;
+    coverOffsetY = clamped.y;
+    coverDragActive = false;
+    coverMedia.classList.remove("is-dragging");
+  };
+
+  const handleCoverImageLoad = () => {
+    recalcCoverBounds();
+    if (!coverDirty) {
+      coverSavedOffsetX = coverOffsetX;
+      coverSavedOffsetY = coverOffsetY;
+    }
+  };
+
+  coverUploadBtn?.addEventListener("click", handleCoverUpload);
+  coverFile?.addEventListener("change", handleCoverFileChange);
+  coverMoveBtn?.addEventListener("click", handleToggleMove);
+  coverSelectExisting?.addEventListener("click", handleOpenSelect);
+  coverSelectCancel?.addEventListener("click", closeCoverSelectModal);
+  coverSelectModal?.addEventListener("click", handleSelectModalClick);
+  coverSaveBtn?.addEventListener("click", commitCoverState);
+  coverCancelBtn?.addEventListener("click", revertCoverState);
+  coverMedia.addEventListener("mousedown", handleCoverMouseDown);
+  window.addEventListener("mousemove", handleCoverMouseMove);
+  window.addEventListener("mouseup", handleCoverMouseUp);
+  coverImg.addEventListener("load", handleCoverImageLoad);
+  window.addEventListener("resize", recalcCoverBounds);
+
+  loadCoverFromStorage();
+  hideCoverActions();
+
+  return () => {};
 };
 
 const ensurePurposeModals = () => {
@@ -404,9 +783,10 @@ const ensurePurposeLayout = () => {
 const getAccessToken = () => localStorage.getItem("access_token") || "";
 
 export const initPurposeCoverModule = () => {
+  const cleanupCoverEditor = initCoverEditor();
   ensurePurposeModals();
   const layout = ensurePurposeLayout();
-  if (!layout) return () => {};
+  if (!layout) return cleanupCoverEditor;
 
   const {
     btnEditPurposes,

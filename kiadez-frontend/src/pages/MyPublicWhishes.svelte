@@ -135,6 +135,7 @@
     const cancelDeleteWish = document.getElementById("cancelDeleteWish");
     const fulfillWishModal = document.getElementById("fulfillWishModal");
     const cancelFulfillWish = document.getElementById("cancelFulfillWish");
+    const confirmFulfillWish = document.getElementById("confirmFulfillWish");
     const fulfillEvidence = document.getElementById("fulfillEvidence");
     const fulfillEvidencePreview = document.getElementById("fulfillEvidencePreview");
     const cooperativeWishTypeIcon = document.getElementById("cooperativeWishTypeIcon");
@@ -511,6 +512,106 @@
     };
 
     const getAccessToken = () => localStorage.getItem("access_token") || "";
+
+    const parseResponseJson = async (res) => {
+      try {
+        return await res.json();
+      } catch {
+        return {};
+      }
+    };
+
+    const apiFetch = async (path, options = {}) => {
+      const token = getAccessToken();
+      if (!token) {
+        throw new Error("No hay sesión activa.");
+      }
+
+      const headers = {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`
+      };
+      const res = await fetch(`${API}${path}`, { ...options, headers });
+      if (res.status === 401) {
+        throw new Error("Sesión expirada. Inicia sesión nuevamente.");
+      }
+      return res;
+    };
+
+    const uploadWishImage = async (file) => {
+      if (!file) return null;
+      const formData = new FormData();
+      formData.append("visibility", "public");
+      formData.append("file", file);
+      const res = await apiFetch("/media/upload/direct", {
+        method: "POST",
+        body: formData
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo subir la imagen.");
+      }
+      return data;
+    };
+
+    const fetchPersonalWishList = async () => {
+      const res = await apiFetch("/public-wishes/personal");
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudieron cargar tus deseos personales.");
+      }
+      return data;
+    };
+
+    const createPersonalWish = async (payload) => {
+      const res = await apiFetch("/public-wishes/personal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo crear el deseo personal.");
+      }
+      return data;
+    };
+
+    const updatePersonalWishRecord = async (wishId, payload) => {
+      const res = await apiFetch(`/public-wishes/personal/${wishId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo actualizar el deseo personal.");
+      }
+      return data;
+    };
+
+    const deletePersonalWishRecord = async (wishId) => {
+      const res = await apiFetch(`/public-wishes/personal/${wishId}`, {
+        method: "DELETE"
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo borrar el deseo personal.");
+      }
+      return data;
+    };
+
+    const fulfillPersonalWishRecord = async (wishId, evidenceMediaId = null) => {
+      const res = await apiFetch(`/public-wishes/personal/${wishId}/fulfill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ evidence_media_id: evidenceMediaId || null })
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo marcar el deseo como cumplido.");
+      }
+      return data;
+    };
 
     const fetchPurposeSlotsFromApi = async () => {
       const token = getAccessToken();
@@ -1278,6 +1379,33 @@
       cancelFulfillWish.addEventListener("click", closeFulfillWishModalFn);
     }
 
+    if (confirmFulfillWish) {
+      confirmFulfillWish.addEventListener("click", async () => {
+        if (!activeFulfillSlot) return;
+        if (activeFulfillSlot.classList.contains("is-cooperative")) {
+          closeFulfillWishModalFn();
+          return;
+        }
+
+        const wishId = parsePositiveId(activeFulfillSlot.dataset.wishId);
+        if (!wishId) {
+          closeFulfillWishModalFn();
+          return;
+        }
+
+        try {
+          const evidenceFile = fulfillEvidence?.files?.[0] || null;
+          const uploadedEvidence = evidenceFile ? await uploadWishImage(evidenceFile) : null;
+          await fulfillPersonalWishRecord(wishId, uploadedEvidence?.media_id || null);
+          resetSlotToEmpty(activeFulfillSlot);
+          closeFulfillWishModalFn();
+        } catch (error) {
+          console.error(error);
+          window.alert(error?.message || "No se pudo marcar el deseo como cumplido.");
+        }
+      });
+    }
+
     if (fulfillWishModal) {
       fulfillWishModal.addEventListener("click", (event) => {
         if (event.target === fulfillWishModal) closeFulfillWishModalFn();
@@ -1555,8 +1683,13 @@
 
     const isPersonalWishValid = () => getPersonalWishDescription().length > 0;
 
-    const setPersonalWishError = (show) => {
+    const defaultPersonalWishErrorText = personalWishError?.textContent || "No has descrito tu deseo";
+
+    const setPersonalWishError = (show, message = "") => {
       if (!personalWishError) return;
+      personalWishError.textContent = show
+        ? (message || defaultPersonalWishErrorText)
+        : defaultPersonalWishErrorText;
       personalWishError.classList.toggle("is-visible", show);
     };
 
@@ -1610,15 +1743,18 @@
 
     const resetSlotToEmpty = (slot) => {
       if (!slot || !lampSlotTemplate) return;
-      if (slot.dataset.imageUrl) {
+      if (slot.dataset.imageUrl && slot.dataset.imageObjectUrl === "true") {
         URL.revokeObjectURL(slot.dataset.imageUrl);
-        delete slot.dataset.imageUrl;
       }
+      delete slot.dataset.imageUrl;
+      delete slot.dataset.imageObjectUrl;
       delete slot.dataset.description;
       delete slot.dataset.type;
       delete slot.dataset.goal;
       delete slot.dataset.current;
       delete slot.dataset.template;
+      delete slot.dataset.wishId;
+      delete slot.dataset.mediaId;
       slot.classList.remove("is-choosing", "is-filled");
       slot.classList.add("is-empty");
       slot.innerHTML = "";
@@ -1627,10 +1763,11 @@
 
     const renderPersonalWishSlot = (slot, description, imageUrl, type) => {
       if (!slot) return;
-      if (slot.dataset.imageUrl) {
+      if (slot.dataset.imageUrl && slot.dataset.imageObjectUrl === "true") {
         URL.revokeObjectURL(slot.dataset.imageUrl);
-        delete slot.dataset.imageUrl;
       }
+      delete slot.dataset.imageUrl;
+      delete slot.dataset.imageObjectUrl;
 
       slot.classList.remove("is-empty", "is-choosing");
       slot.classList.add("is-filled");
@@ -1690,12 +1827,69 @@
         imageWrap.appendChild(img);
         body.appendChild(imageWrap);
         slot.dataset.imageUrl = imageUrl;
+        slot.dataset.imageObjectUrl = imageUrl.startsWith("blob:") ? "true" : "false";
       } else {
         body.classList.add("single");
       }
 
       row.appendChild(body);
       slot.appendChild(row);
+    };
+
+    const parsePositiveId = (value) => {
+      const id = Number(value || 0);
+      return Number.isFinite(id) && id > 0 ? id : null;
+    };
+
+    const applyPersonalWishRecordToSlot = (slot, wish) => {
+      if (!slot || !wish) return;
+      const wishId = parsePositiveId(wish.id);
+      const mediaId = parsePositiveId(wish.media_id);
+      if (wishId) {
+        slot.dataset.wishId = `${wishId}`;
+      } else {
+        delete slot.dataset.wishId;
+      }
+      if (mediaId) {
+        slot.dataset.mediaId = `${mediaId}`;
+      } else {
+        delete slot.dataset.mediaId;
+      }
+      renderPersonalWishSlot(slot, wish.wish_text || "", wish.media_url || null, wish.wish_type || "Espiritual");
+    };
+
+    const clearPersonalSlots = () => {
+      if (!personalWishList) return;
+      personalWishList.innerHTML = "";
+      personalTotal = 0;
+      if (personalWishAdd) {
+        personalWishAdd.disabled = false;
+      }
+    };
+
+    const hydratePersonalSlots = (items) => {
+      if (!personalWishList) return;
+      const records = Array.isArray(items) ? items : [];
+      clearPersonalSlots();
+      const totalSlots = Math.max(personalMin, Math.min(personalMax, records.length));
+      for (let i = 0; i < totalSlots; i += 1) {
+        addLampSlot();
+      }
+      const slots = Array.from(personalWishList.querySelectorAll(".wish-slot"));
+      records.forEach((wish, index) => {
+        const slot = slots[index];
+        if (!slot) return;
+        applyPersonalWishRecordToSlot(slot, wish);
+      });
+    };
+
+    const loadPersonalWishesFromApi = async () => {
+      try {
+        const data = await fetchPersonalWishList();
+        hydratePersonalSlots(data?.items || []);
+      } catch (error) {
+        console.error(error);
+      }
     };
 
     const renderCooperativeWishSlot = (slot, description, imageUrl, type, current, goal, template, securityCode) => {
@@ -2012,23 +2206,40 @@
       });
     }
 
-    const handleConfirmPersonalWish = () => {
+    const handleConfirmPersonalWish = async () => {
       if (!activePersonalSlot) return;
       if (!personalWishText) return;
       if (!isPersonalWishValid()) {
-        setPersonalWishError(true);
+        setPersonalWishError(true, "No has descrito tu deseo.");
         return;
       }
 
       const description = personalWishText.value.trim();
       const file = personalWishMedia && personalWishMedia.files ? personalWishMedia.files[0] : null;
-      const imageUrl = file ? URL.createObjectURL(file) : activePersonalSlot.dataset.imageUrl || null;
       const selectedType = Array.from(personalWishTypeInputs).find((input) => input.checked)?.value || "Espiritual";
+      const wishId = parsePositiveId(activePersonalSlot.dataset.wishId);
+      const currentMediaId = parsePositiveId(activePersonalSlot.dataset.mediaId);
 
-      renderPersonalWishSlot(activePersonalSlot, description, imageUrl, selectedType);
-      closePersonalWishModalFn();
-      resetPersonalWishForm();
-      activePersonalSlot = null;
+      try {
+        setPersonalWishError(false);
+        const uploadedMedia = file ? await uploadWishImage(file) : null;
+        const payload = {
+          wish_text: description,
+          wish_type: selectedType,
+          media_id: uploadedMedia?.media_id || currentMediaId || null
+        };
+
+        const savedWish = wishId
+          ? await updatePersonalWishRecord(wishId, payload)
+          : await createPersonalWish(payload);
+
+        applyPersonalWishRecordToSlot(activePersonalSlot, savedWish);
+        closePersonalWishModalFn();
+        resetPersonalWishForm();
+        activePersonalSlot = null;
+      } catch (error) {
+        setPersonalWishError(true, error?.message || "No se pudo guardar tu deseo personal.");
+      }
     };
 
     if (confirmPersonalWish) {
@@ -2333,7 +2544,7 @@
     window.addEventListener("resize", recalcCoverBounds);
 
     if (confirmDeleteWish) {
-      confirmDeleteWish.addEventListener("click", () => {
+      confirmDeleteWish.addEventListener("click", async () => {
         if (activeDeleteSlot) {
           if (activeDeleteSlot.classList.contains("is-cooperative")) {
             if (activeDeleteSlot.dataset.imageUrl) {
@@ -2341,6 +2552,16 @@
             }
             activeDeleteSlot.remove();
           } else {
+            const wishId = parsePositiveId(activeDeleteSlot.dataset.wishId);
+            if (wishId) {
+              try {
+                await deletePersonalWishRecord(wishId);
+              } catch (error) {
+                console.error(error);
+                window.alert(error?.message || "No se pudo borrar el deseo personal.");
+                return;
+              }
+            }
             resetSlotToEmpty(activeDeleteSlot);
           }
         }
@@ -2566,6 +2787,8 @@
         }
       });
     }
+
+    void loadPersonalWishesFromApi();
   });
 </script>
 
@@ -3254,7 +3477,7 @@
               </p>
             </div>
             <div class="modal-actions">
-              <button class="btn btn-primary btn-compact" type="button">
+              <button class="btn btn-primary btn-compact" type="button" id="confirmFulfillWish">
                 Juro bajo verdad de juramento que este deseo se ha cumplido
               </button>
             </div>

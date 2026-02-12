@@ -3,74 +3,15 @@
   import { initPurposeCoverModule } from '../lib/purposeCover';
 
   onMount(() => {
-    // COVER: upload + drag to position
-    const coverMedia = document.getElementById('coverMedia');
-    const coverImg = document.getElementById('coverImg');
-    const coverFile = document.getElementById('coverFile');
-    const btnChangeCover = document.getElementById('btnChangeCover');
-    const coverHint = document.getElementById('coverHint');
-
-    let isDraggingCover = false;
-    let startX = 0;
-    let startY = 0;
-    let currentX = 0;
-    let currentY = 0;
-
-    const applyCoverTransform = () => {
-      if (coverImg) {
-        coverImg.style.transform = `translate(${currentX}px, ${currentY}px)`;
-      }
-    };
-
-    const handleChangeCover = () => coverFile?.click();
-    const handleCoverFileChange = (event) => {
-      const file = event?.target?.files?.[0];
-      if (!file || !coverImg) return;
-
-      const url = URL.createObjectURL(file);
-      coverImg.src = url;
-      currentX = 0;
-      currentY = 0;
-      applyCoverTransform();
-    };
-
-    const handleCoverMouseDown = (event) => {
-      const isButton = event.target.closest('.cover-actions');
-      const isPill = event.target.closest('.purpose-pill');
-      if (isButton || isPill) return;
-
-      isDraggingCover = true;
-      startX = event.clientX - currentX;
-      startY = event.clientY - currentY;
-      coverMedia?.classList.add('is-dragging');
-      coverHint?.classList.add('hidden');
-    };
-
-    const handleCoverMouseMove = (event) => {
-      if (!isDraggingCover) return;
-      currentX = event.clientX - startX;
-      currentY = event.clientY - startY;
-      applyCoverTransform();
-    };
-
-    const handleCoverMouseUp = () => {
-      if (!isDraggingCover) return;
-      isDraggingCover = false;
-      coverMedia?.classList.remove('is-dragging');
-    };
-
-    btnChangeCover?.addEventListener('click', handleChangeCover);
-    coverFile?.addEventListener('change', handleCoverFileChange);
-    coverMedia?.addEventListener('mousedown', handleCoverMouseDown);
-    window.addEventListener('mousemove', handleCoverMouseMove);
-    window.addEventListener('mouseup', handleCoverMouseUp);
-
     initPurposeCoverModule();
 
     // POSTS
     const API = 'http://127.0.0.1:8000';
     const postModalOverlay = document.getElementById('postModalOverlay');
     const openPostModal = document.getElementById('openPostModal');
+    const menuPublishBtn = document.getElementById('menuPublishBtn');
+    const menuDropdown = document.getElementById('menuDropdown');
+    const homeTopbarBtn = document.getElementById('homeTopbarBtn');
     const closePostModal = document.getElementById('closePostModal');
     const cancelPost = document.getElementById('cancelPost');
     const postFile = document.getElementById('postFile');
@@ -265,6 +206,15 @@
 
     const handlePostOverlayClick = (event) => {
       if (event.target === postModalOverlay) closePost();
+    };
+
+    const handleMenuPublishClick = () => {
+      openPost();
+      menuDropdown?.removeAttribute('open');
+    };
+
+    const handleTopbarHomeClick = () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handlePostFileChange = (event) => {
@@ -566,6 +516,8 @@
     };
 
     openPostModal?.addEventListener('click', openPost);
+    menuPublishBtn?.addEventListener('click', handleMenuPublishClick);
+    homeTopbarBtn?.addEventListener('click', handleTopbarHomeClick);
     closePostModal?.addEventListener('click', closePost);
     cancelPost?.addEventListener('click', closePost);
     postModalOverlay?.addEventListener('click', handlePostOverlayClick);
@@ -602,13 +554,9 @@
     return () => {
       if (selectedFileURL) URL.revokeObjectURL(selectedFileURL);
 
-      btnChangeCover?.removeEventListener('click', handleChangeCover);
-      coverFile?.removeEventListener('change', handleCoverFileChange);
-      coverMedia?.removeEventListener('mousedown', handleCoverMouseDown);
-      window.removeEventListener('mousemove', handleCoverMouseMove);
-      window.removeEventListener('mouseup', handleCoverMouseUp);
-
       openPostModal?.removeEventListener('click', openPost);
+      menuPublishBtn?.removeEventListener('click', handleMenuPublishClick);
+      homeTopbarBtn?.removeEventListener('click', handleTopbarHomeClick);
       closePostModal?.removeEventListener('click', closePost);
       cancelPost?.removeEventListener('click', closePost);
       postModalOverlay?.removeEventListener('click', handlePostOverlayClick);
@@ -643,6 +591,56 @@
 </svelte:head>
 
 <div class="page-background page-background-user home-background">
+  <header class="feed-topbar">
+    <div class="feed-topbar-zone feed-topbar-left">
+      <a class="topbar-logo" href="/feed.html" aria-label="Kiadez">
+        <img src="/css/logo-kiadez.webp" alt="Kiadez" />
+      </a>
+      <form class="topbar-search" role="search" on:submit|preventDefault>
+        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+      </form>
+    </div>
+
+    <div class="feed-topbar-zone feed-topbar-center">
+      <button class="topbar-btn is-active" id="homeTopbarBtn" type="button">🏠 Home</button>
+      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+    </div>
+
+    <div class="feed-topbar-zone feed-topbar-right">
+      <details class="topbar-dropdown" id="profileDropdown">
+        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
+          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+        </summary>
+        <div class="dropdown-menu" role="menu">
+          <a href="#" role="menuitem">Configuración y privacidad</a>
+          <a href="#" role="menuitem">Cerrar sesión</a>
+        </div>
+      </details>
+
+      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+        🔔
+        <span class="topbar-badge">3</span>
+      </button>
+
+      <details class="topbar-dropdown" id="menuDropdown">
+        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+          <span class="topbar-menu-icon" aria-hidden="true">☰</span>
+          <span class="topbar-menu-label">Menú</span>
+        </summary>
+        <div class="dropdown-menu" role="menu">
+          <button class="dropdown-action" id="menuPublishBtn" type="button" role="menuitem">
+            Publicar
+          </button>
+          <a href="/home_user.html" role="menuitem">Mi Home</a>
+          <a href="/achievements.html" role="menuitem">Logros recientes</a>
+          <a href="/gallery.html" role="menuitem">Galería</a>
+          <a href="/calendar.html" role="menuitem">Calendario</a>
+          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+        </div>
+      </details>
+    </div>
+  </header>
+
   <main class="user-home">
     <section class="cover" id="cover">
       <div class="cover-media" id="coverMedia">

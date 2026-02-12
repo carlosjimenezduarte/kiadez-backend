@@ -86,13 +86,37 @@
                 return data.has_vault;
             }
 
+            async function checkLifePurposeConfigured(token) {
+                const res = await fetch(`${API}/life-purpose/mine`, {
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                    },
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || "No se pudo verificar tu propósito de vida");
+                }
+
+                const slots = Array.isArray(data?.slots) ? data.slots : [];
+                const activeSlots = slots.filter((slot) => slot?.status === "active");
+                return activeSlots.length >= 3;
+            }
+
             async function continueAfterLogin(token) {
                 const hasVault = await checkVault(token);
-                if (hasVault) {
-                    window.location.href = "/life-proposal.html";
-                } else {
+                if (!hasVault) {
                     window.location.href = "/create-private-key.html";
+                    return;
                 }
+
+                const hasLifePurpose = await checkLifePurposeConfigured(token);
+                if (hasLifePurpose) {
+                    window.location.href = "/home_user.html";
+                    return;
+                }
+
+                window.location.href = "/life-proposal.html";
             }
     
             form.addEventListener("submit", async (e) => {

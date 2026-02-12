@@ -3,6 +3,31 @@
 
   onMount(() => {
     const API = "http://127.0.0.1:8000";
+        const token = localStorage.getItem("access_token") || "";
+        if (!token) {
+          window.location.href = "/login.html";
+          return;
+        }
+
+        void (async () => {
+          try {
+            const res = await fetch(`${API}/life-purpose/mine`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            const data = await res.json();
+            if (!res.ok) return;
+            const slots = Array.isArray(data?.slots) ? data.slots : [];
+            const activeSlots = slots.filter((slot) => slot?.status === "active");
+            if (activeSlots.length >= 3) {
+              window.location.href = "/home_user.html";
+            }
+          } catch (error) {
+            console.error("No se pudo validar onboarding de propósito de vida", error);
+          }
+        })();
+
         const AAD_PURPOSE = new TextEncoder().encode("kiadez-life-purpose-v1");
     
         function bufToHex(buf) {
