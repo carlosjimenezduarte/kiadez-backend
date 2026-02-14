@@ -20,3 +20,4 @@ from .biography_professional_achievements import BiographyProfessionalAchievemen
 from .biography_life_achievements import BiographyLifeAchievements  # noqa
 from .biography_favorite_quotes import BiographyFavoriteQuotes  # noqa
 from .public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus  # noqa
+from .private_personal_wish import PrivatePersonalWish, PrivatePersonalWishStatus  # noqa

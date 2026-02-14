@@ -6,6 +6,16 @@
   const FULFILLED_VISIBLE_SLOTS = 10;
   const PLACEHOLDER_FULFILLED_MESSAGE = "Aquí se publicará tu deseo cuando lo marques como cumplido.";
 
+  const personalTypeIconMap = {
+    "Espiritual": "/css/icons/Espiritual.webp",
+    "Material": "/css/icons/Material.webp",
+    "Monetario": "/css/icons/Monetario.webp",
+    "Profesional": "/css/icons/Profesional.webp",
+    "Salud y cuerpo": "/css/icons/Salud.webp",
+    "Relacional": "/css/icons/Relacional.webp",
+    "Vivencial": "/css/icons/Vivencial.webp"
+  };
+
   const personalCompletedSlots = Array.from({ length: FULFILLED_VISIBLE_SLOTS }, (_, index) => index + 1);
   const cooperativeCompletedSlots = Array.from({ length: FULFILLED_VISIBLE_SLOTS }, (_, index) => index + 1);
 
@@ -60,6 +70,14 @@
       month: "2-digit",
       year: "numeric"
     });
+  };
+
+  const getTypeIconSrc = (wishType) => personalTypeIconMap[wishType] || personalTypeIconMap["Espiritual"];
+
+  const getWishTypeHint = (wishType) => {
+    const normalized = String(wishType || "").trim();
+    if (!normalized) return "Deseo personal";
+    return `Deseo ${normalized.toLowerCase()}`;
   };
 
   const loadFulfilledPersonalWishes = async () => {
@@ -225,35 +243,55 @@
             </div>
             <ol class="wish-slot-list wish-slot-list-fulfilled" aria-label="Deseos personales cumplidos">
               {#each personalCompletedView as item}
-                <li class="wish-slot is-filled wish-slot-fulfilled" data-slot={item.slot}>
-                  <div class={`wish-slot-row wish-slot-row-fulfilled${item.wish ? " has-data" : ""}`}>
-                    {#if item.wish}
-                      <div class="wish-slot-fulfilled-content">
-                        <p class="wish-slot-fulfilled-title">{item.wish.wish_text}</p>
-                        <div class="wish-slot-fulfilled-meta">
-                          <span class="wish-type-pill">{item.wish.wish_type}</span>
-                          {#if item.wish.fulfilled_at}
-                            <span class="wish-slot-fulfilled-date">
-                              Cumplido el {formatFulfilledDate(item.wish.fulfilled_at)}
-                            </span>
-                          {/if}
+                <li class="wish-slot is-filled" data-slot={item.slot}>
+                  {#if item.wish}
+                    {@const fulfilledImageUrl = item.wish.fulfilled_evidence_media_url || item.wish.media_url || null}
+                    <div class="wish-slot-row">
+                      <div class={`wish-slot-body${fulfilledImageUrl ? "" : " single"}`}>
+                        <div class="wish-slot-left">
+                          <div class="wish-slot-header">
+                            <button
+                              class="wish-category-hint"
+                              type="button"
+                              data-hint={getWishTypeHint(item.wish.wish_type)}
+                              aria-label={getWishTypeHint(item.wish.wish_type)}
+                            >
+                              <img
+                                class="wish-slot-category-icon"
+                                src={getTypeIconSrc(item.wish.wish_type)}
+                                alt={getWishTypeHint(item.wish.wish_type)}
+                                loading="lazy"
+                              />
+                            </button>
+                            <br />
+                            <div class="wish-slot-title">{item.wish.wish_text}</div>
+                            <div class="wish-slot-meta wish-slot-meta-fulfilled">
+                              {#if item.wish.fulfilled_at}
+                                <span class="wish-type-pill wish-fulfilled-date-pill">
+                                  Cumplido el {formatFulfilledDate(item.wish.fulfilled_at)}
+                                </span>
+                              {/if}
+                            </div>
+                          </div>
                         </div>
-                      </div>
 
-                      {#if item.wish.fulfilled_evidence_media_url || item.wish.media_url}
-                        <div class="wish-slot-fulfilled-image-wrap">
-                          <img
-                            class="wish-slot-fulfilled-image"
-                            src={item.wish.fulfilled_evidence_media_url || item.wish.media_url}
-                            alt="Evidencia del deseo cumplido"
-                            loading="lazy"
-                          />
-                        </div>
-                      {/if}
-                    {:else}
+                        {#if fulfilledImageUrl}
+                          <div class="wish-slot-image-wrap">
+                            <img
+                              class="wish-slot-image wish-slot-image-fulfilled"
+                              src={fulfilledImageUrl}
+                              alt="Evidencia del deseo cumplido"
+                              loading="lazy"
+                            />
+                          </div>
+                        {/if}
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="wish-slot-row wish-slot-row-fulfilled">
                       <p class="wish-slot-fulfilled-message">{PLACEHOLDER_FULFILLED_MESSAGE}</p>
-                    {/if}
-                  </div>
+                    </div>
+                  {/if}
                 </li>
               {/each}
             </ol>

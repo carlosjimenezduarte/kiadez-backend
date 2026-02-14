@@ -1,19 +1,92 @@
 <script>
   import { onMount } from "svelte";
+  import { initPurposeCoverModule } from "../lib/purposeCover";
+  import { logout } from "../lib/logout";
+
+  const PRIVATE_FULFILLED_VISIBLE_SLOTS = 10;
+  const PLACEHOLDER_PRIVATE_FULFILLED_MESSAGE =
+    "Aquí se publicará tu deseo privado cuando lo marques como cumplido.";
+  const privateCompletedSlots = Array.from(
+    { length: PRIVATE_FULFILLED_VISIBLE_SLOTS },
+    (_, index) => index + 1
+  );
+
+  const personalTypeIconMap = {
+    "Espiritual": "/css/icons/Espiritual.webp",
+    "Material": "/css/icons/Material.webp",
+    "Monetario": "/css/icons/Monetario.webp",
+    "Profesional": "/css/icons/Profesional.webp",
+    "Salud y cuerpo": "/css/icons/Salud.webp",
+    "Relacional": "/css/icons/Relacional.webp",
+    "Vivencial": "/css/icons/Vivencial.webp"
+  };
+
+  const personalTypeHintMap = {
+    "Espiritual": "Deseos relacionados con el sentido de vida, la conciencia, la fe, la paz interior y el crecimiento espiritual. Ejemplo: perseverar en el hábito de la meditación, leer libros sobre espiritualidad, asistir a misa.",
+    "Material": "Deseos vinculados a bienes, objetos o condiciones tangibles que mejoran la calidad de vida. Pueden involucrar recursos externos y, en algunos casos, la ayuda o participación de otras personas. Ejemplo: tener una cafetera nueva, un nuevo auto, una nueva computadora.",
+    "Monetario": "Deseos relacionados exclusivamente con metas económicas personales. No pueden ser concedidos por otras personas y funcionan como objetivos de ahorro, disciplina y logro individual. Solo el propio usuario puede cumplirlos.",
+    "Profesional": "Deseos asociados al desarrollo laboral, académico o creativo. Incluyen proyectos, estudios, reconocimiento, impacto profesional y crecimiento en la vocación personal. Ejemplo: estudiar arquitectura y graduarme de la Universidad Politécnico de Milán.",
+    "Salud y cuerpo": "Deseos enfocados en el bienestar físico, la energía vital, la recuperación y la relación consciente con el cuerpo. No sustituyen atención médica ni tratamientos profesionales. Ejemplo: mantener la disciplina de ejercitar tu cuerpo a diario, correr 1 km diario, alimentarte bien.",
+    "Relacional": "Deseos relacionados con vínculos humanos: familia, pareja, amistades y comunidad. Incluyen encuentros, reconciliaciones, fortalecimiento de relaciones y construcción de lazos significativos. Ejemplo: tomarse una cerveza con Lars Ulrich, ir a un concierto con tu hermano, disfrutar de un día en familia en el Restaurante La Matriarca.",
+    "Vivencial": "Deseos orientados a experiencias, momentos únicos y vivencias significativas. No se definen por la posesión, sino por el hecho de vivir algo que deje huella en la memoria y la conciencia. Ejemplo: lanzarse en paracaídas, visitar Las Islas Maldivas, viajar en helicóptero."
+  };
+
+  const formatFulfilledDate = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("es-CO", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    });
+  };
+
+  const getTypeIconSrc = (wishType) => personalTypeIconMap[wishType] || personalTypeIconMap["Espiritual"];
+
+  const getWishTypeHint = (wishType) => {
+    const normalized = String(wishType || "").trim();
+    if (!normalized) return "Deseo personal";
+    return `Deseo ${normalized.toLowerCase()}`;
+  };
+
+  let privateFulfilledItems = [];
+  let privateFulfilledView = privateCompletedSlots.map((slot) => ({ slot, wish: null }));
+  let privateFulfilledTotal = 0;
+  let privateFulfilledError = "";
+  let privateFulfilledLoading = false;
+
+  $: privateFulfilledView = privateCompletedSlots.map((slot, index) => ({
+    slot,
+    wish: privateFulfilledItems[index] || null
+  }));
 
   let privateLockRoot;
 
   onMount(() => {
     document.body.dataset.visitor = "false";
+    initPurposeCoverModule();
+
+    const API = "http://127.0.0.1:8000";
+    const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
+    const AAD_PRIVATE_WISH = new TextEncoder().encode("kiadez-private-wish-v1");
+    const PRIVATE_MEDIA_AAD_PREFIX = "kiadez-private-media-v1:";
+    let privateUiEpoch = 0;
 
     const prefixInputs = document.querySelectorAll(".wish-prefix-input");
     const privateUnlockBtn = document.getElementById("private-security-unlock");
     const privatePasswordInput = document.getElementById("private-security-password");
     const privateSecurityError = document.getElementById("private-security-error");
+    const privateCensorInterfaceBtn = document.getElementById("private-censor-interface");
     const privateChangePasswordBtn = document.getElementById("private-security-change-password");
     const privateChangePasswordModal = document.getElementById("private-change-password-modal");
     const privateChangePasswordCancel = document.getElementById("private-change-password-cancel");
     const privateChangePasswordCancelFooter = document.getElementById("private-change-password-cancel-footer");
+    const privateCurrentPassword = document.getElementById("private-current-password");
+    const privateNewPassword = document.getElementById("private-new-password");
+    const privateConfirmPassword = document.getElementById("private-confirm-password");
+    const privateChangePasswordConfirm = document.getElementById("private-change-password-confirm");
+    const privateChangePasswordError = document.getElementById("private-change-password-error");
     const privateResetPasswordBtn = document.getElementById("private-security-reset-password");
     const privateResetPasswordModal = document.getElementById("private-reset-password-modal");
     const privateResetPasswordCancel = document.getElementById("private-reset-password-cancel");
@@ -22,8 +95,228 @@
     const privateResetPasswordFinalModal = document.getElementById("private-reset-password-final-modal");
     const privateResetPasswordFinalCancel = document.getElementById("private-reset-password-final-cancel");
     const privateResetPasswordFinalCancelFooter = document.getElementById("private-reset-password-final-cancel-footer");
-    const PRIVATE_PASSWORD = "LibertadSuprema1986*";
+    const privateResetKeywordLabel = document.getElementById("private-reset-keyword-label");
+    const privateResetKeywordInput = document.getElementById("private-reset-password-keyword");
+    const privateResetKeywordConfirm = document.getElementById("private-reset-password-final-confirm");
+    const privateResetKeywordError = document.getElementById("private-reset-password-error");
     const suffixInputs = document.querySelectorAll("[data-suffix]");
+
+    const bufToHex = (buf) =>
+      [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    const hexToBuf = (hex) => {
+      const normalized = (hex || "").trim();
+      if (!normalized) return new ArrayBuffer(0);
+      const bytes = new Uint8Array(normalized.length / 2);
+      for (let i = 0; i < bytes.length; i += 1) {
+        bytes[i] = parseInt(normalized.substr(i * 2, 2), 16);
+      }
+      return bytes.buffer;
+    };
+
+    const getAccessToken = () => localStorage.getItem("access_token") || "";
+
+    const parseResponseJson = async (res) => {
+      try {
+        return await res.json();
+      } catch {
+        return {};
+      }
+    };
+
+    const apiFetch = async (path, options = {}) => {
+      const token = getAccessToken();
+      if (!token) {
+        window.location.href = "/login.html";
+        throw new Error("No hay sesión activa.");
+      }
+      const headers = {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`,
+      };
+      const res = await fetch(`${API}${path}`, { ...options, headers });
+      if (res.status === 401) {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        window.location.href = "/login.html";
+        throw new Error("Sesión expirada.");
+      }
+      return res;
+    };
+
+    const importDekFromSession = async () => {
+      const dekHex = sessionStorage.getItem("dek_hex");
+      if (!dekHex) {
+        throw new Error("Debes desbloquear tu clave privada personal primero.");
+      }
+      const dekRaw = hexToBuf(dekHex);
+      return crypto.subtle.importKey("raw", dekRaw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    };
+
+    const pbkdf2Key = async (password, saltBuf, iters) => {
+      const baseKey = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(password),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+      );
+      return crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt: saltBuf, iterations: iters, hash: "SHA-256" },
+        baseKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    };
+
+    const aesGcmEncryptText = async (key, text, aadBuf) => {
+      const nonce = crypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: nonce, additionalData: aadBuf },
+        key,
+        new TextEncoder().encode(text)
+      );
+      return { nonce, ciphertext };
+    };
+
+    const aesGcmDecryptText = async (key, ciphertextHex, nonceHex, aadBuf) => {
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: new Uint8Array(hexToBuf(nonceHex)), additionalData: aadBuf },
+        key,
+        hexToBuf(ciphertextHex)
+      );
+      return new TextDecoder().decode(decrypted);
+    };
+
+    const decryptDekFromPassword = async (privatePassword) => {
+      const vaultRes = await apiFetch("/vault/record");
+      const vaultData = await vaultRes.json();
+      if (!vaultRes.ok) {
+        throw new Error(vaultData.detail || "No se pudo leer el vault.");
+      }
+      const kdfSalt = hexToBuf(vaultData.kdf_salt_b64 || "");
+      const wrappedDekNonce = new Uint8Array(hexToBuf(vaultData.wrapped_dek_nonce_b64 || ""));
+      const wrappedDek = hexToBuf(vaultData.wrapped_dek_b64 || "");
+      const iters = Number(vaultData.kdf_iters || 310000);
+      const kek = await pbkdf2Key(privatePassword, kdfSalt, iters);
+      const dekRaw = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: wrappedDekNonce, additionalData: AAD_VAULT },
+        kek,
+        wrappedDek
+      );
+      sessionStorage.setItem("dek_hex", bufToHex(dekRaw));
+      return dekRaw;
+    };
+
+    const resolveImageContentType = (file) => {
+      if (file?.type && file.type.startsWith("image/")) return file.type;
+      const name = String(file?.name || "").toLowerCase();
+      if (name.endsWith(".webp")) return "image/webp";
+      if (name.endsWith(".png")) return "image/png";
+      if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+      if (name.endsWith(".gif")) return "image/gif";
+      return "";
+    };
+
+    const presignEncryptedUpload = async (file) => {
+      const contentType = resolveImageContentType(file);
+      if (!contentType) {
+        throw new Error("Tipo de imagen no reconocido. Usa WEBP, PNG o JPEG.");
+      }
+
+      // AES-GCM adds 16 bytes tag; we also prefix 12 bytes nonce => +28 bytes total.
+      const sizeBytes = Number(file.size || 0) + 28;
+
+      const res = await apiFetch("/media/presign/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: file.name,
+          content_type: contentType,
+          size_bytes: sizeBytes,
+          visibility: "private",
+          obfuscate_owner: true,
+        }),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo preparar la carga cifrada.");
+      }
+      return { ...data, contentType };
+    };
+
+    const uploadEncryptedMediaFile = async (file) => {
+      if (!file) return null;
+
+      const dekKey = await importDekFromSession();
+      const presign = await presignEncryptedUpload(file);
+      const mediaId = Number(presign.media_id || 0);
+      if (!Number.isFinite(mediaId) || mediaId <= 0) {
+        throw new Error("No se pudo preparar la carga (media_id inválido).");
+      }
+
+      const aad = new TextEncoder().encode(`${PRIVATE_MEDIA_AAD_PREFIX}${mediaId}`);
+      const nonce = crypto.getRandomValues(new Uint8Array(12));
+      const plaintextBuf = await file.arrayBuffer();
+      const encryptedBuf = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: nonce, additionalData: aad },
+        dekKey,
+        plaintextBuf
+      );
+
+      const combined = new Uint8Array(nonce.byteLength + encryptedBuf.byteLength);
+      combined.set(nonce, 0);
+      combined.set(new Uint8Array(encryptedBuf), nonce.byteLength);
+
+      const formData = new FormData();
+      formData.append("media_id", `${mediaId}`);
+      formData.append(
+        "file",
+        new Blob([combined], { type: presign.contentType }),
+        file.name
+      );
+
+      const uploadRes = await apiFetch("/media/upload/proxy", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await parseResponseJson(uploadRes);
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.detail || "No se pudo subir la imagen cifrada.");
+      }
+
+      return {
+        media_id: mediaId,
+        mime_type: presign.contentType,
+        original_filename: file.name,
+      };
+    };
+
+    const decryptMediaToBlobUrl = async ({ media_id, mime_type }) => {
+      if (!media_id) return null;
+      const dekKey = await importDekFromSession();
+
+      const res = await apiFetch(`/media/${media_id}/raw`);
+      if (!res.ok) return null;
+      const responseContentType = (res.headers.get("content-type") || "").split(";")[0].trim();
+      const buf = await res.arrayBuffer();
+      if (!buf || buf.byteLength < 12 + 16) return null;
+
+      const bytes = new Uint8Array(buf);
+      const nonce = bytes.slice(0, 12);
+      const ciphertext = bytes.slice(12);
+      const aad = new TextEncoder().encode(`${PRIVATE_MEDIA_AAD_PREFIX}${media_id}`);
+
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: nonce, additionalData: aad },
+        dekKey,
+        ciphertext
+      );
+
+      const blob = new Blob([decrypted], { type: mime_type || responseContentType || "application/octet-stream" });
+      return URL.createObjectURL(blob);
+    };
 
     prefixInputs.forEach((input) => {
       const field = /** @type {HTMLInputElement | HTMLTextAreaElement} */ (input);
@@ -74,30 +367,100 @@
       });
     });
 
-    const attemptPrivateUnlock = () => {
+    const setInlineError = (el, message) => {
+      if (!el) return;
+      el.textContent = message || "";
+      el.classList.toggle("is-visible", Boolean(message));
+    };
+
+    // Replaced later once wish DOM nodes are available.
+    let clearPrivateSensitiveUi = () => {};
+
+    const censorPrivateInterface = ({ focusPassword = true } = {}) => {
+      if (!privateLockRoot) return;
+      privateUiEpoch += 1;
+
+      // Ensure sensitive session data is not kept once the UI is censored.
+      try {
+        sessionStorage.removeItem("dek_hex");
+      } catch {
+        // ignore
+      }
+
+      // Clear decrypted UI so the interface is safe even if overlays fail.
+      try {
+        clearPrivateSensitiveUi();
+      } catch {
+        // ignore
+      }
+
+      // Close any open modals (fixed overlays) that could leak info above the censor overlay.
+      document.querySelectorAll(".modal-overlay:not(.hidden)").forEach((overlay) => {
+        overlay.classList.add("hidden");
+        overlay.setAttribute("aria-hidden", "true");
+      });
+      document.body.classList.remove("modal-open");
+
+      // Close any dropdowns as well.
+      document.querySelectorAll("details[open]").forEach((details) => {
+        details.removeAttribute("open");
+      });
+
+      privateLockRoot.classList.add("private-locked");
+      if (privatePasswordInput) privatePasswordInput.value = "";
+      setInlineError(privateSecurityError, "");
+
+      if (focusPassword) {
+        setTimeout(() => privatePasswordInput?.focus(), 0);
+      }
+    };
+
+    const attemptPrivateUnlock = async () => {
       if (!privatePasswordInput || !privateLockRoot) return;
       const value = privatePasswordInput.value || "";
-      const isValid = value === PRIVATE_PASSWORD;
-      if (privateSecurityError) {
-        privateSecurityError.classList.toggle("is-visible", !isValid);
+      if (!value.trim()) {
+        setInlineError(privateSecurityError, "Debes digitar tu clave privada personal.");
+        return;
       }
-      if (!isValid) return;
-      privateLockRoot.classList.remove("private-locked");
-      privatePasswordInput.value = "";
+
+      try {
+        await decryptDekFromPassword(value);
+        privateLockRoot.classList.remove("private-locked");
+        privatePasswordInput.value = "";
+        setInlineError(privateSecurityError, "");
+        // Hydrate private wishes only after the DEK is available.
+        privateUiEpoch += 1;
+        const epoch = privateUiEpoch;
+        void loadPrivatePersonalWishesFromApi(epoch);
+        void loadPrivateFulfilledWishesFromApi(epoch);
+      } catch (err) {
+        setInlineError(
+          privateSecurityError,
+          err?.message || "Contraseña incorrecta. Inténtalo de nuevo."
+        );
+      }
     };
 
     if (privateUnlockBtn) {
-      privateUnlockBtn.addEventListener("click", attemptPrivateUnlock);
+      privateUnlockBtn.addEventListener("click", () => void attemptPrivateUnlock());
     }
 
     if (privatePasswordInput) {
       privatePasswordInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
           event.preventDefault();
-          attemptPrivateUnlock();
+          void attemptPrivateUnlock();
         }
       });
     }
+
+    if (privateCensorInterfaceBtn) {
+      privateCensorInterfaceBtn.addEventListener("click", () => censorPrivateInterface());
+    }
+
+    // If the user leaves this page (or the browser restores it from bfcache), require the password again.
+    window.addEventListener("pagehide", () => censorPrivateInterface({ focusPassword: false }));
+    window.addEventListener("pageshow", () => censorPrivateInterface({ focusPassword: false }));
 
     const setChangePasswordModal = (isOpen) => {
       if (!privateChangePasswordModal) return;
@@ -116,6 +479,80 @@
 
     if (privateChangePasswordCancelFooter) {
       privateChangePasswordCancelFooter.addEventListener("click", () => setChangePasswordModal(false));
+    }
+
+    const handleChangePrivatePassword = async () => {
+      const current = privateCurrentPassword?.value || "";
+      const next = privateNewPassword?.value || "";
+      const next2 = privateConfirmPassword?.value || "";
+
+      setInlineError(privateChangePasswordError, "");
+
+      if (!current.trim()) {
+        setInlineError(privateChangePasswordError, "Debes digitar tu contraseña privada actual.");
+        return;
+      }
+      if (!next.trim() || next.length < 8) {
+        setInlineError(privateChangePasswordError, "Tu nueva clave debe tener al menos 8 caracteres.");
+        return;
+      }
+      if (next !== next2) {
+        setInlineError(privateChangePasswordError, "La confirmación no coincide con tu nueva clave.");
+        return;
+      }
+
+      try {
+        const dekRaw = await decryptDekFromPassword(current);
+
+        const iters = 310000;
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const kek = await pbkdf2Key(next, salt.buffer, iters);
+        const nonce = crypto.getRandomValues(new Uint8Array(12));
+        const wrappedDek = await crypto.subtle.encrypt(
+          { name: "AES-GCM", iv: nonce, additionalData: AAD_VAULT },
+          kek,
+          dekRaw
+        );
+
+        const rewrapRes = await apiFetch("/vault/rewrap", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kdf_name: "pbkdf2_sha256",
+            kdf_iters: iters,
+            kdf_salt_hex: bufToHex(salt.buffer),
+            wrapped_dek_nonce_hex: bufToHex(nonce.buffer),
+            wrapped_dek_hex: bufToHex(wrappedDek),
+          }),
+        });
+        const rewrapData = await rewrapRes.json().catch(() => ({}));
+        if (!rewrapRes.ok) {
+          throw new Error(rewrapData.detail || "No se pudo actualizar tu clave privada.");
+        }
+
+        // Ya tenemos el DEK, así que podemos desbloquear la página inmediatamente.
+        privateLockRoot?.classList.remove("private-locked");
+        privatePasswordInput && (privatePasswordInput.value = "");
+
+        privateCurrentPassword && (privateCurrentPassword.value = "");
+        privateNewPassword && (privateNewPassword.value = "");
+        privateConfirmPassword && (privateConfirmPassword.value = "");
+
+        setChangePasswordModal(false);
+        privateUiEpoch += 1;
+        const epoch = privateUiEpoch;
+        void loadPrivatePersonalWishesFromApi(epoch);
+        void loadPrivateFulfilledWishesFromApi(epoch);
+      } catch (err) {
+        setInlineError(
+          privateChangePasswordError,
+          err?.message || "No se pudo modificar la contraseña privada."
+        );
+      }
+    };
+
+    if (privateChangePasswordConfirm) {
+      privateChangePasswordConfirm.addEventListener("click", () => void handleChangePrivatePassword());
     }
 
     const setResetPasswordModal = (isOpen) => {
@@ -158,6 +595,85 @@
     if (privateResetPasswordFinalCancelFooter) {
       privateResetPasswordFinalCancelFooter.addEventListener("click", () => setResetPasswordFinalModal(false));
     }
+
+    let resetKeywords = null;
+    const loadResetKeywords = async () => {
+      try {
+        const res = await apiFetch("/vault/reset-keywords");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return;
+        resetKeywords = data?.keywords || null;
+        if (privateResetKeywordLabel && resetKeywords && resetKeywords.es) {
+          privateResetKeywordLabel.textContent = String(resetKeywords.es);
+        }
+      } catch {
+        // no-op: si falla, dejamos el texto por defecto
+      }
+    };
+
+    const handleResetVault = async () => {
+      setInlineError(privateResetKeywordError, "");
+      const typed = (privateResetKeywordInput?.value || "").trim();
+      if (!typed) {
+        setInlineError(privateResetKeywordError, "Debes escribir la palabra de confirmación.");
+        return;
+      }
+
+      const allowed = resetKeywords
+        ? Object.values(resetKeywords).map((v) => String(v).toUpperCase())
+        : ["ELIMINAR", "DELETE", "SUPPRIMER"];
+
+      if (!allowed.includes(typed.toUpperCase())) {
+        setInlineError(privateResetKeywordError, "La palabra de confirmación no coincide.");
+        return;
+      }
+
+      try {
+        const res = await apiFetch("/vault/reset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm_keyword: typed }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.detail || "No se pudo restaurar tu clave privada.");
+        }
+
+        // Limpieza local para que la UI no quede en un estado inconsistente.
+        sessionStorage.removeItem("dek_hex");
+        localStorage.removeItem("kiadez_user_purpose");
+
+        setResetPasswordFinalModal(false);
+        setResetPasswordModal(false);
+        window.location.href = "/create-private-key.html";
+      } catch (err) {
+        setInlineError(
+          privateResetKeywordError,
+          err?.message || "No se pudo restaurar tu clave privada."
+        );
+      }
+    };
+
+    if (privateResetKeywordConfirm) {
+      privateResetKeywordConfirm.addEventListener("click", () => void handleResetVault());
+    }
+
+    // Al entrar a la página verificamos que exista vault; si ya está desbloqueado en esta sesión, quitamos el lock.
+    (async () => {
+      try {
+        const stRes = await apiFetch("/vault/status");
+        const st = await stRes.json().catch(() => ({}));
+        if (!stRes.ok) return;
+        if (!st?.has_vault) {
+          window.location.href = "/create-private-key.html";
+          return;
+        }
+
+        await loadResetKeywords();
+      } catch (err) {
+        console.error(err);
+      }
+    })();
 
     suffixInputs.forEach((input) => {
       const field = /** @type {HTMLInputElement | HTMLTextAreaElement} */ (input);
@@ -230,6 +746,7 @@
     const cancelDeleteWish = document.getElementById("private-cancel-delete-wish");
     const fulfillWishModal = document.getElementById("private-fulfill-wish-modal");
     const cancelFulfillWish = document.getElementById("private-cancel-fulfill-wish");
+    const confirmFulfillWish = document.getElementById("private-confirm-fulfill-wish");
     const fulfillEvidence = document.getElementById("private-fulfill-evidence");
     const fulfillEvidencePreview = document.getElementById("private-fulfill-evidence-preview");
     const icanConfirmModal = document.getElementById("private-ican-confirm-modal");
@@ -257,6 +774,81 @@
     let activeIcanSlot = null;
     let isVisitorView = false;
     let fulfillEvidenceUrl = null;
+    let fulfillEvidenceImage = null;
+
+    const parsePositiveId = (value) => {
+      const id = Number(value || 0);
+      return Number.isFinite(id) && id > 0 ? id : null;
+    };
+
+    const fetchPrivatePersonalWishList = async () => {
+      const res = await apiFetch("/private-wishes/personal");
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudieron cargar tus deseos privados.");
+      }
+      return data;
+    };
+
+    const fetchPrivateFulfilledPersonalWishList = async (
+      limit = PRIVATE_FULFILLED_VISIBLE_SLOTS,
+      offset = 0
+    ) => {
+      const res = await apiFetch(`/private-wishes/personal/fulfilled?limit=${limit}&offset=${offset}`);
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudieron cargar tus deseos privados cumplidos.");
+      }
+      return data;
+    };
+
+    const createPrivatePersonalWish = async (payload) => {
+      const res = await apiFetch("/private-wishes/personal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo crear el deseo privado.");
+      }
+      return data;
+    };
+
+    const updatePrivatePersonalWish = async (wishId, payload) => {
+      const res = await apiFetch(`/private-wishes/personal/${wishId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo actualizar el deseo privado.");
+      }
+      return data;
+    };
+
+    const deletePrivatePersonalWish = async (wishId) => {
+      const res = await apiFetch(`/private-wishes/personal/${wishId}`, { method: "DELETE" });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo borrar el deseo privado.");
+      }
+      return data;
+    };
+
+    const fulfillPrivatePersonalWish = async (wishId, evidenceMediaId = null) => {
+      const res = await apiFetch(`/private-wishes/personal/${wishId}/fulfill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ evidence_media_id: evidenceMediaId || null }),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo marcar el deseo como cumplido.");
+      }
+      return data;
+    };
 
     const addLampSlot = () => {
       if (!lampSlotTemplate || !personalWishList) return;
@@ -325,6 +917,7 @@
       fulfillWishModal.classList.remove("hidden");
       fulfillWishModal.setAttribute("aria-hidden", "false");
       updateModalScrollLock();
+      if (fulfillEvidence) fulfillEvidence.value = "";
       updateFulfillEvidencePreview(null);
     };
 
@@ -443,25 +1036,39 @@
         fulfillEvidenceUrl = null;
       }
 
-      fulfillEvidencePreview.innerHTML = "";
+      const previewPlaceholder = fulfillEvidencePreview.querySelector(".wish-preview-placeholder");
+      const previewName = fulfillEvidencePreview.querySelector(".wish-preview-name");
 
       if (!file) {
-        fulfillEvidencePreview.innerHTML = `
-          <label class="wish-image-btn" for="private-fulfill-evidence" aria-label="Sube la evidencia visual">+</label>
-          <div class="wish-preview-content">
-            <span class="wish-preview-placeholder">Sube la evidencia visual.</span>
-            <span class="wish-preview-name">PNG, WEBP, JPEG, etc.</span>
-          </div>
-        `;
+        fulfillEvidencePreview.classList.remove("has-image");
+        if (fulfillEvidenceImage) {
+          fulfillEvidenceImage.remove();
+          fulfillEvidenceImage = null;
+        }
+        if (previewPlaceholder) {
+          previewPlaceholder.textContent = "Sube la evidencia visual.";
+        }
+        if (previewName) {
+          previewName.textContent = "PNG, WEBP, JPEG, etc.";
+        }
         return;
       }
 
       fulfillEvidenceUrl = URL.createObjectURL(file);
-      const img = document.createElement("img");
-      img.src = fulfillEvidenceUrl;
-      img.alt = "Evidencia seleccionada";
-      img.className = "wish-evidence-image";
-      fulfillEvidencePreview.appendChild(img);
+      fulfillEvidencePreview.classList.add("has-image");
+      if (!fulfillEvidenceImage) {
+        fulfillEvidenceImage = document.createElement("img");
+        fulfillEvidenceImage.className = "wish-preview-image";
+        fulfillEvidenceImage.alt = "Evidencia seleccionada";
+        fulfillEvidencePreview.insertBefore(fulfillEvidenceImage, fulfillEvidencePreview.firstChild);
+      }
+      fulfillEvidenceImage.src = fulfillEvidenceUrl;
+      if (previewPlaceholder) {
+        previewPlaceholder.textContent = "Imagen seleccionada";
+      }
+      if (previewName) {
+        previewName.textContent = file.name;
+      }
     };
 
     if (fulfillEvidence) {
@@ -567,8 +1174,11 @@
 
     const isPersonalWishValid = () => getPersonalWishDescription().length > 0;
 
-    const setPersonalWishError = (show) => {
+    const setPersonalWishError = (show, message) => {
       if (!personalWishError) return;
+      if (message) {
+        personalWishError.textContent = message;
+      }
       personalWishError.classList.toggle("is-visible", show);
     };
 
@@ -609,15 +1219,20 @@
 
     const resetSlotToEmpty = (slot) => {
       if (!slot || !lampSlotTemplate) return;
-      if (slot.dataset.imageUrl) {
+      if (slot.dataset.imageUrl && slot.dataset.imageObjectUrl === "true") {
         URL.revokeObjectURL(slot.dataset.imageUrl);
-        delete slot.dataset.imageUrl;
       }
+      delete slot.dataset.imageUrl;
+      delete slot.dataset.imageObjectUrl;
+      delete slot.dataset.imageMimeType;
+      delete slot.dataset.imageFilename;
       delete slot.dataset.description;
       delete slot.dataset.type;
       delete slot.dataset.goal;
       delete slot.dataset.current;
       delete slot.dataset.template;
+      delete slot.dataset.wishId;
+      delete slot.dataset.mediaId;
       slot.classList.remove("is-choosing", "is-filled");
       slot.classList.add("is-empty");
       slot.innerHTML = "";
@@ -626,10 +1241,11 @@
 
     const renderPersonalWishSlot = (slot, description, imageUrl, type) => {
       if (!slot) return;
-      if (slot.dataset.imageUrl) {
+      if (slot.dataset.imageUrl && slot.dataset.imageUrl !== imageUrl && slot.dataset.imageObjectUrl === "true") {
         URL.revokeObjectURL(slot.dataset.imageUrl);
-        delete slot.dataset.imageUrl;
       }
+      delete slot.dataset.imageUrl;
+      delete slot.dataset.imageObjectUrl;
 
       slot.classList.remove("is-empty", "is-choosing");
       slot.classList.add("is-filled");
@@ -689,12 +1305,242 @@
         imageWrap.appendChild(img);
         body.appendChild(imageWrap);
         slot.dataset.imageUrl = imageUrl;
+        slot.dataset.imageObjectUrl = imageUrl.startsWith("blob:") ? "true" : "false";
       } else {
         body.classList.add("single");
       }
 
       row.appendChild(body);
       slot.appendChild(row);
+    };
+
+    const decryptPrivateWishPayload = async (wish) => {
+      if (!wish?.ciphertext_hex || !wish?.nonce_hex) return null;
+      const dekKey = await importDekFromSession();
+      const plainText = await aesGcmDecryptText(dekKey, wish.ciphertext_hex, wish.nonce_hex, AAD_PRIVATE_WISH);
+      try {
+        return JSON.parse(plainText);
+      } catch {
+        return { wish_text: plainText };
+      }
+    };
+
+    const applyPrivateWishRecordToSlot = async (slot, wish, epoch) => {
+      if (!slot || !wish) return;
+      if (epoch !== privateUiEpoch) return;
+
+      const wishId = parsePositiveId(wish.id);
+      const mediaId = parsePositiveId(wish.media_id);
+      if (wishId) {
+        slot.dataset.wishId = `${wishId}`;
+      } else {
+        delete slot.dataset.wishId;
+      }
+      if (mediaId) {
+        slot.dataset.mediaId = `${mediaId}`;
+      } else {
+        delete slot.dataset.mediaId;
+      }
+
+      let wishText = "";
+      let wishType = "Espiritual";
+      let imageMimeType = "";
+      let imageFilename = "";
+
+      try {
+        const payload = await decryptPrivateWishPayload(wish);
+        if (epoch !== privateUiEpoch) return;
+        if (payload && typeof payload === "object") {
+          wishText = String(payload.wish_text || payload.text || "");
+          wishType = String(payload.wish_type || payload.type || "Espiritual");
+          const image = payload.image && typeof payload.image === "object" ? payload.image : null;
+          imageMimeType = String(image?.mime_type || payload.image_mime_type || "");
+          imageFilename = String(image?.filename || payload.image_filename || "");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+
+      let imageUrl = null;
+      if (mediaId) {
+        if (epoch !== privateUiEpoch) return;
+        try {
+          imageUrl = await decryptMediaToBlobUrl({
+            media_id: mediaId,
+            mime_type: imageMimeType,
+          });
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      if (epoch !== privateUiEpoch) {
+        if (imageUrl && String(imageUrl).startsWith("blob:")) {
+          URL.revokeObjectURL(imageUrl);
+        }
+        return;
+      }
+
+      if (imageMimeType) slot.dataset.imageMimeType = imageMimeType;
+      else delete slot.dataset.imageMimeType;
+      if (imageFilename) slot.dataset.imageFilename = imageFilename;
+      else delete slot.dataset.imageFilename;
+
+      renderPersonalWishSlot(slot, wishText || "", imageUrl || null, wishType || "Espiritual");
+    };
+
+    const clearPersonalSlots = () => {
+      if (!personalWishList) return;
+      personalWishList.querySelectorAll(".wish-slot").forEach((slot) => {
+        if (slot.dataset?.imageUrl && slot.dataset.imageObjectUrl === "true") {
+          URL.revokeObjectURL(slot.dataset.imageUrl);
+        }
+      });
+      personalWishList.innerHTML = "";
+      personalTotal = 0;
+      if (personalWishAdd) {
+        personalWishAdd.disabled = false;
+      }
+      if (personalWishCount) {
+        personalWishCount.textContent = "0";
+      }
+    };
+
+    const hydratePersonalSlots = async (items, epoch) => {
+      if (!personalWishList) return;
+      const records = Array.isArray(items) ? items : [];
+      clearPersonalSlots();
+      if (epoch !== privateUiEpoch) return;
+
+      const totalSlots = Math.max(personalMin, Math.min(personalMax, records.length));
+      for (let i = 0; i < totalSlots; i += 1) {
+        addLampSlot();
+      }
+
+      const slots = Array.from(personalWishList.querySelectorAll(".wish-slot"));
+      for (let i = 0; i < records.length; i += 1) {
+        const slot = slots[i];
+        const wish = records[i];
+        if (!slot) continue;
+        try {
+          if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) break;
+          await applyPrivateWishRecordToSlot(slot, wish, epoch);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    };
+
+    const loadPrivatePersonalWishesFromApi = async (epoch = privateUiEpoch) => {
+      try {
+        await importDekFromSession();
+        const data = await fetchPrivatePersonalWishList();
+        if (epoch !== privateUiEpoch) return;
+        await hydratePersonalSlots(data?.items || [], epoch);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const revokePrivateFulfilledBlobUrls = () => {
+      const items = Array.isArray(privateFulfilledItems) ? privateFulfilledItems : [];
+      items.forEach((item) => {
+        const url = item?.image_url || "";
+        if (url && String(url).startsWith("blob:")) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+
+    const loadPrivateFulfilledWishesFromApi = async (epoch = privateUiEpoch) => {
+      privateFulfilledLoading = true;
+      privateFulfilledError = "";
+
+      const newBlobUrls = [];
+
+      try {
+        await importDekFromSession();
+        const data = await fetchPrivateFulfilledPersonalWishList(PRIVATE_FULFILLED_VISIBLE_SLOTS, 0);
+        if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) {
+          newBlobUrls.forEach((url) => URL.revokeObjectURL(url));
+          return;
+        }
+
+        const rawItems = Array.isArray(data?.items) ? data.items : [];
+        const total = Number(data?.total) || rawItems.length;
+        const hydrated = [];
+
+        for (let i = 0; i < rawItems.length; i += 1) {
+          if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) break;
+          const wish = rawItems[i];
+
+          let wishText = "";
+          let wishType = "Espiritual";
+          let originalMimeType = "";
+
+          try {
+            const payload = await decryptPrivateWishPayload(wish);
+            if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) break;
+            if (payload && typeof payload === "object") {
+              wishText = String(payload.wish_text || payload.text || "");
+              wishType = String(payload.wish_type || payload.type || "Espiritual");
+              const image = payload.image && typeof payload.image === "object" ? payload.image : null;
+              originalMimeType = String(image?.mime_type || payload.image_mime_type || "");
+            }
+          } catch (err) {
+            console.error(err);
+          }
+
+          const evidenceId = parsePositiveId(wish.fulfilled_evidence_media_id);
+          const originalId = parsePositiveId(wish.media_id);
+          const imageMediaId = evidenceId || originalId || null;
+
+          let imageUrl = null;
+          if (imageMediaId) {
+            try {
+              imageUrl = await decryptMediaToBlobUrl({
+                media_id: imageMediaId,
+                mime_type: evidenceId ? "" : originalMimeType,
+              });
+              if (imageUrl && String(imageUrl).startsWith("blob:")) {
+                newBlobUrls.push(imageUrl);
+              }
+            } catch (err) {
+              console.error(err);
+            }
+          }
+
+          hydrated.push({
+            id: wish.id,
+            wish_text: wishText,
+            wish_type: wishType,
+            fulfilled_at: wish.fulfilled_at,
+            image_url: imageUrl,
+          });
+        }
+
+        if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) {
+          newBlobUrls.forEach((url) => URL.revokeObjectURL(url));
+          return;
+        }
+
+        revokePrivateFulfilledBlobUrls();
+        privateFulfilledItems = hydrated;
+        privateFulfilledTotal = total;
+      } catch (error) {
+        newBlobUrls.forEach((url) => URL.revokeObjectURL(url));
+        if (epoch !== privateUiEpoch) return;
+        privateFulfilledItems = [];
+        privateFulfilledTotal = 0;
+        privateFulfilledError =
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar tus deseos privados cumplidos.";
+      } finally {
+        if (epoch === privateUiEpoch) {
+          privateFulfilledLoading = false;
+        }
+      }
     };
 
     const resetPersonalWishForm = () => {
@@ -710,24 +1556,27 @@
       setPersonalWishError(false);
     };
 
-    const personalTypeIconMap = {
-      "Espiritual": "/css/icons/Espiritual.webp",
-      "Material": "/css/icons/Material.webp",
-      "Monetario": "/css/icons/Monetario.webp",
-      "Profesional": "/css/icons/Profesional.webp",
-      "Salud y cuerpo": "/css/icons/Salud.webp",
-      "Relacional": "/css/icons/Relacional.webp",
-      "Vivencial": "/css/icons/Vivencial.webp"
-    };
+    clearPrivateSensitiveUi = () => {
+      // Remove any decrypted data + blob URLs from the DOM.
+      clearPersonalSlots();
+      for (let i = 0; i < personalMin; i += 1) {
+        addLampSlot();
+      }
 
-    const personalTypeHintMap = {
-      "Espiritual": "Deseos relacionados con el sentido de vida, la conciencia, la fe, la paz interior y el crecimiento espiritual. Ejemplo: perseverar en el hábito de la meditación, leer libros sobre espiritualidad, asistir a misa.",
-      "Material": "Deseos vinculados a bienes, objetos o condiciones tangibles que mejoran la calidad de vida. Pueden involucrar recursos externos y, en algunos casos, la ayuda o participación de otras personas. Ejemplo: tener una cafetera nueva, un nuevo auto, una nueva computadora.",
-      "Monetario": "Deseos relacionados exclusivamente con metas económicas personales. No pueden ser concedidos por otras personas y funcionan como objetivos de ahorro, disciplina y logro individual. Solo el propio usuario puede cumplirlos.",
-      "Profesional": "Deseos asociados al desarrollo laboral, académico o creativo. Incluyen proyectos, estudios, reconocimiento, impacto profesional y crecimiento en la vocación personal. Ejemplo: estudiar arquitectura y graduarme de la Universidad Politécnico de Milán.",
-      "Salud y cuerpo": "Deseos enfocados en el bienestar físico, la energía vital, la recuperación y la relación consciente con el cuerpo. No sustituyen atención médica ni tratamientos profesionales. Ejemplo: mantener la disciplina de ejercitar tu cuerpo a diario, correr 1 km diario, alimentarte bien.",
-      "Relacional": "Deseos relacionados con vínculos humanos: familia, pareja, amistades y comunidad. Incluyen encuentros, reconciliaciones, fortalecimiento de relaciones y construcción de lazos significativos. Ejemplo: tomarse una cerveza con Lars Ulrich, ir a un concierto con tu hermano, disfrutar de un día en familia en el Restaurante La Matriarca.",
-      "Vivencial": "Deseos orientados a experiencias, momentos únicos y vivencias significativas. No se definen por la posesión, sino por el hecho de vivir algo que deje huella en la memoria y la conciencia. Ejemplo: lanzarse en paracaídas, visitar Las Islas Maldivas, viajar en helicóptero."
+      revokePrivateFulfilledBlobUrls();
+      privateFulfilledItems = [];
+      privateFulfilledTotal = 0;
+      privateFulfilledError = "";
+      privateFulfilledLoading = false;
+
+      resetPersonalWishForm();
+      updateFulfillEvidencePreview(null);
+      if (fulfillEvidence) fulfillEvidence.value = "";
+
+      activePersonalSlot = null;
+      activeDeleteSlot = null;
+      activeFulfillSlot = null;
+      activeIcanSlot = null;
     };
 
     const syncPersonalTypeIcon = (value) => {
@@ -758,23 +1607,92 @@
       syncPersonalTypeHint(checkedInput.value);
     }
 
-    const handleConfirmPersonalWish = () => {
+    const handleConfirmPersonalWish = async () => {
       if (!activePersonalSlot) return;
       if (!personalWishText) return;
       if (!isPersonalWishValid()) {
-        setPersonalWishError(true);
+        setPersonalWishError(true, "No has descrito tu deseo.");
         return;
       }
 
+      const epoch = privateUiEpoch;
       const description = personalWishText.value.trim();
       const file = personalWishMedia && personalWishMedia.files ? personalWishMedia.files[0] : null;
-      const imageUrl = file ? URL.createObjectURL(file) : activePersonalSlot.dataset.imageUrl || null;
       const selectedType = Array.from(personalWishTypeInputs).find((input) => input.checked)?.value || "Espiritual";
 
-      renderPersonalWishSlot(activePersonalSlot, description, imageUrl, selectedType);
-      closePersonalWishModalFn();
-      resetPersonalWishForm();
-      activePersonalSlot = null;
+      const wishId = parsePositiveId(activePersonalSlot.dataset.wishId);
+      const currentMediaId = parsePositiveId(activePersonalSlot.dataset.mediaId);
+      const currentMimeType = activePersonalSlot.dataset.imageMimeType || "";
+      const currentFilename = activePersonalSlot.dataset.imageFilename || "";
+
+      try {
+        setPersonalWishError(false);
+
+        const uploaded = file ? await uploadEncryptedMediaFile(file) : null;
+        if (epoch !== privateUiEpoch) return;
+        const mediaId = uploaded?.media_id || currentMediaId || null;
+        const mimeType = uploaded?.mime_type || currentMimeType || "";
+        const filename = uploaded?.original_filename || currentFilename || "";
+
+        const dekKey = await importDekFromSession();
+        if (epoch !== privateUiEpoch) return;
+        const payloadPlain = {
+          v: 1,
+          wish_text: description,
+          wish_type: selectedType,
+          image: mediaId
+            ? {
+                mime_type: mimeType || null,
+                filename: filename || null,
+              }
+            : null,
+        };
+
+        const { nonce, ciphertext } = await aesGcmEncryptText(dekKey, JSON.stringify(payloadPlain), AAD_PRIVATE_WISH);
+        if (epoch !== privateUiEpoch) return;
+
+        const apiPayload = {
+          ciphertext_hex: bufToHex(ciphertext),
+          nonce_hex: bufToHex(nonce.buffer),
+          media_id: mediaId || null,
+        };
+
+        const savedWish = wishId
+          ? await updatePrivatePersonalWish(wishId, apiPayload)
+          : await createPrivatePersonalWish(apiPayload);
+        if (epoch !== privateUiEpoch) return;
+
+        if (savedWish?.id) {
+          activePersonalSlot.dataset.wishId = `${savedWish.id}`;
+        }
+        if (mediaId) {
+          activePersonalSlot.dataset.mediaId = `${mediaId}`;
+        } else {
+          delete activePersonalSlot.dataset.mediaId;
+        }
+        if (mimeType) activePersonalSlot.dataset.imageMimeType = mimeType;
+        else delete activePersonalSlot.dataset.imageMimeType;
+        if (filename) activePersonalSlot.dataset.imageFilename = filename;
+        else delete activePersonalSlot.dataset.imageFilename;
+
+        // Render immediately using local plaintext + local preview (if any). On refresh it'll decrypt from API.
+        const imageUrl = file ? URL.createObjectURL(file) : activePersonalSlot.dataset.imageUrl || null;
+        if (epoch !== privateUiEpoch) {
+          if (imageUrl && String(imageUrl).startsWith("blob:")) {
+            URL.revokeObjectURL(imageUrl);
+          }
+          return;
+        }
+        renderPersonalWishSlot(activePersonalSlot, description, imageUrl, selectedType);
+
+        closePersonalWishModalFn();
+        resetPersonalWishForm();
+        activePersonalSlot = null;
+      } catch (error) {
+        console.error(error);
+        if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) return;
+        setPersonalWishError(true, error?.message || "No se pudo guardar tu deseo privado.");
+      }
     };
 
     if (confirmPersonalWish) {
@@ -782,12 +1700,57 @@
     }
 
     if (confirmDeleteWish) {
-      confirmDeleteWish.addEventListener("click", () => {
+      confirmDeleteWish.addEventListener("click", async () => {
+        const epoch = privateUiEpoch;
         if (activeDeleteSlot) {
+          const wishId = parsePositiveId(activeDeleteSlot.dataset.wishId);
+          if (wishId) {
+            try {
+              await deletePrivatePersonalWish(wishId);
+              if (epoch !== privateUiEpoch) return;
+            } catch (error) {
+              console.error(error);
+              if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) return;
+              window.alert(error?.message || "No se pudo borrar el deseo privado.");
+              return;
+            }
+          }
+          if (epoch !== privateUiEpoch) return;
           resetSlotToEmpty(activeDeleteSlot);
         }
+        if (epoch !== privateUiEpoch) return;
         closeDeleteWishModalFn();
       });
+    }
+
+    const handleConfirmFulfillWish = async () => {
+      if (!activeFulfillSlot) return;
+      const epoch = privateUiEpoch;
+      const wishId = parsePositiveId(activeFulfillSlot.dataset.wishId);
+      if (!wishId) {
+        window.alert("Primero debes guardar el deseo antes de marcarlo como cumplido.");
+        return;
+      }
+
+      try {
+        const file = fulfillEvidence && fulfillEvidence.files ? fulfillEvidence.files[0] : null;
+        const uploadedEvidence = file ? await uploadEncryptedMediaFile(file) : null;
+        if (epoch !== privateUiEpoch) return;
+        await fulfillPrivatePersonalWish(wishId, uploadedEvidence?.media_id || null);
+        if (epoch !== privateUiEpoch) return;
+
+        resetSlotToEmpty(activeFulfillSlot);
+        closeFulfillWishModalFn();
+        void loadPrivateFulfilledWishesFromApi(epoch);
+      } catch (error) {
+        console.error(error);
+        if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) return;
+        window.alert(error?.message || "No se pudo marcar el deseo como cumplido.");
+      }
+    };
+
+    if (confirmFulfillWish) {
+      confirmFulfillWish.addEventListener("click", () => void handleConfirmFulfillWish());
     }
 
     const rerenderPersonalSlots = () => {
@@ -872,40 +1835,89 @@
 
 <div class="private-wishes-page private-locked" bind:this={privateLockRoot}>
   <div class="page-background page-background-user private-wishes-background">
+    <header class="feed-topbar">
+      <div class="feed-topbar-zone feed-topbar-left">
+        <a class="topbar-logo" href="/feed.html" aria-label="Kiadez">
+          <img src="/css/logo-kiadez.webp" alt="Kiadez" />
+        </a>
+        <form class="topbar-search" role="search" on:submit|preventDefault>
+          <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+        </form>
+      </div>
+
+      <div class="feed-topbar-zone feed-topbar-center">
+        <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
+        <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+        <a class="topbar-btn is-active" href="/my-private-whishes.html">🔒 Deseos privados</a>
+        <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+      </div>
+
+      <div class="feed-topbar-zone feed-topbar-right">
+        <details class="topbar-dropdown" id="profileDropdown">
+          <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
+            <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+          </summary>
+          <div class="dropdown-menu" role="menu">
+            <a href="#" role="menuitem">Configuración y privacidad</a>
+            <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+          </div>
+        </details>
+
+        <button class="topbar-icon" type="button" aria-label="Notificaciones">
+          🔔
+          <span class="topbar-badge">3</span>
+        </button>
+
+        <details class="topbar-dropdown" id="menuDropdown">
+          <summary class="topbar-menu-btn" aria-label="Abrir menú">
+            <span class="topbar-menu-icon" aria-hidden="true">☰</span>
+            <span class="topbar-menu-label">Menú</span>
+          </summary>
+          <div class="dropdown-menu" role="menu">
+            <a href="/home_user.html" role="menuitem">Mi Home</a>
+            <a href="/achievements.html" role="menuitem">Logros recientes</a>
+            <a href="/gallery.html" role="menuitem">Galería</a>
+            <a href="/calendar.html" role="menuitem">Calendario</a>
+            <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+          </div>
+        </details>
+      </div>
+    </header>
+
     <main class="user-home">
       <!-- =========================
        *  PORTADA / COVER
        *  ========================= -->
-      <section class="cover private-cover" id="private-cover">
-        <div class="cover-media" id="private-cover-media">
-          <img id="private-cover-img" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
+      <section class="cover" id="cover">
+        <div class="cover-media" id="coverMedia">
+          <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
 
           <div class="cover-actions">
-            <button class="icon-btn" id="private-btn-change-cover" type="button" title="Cambiar portada">
+            <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
               Cambiar portada
             </button>
-            <button class="icon-btn" id="private-btn-edit-purposes" type="button" title="Editar deseos de propósito">
-              Editar propósito
+            <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title="Editar mi propósito de vida">
+              Editar mi propósito de vida
             </button>
 
-            <input id="private-cover-file" type="file" accept="image/*" class="hidden" />
+            <input id="coverFile" type="file" accept="image/*" class="hidden" />
           </div>
 
           <div class="purpose-triangle" aria-label="Deseos de propósito">
-            <button class="purpose-pill purpose-top" type="button" id="private-purpose-1">
+            <button class="purpose-pill purpose-top" type="button" id="purpose1">
               Deseo #1: Secreto
             </button>
 
-            <button class="purpose-pill purpose-left" type="button" id="private-purpose-2">
+            <button class="purpose-pill purpose-left" type="button" id="purpose2">
               Deseo construir el Reino de Combray
             </button>
 
-            <button class="purpose-pill purpose-right" type="button" id="private-purpose-3">
+            <button class="purpose-pill purpose-right" type="button" id="purpose3">
               Deseo estar unido a Jesús
             </button>
           </div>
 
-          <div class="cover-hint" id="private-cover-hint">
+          <div class="cover-hint" id="coverHint">
             Arrastra la portada para encuadrarla
           </div>
         </div>
@@ -937,6 +1949,13 @@
             <div>
               <h2 class="private-wishes-title">Mis deseos privados</h2>
             </div>
+
+            <div class="private-wishes-tags">
+              <button class="btn btn-outline btn-compact private-censor-btn" type="button" id="private-censor-interface" title="Censurar interfaz de deseos privados">
+                <span class="private-censor-icon" aria-hidden="true">🔒</span>
+                <span>Censurar interfaz de deseos privados</span>
+              </button>
+            </div>
           </header>
 
           <!-- =========================
@@ -962,6 +1981,80 @@
                 </button>
               </div>
             </article>
+
+            <div class="fulfilled-wishes-page">
+              <article class="panel wish-list-panel">
+                <div class="panel-head">
+                  <h3 class="panel-title">Deseos privados cumplidos</h3>
+                  <span class="panel-badge">
+                    {Math.min(privateFulfilledTotal, PRIVATE_FULFILLED_VISIBLE_SLOTS)} / {PRIVATE_FULFILLED_VISIBLE_SLOTS}
+                  </span>
+                </div>
+                <ol class="wish-slot-list wish-slot-list-fulfilled" aria-label="Deseos privados cumplidos">
+                  {#each privateFulfilledView as item}
+                    <li class="wish-slot is-filled" data-slot={item.slot}>
+                      {#if item.wish}
+                        {@const fulfilledImageUrl = item.wish.image_url || null}
+                        <div class="wish-slot-row">
+                          <div class={`wish-slot-body${fulfilledImageUrl ? "" : " single"}`}>
+                            <div class="wish-slot-left">
+                              <div class="wish-slot-header">
+                                <button
+                                  class="wish-category-hint"
+                                  type="button"
+                                  data-hint={getWishTypeHint(item.wish.wish_type)}
+                                  aria-label={getWishTypeHint(item.wish.wish_type)}
+                                >
+                                  <img
+                                    class="wish-slot-category-icon"
+                                    src={getTypeIconSrc(item.wish.wish_type)}
+                                    alt={getWishTypeHint(item.wish.wish_type)}
+                                    loading="lazy"
+                                  />
+                                </button>
+                                <br />
+                                <div class="wish-slot-title">{item.wish.wish_text}</div>
+                                <div class="wish-slot-meta wish-slot-meta-fulfilled">
+                                  {#if item.wish.fulfilled_at}
+                                    <span class="wish-type-pill wish-fulfilled-date-pill">
+                                      Cumplido el {formatFulfilledDate(item.wish.fulfilled_at)}
+                                    </span>
+                                  {/if}
+                                </div>
+                              </div>
+                            </div>
+
+                            {#if fulfilledImageUrl}
+                              <div class="wish-slot-image-wrap">
+                                <img
+                                  class="wish-slot-image wish-slot-image-fulfilled"
+                                  src={fulfilledImageUrl}
+                                  alt="Evidencia del deseo privado cumplido"
+                                  loading="lazy"
+                                />
+                              </div>
+                            {/if}
+                          </div>
+                        </div>
+                      {:else}
+                        <div class="wish-slot-row wish-slot-row-fulfilled">
+                          <p class="wish-slot-fulfilled-message">{PLACEHOLDER_PRIVATE_FULFILLED_MESSAGE}</p>
+                        </div>
+                      {/if}
+                    </li>
+                  {/each}
+                </ol>
+                {#if privateFulfilledLoading}
+                  <p class="wish-fulfilled-status">Cargando deseos cumplidos...</p>
+                {:else if privateFulfilledError}
+                  <p class="wish-fulfilled-status is-error">{privateFulfilledError}</p>
+                {:else if privateFulfilledTotal > PRIVATE_FULFILLED_VISIBLE_SLOTS}
+                  <p class="wish-fulfilled-status">
+                    Mostrando los últimos {PRIVATE_FULFILLED_VISIBLE_SLOTS} de {privateFulfilledTotal} deseos cumplidos.
+                  </p>
+                {/if}
+              </article>
+            </div>
           </section>
 
           <template id="private-wish-lamp-slot-template">
@@ -1101,7 +2194,7 @@
               </div>
               <div class="modal-body">
                 <input id="private-fulfill-evidence" type="file" accept="image/*" class="hidden" />
-                <div class="wish-evidence-preview" id="private-fulfill-evidence-preview" aria-live="polite">
+                <div class="wish-image-preview" id="private-fulfill-evidence-preview" aria-live="polite">
                   <label class="wish-image-btn" for="private-fulfill-evidence" aria-label="Sube la evidencia visual">+</label>
                   <div class="wish-preview-content">
                     <span class="wish-preview-placeholder">Sube la evidencia visual.</span>
@@ -1113,7 +2206,7 @@
                 </p>
               </div>
               <div class="modal-actions">
-                <button class="btn btn-primary btn-compact" type="button">
+                <button class="btn btn-primary btn-compact" type="button" id="private-confirm-fulfill-wish">
                   Juro bajo verdad de juramento que este deseo se ha cumplido
                 </button>
               </div>
@@ -1256,9 +2349,11 @@
 
           <label class="modal-label" for="private-confirm-password">Confirma tu nueva contraseña privada actual</label>
           <input class="modal-input" id="private-confirm-password" type="password" autocomplete="off" />
+
+          <p class="private-security-error" id="private-change-password-error" role="alert"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-primary btn-compact" type="button">Confirmar</button>
+          <button class="btn btn-primary btn-compact" type="button" id="private-change-password-confirm">Confirmar</button>
           <button class="btn btn-outline btn-compact" type="button" id="private-change-password-cancel-footer">Cancelar</button>
         </div>
       </div>
@@ -1289,20 +2384,22 @@
     </div>
 
     <div class="modal-overlay hidden" id="private-reset-password-final-modal" aria-hidden="true">
-      <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label="Confirmación final de restauración">
+      <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label="Confirmación final de eliminación">
         <div class="modal-head">
           <h3>Confirmación final</h3>
           <button class="modal-close" type="button" id="private-reset-password-final-cancel">✕</button>
         </div>
         <div class="modal-body">
           <p class="private-reset-text">
-            Para confirmar la restauración de tu clave secreta personal, escribe la siguiente palabra exactamente como se muestra:
+            Para confirmar la eliminación de tu clave secreta personal, escribe la siguiente palabra exactamente como se muestra:
           </p>
-          <p class="private-reset-text private-reset-keyword">RESTAURACIÓN</p>
+          <p class="private-reset-text private-reset-keyword" id="private-reset-keyword-label">ELIMINAR</p>
           <input class="modal-input" id="private-reset-password-keyword" type="text" autocomplete="off" />
+
+          <p class="private-security-error" id="private-reset-password-error" role="alert"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-primary btn-compact" type="button">Restaurar clave</button>
+          <button class="btn btn-primary btn-compact" type="button" id="private-reset-password-final-confirm">Eliminar clave</button>
           <button class="btn btn-outline btn-compact" type="button" id="private-reset-password-final-cancel-footer">Cancelar</button>
         </div>
       </div>

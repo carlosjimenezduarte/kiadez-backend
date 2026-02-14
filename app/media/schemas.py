@@ -11,6 +11,7 @@ class MediaPresignRequest(BaseModel):
     content_type: str
     size_bytes: int = Field(..., gt=0)
     visibility: MediaVisibility = MediaVisibility.private
+    obfuscate_owner: bool = False
 
 
 class MediaPresignResponse(BaseModel):

@@ -1,0 +1,2 @@
+"""Private wishes module."""
+

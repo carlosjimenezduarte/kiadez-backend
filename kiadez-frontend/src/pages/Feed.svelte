@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { logout } from "../lib/logout";
 
   onMount(() => {
     const promptOptions = [
@@ -154,7 +155,7 @@
         </summary>
         <div class="dropdown-menu" role="menu">
           <a href="#" role="menuitem">Configuración y privacidad</a>
-          <a href="#" role="menuitem">Cerrar sesión</a>
+          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
         </div>
       </details>
 

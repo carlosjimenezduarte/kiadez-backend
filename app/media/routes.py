@@ -4,6 +4,7 @@ from uuid import uuid4
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.auth.routes import get_current_user
@@ -69,13 +70,36 @@ def _validate_media_size(content_type: str, size_bytes: int) -> None:
         raise HTTPException(status_code=400, detail="Archivo supera el tamaño permitido.")
 
 
-def _build_object_key(user_id: int, visibility: MediaVisibility, filename: str | None) -> str:
+def _build_object_key(
+    *,
+    user_id: int,
+    visibility: MediaVisibility,
+    filename: str | None,
+    obfuscate_owner: bool = False,
+) -> str:
     ext = ""
     if filename:
         ext = Path(filename).suffix.lower()
         if len(ext) > 10:
             ext = ""
+    if obfuscate_owner:
+        # Avoid embedding user identifiers in the object key. Useful for zero-knowledge / E2EE objects.
+        return f"{visibility.value}/{uuid4().hex}{ext}"
     return f"{visibility.value}/{user_id}/{uuid4().hex}{ext}"
+
+
+def _iter_streaming_body(body, *, chunk_size: int = 1024 * 1024):
+    try:
+        while True:
+            chunk = body.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+    finally:
+        try:
+            body.close()
+        except Exception:
+            pass
 
 
 def _get_user_from_token(token: str | None, db: Session):
@@ -109,6 +133,7 @@ def presign_upload(
         user_id=current.user_number,
         visibility=payload.visibility,
         filename=payload.filename,
+        obfuscate_owner=bool(payload.obfuscate_owner),
     )
 
     media = Media(
@@ -195,6 +220,98 @@ def confirm_upload(
     expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
     url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
     return MediaURLResponse(media_id=media.id, url=url, expires_in=expires_in)
+
+
+@router.post("/upload/proxy", response_model=MediaURLResponse)
+async def upload_proxy(
+    media_id: int = Form(...),
+    file: UploadFile = File(...),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload via backend (no browser->S3 CORS required). Intended for E2EE "rocks" (ciphertext) uploads.
+    Workflow:
+    1) Client calls /media/presign/upload to register Media and obtain media_id (and object_key).
+    2) Client encrypts bytes locally.
+    3) Client POSTs ciphertext bytes here with media_id.
+    """
+    _ensure_media_storage_ready()
+
+    media = db.query(Media).filter(Media.id == media_id).one_or_none()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media no encontrada.")
+    if media.owner_id != current.user_number:
+        raise HTTPException(status_code=403, detail="No autorizado.")
+    if media.status != "pending":
+        raise HTTPException(status_code=409, detail="Media no está en estado pendiente.")
+
+    # Keep the content-type that was registered in DB (caller provided it on /presign/upload).
+    content_type = _normalize_content_type(media.mime_type or file.content_type or "")
+    if not content_type:
+        raise HTTPException(status_code=400, detail="No se pudo detectar el tipo de archivo.")
+
+    content = await file.read()
+    size_bytes = len(content)
+    _validate_media_size(content_type, size_bytes)
+
+    try:
+        client = get_s3_client()
+        client.put_object(
+            Bucket=settings.S3_BUCKET,
+            Key=media.object_key,
+            Body=content,
+            ContentType=content_type,
+        )
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="No se pudo subir la imagen al storage.")
+
+    media.size_bytes = size_bytes
+    media.mime_type = content_type
+    media.status = "ready"
+    db.commit()
+
+    expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
+    url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
+    return MediaURLResponse(media_id=media.id, url=url, expires_in=expires_in)
+
+
+@router.get("/{media_id}/raw")
+def download_media_raw(
+    media_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Proxy media bytes through the backend (no bucket CORS needed).
+    Useful for client-side decryption (E2EE) where JS needs access to bytes.
+    """
+    _ensure_media_storage_ready()
+    media = db.query(Media).filter(Media.id == media_id).one_or_none()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media no encontrada.")
+    if media.status != "ready":
+        raise HTTPException(status_code=409, detail="Media aún no disponible.")
+
+    if media.visibility == MediaVisibility.private and media.owner_id != current.user_number:
+        raise HTTPException(status_code=403, detail="No autorizado.")
+
+    try:
+        client = get_s3_client()
+        obj = client.get_object(Bucket=settings.S3_BUCKET, Key=media.object_key)
+        body = obj["Body"]
+    except ClientError:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado en storage.")
+    except Exception:
+        raise HTTPException(status_code=500, detail="No se pudo descargar el archivo.")
+
+    # It's ciphertext for E2EE use cases, but keeping the stored mime_type is harmless for fetch().
+    return StreamingResponse(
+        _iter_streaming_body(body),
+        media_type=media.mime_type or "application/octet-stream",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.post("/upload/direct", response_model=MediaURLResponse)

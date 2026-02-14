@@ -3338,6 +3338,14 @@ body {
     font-family: 'Liberation Serif', serif;
 }
 
+.topbar-nav-icon {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    display: block;
+    flex-shrink: 0;
+}
+
 .topbar-btn:hover {
     background: #f0f2f5;
 }
@@ -4546,6 +4554,84 @@ body[data-visitor="true"] .visitor-only {
     max-width: 980px;
 }
 
+.fulfilled-wishes-page .wish-slot-meta-fulfilled {
+    justify-content: center;
+}
+
+.fulfilled-wishes-page .wish-fulfilled-date-pill {
+    background: rgba(31, 107, 69, 0.10);
+    border-color: rgba(31, 107, 69, 0.22);
+    padding: 7px 16px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.fulfilled-wishes-page .wish-slot-image-fulfilled {
+    max-height: 460px;
+}
+
+.fulfilled-wishes-page .wish-category-hint {
+    position: relative;
+    border: none;
+    padding: 0;
+    background: transparent;
+    border-radius: 999px;
+    cursor: help;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fulfilled-wishes-page .wish-category-hint:focus {
+    outline: none;
+}
+
+.fulfilled-wishes-page .wish-category-hint:focus-visible {
+    outline: 2px solid rgba(11, 95, 42, 0.35);
+    outline-offset: 8px;
+}
+
+.fulfilled-wishes-page .wish-category-hint::after {
+    content: attr(data-hint);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 12px);
+    transform: translateX(-50%) translateY(6px);
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: rgba(11, 95, 42, 0.92);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+    z-index: 5;
+}
+
+.fulfilled-wishes-page .wish-category-hint::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 4px);
+    transform: translateX(-50%) translateY(6px);
+    opacity: 0;
+    pointer-events: none;
+    border: 7px solid transparent;
+    border-top-color: rgba(11, 95, 42, 0.92);
+    z-index: 5;
+}
+
+.fulfilled-wishes-page .wish-category-hint:hover::after,
+.fulfilled-wishes-page .wish-category-hint:hover::before,
+.fulfilled-wishes-page .wish-category-hint:focus::after,
+.fulfilled-wishes-page .wish-category-hint:focus::before {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
 .fulfilled-wishes-page .wish-fulfilled-status {
     margin: 2px 0 0;
     color: rgba(0, 0, 0, 0.62);
@@ -4608,6 +4694,14 @@ body[data-visitor="true"] .visitor-only {
 
     .fulfilled-wishes-page .wish-slot-fulfilled-title {
         font-size: 1.04rem;
+    }
+
+    .fulfilled-wishes-page .wish-slot-body {
+        grid-template-columns: 1fr;
+    }
+
+    .fulfilled-wishes-page .wish-slot-image-fulfilled {
+        max-height: 360px;
     }
 }
 
@@ -5113,7 +5207,27 @@ body[data-visitor="true"] .visitor-only {
 }
 
 .fulfill-wish-modal {
-    width: min(520px, 90vw);
+    width: min(720px, 92vw);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.fulfill-wish-modal .modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.fulfill-wish-modal .wish-image-preview {
+    margin-top: 0;
+    min-height: 240px;
+}
+
+.fulfill-wish-modal .wish-preview-image {
+    max-height: min(44vh, 420px);
 }
 
 .ican-confirm-modal {
@@ -5210,6 +5324,8 @@ body[data-visitor="true"] .visitor-only {
         linear-gradient(135deg, #131720 0%, #1d2631 48%, #151b24 100%);
     background-color: #131720;
     background-attachment: scroll;
+    --feed-left: 320px;
+    --feed-right: 280px;
 }
 
 .private-wishes-body {
@@ -5262,6 +5378,24 @@ body[data-visitor="true"] .visitor-only {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+}
+
+.private-wishes-page .private-censor-btn {
+    gap: 10px;
+    font-weight: 600;
+    color: var(--private-ink);
+    border-color: rgba(195, 161, 91, 0.55);
+    background: rgba(255, 255, 255, 0.78);
+}
+
+.private-wishes-page .private-censor-btn:hover {
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 0 0 2px rgba(195, 161, 91, 0.18);
+}
+
+.private-wishes-page .private-censor-icon {
+    font-size: 1.05rem;
+    line-height: 1;
 }
 
 .private-wishes-page .icon-btn {

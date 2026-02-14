@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { initPurposeCoverModule } from '../lib/purposeCover';
+  import { logout } from '../lib/logout';
 
   onMount(() => {
     initPurposeCoverModule();
@@ -604,6 +605,8 @@
     <div class="feed-topbar-zone feed-topbar-center">
       <button class="topbar-btn is-active" id="homeTopbarBtn" type="button">🏠 Home</button>
       <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
@@ -613,7 +616,7 @@
         </summary>
         <div class="dropdown-menu" role="menu">
           <a href="#" role="menuitem">Configuración y privacidad</a>
-          <a href="#" role="menuitem">Cerrar sesión</a>
+          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
         </div>
       </details>
 

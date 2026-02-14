@@ -243,6 +243,7 @@
     let coverPendingUrl = null;
     let isVisitorView = false;
     let fulfillEvidenceUrl = null;
+    let fulfillEvidenceImage = null;
 
     const addLampSlot = () => {
       if (!lampSlotTemplate || !personalWishList) return;
@@ -1005,6 +1006,7 @@
       fulfillWishModal.classList.remove("hidden");
       fulfillWishModal.setAttribute("aria-hidden", "false");
       updateModalScrollLock();
+      if (fulfillEvidence) fulfillEvidence.value = "";
       updateFulfillEvidencePreview(null);
     };
 
@@ -1013,6 +1015,8 @@
       fulfillWishModal.classList.add("hidden");
       fulfillWishModal.setAttribute("aria-hidden", "true");
       updateModalScrollLock();
+      if (fulfillEvidence) fulfillEvidence.value = "";
+      updateFulfillEvidencePreview(null);
       activeFulfillSlot = null;
     };
 
@@ -1469,31 +1473,44 @@
 
     const updateFulfillEvidencePreview = (file) => {
       if (!fulfillEvidencePreview) return;
+      const previewPlaceholder = fulfillEvidencePreview.querySelector(".wish-preview-placeholder");
+      const previewName = fulfillEvidencePreview.querySelector(".wish-preview-name");
 
       if (fulfillEvidenceUrl) {
         URL.revokeObjectURL(fulfillEvidenceUrl);
         fulfillEvidenceUrl = null;
       }
 
-      fulfillEvidencePreview.innerHTML = "";
-
       if (!file) {
-        fulfillEvidencePreview.innerHTML = `
-          <label class="wish-image-btn" for="fulfillEvidence" aria-label="Sube la evidencia visual">+</label>
-          <div class="wish-preview-content">
-            <span class="wish-preview-placeholder">Sube la evidencia visual.</span>
-            <span class="wish-preview-name">PNG, WEBP, JPEG, etc.</span>
-          </div>
-        `;
+        fulfillEvidencePreview.classList.remove("has-image");
+        if (fulfillEvidenceImage) {
+          fulfillEvidenceImage.remove();
+          fulfillEvidenceImage = null;
+        }
+        if (previewPlaceholder) {
+          previewPlaceholder.textContent = "Sube la evidencia visual.";
+        }
+        if (previewName) {
+          previewName.textContent = "PNG, WEBP, JPEG, etc.";
+        }
         return;
       }
 
       fulfillEvidenceUrl = URL.createObjectURL(file);
-      const img = document.createElement("img");
-      img.src = fulfillEvidenceUrl;
-      img.alt = "Evidencia seleccionada";
-      img.className = "wish-evidence-image";
-      fulfillEvidencePreview.appendChild(img);
+      fulfillEvidencePreview.classList.add("has-image");
+      if (!fulfillEvidenceImage) {
+        fulfillEvidenceImage = document.createElement("img");
+        fulfillEvidenceImage.className = "wish-preview-image";
+        fulfillEvidenceImage.alt = "Evidencia seleccionada";
+        fulfillEvidencePreview.insertBefore(fulfillEvidenceImage, fulfillEvidencePreview.firstChild);
+      }
+      fulfillEvidenceImage.src = fulfillEvidenceUrl;
+      if (previewPlaceholder) {
+        previewPlaceholder.textContent = "Imagen seleccionada";
+      }
+      if (previewName) {
+        previewName.textContent = file.name;
+      }
     };
 
     if (fulfillEvidence) {
@@ -3465,7 +3482,7 @@
             </div>
             <div class="modal-body">
               <input id="fulfillEvidence" type="file" accept="image/*" class="hidden" />
-              <div class="wish-evidence-preview" id="fulfillEvidencePreview" aria-live="polite">
+              <div class="wish-image-preview" id="fulfillEvidencePreview" aria-live="polite">
                 <label class="wish-image-btn" for="fulfillEvidence" aria-label="Sube la evidencia visual">+</label>
                 <div class="wish-preview-content">
                   <span class="wish-preview-placeholder">Sube la evidencia visual.</span>
