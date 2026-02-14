@@ -53,6 +53,8 @@ def _wish_out(
         id=wish.id,
         wish_text=wish.wish_text,
         wish_type=wish.wish_type,
+        life_purpose_slot_number=wish.life_purpose_slot_number,
+        life_purpose_icon_key=wish.life_purpose_icon_key,
         media_id=wish.media_id,
         media_url=_build_media_url(media),
         fulfilled_evidence_media_id=wish.fulfilled_evidence_media_id,

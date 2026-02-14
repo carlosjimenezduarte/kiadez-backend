@@ -39,6 +39,8 @@ class PublicPersonalWishOut(BaseModel):
     id: int
     wish_text: str
     wish_type: PublicPersonalWishType
+    life_purpose_slot_number: int | None = None
+    life_purpose_icon_key: str | None = None
     media_id: int | None = None
     media_url: str | None = None
     fulfilled_evidence_media_id: int | None = None

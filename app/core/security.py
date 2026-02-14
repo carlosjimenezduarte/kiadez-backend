@@ -13,7 +13,8 @@ from .config import settings
 # =========================
 
 UPPERCASE_RE = re.compile(r"[A-Z]")
-NON_ALPHA_RE = re.compile(r"[^a-zA-Z]")  # número o símbolo
+DIGIT_RE = re.compile(r"[0-9]")
+SPECIAL_RE = re.compile(r"[^a-zA-Z0-9]")  # símbolo (no letra / no número)
 
 
 def validate_password_policy(password: str) -> None:
@@ -21,8 +22,10 @@ def validate_password_policy(password: str) -> None:
         raise ValueError("La contraseña debe tener al menos 8 caracteres.")
     if not UPPERCASE_RE.search(password):
         raise ValueError("La contraseña debe contener al menos 1 mayúscula.")
-    if not NON_ALPHA_RE.search(password):
-        raise ValueError("La contraseña debe contener al menos 1 número o símbolo.")
+    if not DIGIT_RE.search(password):
+        raise ValueError("La contraseña debe contener al menos 1 número.")
+    if not SPECIAL_RE.search(password):
+        raise ValueError("La contraseña debe contener al menos 1 caracter especial.")
 
 
 # =========================

@@ -615,7 +615,7 @@
           <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="#" role="menuitem">Configuración y privacidad</a>
+          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
           <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
         </div>
       </details>

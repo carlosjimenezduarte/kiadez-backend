@@ -28,6 +28,10 @@ class PublicPersonalWish(Base):
     wish_text: Mapped[str] = mapped_column(Text, nullable=False)
     wish_type: Mapped[str] = mapped_column(String(40), nullable=False)
 
+    # Optional metadata when a fulfilled wish originates from a Life Purpose slot.
+    life_purpose_slot_number: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    life_purpose_icon_key: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
     media_id: Mapped[int | None] = mapped_column(
         ForeignKey("media.id", ondelete="SET NULL"),
         nullable=True,

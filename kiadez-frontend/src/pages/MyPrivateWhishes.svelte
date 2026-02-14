@@ -50,11 +50,39 @@
     return `Deseo ${normalized.toLowerCase()}`;
   };
 
+  const PURPOSE_ORIGIN_HINT = "Este deseo fue alguna vez un deseo de propósito de vida";
+
+  const DEFAULT_PURPOSE_ICON_SRC = "/css/icons/iconelemental.webp";
+
+  const purposeIconMap = {
+    air: "/assets/air.png",
+    earth: "/assets/earth.png",
+    water: "/assets/water.png",
+    fire: "/assets/fire.png",
+  };
+
+  const getPurposeIconLabel = (iconKey) => {
+    if (iconKey === "air") return "Aire";
+    if (iconKey === "earth") return "Tierra";
+    if (iconKey === "water") return "Agua";
+    if (iconKey === "fire") return "Fuego";
+    return "Propósito";
+  };
+
+  const getPurposeIconSrc = (iconKey) => purposeIconMap[String(iconKey || "")] || "";
+  const getLifePurposeIconSrc = (iconKey) => getPurposeIconSrc(iconKey) || DEFAULT_PURPOSE_ICON_SRC;
+  const isFromLifePurpose = (wish) => Boolean(wish?.from_life_purpose || wish?.life_purpose_icon_key);
+
   let privateFulfilledItems = [];
   let privateFulfilledView = privateCompletedSlots.map((slot) => ({ slot, wish: null }));
   let privateFulfilledTotal = 0;
   let privateFulfilledError = "";
   let privateFulfilledLoading = false;
+  let privateFulfilledPage = 1;
+  let privateFulfilledTotalPages = 1;
+  let privateFulfilledPageNumbers = [1];
+  let privateFulfilledRangeStart = 0;
+  let privateFulfilledRangeEnd = 0;
 
   $: privateFulfilledView = privateCompletedSlots.map((slot, index) => ({
     slot,
@@ -62,6 +90,40 @@
   }));
 
   let privateLockRoot;
+  let privateUiEpoch = 0;
+  let privateFulfilledRequestId = 0;
+  let loadPrivateFulfilledWishesFromApiRef = null;
+
+  const goToPrivateFulfilledPage = (page) => {
+    const next = Number(page);
+    if (!Number.isFinite(next)) return;
+    if (privateLockRoot?.classList.contains("private-locked")) return;
+
+    const clamped = Math.max(1, Math.min(Math.trunc(next), privateFulfilledTotalPages || 1));
+    if (clamped === privateFulfilledPage) return;
+
+    privateFulfilledPage = clamped;
+    if (typeof loadPrivateFulfilledWishesFromApiRef === "function") {
+      void loadPrivateFulfilledWishesFromApiRef(privateUiEpoch, clamped);
+    }
+  };
+
+  $: privateFulfilledTotalPages = Math.max(
+    1,
+    Math.ceil(privateFulfilledTotal / PRIVATE_FULFILLED_VISIBLE_SLOTS)
+  );
+  $: privateFulfilledPage = Math.min(privateFulfilledPage, privateFulfilledTotalPages);
+  $: privateFulfilledPage = Math.max(privateFulfilledPage, 1);
+  $: privateFulfilledPageNumbers = Array.from(
+    { length: privateFulfilledTotalPages },
+    (_, index) => index + 1
+  );
+  $: privateFulfilledRangeStart = privateFulfilledTotal
+    ? (privateFulfilledPage - 1) * PRIVATE_FULFILLED_VISIBLE_SLOTS + 1
+    : 0;
+  $: privateFulfilledRangeEnd = privateFulfilledTotal
+    ? Math.min(privateFulfilledPage * PRIVATE_FULFILLED_VISIBLE_SLOTS, privateFulfilledTotal)
+    : 0;
 
   onMount(() => {
     document.body.dataset.visitor = "false";
@@ -71,7 +133,6 @@
     const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
     const AAD_PRIVATE_WISH = new TextEncoder().encode("kiadez-private-wish-v1");
     const PRIVATE_MEDIA_AAD_PREFIX = "kiadez-private-media-v1:";
-    let privateUiEpoch = 0;
 
     const prefixInputs = document.querySelectorAll(".wish-prefix-input");
     const privateUnlockBtn = document.getElementById("private-security-unlock");
@@ -431,8 +492,9 @@
         // Hydrate private wishes only after the DEK is available.
         privateUiEpoch += 1;
         const epoch = privateUiEpoch;
+        privateFulfilledPage = 1;
         void loadPrivatePersonalWishesFromApi(epoch);
-        void loadPrivateFulfilledWishesFromApi(epoch);
+        void loadPrivateFulfilledWishesFromApi(epoch, 1);
       } catch (err) {
         setInlineError(
           privateSecurityError,
@@ -541,8 +603,9 @@
         setChangePasswordModal(false);
         privateUiEpoch += 1;
         const epoch = privateUiEpoch;
+        privateFulfilledPage = 1;
         void loadPrivatePersonalWishesFromApi(epoch);
-        void loadPrivateFulfilledWishesFromApi(epoch);
+        void loadPrivateFulfilledWishesFromApi(epoch, 1);
       } catch (err) {
         setInlineError(
           privateChangePasswordError,
@@ -1453,15 +1516,24 @@
     };
 
     const loadPrivateFulfilledWishesFromApi = async (epoch = privateUiEpoch) => {
+      const requestId = (privateFulfilledRequestId += 1);
+      const requestedPage = Math.max(1, Math.trunc(Number(privateFulfilledPage || 1)));
+      const offset = (requestedPage - 1) * PRIVATE_FULFILLED_VISIBLE_SLOTS;
+      privateFulfilledPage = requestedPage;
       privateFulfilledLoading = true;
       privateFulfilledError = "";
 
       const newBlobUrls = [];
 
+      const isStale = () =>
+        requestId !== privateFulfilledRequestId ||
+        epoch !== privateUiEpoch ||
+        privateLockRoot?.classList.contains("private-locked");
+
       try {
         await importDekFromSession();
-        const data = await fetchPrivateFulfilledPersonalWishList(PRIVATE_FULFILLED_VISIBLE_SLOTS, 0);
-        if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) {
+        const data = await fetchPrivateFulfilledPersonalWishList(PRIVATE_FULFILLED_VISIBLE_SLOTS, offset);
+        if (isStale()) {
           newBlobUrls.forEach((url) => URL.revokeObjectURL(url));
           return;
         }
@@ -1471,25 +1543,34 @@
         const hydrated = [];
 
         for (let i = 0; i < rawItems.length; i += 1) {
-          if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) break;
+          if (isStale()) break;
           const wish = rawItems[i];
 
-          let wishText = "";
-          let wishType = "Espiritual";
-          let originalMimeType = "";
+	          let wishText = "";
+	          let wishType = "Espiritual";
+	          let originalMimeType = "";
+	          let lifePurposeIconKey = null;
+	          let fromLifePurpose = false;
 
-          try {
-            const payload = await decryptPrivateWishPayload(wish);
-            if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) break;
-            if (payload && typeof payload === "object") {
-              wishText = String(payload.wish_text || payload.text || "");
-              wishType = String(payload.wish_type || payload.type || "Espiritual");
-              const image = payload.image && typeof payload.image === "object" ? payload.image : null;
-              originalMimeType = String(image?.mime_type || payload.image_mime_type || "");
-            }
-          } catch (err) {
-            console.error(err);
-          }
+	          try {
+	            const payload = await decryptPrivateWishPayload(wish);
+	            if (isStale()) break;
+	            if (payload && typeof payload === "object") {
+	              wishText = String(payload.wish_text || payload.text || "");
+	              wishType = String(payload.wish_type || payload.type || "Espiritual");
+	              lifePurposeIconKey = payload.life_purpose_icon_key || payload.purpose_icon_key || null;
+	              fromLifePurpose = Boolean(
+	                payload.from_life_purpose ||
+	                  payload.life_purpose_slot_number ||
+	                  payload.life_purpose_icon_key ||
+	                  payload.purpose_icon_key
+	              );
+	              const image = payload.image && typeof payload.image === "object" ? payload.image : null;
+	              originalMimeType = String(image?.mime_type || payload.image_mime_type || "");
+	            }
+	          } catch (err) {
+	            console.error(err);
+	          }
 
           const evidenceId = parsePositiveId(wish.fulfilled_evidence_media_id);
           const originalId = parsePositiveId(wish.media_id);
@@ -1510,16 +1591,18 @@
             }
           }
 
-          hydrated.push({
-            id: wish.id,
-            wish_text: wishText,
-            wish_type: wishType,
-            fulfilled_at: wish.fulfilled_at,
-            image_url: imageUrl,
-          });
-        }
+	          hydrated.push({
+	            id: wish.id,
+	            wish_text: wishText,
+	            wish_type: wishType,
+	            from_life_purpose: fromLifePurpose,
+	            life_purpose_icon_key: lifePurposeIconKey,
+	            fulfilled_at: wish.fulfilled_at,
+	            image_url: imageUrl,
+	          });
+	        }
 
-        if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) {
+        if (isStale()) {
           newBlobUrls.forEach((url) => URL.revokeObjectURL(url));
           return;
         }
@@ -1529,7 +1612,7 @@
         privateFulfilledTotal = total;
       } catch (error) {
         newBlobUrls.forEach((url) => URL.revokeObjectURL(url));
-        if (epoch !== privateUiEpoch) return;
+        if (isStale()) return;
         privateFulfilledItems = [];
         privateFulfilledTotal = 0;
         privateFulfilledError =
@@ -1537,13 +1620,25 @@
             ? error.message
             : "No se pudieron cargar tus deseos privados cumplidos.";
       } finally {
-        if (epoch === privateUiEpoch) {
+        if (epoch === privateUiEpoch && requestId === privateFulfilledRequestId) {
           privateFulfilledLoading = false;
         }
       }
-    };
+	    };
+	
+	    loadPrivateFulfilledWishesFromApiRef = loadPrivateFulfilledWishesFromApi;
 
-    const resetPersonalWishForm = () => {
+	    window.addEventListener("kiadez:fulfilled-wishes-changed", (event) => {
+	      const scope = event?.detail?.scope;
+	      if (scope !== "private") return;
+	      if (privateLockRoot?.classList.contains("private-locked")) return;
+	      privateFulfilledPage = 1;
+	      privateUiEpoch += 1;
+	      const epoch = privateUiEpoch;
+	      void loadPrivateFulfilledWishesFromApi(epoch);
+	    });
+	
+	    const resetPersonalWishForm = () => {
       if (personalWishText) {
         const prefix = personalWishText.dataset.prefix || "Deseo ";
         personalWishText.value = prefix;
@@ -1564,10 +1659,12 @@
       }
 
       revokePrivateFulfilledBlobUrls();
+      privateFulfilledRequestId += 1;
       privateFulfilledItems = [];
       privateFulfilledTotal = 0;
       privateFulfilledError = "";
       privateFulfilledLoading = false;
+      privateFulfilledPage = 1;
 
       resetPersonalWishForm();
       updateFulfillEvidencePreview(null);
@@ -1741,7 +1838,8 @@
 
         resetSlotToEmpty(activeFulfillSlot);
         closeFulfillWishModalFn();
-        void loadPrivateFulfilledWishesFromApi(epoch);
+        privateFulfilledPage = 1;
+        void loadPrivateFulfilledWishesFromApi(epoch, 1);
       } catch (error) {
         console.error(error);
         if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) return;
@@ -1858,7 +1956,7 @@
             <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
           </summary>
           <div class="dropdown-menu" role="menu">
-            <a href="#" role="menuitem">Configuración y privacidad</a>
+            <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
             <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
           </div>
         </details>
@@ -1987,7 +2085,7 @@
                 <div class="panel-head">
                   <h3 class="panel-title">Deseos privados cumplidos</h3>
                   <span class="panel-badge">
-                    {Math.min(privateFulfilledTotal, PRIVATE_FULFILLED_VISIBLE_SLOTS)} / {PRIVATE_FULFILLED_VISIBLE_SLOTS}
+                    {privateFulfilledItems.length} / {PRIVATE_FULFILLED_VISIBLE_SLOTS}
                   </span>
                 </div>
                 <ol class="wish-slot-list wish-slot-list-fulfilled" aria-label="Deseos privados cumplidos">
@@ -2002,20 +2100,20 @@
                                 <button
                                   class="wish-category-hint"
                                   type="button"
-                                  data-hint={getWishTypeHint(item.wish.wish_type)}
-                                  aria-label={getWishTypeHint(item.wish.wish_type)}
-                                >
-                                  <img
-                                    class="wish-slot-category-icon"
-                                    src={getTypeIconSrc(item.wish.wish_type)}
-                                    alt={getWishTypeHint(item.wish.wish_type)}
-                                    loading="lazy"
-                                  />
-                                </button>
-                                <br />
-                                <div class="wish-slot-title">{item.wish.wish_text}</div>
-                                <div class="wish-slot-meta wish-slot-meta-fulfilled">
-                                  {#if item.wish.fulfilled_at}
+                                  data-hint={isFromLifePurpose(item.wish) ? PURPOSE_ORIGIN_HINT : getWishTypeHint(item.wish.wish_type)}
+                                  aria-label={isFromLifePurpose(item.wish) ? PURPOSE_ORIGIN_HINT : getWishTypeHint(item.wish.wish_type)}
+	                                >
+	                                  <img
+	                                    class={`wish-slot-category-icon${isFromLifePurpose(item.wish) ? " is-purpose-icon" : ""}`}
+	                                    src={isFromLifePurpose(item.wish) ? getLifePurposeIconSrc(item.wish.life_purpose_icon_key) : getTypeIconSrc(item.wish.wish_type)}
+	                                    alt={isFromLifePurpose(item.wish) ? getPurposeIconLabel(item.wish.life_purpose_icon_key) : getWishTypeHint(item.wish.wish_type)}
+	                                    loading="lazy"
+	                                  />
+	                                </button>
+	                                <br />
+	                                <div class="wish-slot-title">{item.wish.wish_text}</div>
+	                                <div class="wish-slot-meta wish-slot-meta-fulfilled">
+	                                  {#if item.wish.fulfilled_at}
                                     <span class="wish-type-pill wish-fulfilled-date-pill">
                                       Cumplido el {formatFulfilledDate(item.wish.fulfilled_at)}
                                     </span>
@@ -2044,13 +2142,45 @@
                     </li>
                   {/each}
                 </ol>
+                {#if privateFulfilledTotal > 0 && privateFulfilledTotal >= PRIVATE_FULFILLED_VISIBLE_SLOTS}
+                  <nav class="wish-pagination" aria-label="Paginación de deseos privados cumplidos">
+                    <button
+                      class="wish-page-btn is-arrow"
+                      type="button"
+                      aria-label="Página anterior"
+                      on:click={() => goToPrivateFulfilledPage(privateFulfilledPage - 1)}
+                      disabled={privateFulfilledPage <= 1}
+                    >
+                      &lt;&lt;
+                    </button>
+                    {#each privateFulfilledPageNumbers as page}
+                      <button
+                        class={`wish-page-btn${page === privateFulfilledPage ? " is-active" : ""}`}
+                        type="button"
+                        aria-current={page === privateFulfilledPage ? "page" : undefined}
+                        on:click={() => goToPrivateFulfilledPage(page)}
+                      >
+                        {page}
+                      </button>
+                    {/each}
+                    <button
+                      class="wish-page-btn is-arrow"
+                      type="button"
+                      aria-label="Página siguiente"
+                      on:click={() => goToPrivateFulfilledPage(privateFulfilledPage + 1)}
+                      disabled={privateFulfilledPage >= privateFulfilledTotalPages}
+                    >
+                      &gt;&gt;
+                    </button>
+                  </nav>
+                {/if}
                 {#if privateFulfilledLoading}
                   <p class="wish-fulfilled-status">Cargando deseos cumplidos...</p>
                 {:else if privateFulfilledError}
                   <p class="wish-fulfilled-status is-error">{privateFulfilledError}</p>
-                {:else if privateFulfilledTotal > PRIVATE_FULFILLED_VISIBLE_SLOTS}
+                {:else if privateFulfilledTotal > 0 && privateFulfilledTotal >= PRIVATE_FULFILLED_VISIBLE_SLOTS}
                   <p class="wish-fulfilled-status">
-                    Mostrando los últimos {PRIVATE_FULFILLED_VISIBLE_SLOTS} de {privateFulfilledTotal} deseos cumplidos.
+                    Mostrando {privateFulfilledRangeStart}-{privateFulfilledRangeEnd} de {privateFulfilledTotal} deseos cumplidos.
                   </p>
                 {/if}
               </article>

@@ -1,8 +1,11 @@
 const API = "http://127.0.0.1:8000";
 const AAD_PURPOSE = new TextEncoder().encode("kiadez-life-purpose-v1");
 const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
+const AAD_PRIVATE_WISH = new TextEncoder().encode("kiadez-private-wish-v1");
+const PRIVATE_MEDIA_AAD_PREFIX = "kiadez-private-media-v1:";
 const PURPOSE_PREFIX = "Deseo ";
 const PURPOSE_SECRET_TEXT = "Deseo marcado como secreto";
+const PURPOSE_UNDEFINED_TEXT = "Deseo de propósito sin definir";
 const PURPOSE_REVEAL_PREFIX = "Este deseo será revelado";
 const PURPOSE_STORAGE_VERSION = 2;
 const LS = {
@@ -78,10 +81,26 @@ const getPurposeSlotMap = (slots) => new Map(
 
 const normalizePurposeSlot = (slot, fallbackSlotNumber) => {
   const slotNumber = Number(slot?.slot_number || fallbackSlotNumber);
+  const status = slot?.status || "active";
+
+  // A fulfilled slot is considered "vacant" so the user can define a new purpose explicitly.
+  if (String(status) === "fulfilled") {
+    return {
+      slot_number: slotNumber,
+      is_private: false,
+      status: "fulfilled",
+      reveal_at: null,
+      icon_key: null,
+      text_public: null,
+      text_input: "",
+      ciphertext_hex: null,
+      nonce_hex: null,
+    };
+  }
   return {
     slot_number: slotNumber,
     is_private: Boolean(slot?.is_private),
-    status: slot?.status || "active",
+    status,
     reveal_at: slot?.reveal_at || null,
     icon_key: slot?.icon_key || null,
     text_public: slot?.text_public || null,
@@ -675,6 +694,62 @@ const ensurePurposeModals = () => {
       </div>
     `);
   }
+
+  if (!document.getElementById("purposeFulfillOverlay")) {
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="modal-overlay hidden" id="purposeFulfillOverlay" aria-hidden="true">
+        <div class="modal wish-modal fulfill-wish-modal purpose-fulfill-modal" role="dialog" aria-modal="true" aria-label="Subir evidencia">
+          <div class="modal-head">
+            <h3>¡Sube la evidencia!</h3>
+            <button class="modal-close" type="button" id="purposeFulfillClose">✕</button>
+          </div>
+          <div class="modal-body">
+            <p class="panel-muted"><strong>¿Dónde quieres publicarlo?</strong></p>
+            <div class="purpose-publish-choice" role="group" aria-label="Seleccionar dónde publicar">
+              <button class="purpose-publish-btn is-selected" type="button" data-publish="private" aria-pressed="true">
+                <span class="purpose-publish-emoji" aria-hidden="true">🔒</span>
+                <span>Privado</span>
+              </button>
+              <button class="purpose-publish-btn" type="button" data-publish="public" aria-pressed="false">
+                <span class="purpose-publish-emoji" aria-hidden="true">🌐</span>
+                <span>Público</span>
+              </button>
+            </div>
+
+            <div class="purpose-private-key" id="purposeFulfillKeyRow">
+              <label class="modal-label" for="purposeFulfillPassword">Clave privada personal</label>
+              <input class="modal-input" id="purposeFulfillPassword" type="password" autocomplete="off" placeholder="Clave privada personal" />
+              <p class="panel-muted purpose-private-key-note">
+                Digita tu clave privada personal para confirmar tu decisión.
+              </p>
+            </div>
+
+            <input id="purposeFulfillEvidence" type="file" accept="image/*" class="hidden" />
+            <div class="wish-image-preview" id="purposeFulfillEvidencePreview" aria-live="polite">
+              <label class="wish-image-btn" for="purposeFulfillEvidence" aria-label="Sube la evidencia visual">+</label>
+              <div class="wish-preview-content">
+                <span class="wish-preview-placeholder">Sube la evidencia visual.</span>
+                <span class="wish-preview-name">PNG, WEBP, JPEG, etc.</span>
+              </div>
+            </div>
+
+            <p class="panel-muted">
+              <strong>¿Declaras bajo verdad de juramento que este deseo se ha cumplido?</strong>
+            </p>
+            <p class="purpose-fulfill-error" id="purposeFulfillError" aria-live="polite"></p>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-primary btn-compact" type="button" id="purposeFulfillConfirm">
+              Juro bajo verdad de juramento que este deseo se ha cumplido
+            </button>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-outline btn-compact" type="button" id="purposeFulfillCancel">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    `);
+  }
 };
 
 const enhancePrefixInputs = (scopeEl) => {
@@ -801,6 +876,10 @@ export const initPurposeCoverModule = () => {
     3: purposePills[3]?.textContent?.trim() || DEFAULT_PURPOSE_TEXT[3]
   };
 
+  const purposeFulfillBySlot = new Map(
+    Array.from(purposeFulfillBtns || []).map((btn) => [Number(btn.dataset.slot || 0), btn])
+  );
+
   const lifeProposalOverlay = document.getElementById("lifeProposalOverlay");
   const lifeProposalClose = document.getElementById("lifeProposalClose");
   const lifeProposalCloseFooter = document.getElementById("lifeProposalCloseFooter");
@@ -816,11 +895,26 @@ export const initPurposeCoverModule = () => {
   const purposeUnlockPassword = document.getElementById("purposeUnlockPassword");
   const purposeUnlockError = document.getElementById("purposeUnlockError");
   const purposeUnlockText = document.getElementById("purposeUnlockText");
+  const purposeFulfillOverlay = document.getElementById("purposeFulfillOverlay");
+  const purposeFulfillClose = document.getElementById("purposeFulfillClose");
+  const purposeFulfillCancel = document.getElementById("purposeFulfillCancel");
+  const purposeFulfillConfirm = document.getElementById("purposeFulfillConfirm");
+  const purposeFulfillEvidence = document.getElementById("purposeFulfillEvidence");
+  const purposeFulfillEvidencePreview = document.getElementById("purposeFulfillEvidencePreview");
+  const purposeFulfillKeyRow = document.getElementById("purposeFulfillKeyRow");
+  const purposeFulfillPassword = document.getElementById("purposeFulfillPassword");
+  const purposeFulfillError = document.getElementById("purposeFulfillError");
+  const purposePublishChoice = purposeFulfillOverlay?.querySelector(".purpose-publish-choice");
 
   enhancePrefixInputs(lifeProposalOverlay);
 
   let purposeSlots = [];
   let activePurposeUnlockSlot = null;
+  let activePurposeFulfillSlot = null;
+  let purposePublishTo = "private";
+  let purposeFulfillEvidenceUrl = null;
+  let purposeFulfillEvidenceImage = null;
+  let purposeFulfillBusy = false;
   let pendingConfirmGroup = null;
 
   const setPurposeStatus = (groupEl, text) => {
@@ -830,6 +924,9 @@ export const initPurposeCoverModule = () => {
 
   const getPurposePresentation = (slot) => {
     if (!slot) return { text: "", showUnlock: false };
+    if (String(slot.status || "active") === "fulfilled") {
+      return { text: PURPOSE_UNDEFINED_TEXT, showUnlock: false };
+    }
     if (slot.reveal_at && isRevealPending(slot.reveal_at)) {
       return {
         text: `${PURPOSE_REVEAL_PREFIX} ${formatRevealDate(slot.reveal_at)}`,
@@ -846,17 +943,41 @@ export const initPurposeCoverModule = () => {
       const slot = slotMap.get(slotNumber);
       const pill = purposePills[slotNumber];
       const unlockBtn = purposeUnlocks[slotNumber];
+      const fulfillBtn = purposeFulfillBySlot.get(slotNumber);
       if (!pill) return;
 
       if (!slot) {
+        pill.classList.remove("is-undefined");
         pill.textContent = defaultPurposeTextBySlot[slotNumber];
         unlockBtn?.classList.add("hidden");
+        if (fulfillBtn) {
+          fulfillBtn.classList.remove("is-marked");
+          fulfillBtn.classList.remove("is-vanished");
+          fulfillBtn.disabled = true;
+          fulfillBtn.setAttribute("title", "Primero define este propósito para poder marcarlo como cumplido.");
+        }
         return;
       }
 
+      const isFulfilled = String(slot.status || "active") === "fulfilled";
+      pill.classList.toggle("is-undefined", isFulfilled);
       const view = getPurposePresentation(slot);
       pill.textContent = view.text || defaultPurposeTextBySlot[slotNumber];
       unlockBtn?.classList.toggle("hidden", !view.showUnlock);
+
+      if (fulfillBtn) {
+        const hasContent = Boolean(slot.text_public || slot.text_input || slot.ciphertext_hex);
+        fulfillBtn.classList.toggle("is-marked", isFulfilled);
+        fulfillBtn.classList.toggle("is-vanished", isFulfilled);
+        fulfillBtn.disabled = !hasContent || isFulfilled;
+        if (isFulfilled) {
+          fulfillBtn.setAttribute("title", "Propósito cumplido. Define uno nuevo desde 'Editar mi propósito de vida'.");
+        } else if (!hasContent) {
+          fulfillBtn.setAttribute("title", "Primero define este propósito para poder marcarlo como cumplido.");
+        } else {
+          fulfillBtn.setAttribute("title", `Marcar deseo ${slotNumber} como cumplido`);
+        }
+      }
     });
   };
 
@@ -868,15 +989,43 @@ export const initPurposeCoverModule = () => {
         const remoteSlot = remoteMap.get(slotNumber);
         const localSlot = localMap.get(slotNumber);
         if (remoteSlot) {
+          const mergedTextInput = String(remoteSlot.status || "active") === "fulfilled"
+            ? ""
+            : (remoteSlot.text_public || localSlot?.text_input || "");
           return normalizePurposeSlot({
             ...remoteSlot,
-            text_input: remoteSlot.text_public || localSlot?.text_input || ""
+            text_input: mergedTextInput
           }, slotNumber);
         }
         if (localSlot) return normalizePurposeSlot(localSlot, slotNumber);
         return null;
       })
       .filter(Boolean);
+  };
+
+  const parseResponseJson = async (res) => {
+    try {
+      return await res.json();
+    } catch {
+      return {};
+    }
+  };
+
+  const apiFetch = async (path, options = {}) => {
+    const token = getAccessToken();
+    if (!token) {
+      throw new Error("No hay sesión activa.");
+    }
+
+    const headers = {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${token}`
+    };
+    const res = await fetch(`${API}${path}`, { ...options, headers });
+    if (res.status === 401) {
+      throw new Error("Sesión expirada. Inicia sesión nuevamente.");
+    }
+    return res;
   };
 
   const fetchPurposeSlotsFromApi = async () => {
@@ -1036,6 +1185,93 @@ export const initPurposeCoverModule = () => {
     updateModalScrollLock();
   };
 
+  const setPurposeFulfillError = (message) => {
+    if (!purposeFulfillError) return;
+    purposeFulfillError.textContent = message || "";
+    purposeFulfillError.classList.toggle("is-visible", Boolean(message));
+  };
+
+  const syncPurposePublishChoice = () => {
+    if (!purposePublishChoice) return;
+    purposePublishChoice.querySelectorAll(".purpose-publish-btn").forEach((btn) => {
+      const isSelected = btn.dataset.publish === purposePublishTo;
+      btn.classList.toggle("is-selected", isSelected);
+      btn.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    });
+    if (purposeFulfillKeyRow) {
+      const showKey = purposePublishTo === "private";
+      purposeFulfillKeyRow.classList.toggle("hidden", !showKey);
+      if (!showKey && purposeFulfillPassword) purposeFulfillPassword.value = "";
+    }
+  };
+
+  const closePurposeFulfillModal = () => {
+    if (!purposeFulfillOverlay) return;
+    purposeFulfillOverlay.classList.add("hidden");
+    purposeFulfillOverlay.setAttribute("aria-hidden", "true");
+    if (purposeFulfillEvidence) purposeFulfillEvidence.value = "";
+    if (purposeFulfillPassword) purposeFulfillPassword.value = "";
+    setPurposeFulfillError("");
+    activePurposeFulfillSlot = null;
+    purposePublishTo = "private";
+    syncPurposePublishChoice();
+    if (purposeFulfillEvidenceUrl) {
+      URL.revokeObjectURL(purposeFulfillEvidenceUrl);
+      purposeFulfillEvidenceUrl = null;
+    }
+    if (purposeFulfillEvidenceImage) {
+      purposeFulfillEvidenceImage.remove();
+      purposeFulfillEvidenceImage = null;
+    }
+    if (purposeFulfillEvidencePreview) {
+      purposeFulfillEvidencePreview.classList.remove("has-image");
+      const placeholder = purposeFulfillEvidencePreview.querySelector(".wish-preview-placeholder");
+      const nameEl = purposeFulfillEvidencePreview.querySelector(".wish-preview-name");
+      if (placeholder) placeholder.textContent = "Sube la evidencia visual.";
+      if (nameEl) nameEl.textContent = "PNG, WEBP, JPEG, etc.";
+    }
+    updateModalScrollLock();
+  };
+
+  const openPurposeFulfillModal = (slotNumber) => {
+    if (!purposeFulfillOverlay) return;
+    const slotMap = getPurposeSlotMap(purposeSlots);
+    const slotData = slotMap.get(slotNumber);
+    if (!slotData) {
+      window.alert("Primero define este propósito antes de marcarlo como cumplido.");
+      return;
+    }
+    if (String(slotData.status || "active") === "fulfilled") return;
+
+    activePurposeFulfillSlot = slotNumber;
+    purposePublishTo = "private";
+    syncPurposePublishChoice();
+    setPurposeFulfillError("");
+    if (purposeFulfillEvidence) purposeFulfillEvidence.value = "";
+    if (purposeFulfillPassword) purposeFulfillPassword.value = "";
+
+    if (purposeFulfillEvidenceUrl) {
+      URL.revokeObjectURL(purposeFulfillEvidenceUrl);
+      purposeFulfillEvidenceUrl = null;
+    }
+    if (purposeFulfillEvidenceImage) {
+      purposeFulfillEvidenceImage.remove();
+      purposeFulfillEvidenceImage = null;
+    }
+    if (purposeFulfillEvidencePreview) {
+      purposeFulfillEvidencePreview.classList.remove("has-image");
+      const placeholder = purposeFulfillEvidencePreview.querySelector(".wish-preview-placeholder");
+      const nameEl = purposeFulfillEvidencePreview.querySelector(".wish-preview-name");
+      if (placeholder) placeholder.textContent = "Sube la evidencia visual.";
+      if (nameEl) nameEl.textContent = "PNG, WEBP, JPEG, etc.";
+    }
+
+    purposeFulfillOverlay.classList.remove("hidden");
+    purposeFulfillOverlay.setAttribute("aria-hidden", "false");
+    updateModalScrollLock();
+    if (purposeFulfillPassword) purposeFulfillPassword.focus();
+  };
+
   const pbkdf2Key = async (password, saltBuf, iters) => {
     const baseKey = await crypto.subtle.importKey(
       "raw",
@@ -1078,7 +1314,7 @@ export const initPurposeCoverModule = () => {
   const importDekFromSession = async () => {
     const dekHex = sessionStorage.getItem("dek_hex");
     if (!dekHex) {
-      throw new Error("Vault no desbloqueado. Crea tu clave privada o desbloquéala primero.");
+      throw new Error("Digita tu clave privada personal para confirmar tu decisión.");
     }
     const dekRaw = hexToBuf(dekHex);
     return crypto.subtle.importKey("raw", dekRaw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
@@ -1091,6 +1327,16 @@ export const initPurposeCoverModule = () => {
       hexToBuf(ciphertextHex)
     );
     return new TextDecoder().decode(decrypted);
+  };
+
+  const aesGcmEncryptText = async (key, text, aadBuf) => {
+    const nonce = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: nonce, additionalData: aadBuf },
+      key,
+      new TextEncoder().encode(text)
+    );
+    return { nonce, ciphertext };
   };
 
   const revealPurposeFromPrivateKey = async () => {
@@ -1159,6 +1405,303 @@ export const initPurposeCoverModule = () => {
     } catch (err) {
       purposeUnlockError.textContent = err?.message || "No se pudo desbloquear el deseo.";
       purposeUnlockError.classList.add("is-visible");
+    }
+  };
+
+  const resolveImageContentType = (file) => {
+    if (file?.type && file.type.startsWith("image/")) return file.type;
+    const name = String(file?.name || "").toLowerCase();
+    if (name.endsWith(".webp")) return "image/webp";
+    if (name.endsWith(".png")) return "image/png";
+    if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+    if (name.endsWith(".gif")) return "image/gif";
+    return "";
+  };
+
+  const presignEncryptedUpload = async (file) => {
+    const contentType = resolveImageContentType(file);
+    if (!contentType) {
+      throw new Error("Tipo de imagen no reconocido. Usa WEBP, PNG o JPEG.");
+    }
+
+    // AES-GCM adds 16 bytes tag; we also prefix 12 bytes nonce => +28 bytes total.
+    const sizeBytes = Number(file.size || 0) + 28;
+
+    const res = await apiFetch("/media/presign/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: file.name,
+        content_type: contentType,
+        size_bytes: sizeBytes,
+        visibility: "private",
+        obfuscate_owner: true,
+      }),
+    });
+    const data = await parseResponseJson(res);
+    if (!res.ok) {
+      throw new Error(data.detail || "No se pudo preparar la carga cifrada.");
+    }
+    return { ...data, contentType };
+  };
+
+  const uploadEncryptedMediaFile = async (file) => {
+    if (!file) return null;
+
+    const dekKey = await importDekFromSession();
+    const presign = await presignEncryptedUpload(file);
+    const mediaId = Number(presign.media_id || 0);
+    if (!Number.isFinite(mediaId) || mediaId <= 0) {
+      throw new Error("No se pudo preparar la carga (media_id inválido).");
+    }
+
+    const aad = new TextEncoder().encode(`${PRIVATE_MEDIA_AAD_PREFIX}${mediaId}`);
+    const nonce = crypto.getRandomValues(new Uint8Array(12));
+    const plaintextBuf = await file.arrayBuffer();
+    const encryptedBuf = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: nonce, additionalData: aad },
+      dekKey,
+      plaintextBuf
+    );
+
+    const combined = new Uint8Array(nonce.byteLength + encryptedBuf.byteLength);
+    combined.set(nonce, 0);
+    combined.set(new Uint8Array(encryptedBuf), nonce.byteLength);
+
+    const formData = new FormData();
+    formData.append("media_id", `${mediaId}`);
+    formData.append(
+      "file",
+      new Blob([combined], { type: presign.contentType }),
+      file.name
+    );
+
+    const uploadRes = await apiFetch("/media/upload/proxy", {
+      method: "POST",
+      body: formData,
+    });
+    const uploadData = await parseResponseJson(uploadRes);
+    if (!uploadRes.ok) {
+      throw new Error(uploadData.detail || "No se pudo subir la imagen cifrada.");
+    }
+
+    return {
+      media_id: mediaId,
+      mime_type: presign.contentType,
+      original_filename: file.name,
+    };
+  };
+
+  const uploadPublicMediaFile = async (file) => {
+    if (!file) return null;
+    const formData = new FormData();
+    formData.append("visibility", "public");
+    formData.append("file", file);
+    const res = await apiFetch("/media/upload/direct", {
+      method: "POST",
+      body: formData
+    });
+    const data = await parseResponseJson(res);
+    if (!res.ok) {
+      throw new Error(data.detail || "No se pudo subir la imagen.");
+    }
+    return data;
+  };
+
+  const updatePurposeFulfillEvidencePreview = (file) => {
+    if (!purposeFulfillEvidencePreview) return;
+
+    const previewPlaceholder = purposeFulfillEvidencePreview.querySelector(".wish-preview-placeholder");
+    const previewName = purposeFulfillEvidencePreview.querySelector(".wish-preview-name");
+
+    if (purposeFulfillEvidenceUrl) {
+      URL.revokeObjectURL(purposeFulfillEvidenceUrl);
+      purposeFulfillEvidenceUrl = null;
+    }
+
+    if (!file) {
+      purposeFulfillEvidencePreview.classList.remove("has-image");
+      if (purposeFulfillEvidenceImage) {
+        purposeFulfillEvidenceImage.remove();
+        purposeFulfillEvidenceImage = null;
+      }
+      if (previewPlaceholder) previewPlaceholder.textContent = "Sube la evidencia visual.";
+      if (previewName) previewName.textContent = "PNG, WEBP, JPEG, etc.";
+      return;
+    }
+
+    purposeFulfillEvidenceUrl = URL.createObjectURL(file);
+    purposeFulfillEvidencePreview.classList.add("has-image");
+    if (!purposeFulfillEvidenceImage) {
+      purposeFulfillEvidenceImage = document.createElement("img");
+      purposeFulfillEvidenceImage.className = "wish-preview-image";
+      purposeFulfillEvidenceImage.alt = "Evidencia seleccionada";
+      purposeFulfillEvidencePreview.insertBefore(
+        purposeFulfillEvidenceImage,
+        purposeFulfillEvidencePreview.firstChild
+      );
+    }
+    purposeFulfillEvidenceImage.src = purposeFulfillEvidenceUrl;
+    if (previewPlaceholder) previewPlaceholder.textContent = "";
+    if (previewName) previewName.textContent = file.name || "Evidencia seleccionada";
+  };
+
+  const resolvePurposePlainText = async (slotData) => {
+    if (!slotData) return "";
+    if (!slotData.is_private) {
+      return slotData.text_public || slotData.text_input || "";
+    }
+    if (slotData.text_input) return slotData.text_input;
+    if (slotData.ciphertext_hex && slotData.nonce_hex) {
+      const dekKey = await importDekFromSession();
+      return await aesGcmDecryptText(dekKey, slotData.ciphertext_hex, slotData.nonce_hex, AAD_PURPOSE);
+    }
+    return "";
+  };
+
+  const fulfillPurposeSlot = async () => {
+    if (!activePurposeFulfillSlot) return;
+    if (purposeFulfillBusy) return;
+    if (!purposeFulfillConfirm) return;
+
+    const slotNumber = Number(activePurposeFulfillSlot || 0);
+    if (!slotNumber) return;
+
+    const slotMap = getPurposeSlotMap(purposeSlots);
+    const slotData = slotMap.get(slotNumber);
+    if (!slotData) {
+      setPurposeFulfillError("No se encontró el propósito. Intenta recargar la página.");
+      return;
+    }
+
+    purposeFulfillBusy = true;
+    purposeFulfillConfirm.disabled = true;
+    setPurposeFulfillError("");
+
+    try {
+      let dekKey = null;
+      if (purposePublishTo === "private") {
+        const password = (purposeFulfillPassword?.value || "").trim();
+        if (!password) {
+          throw new Error("Digita tu clave privada personal para confirmar tu decisión.");
+        }
+        const token = getAccessToken();
+        if (!token) {
+          throw new Error("No hay sesión activa.");
+        }
+        try {
+          dekKey = await decryptDekFromPassword(password, token);
+        } catch (err) {
+          if (err?.name === "OperationError" || String(err?.message || "").includes("OperationError")) {
+            throw new Error("Clave privada personal incorrecta.");
+          }
+          throw err;
+        }
+        if (purposeFulfillPassword) purposeFulfillPassword.value = "";
+      }
+
+      const wishText = (await resolvePurposePlainText(slotData)).trim();
+      if (!wishText) {
+        throw new Error("Primero define el texto de este propósito para poder publicarlo.");
+      }
+
+      const file = purposeFulfillEvidence && purposeFulfillEvidence.files ? purposeFulfillEvidence.files[0] : null;
+      const evidence = file
+        ? (purposePublishTo === "public" ? await uploadPublicMediaFile(file) : await uploadEncryptedMediaFile(file))
+        : null;
+      const evidenceMediaId = Number(evidence?.media_id || 0) || null;
+
+      if (purposePublishTo === "public") {
+        const res = await apiFetch("/life-purpose/fulfill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            slot_number: slotNumber,
+            publish_to: "public",
+            evidence_media_id: evidenceMediaId,
+            wish_text: wishText,
+            wish_type: "Espiritual",
+          }),
+        });
+        const data = await parseResponseJson(res);
+        if (!res.ok) {
+          throw new Error(data.detail || "No se pudo publicar el deseo.");
+        }
+
+        purposeSlots = purposeSlots.map((slot) => {
+          if (Number(slot.slot_number) !== slotNumber) return slot;
+          return {
+            ...slot,
+            is_private: false,
+            reveal_at: null,
+            icon_key: null,
+            text_public: null,
+            text_input: "",
+            ciphertext_hex: null,
+            nonce_hex: null,
+            status: "fulfilled"
+          };
+        });
+      } else {
+        const dekKey = await importDekFromSession();
+        const privatePayload = {
+          wish_text: wishText,
+          wish_type: "Espiritual",
+          from_life_purpose: true,
+          life_purpose_slot_number: slotNumber,
+          life_purpose_icon_key: slotData.icon_key || null,
+        };
+        const { nonce, ciphertext } = await aesGcmEncryptText(
+          dekKey,
+          JSON.stringify(privatePayload),
+          AAD_PRIVATE_WISH
+        );
+
+        const res = await apiFetch("/life-purpose/fulfill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            slot_number: slotNumber,
+            publish_to: "private",
+            evidence_media_id: evidenceMediaId,
+            ciphertext_hex: bufToHex(ciphertext),
+            nonce_hex: bufToHex(nonce.buffer),
+          }),
+        });
+        const data = await parseResponseJson(res);
+        if (!res.ok) {
+          throw new Error(data.detail || "No se pudo publicar el deseo.");
+        }
+
+        purposeSlots = purposeSlots.map((slot) => {
+          if (Number(slot.slot_number) !== slotNumber) return slot;
+          return {
+            ...slot,
+            is_private: false,
+            reveal_at: null,
+            icon_key: null,
+            text_public: null,
+            text_input: "",
+            ciphertext_hex: null,
+            nonce_hex: null,
+            status: "fulfilled"
+          };
+        });
+      }
+
+      const publishedScope = purposePublishTo;
+      renderPurposeSlots(purposeSlots);
+      storePurposeValues(purposeSlots);
+      closePurposeFulfillModal();
+
+      window.dispatchEvent(new CustomEvent("kiadez:fulfilled-wishes-changed", {
+        detail: { scope: publishedScope }
+      }));
+    } catch (err) {
+      setPurposeFulfillError(err?.message || "No se pudo publicar el deseo.");
+    } finally {
+      purposeFulfillBusy = false;
+      purposeFulfillConfirm.disabled = false;
     }
   };
 
@@ -1380,10 +1923,36 @@ export const initPurposeCoverModule = () => {
     }
   });
 
+  purposeFulfillClose?.addEventListener("click", closePurposeFulfillModal);
+  purposeFulfillCancel?.addEventListener("click", closePurposeFulfillModal);
+  purposeFulfillOverlay?.addEventListener("click", (event) => {
+    if (event.target === purposeFulfillOverlay) closePurposeFulfillModal();
+  });
+  purposePublishChoice?.addEventListener("click", (event) => {
+    const btn = event.target.closest(".purpose-publish-btn");
+    if (!btn) return;
+    const next = btn.dataset.publish;
+    if (next !== "private" && next !== "public") return;
+    purposePublishTo = next;
+    setPurposeFulfillError("");
+    syncPurposePublishChoice();
+    if (purposePublishTo === "private" && purposeFulfillPassword) {
+      purposeFulfillPassword.focus();
+    }
+  });
+  purposeFulfillEvidence?.addEventListener("change", () => {
+    const file = purposeFulfillEvidence.files && purposeFulfillEvidence.files[0];
+    updatePurposeFulfillEvidencePreview(file || null);
+  });
+  purposeFulfillConfirm?.addEventListener("click", () => void fulfillPurposeSlot());
+
   purposeFulfillBtns.forEach((btn) => {
+    if (btn.dataset.bound === "true") return;
+    btn.dataset.bound = "true";
     btn.addEventListener("click", () => {
-      btn.classList.add("is-marked");
-      btn.setAttribute("title", "Deseo marcado como cumplido (demo)");
+      const slotNumber = Number(btn.dataset.slot || "0");
+      if (!slotNumber) return;
+      openPurposeFulfillModal(slotNumber);
     });
   });
 

@@ -121,8 +121,12 @@
       }
 
       const slots = Array.isArray(data?.slots) ? data.slots : [];
-      const activeSlots = slots.filter((slot) => slot?.status === "active");
-      return { configured: activeSlots.length >= 3, ok: true };
+      const slotNumbers = new Set(
+        slots
+          .map((slot) => Number(slot?.slot_number))
+          .filter((n) => Number.isFinite(n) && n >= 1 && n <= 3)
+      );
+      return { configured: slotNumbers.size >= 3, ok: true };
     } catch (e) {
       showStatus("No se pudo conectar con el servidor.");
       return { configured: false, ok: false };

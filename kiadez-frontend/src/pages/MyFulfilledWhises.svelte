@@ -80,6 +80,29 @@
     return `Deseo ${normalized.toLowerCase()}`;
   };
 
+  const PURPOSE_ORIGIN_HINT = "Este deseo fue alguna vez un deseo de propósito de vida";
+
+  const DEFAULT_PURPOSE_ICON_SRC = "/css/icons/iconelemental.webp";
+
+  const purposeIconMap = {
+    air: "/assets/air.png",
+    earth: "/assets/earth.png",
+    water: "/assets/water.png",
+    fire: "/assets/fire.png",
+  };
+
+  const getPurposeIconLabel = (iconKey) => {
+    if (iconKey === "air") return "Aire";
+    if (iconKey === "earth") return "Tierra";
+    if (iconKey === "water") return "Agua";
+    if (iconKey === "fire") return "Fuego";
+    return "Propósito";
+  };
+
+  const getPurposeIconSrc = (iconKey) => purposeIconMap[String(iconKey || "")] || "";
+  const getLifePurposeIconSrc = (iconKey) => getPurposeIconSrc(iconKey) || DEFAULT_PURPOSE_ICON_SRC;
+  const isFromLifePurpose = (wish) => Boolean(wish?.life_purpose_slot_number || wish?.life_purpose_icon_key);
+
   const loadFulfilledPersonalWishes = async () => {
     personalFulfilledLoading = true;
     personalFulfilledError = "";
@@ -106,8 +129,15 @@
 
   onMount(() => {
     const cleanup = initPurposeCoverModule();
+    const onFulfilledChanged = (event) => {
+      const scope = event?.detail?.scope;
+      if (scope !== "public") return;
+      void loadFulfilledPersonalWishes();
+    };
+    window.addEventListener("kiadez:fulfilled-wishes-changed", onFulfilledChanged);
     loadFulfilledPersonalWishes();
     return () => {
+      window.removeEventListener("kiadez:fulfilled-wishes-changed", onFulfilledChanged);
       if (typeof cleanup === "function") cleanup();
     };
   });
@@ -253,19 +283,19 @@
                             <button
                               class="wish-category-hint"
                               type="button"
-                              data-hint={getWishTypeHint(item.wish.wish_type)}
-                              aria-label={getWishTypeHint(item.wish.wish_type)}
-                            >
-                              <img
-                                class="wish-slot-category-icon"
-                                src={getTypeIconSrc(item.wish.wish_type)}
-                                alt={getWishTypeHint(item.wish.wish_type)}
-                                loading="lazy"
-                              />
-                            </button>
-                            <br />
-                            <div class="wish-slot-title">{item.wish.wish_text}</div>
-                            <div class="wish-slot-meta wish-slot-meta-fulfilled">
+                              data-hint={isFromLifePurpose(item.wish) ? PURPOSE_ORIGIN_HINT : getWishTypeHint(item.wish.wish_type)}
+                              aria-label={isFromLifePurpose(item.wish) ? PURPOSE_ORIGIN_HINT : getWishTypeHint(item.wish.wish_type)}
+	                            >
+	                              <img
+	                                class={`wish-slot-category-icon${isFromLifePurpose(item.wish) ? " is-purpose-icon" : ""}`}
+	                                src={isFromLifePurpose(item.wish) ? getLifePurposeIconSrc(item.wish.life_purpose_icon_key) : getTypeIconSrc(item.wish.wish_type)}
+	                                alt={isFromLifePurpose(item.wish) ? getPurposeIconLabel(item.wish.life_purpose_icon_key) : getWishTypeHint(item.wish.wish_type)}
+	                                loading="lazy"
+	                              />
+	                            </button>
+	                            <br />
+	                            <div class="wish-slot-title">{item.wish.wish_text}</div>
+	                            <div class="wish-slot-meta wish-slot-meta-fulfilled">
                               {#if item.wish.fulfilled_at}
                                 <span class="wish-type-pill wish-fulfilled-date-pill">
                                   Cumplido el {formatFulfilledDate(item.wish.fulfilled_at)}

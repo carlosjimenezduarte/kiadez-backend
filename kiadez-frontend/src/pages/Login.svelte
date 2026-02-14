@@ -26,6 +26,41 @@
                     localStorage.setItem("refresh_token", data.refresh_token);
                 }
             }
+
+            const twofaOverlay = document.getElementById("twofaLoginOverlay");
+            const twofaCodeInput = document.getElementById("twofa-login-code");
+            const twofaConfirmBtn = document.getElementById("twofa-login-confirm");
+            const twofaCancelBtn = document.getElementById("twofa-login-cancel");
+            const twofaCancelFooterBtn = document.getElementById("twofa-login-cancel-footer");
+            const twofaErrorEl = document.getElementById("twofa-login-error");
+
+            let pending2FATempToken = "";
+
+            function setTwofaError(message) {
+                if (!twofaErrorEl) return;
+                const text = String(message || "");
+                twofaErrorEl.textContent = text;
+                twofaErrorEl.classList.toggle("hidden", !text);
+            }
+
+            function setTwofaModalOpen(isOpen) {
+                if (!twofaOverlay) return;
+                const open = Boolean(isOpen);
+                twofaOverlay.classList.toggle("hidden", !open);
+                twofaOverlay.setAttribute("aria-hidden", String(!open));
+
+                if (open) {
+                    setTwofaError("");
+                    if (twofaCodeInput) {
+                        twofaCodeInput.value = "";
+                        setTimeout(() => twofaCodeInput?.focus(), 0);
+                    }
+                } else {
+                    pending2FATempToken = "";
+                    if (twofaCodeInput) twofaCodeInput.value = "";
+                    setTwofaError("");
+                }
+            }
     
             async function login(email, password) {
                 const res = await fetch(`${API}/auth/login`, {
@@ -40,7 +75,36 @@
                 if (!res.ok) {
                     throw new Error(data.detail || "Error al iniciar sesión");
                 }
-    
+
+                if (data?.["2fa_required"]) {
+                    return {
+                        twofa_required: true,
+                        temp_token: data?.temp_token || "",
+                    };
+                }
+
+                persistTokens(data);
+                return {
+                    twofa_required: false,
+                    access_token: data.access_token,
+                };
+            }
+
+            async function verify2fa(tempToken, code) {
+                const res = await fetch(`${API}/auth/2fa/verify`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${tempToken}`,
+                    },
+                    body: JSON.stringify({ code }),
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || "Código 2FA incorrecto");
+                }
+
                 persistTokens(data);
                 return data.access_token;
             }
@@ -99,8 +163,12 @@
                 }
 
                 const slots = Array.isArray(data?.slots) ? data.slots : [];
-                const activeSlots = slots.filter((slot) => slot?.status === "active");
-                return activeSlots.length >= 3;
+                const slotNumbers = new Set(
+                  slots
+                    .map((slot) => Number(slot?.slot_number))
+                    .filter((n) => Number.isFinite(n) && n >= 1 && n <= 3)
+                );
+                return slotNumbers.size >= 3;
             }
 
             async function continueAfterLogin(token) {
@@ -126,7 +194,14 @@
                 const password = form.password.value;
     
                 try {
-                    const token = await login(email, password);
+                    const result = await login(email, password);
+                    if (result?.twofa_required) {
+                        pending2FATempToken = result?.temp_token || "";
+                        setTwofaModalOpen(true);
+                        return;
+                    }
+
+                    const token = result?.access_token;
                     await continueAfterLogin(token);
                 } catch (err) {
                     alert(err.message);
@@ -152,6 +227,41 @@
                     alert(err.message);
                     console.error(err);
                 }
+            });
+
+            const handleTwofaConfirm = async () => {
+                setTwofaError("");
+                const code = (twofaCodeInput?.value || "").trim();
+                if (!/^[0-9]{6}$/.test(code)) {
+                    setTwofaError("Digita un código válido de 6 dígitos.");
+                    return;
+                }
+
+                try {
+                    if (twofaConfirmBtn) twofaConfirmBtn.disabled = true;
+                    const token = await verify2fa(pending2FATempToken, code);
+                    setTwofaModalOpen(false);
+                    await continueAfterLogin(token);
+                } catch (err) {
+                    setTwofaError(err.message || "Código 2FA incorrecto");
+                    console.error(err);
+                } finally {
+                    if (twofaConfirmBtn) twofaConfirmBtn.disabled = false;
+                }
+            };
+
+            twofaConfirmBtn?.addEventListener("click", () => void handleTwofaConfirm());
+            twofaCodeInput?.addEventListener("keydown", (event) => {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleTwofaConfirm();
+                }
+            });
+
+            twofaCancelBtn?.addEventListener("click", () => setTwofaModalOpen(false));
+            twofaCancelFooterBtn?.addEventListener("click", () => setTwofaModalOpen(false));
+            twofaOverlay?.addEventListener("click", (event) => {
+                if (event.target === twofaOverlay) setTwofaModalOpen(false);
             });
     
             // Prefill email si viene por URL
@@ -252,5 +362,26 @@
                 © 2026 Kiadez — Una red social para cumplir deseos.
             </div>
         </footer>
+
+        <div class="modal-overlay hidden" id="twofaLoginOverlay" aria-hidden="true">
+            <div class="modal twofa-login-modal" role="dialog" aria-modal="true" aria-label="Verificación 2FA">
+                <div class="modal-head">
+                    <h3>Verificación 2FA</h3>
+                    <button class="modal-close" type="button" id="twofa-login-cancel">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p class="panel-text">
+                        Digita el código de 6 dígitos de tu app autenticadora para completar el inicio de sesión.
+                    </p>
+                    <input class="modal-input" id="twofa-login-code" type="text" inputmode="numeric" autocomplete="one-time-code"
+                        placeholder="123456" maxlength="6" />
+                    <p class="settings-form-error hidden" id="twofa-login-error" role="alert"></p>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary btn-compact" type="button" id="twofa-login-confirm">Confirmar</button>
+                    <button class="btn btn-outline btn-compact" type="button" id="twofa-login-cancel-footer">Cancelar</button>
+                </div>
+            </div>
+        </div>
 
     </div>

@@ -48,6 +48,7 @@ from .models import (
     TwoFAVerifyRequest,
     PasswordResetRequest,
     PasswordResetConfirm,
+    PasswordChangeRequest,
 )
 from app.core.security import (
     validate_password_policy,
@@ -65,6 +66,7 @@ from app.core.email_verification import (
 )
 from app.db.models.user import User
 from app.db.models.password_reset_token import PasswordResetToken
+from app.db.models.refresh_token import RefreshToken
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")  # aunque login sea JSON, sirve para dependencia
@@ -281,6 +283,38 @@ def refresh(
 def me(current: UserPublic = Depends(get_current_user)):
     return current
 
+
+@router.post("/password/change")
+def change_password(
+    payload: PasswordChangeRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    repo = UserRepository(db)
+    user = repo.get_user_by_id(current.user_number)
+
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta.")
+
+    if payload.new_password != payload.new_password_confirm:
+        raise HTTPException(status_code=400, detail="Las contraseñas no coinciden.")
+
+    try:
+        validate_password_policy(payload.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    user.password_hash = hash_password(payload.new_password)
+
+    # Seguridad: al cambiar la contraseña, invalidamos refresh tokens existentes (otras sesiones).
+    db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
+
+    db.commit()
+    return {"changed": True}
+
 @router.post("/2fa/setup")
 def setup_2fa(
     current: UserPublic = Depends(get_current_user),
@@ -391,6 +425,54 @@ def confirm_2fa(
         "2fa_enabled": True,
         "confirmed_at": now.isoformat(),
     }
+
+
+@router.get("/2fa/status")
+def two_fa_status(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    two_fa_repo = User2FARepository(db)
+    two_fa = two_fa_repo.get_by_user_id(current.user_number)
+    if not two_fa:
+        return {
+            "has_2fa": False,
+            "is_enabled": False,
+            "is_confirmed": False,
+        }
+
+    return {
+        "has_2fa": True,
+        "method": two_fa.method,
+        "is_enabled": bool(two_fa.is_enabled),
+        "is_confirmed": bool(two_fa.is_confirmed),
+        "created_at": two_fa.created_at.isoformat() if two_fa.created_at else None,
+        "confirmed_at": two_fa.confirmed_at.isoformat() if two_fa.confirmed_at else None,
+        "last_used_at": two_fa.last_used_at.isoformat() if two_fa.last_used_at else None,
+    }
+
+
+@router.post("/2fa/disable")
+def disable_2fa(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    two_fa = (
+        db.query(User2FA)
+        .filter(User2FA.user_id == current.user_number)
+        .one_or_none()
+    )
+
+    if not two_fa:
+        return {"disabled": True}
+
+    two_fa.is_enabled = False
+    two_fa.is_confirmed = False
+    two_fa.confirmed_at = None
+    two_fa.last_used_at = None
+
+    db.commit()
+    return {"disabled": True}
 
 @router.post("/2fa/verify")
 def verify_2fa(

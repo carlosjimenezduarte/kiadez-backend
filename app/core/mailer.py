@@ -113,6 +113,7 @@ def send_verification_email(to_email: str, token: str) -> None:
 
 def send_password_reset_email(to_email: str, token: str) -> None:
     reset_url = f"{settings.FRONTEND_URL}/reset-password.html?token={token}"
+    expires_minutes = settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES
 
     subject = "Restablece tu contraseña en Kiadez"
 
@@ -174,6 +175,15 @@ def send_password_reset_email(to_email: str, token: str) -> None:
                     Restablecer contraseña
                     </a>
                 </div>
+
+                <p style="text-align:center; font-size:14px; color:#555;">
+                    Este enlace expirará en <strong>{expires_minutes} minutos</strong> por seguridad.
+                </p>
+
+                <p style="text-align:center; font-size:12px; color:#777; word-break: break-all; margin:18px 0 0;">
+                    Si el botón no funciona, copia y pega este enlace en tu navegador:<br />
+                    <a href="{reset_url}" style="color:#00674F; text-decoration:none;">{reset_url}</a>
+                </p>
 
                 <p style="text-align:center; font-size:14px; color:#555;">
                     Si no solicitaste este cambio, puedes ignorar este mensaje.

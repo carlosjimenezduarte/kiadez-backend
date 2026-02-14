@@ -19,8 +19,12 @@
             const data = await res.json();
             if (!res.ok) return;
             const slots = Array.isArray(data?.slots) ? data.slots : [];
-            const activeSlots = slots.filter((slot) => slot?.status === "active");
-            if (activeSlots.length >= 3) {
+            const slotNumbers = new Set(
+              slots
+                .map((slot) => Number(slot?.slot_number))
+                .filter((n) => Number.isFinite(n) && n >= 1 && n <= 3)
+            );
+            if (slotNumbers.size >= 3) {
               window.location.href = "/home_user.html";
             }
           } catch (error) {
