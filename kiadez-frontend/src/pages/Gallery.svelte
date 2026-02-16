@@ -1,9 +1,12 @@
 <script>
   import { onMount } from "svelte";
+  import { logout } from "../lib/logout";
   import { initPurposeCoverModule } from "../lib/purposeCover";
+  import { syncProfileStarsTotal } from "../lib/starsCounter";
 
   onMount(() => {
     initPurposeCoverModule();
+    void syncProfileStarsTotal("galleryStarsTotal");
   });
 </script>
 
@@ -15,6 +18,55 @@
 </svelte:head>
 
 <div class="page-background page-background-user home-background">
+  <header class="feed-topbar">
+    <div class="feed-topbar-zone feed-topbar-left">
+      <a class="topbar-logo" href="/feed.html" aria-label="Kiadez">
+        <img src="/css/logo-kiadez.webp" alt="Kiadez" />
+      </a>
+      <form class="topbar-search" role="search" on:submit|preventDefault>
+        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+      </form>
+    </div>
+
+    <div class="feed-topbar-zone feed-topbar-center">
+      <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
+      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+      <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+    </div>
+
+    <div class="feed-topbar-zone feed-topbar-right">
+      <details class="topbar-dropdown">
+        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
+          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+        </summary>
+        <div class="dropdown-menu" role="menu">
+          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
+          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+        </div>
+      </details>
+
+      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+        🔔
+        <span class="topbar-badge">3</span>
+      </button>
+
+      <details class="topbar-dropdown">
+        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+          <span class="topbar-menu-icon" aria-hidden="true">☰</span>
+          <span class="topbar-menu-label">Menú</span>
+        </summary>
+        <div class="dropdown-menu" role="menu">
+          <a href="/home_user.html" role="menuitem">Mi Home</a>
+          <a href="/achievements.html" role="menuitem">Logros recientes</a>
+          <a href="/gallery.html" role="menuitem">Galería</a>
+          <a href="/calendar.html" role="menuitem">Calendario</a>
+          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+        </div>
+      </details>
+    </div>
+  </header>
   <main class="user-home">
   <section class="cover" id="cover">
       <div class="cover-media" id="coverMedia">
@@ -56,7 +108,7 @@
         <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
         <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
           <span class="nav-icon">⭐</span>
-          <span><strong>5.000.000</strong> estrellas</span>
+          <span><strong id="galleryStarsTotal">0</strong> estrellas</span>
         </a>
 
         <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>

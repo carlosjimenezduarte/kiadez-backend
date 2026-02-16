@@ -1,8 +1,13 @@
 <script>
   import { onMount } from "svelte";
+  import { initPurposeCoverModule } from "../lib/purposeCover";
+  import { logout } from "../lib/logout";
+  import { syncProfileStarsTotal } from "../lib/starsCounter";
 
   onMount(() => {
     document.body.dataset.visitor = "false";
+    void syncProfileStarsTotal("myPublicWishesStarsTotal");
+    initPurposeCoverModule();
 
     const LS = {
       purpose: "kiadez_user_purpose"
@@ -148,41 +153,46 @@
     const cooperativeWishText = document.getElementById("cooperativeWishText");
     const cooperativeWishCount = document.getElementById("cooperativeWishCount");
     const cooperativeWishSecurityCode = document.getElementById("cooperativeWishSecurityCode");
-    const coverMedia = document.getElementById("coverMedia");
-    const coverImg = document.getElementById("coverImg");
-    const coverFile = document.getElementById("coverFile");
-    const coverUploadBtn = document.getElementById("coverUpload");
-    const coverMoveBtn = document.getElementById("coverMove");
-    const coverMenu = document.querySelector(".cover-menu");
-    const coverSelectExisting = document.getElementById("coverSelectExisting");
-    const coverSelectModal = document.getElementById("coverSelectModal");
-    const coverSelectCancel = document.getElementById("coverSelectCancel");
-    const coverSaveActions = document.getElementById("coverSaveActions");
-    const coverSaveBtn = document.getElementById("coverSaveBtn");
-    const coverCancelBtn = document.getElementById("coverCancelBtn");
-    const btnEditPurposes = document.getElementById("btnEditPurposes");
-    const lifeProposalOverlay = document.getElementById("lifeProposalOverlay");
-    const lifeProposalClose = document.getElementById("lifeProposalClose");
-    const lifeProposalCloseFooter = document.getElementById("lifeProposalCloseFooter");
-    const lifeConfirmOverlay = document.getElementById("lifeConfirmOverlay");
-    const lifeConfirmClose = document.getElementById("lifeConfirmClose");
-    const lifeConfirmCancel = document.getElementById("lifeConfirmCancel");
-    const lifeConfirmOk = document.getElementById("lifeConfirmOk");
-    const lifeConfirmText = document.getElementById("lifeConfirmText");
-    const purpose1 = document.getElementById("purpose1");
-    const purpose2 = document.getElementById("purpose2");
-    const purpose3 = document.getElementById("purpose3");
-    const purposeUnlock1 = document.getElementById("purposeUnlock1");
-    const purposeUnlock2 = document.getElementById("purposeUnlock2");
-    const purposeUnlock3 = document.getElementById("purposeUnlock3");
-    const purposeUnlockOverlay = document.getElementById("purposeUnlockOverlay");
-    const purposeUnlockClose = document.getElementById("purposeUnlockClose");
-    const purposeUnlockCancel = document.getElementById("purposeUnlockCancel");
-    const purposeUnlockConfirm = document.getElementById("purposeUnlockConfirm");
-    const purposeUnlockPassword = document.getElementById("purposeUnlockPassword");
-    const purposeUnlockError = document.getElementById("purposeUnlockError");
-    const purposeUnlockText = document.getElementById("purposeUnlockText");
-    const purposeFulfillBtns = document.querySelectorAll(".purpose-fulfill-btn");
+    const disableLegacyPurposeCover = true;
+    const getLegacyElement = (id) => (disableLegacyPurposeCover ? null : document.getElementById(id));
+    const getLegacyQuery = (selector) => (disableLegacyPurposeCover ? null : document.querySelector(selector));
+    const getLegacyQueryAll = (selector) => (disableLegacyPurposeCover ? [] : document.querySelectorAll(selector));
+    const coverMedia = getLegacyElement("coverMedia");
+    const coverImg = getLegacyElement("coverImg");
+    const coverFile = getLegacyElement("coverFile");
+    const coverChangeBtn = getLegacyElement("btnChangeCover");
+    const coverUploadBtn = getLegacyElement("coverUpload");
+    const coverMoveBtn = getLegacyElement("coverMove");
+    const coverMenu = getLegacyQuery(".cover-menu");
+    const coverSelectExisting = getLegacyElement("coverSelectExisting");
+    const coverSelectModal = getLegacyElement("coverSelectModal");
+    const coverSelectCancel = getLegacyElement("coverSelectCancel");
+    const coverSaveActions = getLegacyElement("coverSaveActions");
+    const coverSaveBtn = getLegacyElement("coverSaveBtn");
+    const coverCancelBtn = getLegacyElement("coverCancelBtn");
+    const btnEditPurposes = getLegacyElement("btnEditPurposes");
+    const lifeProposalOverlay = getLegacyElement("lifeProposalOverlay");
+    const lifeProposalClose = getLegacyElement("lifeProposalClose");
+    const lifeProposalCloseFooter = getLegacyElement("lifeProposalCloseFooter");
+    const lifeConfirmOverlay = getLegacyElement("lifeConfirmOverlay");
+    const lifeConfirmClose = getLegacyElement("lifeConfirmClose");
+    const lifeConfirmCancel = getLegacyElement("lifeConfirmCancel");
+    const lifeConfirmOk = getLegacyElement("lifeConfirmOk");
+    const lifeConfirmText = getLegacyElement("lifeConfirmText");
+    const purpose1 = getLegacyElement("purpose1");
+    const purpose2 = getLegacyElement("purpose2");
+    const purpose3 = getLegacyElement("purpose3");
+    const purposeUnlock1 = getLegacyElement("purposeUnlock1");
+    const purposeUnlock2 = getLegacyElement("purposeUnlock2");
+    const purposeUnlock3 = getLegacyElement("purposeUnlock3");
+    const purposeUnlockOverlay = getLegacyElement("purposeUnlockOverlay");
+    const purposeUnlockClose = getLegacyElement("purposeUnlockClose");
+    const purposeUnlockCancel = getLegacyElement("purposeUnlockCancel");
+    const purposeUnlockConfirm = getLegacyElement("purposeUnlockConfirm");
+    const purposeUnlockPassword = getLegacyElement("purposeUnlockPassword");
+    const purposeUnlockError = getLegacyElement("purposeUnlockError");
+    const purposeUnlockText = getLegacyElement("purposeUnlockText");
+    const purposeFulfillBtns = getLegacyQueryAll(".purpose-fulfill-btn");
     const confirmCooperativeWish = document.getElementById("confirmCooperativeWish");
     const icanConfirmModal = document.getElementById("icanConfirmModal");
     const icanConfirmYes = document.getElementById("icanConfirmYes");
@@ -316,7 +326,7 @@
     };
     const defaultPurposeTextBySlot = {
       1: purpose1?.textContent?.trim() || "Deseo #1: Secreto",
-      2: purpose2?.textContent?.trim() || "Deseo construir el Reino de Combray",
+      2: purpose2?.textContent?.trim() || "Deseo de propósito sin definir",
       3: purpose3?.textContent?.trim() || "Deseo estar unido a Jesús"
     };
     let purposeSlots = [];
@@ -501,7 +511,9 @@
           if (remoteSlot) {
             return normalizePurposeSlot({
               ...remoteSlot,
-              text_input: remoteSlot.text_public || localSlot?.text_input || ""
+              // La vista debe reflejar fielmente la base de datos:
+              // no arrastrar textos antiguos guardados localmente.
+              text_input: remoteSlot.text_public || ""
             }, slotNumber);
           }
           if (localSlot) {
@@ -616,12 +628,13 @@
 
     const fetchPurposeSlotsFromApi = async () => {
       const token = getAccessToken();
-      if (!token) return [];
+      if (!token) return null;
       try {
-        const res = await fetch(`${API}/life-purpose/mine`, {
-          headers: { Authorization: `Bearer ${token}` }
+        const res = await fetch(`${API}/life-purpose/mine?t=${Date.now()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store"
         });
-        if (!res.ok) return [];
+        if (!res.ok) return null;
         const data = await res.json();
         if (!Array.isArray(data?.slots)) return [];
         return data.slots
@@ -629,21 +642,20 @@
           .filter((slot) => slot.slot_number >= 1 && slot.slot_number <= 3);
       } catch (err) {
         console.error(err);
-        return [];
+        return null;
       }
     };
 
     const loadPurposeFromStorage = async () => {
-      const storedSlots = normalizePurposeState(readPurposeStorage());
-      if (storedSlots.length) {
-        purposeSlots = storedSlots;
+      const remoteSlots = await fetchPurposeSlotsFromApi();
+      if (remoteSlots === null) {
+        purposeSlots = [];
         renderPurposeSlots(purposeSlots);
+        return;
       }
 
-      const remoteSlots = await fetchPurposeSlotsFromApi();
-      if (!remoteSlots.length) return;
-
-      purposeSlots = mergePurposeSlots(remoteSlots, storedSlots);
+      // Si la API respondió, se toma como fuente de verdad.
+      purposeSlots = mergePurposeSlots(remoteSlots, []);
       renderPurposeSlots(purposeSlots);
       storePurposeValues(purposeSlots);
     };
@@ -1366,8 +1378,10 @@
       });
     };
 
-    initLifeProposalModal();
-    void loadPurposeFromStorage();
+    if (!disableLegacyPurposeCover) {
+      initLifeProposalModal();
+      void loadPurposeFromStorage();
+    }
 
     if (cancelDeleteWish) {
       cancelDeleteWish.addEventListener("click", closeDeleteWishModalFn);
@@ -2439,6 +2453,10 @@
       updateModalScrollLock();
     };
 
+    if (coverChangeBtn && coverFile) {
+      coverChangeBtn.addEventListener("click", () => coverFile.click());
+    }
+
     if (coverUploadBtn && coverFile) {
       coverUploadBtn.addEventListener("click", () => coverFile.click());
     }
@@ -2817,6 +2835,56 @@
 </svelte:head>
 
 <div class="page-background page-background-user public-wishes-background">
+  <header class="feed-topbar">
+    <div class="feed-topbar-zone feed-topbar-left">
+      <a class="topbar-logo" href="/feed.html" aria-label="Kiadez">
+        <img src="/css/logo-kiadez.webp" alt="Kiadez" />
+      </a>
+      <form class="topbar-search" role="search" on:submit|preventDefault>
+        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+      </form>
+    </div>
+
+    <div class="feed-topbar-zone feed-topbar-center">
+      <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
+      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+      <a class="topbar-btn is-active" href="/my-public-whishes.html">🌐 Deseos públicos</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+    </div>
+
+    <div class="feed-topbar-zone feed-topbar-right">
+      <details class="topbar-dropdown" id="profileDropdown">
+        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
+          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+        </summary>
+        <div class="dropdown-menu" role="menu">
+          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
+          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+        </div>
+      </details>
+
+      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+        🔔
+        <span class="topbar-badge">3</span>
+      </button>
+
+      <details class="topbar-dropdown" id="menuDropdown">
+        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+          <span class="topbar-menu-icon" aria-hidden="true">☰</span>
+          <span class="topbar-menu-label">Menú</span>
+        </summary>
+        <div class="dropdown-menu" role="menu">
+          <a href="/home_user.html" role="menuitem">Mi Home</a>
+          <a href="/achievements.html" role="menuitem">Logros recientes</a>
+          <a href="/gallery.html" role="menuitem">Galería</a>
+          <a href="/calendar.html" role="menuitem">Calendario</a>
+          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+        </div>
+      </details>
+    </div>
+  </header>
+
   <main class="user-home">
     <!-- =========================
      *  PORTADA / COVER
@@ -2881,7 +2949,7 @@
                 <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
               </button>
               <button class="purpose-pill" type="button" id="purpose2">
-                Deseo construir el Reino de Combray
+                Deseo de propósito sin definir
               </button>
               <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock2"
                 data-slot="2" title="Desbloquear deseo 2">
@@ -3138,13 +3206,13 @@
        *  ========================= -->
       <nav class="profile-nav" aria-label="Navegación de perfil">
         <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
-        <a class="nav-pill" href="#" title="Estrellas">
+        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
           <span class="nav-icon">⭐</span>
-          <span><strong>5.000.000</strong> estrellas</span>
+          <span><strong id="myPublicWishesStarsTotal">0</strong> estrellas</span>
         </a>
-        <a class="nav-pill" href="#" title="Seguidores">Seguidores</a>
+        <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
         <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-        <a class="nav-pill" href="#" title="Galería">Galería</a>
+        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
         <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
         <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
       </nav>

@@ -1,3 +1,14 @@
+<script>
+  import { onMount } from "svelte";
+  import { initPurposeCoverModule } from "../lib/purposeCover";
+  import { syncProfileStarsTotal } from "../lib/starsCounter";
+
+  onMount(() => {
+    initPurposeCoverModule();
+    void syncProfileStarsTotal("fulfilledWishesSimpleStarsTotal");
+  });
+</script>
+
 <svelte:head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -47,7 +58,7 @@
         <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
         <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
           <span class="nav-icon">⭐</span>
-          <span><strong>5.000.000</strong> estrellas</span>
+          <span><strong id="fulfilledWishesSimpleStarsTotal">0</strong> estrellas</span>
         </a>
 
         <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>

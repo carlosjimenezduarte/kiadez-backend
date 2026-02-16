@@ -2,6 +2,7 @@ from app.core.security import decode_2fa_temp_token
 from fastapi import Query
 from app.core.security import create_2fa_temp_token
 from app.db.repositories.user_2fa_repository import User2FARepository
+import re
 
 from sqlalchemy.exc import IntegrityError
 from datetime import date
@@ -49,6 +50,10 @@ from .models import (
     PasswordResetRequest,
     PasswordResetConfirm,
     PasswordChangeRequest,
+    UsernameState,
+    UsernameAvailabilityOut,
+    UsernameUpdateRequest,
+    UsernameUpdateResponse,
 )
 from app.core.security import (
     validate_password_policy,
@@ -70,6 +75,75 @@ from app.db.models.refresh_token import RefreshToken
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")  # aunque login sea JSON, sirve para dependencia
+
+USERNAME_PATTERN = re.compile(r"^[a-z0-9._]{4,30}$")
+USERNAME_COOLDOWN_DAYS = 30
+USERNAME_RESERVED = {
+    "admin",
+    "support",
+    "root",
+    "api",
+    "auth",
+    "login",
+    "register",
+    "feed",
+    "home",
+    "home_user",
+    "settings",
+    "privacy",
+}
+
+
+def _normalize_username(raw: str) -> str:
+    username = (raw or "").strip().lower()
+    while username.startswith("@"):
+        username = username[1:]
+    return username
+
+
+def _to_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _next_username_change_at(user: User) -> datetime | None:
+    if user.username_updated_at is None:
+        return None
+    return _to_utc(user.username_updated_at) + timedelta(days=USERNAME_COOLDOWN_DAYS)
+
+
+def _validate_username_or_raise(username: str) -> None:
+    if not USERNAME_PATTERN.match(username):
+        raise HTTPException(
+            status_code=400,
+            detail="Nombre de usuario inválido. Usa 4-30 caracteres (a-z, 0-9, punto o guión bajo).",
+        )
+    if username in USERNAME_RESERVED:
+        raise HTTPException(status_code=400, detail="Ese nombre de usuario está reservado.")
+
+
+def _build_profile_url(username: str | None) -> str:
+    if username:
+        return f"/home_user.html?u={username}"
+    return "/home_user.html"
+
+
+def _build_username_state(user: User, now: datetime | None = None) -> UsernameState:
+    now_utc = now or datetime.now(timezone.utc)
+    next_change_at = _next_username_change_at(user)
+    can_update = next_change_at is None or now_utc >= next_change_at
+    remaining_days = 0
+    if not can_update and next_change_at is not None:
+        remaining_days = max(1, int((next_change_at - now_utc).total_seconds() // 86400) + 1)
+
+    return UsernameState(
+        username=user.username,
+        can_update=can_update,
+        cooldown_until=next_change_at if not can_update else None,
+        cooldown_remaining_days=remaining_days,
+        profile_url=_build_profile_url(user.username),
+    )
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),
@@ -93,6 +167,8 @@ def get_current_user(
             email=user.email,
             role=user.role,
             guardian_rank=user.guardian_rank,
+            username=user.username,
+            username_updated_at=user.username_updated_at,
             is_active=user.is_active,
         )
     except Exception:
@@ -170,6 +246,8 @@ def register(
         email=user.email,
         role=user.role,
         guardian_rank=user.guardian_rank,
+        username=user.username,
+        username_updated_at=user.username_updated_at,
         is_active=user.is_active,
     )
 
@@ -282,6 +360,99 @@ def refresh(
 @router.get("/me", response_model=UserPublic)
 def me(current: UserPublic = Depends(get_current_user)):
     return current
+
+
+@router.get("/username", response_model=UsernameState)
+def username_state(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == current.user_number).one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="No autorizado")
+    return _build_username_state(user)
+
+
+@router.get("/username/check", response_model=UsernameAvailabilityOut)
+def check_username_availability(
+    username: str = Query(..., min_length=4, max_length=30),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    normalized = _normalize_username(username)
+    _validate_username_or_raise(normalized)
+
+    current_username = (current.username or "").strip().lower()
+    if normalized == current_username:
+        return UsernameAvailabilityOut(
+            username=normalized,
+            available=True,
+            detail="Este ya es tu nombre de usuario actual.",
+        )
+
+    existing = (
+        db.query(User.id)
+        .filter(User.username == normalized, User.id != current.user_number)
+        .first()
+    )
+    if existing:
+        return UsernameAvailabilityOut(
+            username=normalized,
+            available=False,
+            detail="Ese nombre de usuario ya está en uso.",
+        )
+
+    return UsernameAvailabilityOut(
+        username=normalized,
+        available=True,
+        detail="Nombre de usuario disponible.",
+    )
+
+
+@router.put("/username", response_model=UsernameUpdateResponse)
+def update_username(
+    payload: UsernameUpdateRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == current.user_number).one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    normalized = _normalize_username(payload.username)
+    _validate_username_or_raise(normalized)
+
+    if normalized == (user.username or ""):
+        return UsernameUpdateResponse(
+            updated=False,
+            state=_build_username_state(user),
+        )
+
+    now_utc = datetime.now(timezone.utc)
+    next_change_at = _next_username_change_at(user)
+    if next_change_at is not None and now_utc < next_change_at:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Podrás modificar tu nombre de usuario nuevamente el {next_change_at.date().isoformat()}.",
+        )
+
+    existing = (
+        db.query(User.id)
+        .filter(User.username == normalized, User.id != current.user_number)
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="Ese nombre de usuario ya está en uso.")
+
+    user.username = normalized
+    user.username_updated_at = now_utc
+    db.commit()
+    db.refresh(user)
+
+    return UsernameUpdateResponse(
+        updated=True,
+        state=_build_username_state(user, now=now_utc),
+    )
 
 
 @router.post("/password/change")

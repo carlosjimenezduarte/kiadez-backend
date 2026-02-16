@@ -2,15 +2,14 @@
   import { onMount } from "svelte";
   import { logout } from "../lib/logout";
   import { initPurposeCoverModule } from "../lib/purposeCover";
+  import { syncProfileStarsTotal } from "../lib/starsCounter";
 
   onMount(() => {
     initPurposeCoverModule();
+    void syncProfileStarsTotal("biographyStarsTotal");
 
     const API = "http://127.0.0.1:8000";
     const profilePhoto = document.getElementById("profilePhoto");
-    const biographyTopbarHomeBtn = document.getElementById("biographyTopbarHomeBtn");
-    const biographyMenuPublishBtn = document.getElementById("biographyMenuPublishBtn");
-    const biographyMenuDropdown = document.getElementById("biographyMenuDropdown");
     const profilePhotoTrigger = document.getElementById("profilePhotoTrigger");
     const profilePhotoMenu = document.getElementById("profilePhotoMenu");
     const bioPhotoSelectExisting = document.getElementById("bioPhotoSelectExisting");
@@ -1698,17 +1697,6 @@
       }
     };
 
-    const handleTopbarHomeClick = () => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    };
-
-    const handleMenuPublishClick = () => {
-      biographyMenuDropdown?.removeAttribute("open");
-      window.location.href = "/home_user.html";
-    };
-
-    biographyTopbarHomeBtn?.addEventListener("click", handleTopbarHomeClick);
-    biographyMenuPublishBtn?.addEventListener("click", handleMenuPublishClick);
     personalInfoEditBtn?.addEventListener("click", handleOpenPersonalInfoModal);
     closePersonalInfoModal?.addEventListener("click", closePersonalInfoModalFn);
     cancelPersonalInfoModal?.addEventListener("click", closePersonalInfoModalFn);
@@ -1796,8 +1784,6 @@
     void loadFavoriteQuotes().catch(() => {});
 
     return () => {
-      biographyTopbarHomeBtn?.removeEventListener("click", handleTopbarHomeClick);
-      biographyMenuPublishBtn?.removeEventListener("click", handleMenuPublishClick);
       personalInfoEditBtn?.removeEventListener("click", handleOpenPersonalInfoModal);
       closePersonalInfoModal?.removeEventListener("click", closePersonalInfoModalFn);
       cancelPersonalInfoModal?.removeEventListener("click", closePersonalInfoModalFn);
@@ -1891,8 +1877,11 @@
       </div>
 
       <div class="feed-topbar-zone feed-topbar-center">
-        <button class="topbar-btn is-active" id="biographyTopbarHomeBtn" type="button">🏠 Home</button>
+        <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
         <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+        <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
+        <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
       </div>
 
       <div class="feed-topbar-zone feed-topbar-right">
@@ -1917,9 +1906,6 @@
             <span class="topbar-menu-label">Menú</span>
           </summary>
           <div class="dropdown-menu" role="menu">
-            <button class="dropdown-action" id="biographyMenuPublishBtn" type="button" role="menuitem">
-              Publicar
-            </button>
             <a href="/home_user.html" role="menuitem">Mi Home</a>
             <a href="/achievements.html" role="menuitem">Logros recientes</a>
             <a href="/gallery.html" role="menuitem">Galería</a>
@@ -1974,7 +1960,7 @@
         <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
         <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
           <span class="nav-icon">⭐</span>
-          <span><strong>5.000.000</strong> estrellas</span>
+          <span><strong id="biographyStarsTotal">0</strong> estrellas</span>
         </a>
 
         <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>

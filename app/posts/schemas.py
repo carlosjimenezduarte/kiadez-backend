@@ -98,3 +98,27 @@ class PostReportResponse(BaseModel):
 class MyPostStatsOut(BaseModel):
     my_received_stars_total: int
     my_posts_total: int
+
+
+class StarAchievementOut(BaseModel):
+    key: str
+    title: str
+    threshold: int
+    image_url: str
+    unlocked: bool
+
+
+class StarPoolStateOut(BaseModel):
+    my_received_stars_total: int
+    my_donated_stars_total: int
+    my_donatable_stars_total: int
+    common_pool_stars_total: int
+    unlocked_publication_achievements: int
+    unlocked_donation_achievements: int
+    publication_achievements: list[StarAchievementOut]
+    donation_achievements: list[StarAchievementOut]
+
+
+class StarPoolDonateResponse(BaseModel):
+    donated_now: int
+    state: StarPoolStateOut

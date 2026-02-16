@@ -1,8 +1,11 @@
 <script>
   import { onMount } from "svelte";
+  import { logout } from "../lib/logout";
+  import { initPurposeCoverModule } from "../lib/purposeCover";
 
   onMount(() => {
     document.body.dataset.visitor = "false";
+    initPurposeCoverModule();
 
     const oracleCards = [
           {
@@ -216,364 +219,955 @@
               "Enfocado en cerrar el ciclo con conciencia. Elegir una intención no es imponer un resultado, sino orientar tu forma de estar en el día. Una pequeña intención puede transformar toda una jornada."
           }
         ];
-    
-        const oracleUserName = "Carlos Jiménez Duarte";
-        const ORACLE_STATE_KEY = "oracle_state_v1";
-        const COOLDOWN_MS = 72 * 60 * 60 * 1000;
-        const TOTAL_CARDS = oracleCards.length;
-    
-        const oracleDeck = document.getElementById("oracleDeck");
-        const oracleStatus = document.getElementById("oracleStatus");
-        const oracleCooldown = document.getElementById("oracleCooldown");
-        const oracleDeckEmpty = document.getElementById("oracleDeckEmpty");
-        const oracleRevealed = document.getElementById("oracleRevealed");
-        const oracleRevealedEmpty = document.getElementById("oracleRevealedEmpty");
-    
-        const oracleModalOverlay = document.getElementById("oracleModalOverlay");
-        const closeOracleModal = document.getElementById("closeOracleModal");
-        const oracleCardName = document.getElementById("oracleCardName");
-        const oracleCardQuestion = document.getElementById("oracleCardQuestion");
-        const oracleCardImage = document.getElementById("oracleCardImage");
-        const oracleCardContext = document.getElementById("oracleCardContext");
-        const oracleCardResponse = document.getElementById("oracleCardResponse");
-        const oracleModalNote = document.getElementById("oracleModalNote");
-        const oracleActionRow = document.getElementById("oracleActionRow");
-        const oracleConfirm = document.getElementById("oracleConfirm");
-        const oracleConfirmText = document.getElementById("oracleConfirmText");
-        const oracleConfirmYes = document.getElementById("oracleConfirmYes");
-        const oracleConfirmNo = document.getElementById("oracleConfirmNo");
-        const oraclePublishBtn = document.getElementById("oraclePublishBtn");
-        const oracleSecretBtn = document.getElementById("oracleSecretBtn");
-        const oracleHeartBtn = document.getElementById("oracleHeartBtn");
-        const oracleHistory = document.getElementById("oracleHistory");
-        const oracleHistoryList = document.getElementById("oracleHistoryList");
-    
-        let selectedCard = null;
-        let pendingAction = null;
-    
-        const loadState = () => {
-          const fallback = {
-            cycle: 1,
-            cycleStartAt: Date.now(),
-            lastPickAt: null,
-            revealedThisCycle: [],
-            history: {}
-          };
-    
-          try {
-            const stored = localStorage.getItem(ORACLE_STATE_KEY);
-            if (!stored) return fallback;
-            const parsed = JSON.parse(stored);
-            return {
-              ...fallback,
-              ...parsed,
-              history: parsed.history || {}
-            };
-          } catch (error) {
-            return fallback;
+
+    const API = "http://127.0.0.1:8000";
+    const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
+    const ORACLE_AAD_PREFIX = "kiadez-oracle-v1";
+    const COOLDOWN_MS = 72 * 60 * 60 * 1000;
+    const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+    const MAX_HISTORY_ENTRIES = 4;
+    const MAX_RESPONSE_WORDS = 500;
+    const TOTAL_CARDS = oracleCards.length;
+    const oracleUserName = "Carlos Jiménez Duarte";
+
+    const oracleDeck = document.getElementById("oracleDeck");
+    const oracleStatus = document.getElementById("oracleStatus");
+    const oracleCooldown = document.getElementById("oracleCooldown");
+    const oracleDeckEmpty = document.getElementById("oracleDeckEmpty");
+    const oracleRevealed = document.getElementById("oracleRevealed");
+    const oracleRevealedEmpty = document.getElementById("oracleRevealedEmpty");
+
+    const oracleModalOverlay = document.getElementById("oracleModalOverlay");
+    const closeOracleModal = document.getElementById("closeOracleModal");
+    const oracleCardName = document.getElementById("oracleCardName");
+    const oracleCardQuestion = document.getElementById("oracleCardQuestion");
+    const oracleCardImage = document.getElementById("oracleCardImage");
+    const oracleCardContext = document.getElementById("oracleCardContext");
+    const oracleCardResponse = document.getElementById("oracleCardResponse");
+    const oracleWordCounter = document.getElementById("oracleWordCounter");
+    const oracleModalNote = document.getElementById("oracleModalNote");
+    const oracleActionRow = document.getElementById("oracleActionRow");
+    const oracleSecretActions = document.getElementById("oracleSecretActions");
+    const oracleRevealSecretBtn = document.getElementById("oracleRevealSecretBtn");
+    const oracleSecretUnlock = document.getElementById("oracleSecretUnlock");
+    const oracleSecretUnlockPassword = document.getElementById("oracleSecretUnlockPassword");
+    const oracleSecretUnlockError = document.getElementById("oracleSecretUnlockError");
+    const oracleSecretUnlockConfirm = document.getElementById("oracleSecretUnlockConfirm");
+    const oracleSecretUnlockCancel = document.getElementById("oracleSecretUnlockCancel");
+    const oracleConfirm = document.getElementById("oracleConfirm");
+    const oracleConfirmText = document.getElementById("oracleConfirmText");
+    const oracleConfirmYes = document.getElementById("oracleConfirmYes");
+    const oracleConfirmNo = document.getElementById("oracleConfirmNo");
+    const oraclePrivatePasswordWrap = document.getElementById("oraclePrivatePasswordWrap");
+    const oraclePrivatePasswordInput = document.getElementById("oraclePrivatePassword");
+    const oraclePrivatePasswordError = document.getElementById("oraclePrivatePasswordError");
+    const oraclePublishBtn = document.getElementById("oraclePublishBtn");
+    const oracleSecretBtn = document.getElementById("oracleSecretBtn");
+    const oracleHeartBtn = document.getElementById("oracleHeartBtn");
+    const oracleHistory = document.getElementById("oracleHistory");
+    const oracleHistoryNote = document.getElementById("oracleHistoryNote");
+    const oracleHistoryList = document.getElementById("oracleHistoryList");
+
+    const buildFallbackState = () => ({
+      cycle: 1,
+      cycleStartAt: Date.now(),
+      lastPickAt: null,
+      cooldownMs: COOLDOWN_MS,
+      cooldownRemainingMs: 0,
+      cycleComplete: false,
+      revealedThisCycle: [],
+      history: {}
+    });
+
+    let oracleState = buildFallbackState();
+    const oracleEntriesById = new Map();
+    let selectedCard = null;
+    let pendingAction = null;
+    let pendingDeleteEntryId = null;
+    let pendingSecretRevealEntryId = null;
+    let isSubmitting = false;
+
+    const bufToHex = (buf) =>
+      [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    const hexToBuf = (hex) => {
+      const normalized = (hex || "").trim();
+      if (!normalized) return new ArrayBuffer(0);
+      const bytes = new Uint8Array(normalized.length / 2);
+      for (let i = 0; i < bytes.length; i += 1) {
+        bytes[i] = parseInt(normalized.substr(i * 2, 2), 16);
+      }
+      return bytes.buffer;
+    };
+
+    const getAccessToken = () =>
+      localStorage.getItem("access_token") || localStorage.getItem("kiadez_access_token") || "";
+
+    const countWords = (text) => {
+      const value = String(text || "").trim();
+      if (!value) return 0;
+      return value.split(/\s+/).filter(Boolean).length;
+    };
+
+    const updateWordCounter = () => {
+      if (!oracleWordCounter) return 0;
+      const words = countWords(oracleCardResponse?.value || "");
+      oracleWordCounter.textContent = `${words}/${MAX_RESPONSE_WORDS} palabras`;
+      oracleWordCounter.classList.toggle("is-exceeded", words > MAX_RESPONSE_WORDS);
+      return words;
+    };
+
+    const setPrivatePasswordError = (message) => {
+      if (!oraclePrivatePasswordError) return;
+      oraclePrivatePasswordError.textContent = message || "";
+    };
+
+    const setSecretUnlockError = (message) => {
+      if (!oracleSecretUnlockError) return;
+      oracleSecretUnlockError.textContent = message || "";
+    };
+
+    const resetSecretUnlockUi = () => {
+      pendingSecretRevealEntryId = null;
+      if (oracleSecretUnlock) {
+        oracleSecretUnlock.classList.add("hidden");
+      }
+      if (oracleSecretUnlockPassword) {
+        oracleSecretUnlockPassword.value = "";
+      }
+      setSecretUnlockError("");
+    };
+
+    const openSecretUnlockUi = (entryId) => {
+      const id = Number(entryId || 0);
+      if (!Number.isFinite(id) || id <= 0) return;
+      pendingSecretRevealEntryId = id;
+      pendingAction = null;
+      pendingDeleteEntryId = null;
+      oracleConfirm.classList.add("hidden");
+      if (oracleSecretUnlock) {
+        oracleSecretUnlock.classList.remove("hidden");
+      }
+      setSecretUnlockError("");
+      setTimeout(() => oracleSecretUnlockPassword?.focus(), 0);
+    };
+
+    const resetPrivatePasswordUi = () => {
+      if (oraclePrivatePasswordWrap) {
+        oraclePrivatePasswordWrap.classList.add("hidden");
+      }
+      if (oraclePrivatePasswordInput) {
+        oraclePrivatePasswordInput.value = "";
+      }
+      setPrivatePasswordError("");
+    };
+
+    const showPrivatePasswordUi = () => {
+      if (oraclePrivatePasswordWrap) {
+        oraclePrivatePasswordWrap.classList.remove("hidden");
+      }
+      setPrivatePasswordError("");
+      setTimeout(() => oraclePrivatePasswordInput?.focus(), 0);
+    };
+
+    const parseResponseJson = async (res) => {
+      try {
+        return await res.json();
+      } catch {
+        return {};
+      }
+    };
+
+    const apiFetch = async (path, options = {}) => {
+      const token = getAccessToken();
+      if (!token) {
+        window.location.href = "/login.html";
+        throw new Error("No hay sesión activa.");
+      }
+      const headers = {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`,
+      };
+
+      const res = await fetch(`${API}${path}`, { ...options, headers });
+      if (res.status === 401) {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("kiadez_access_token");
+        window.location.href = "/login.html";
+        throw new Error("Sesión expirada.");
+      }
+      return res;
+    };
+
+    const pbkdf2Key = async (password, saltBuf, iters) => {
+      const baseKey = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(password),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+      );
+      return crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt: saltBuf, iterations: iters, hash: "SHA-256" },
+        baseKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    };
+
+    const decryptDekFromPassword = async (privatePassword) => {
+      const vaultRes = await apiFetch("/vault/record");
+      const vaultData = await parseResponseJson(vaultRes);
+      if (!vaultRes.ok) {
+        throw new Error(vaultData.detail || "No se pudo leer el vault.");
+      }
+
+      const kdfSalt = hexToBuf(vaultData.kdf_salt_b64 || "");
+      const wrappedDekNonce = new Uint8Array(hexToBuf(vaultData.wrapped_dek_nonce_b64 || ""));
+      const wrappedDek = hexToBuf(vaultData.wrapped_dek_b64 || "");
+      const iters = Number(vaultData.kdf_iters || 310000);
+
+      const kek = await pbkdf2Key(privatePassword, kdfSalt, iters);
+      const dekRaw = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: wrappedDekNonce, additionalData: AAD_VAULT },
+        kek,
+        wrappedDek
+      );
+      return crypto.subtle.importKey("raw", dekRaw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    };
+
+    const aesGcmEncryptText = async (key, text, aadBuf) => {
+      const nonce = crypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: nonce, additionalData: aadBuf },
+        key,
+        new TextEncoder().encode(text)
+      );
+      return { nonce, ciphertext };
+    };
+
+    const aesGcmDecryptText = async (key, ciphertextHex, nonceHex, aadBuf) => {
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: new Uint8Array(hexToBuf(nonceHex)), additionalData: aadBuf },
+        key,
+        hexToBuf(ciphertextHex)
+      );
+      return new TextDecoder().decode(decrypted);
+    };
+
+    const buildOracleAad = (cardId, cycle) =>
+      new TextEncoder().encode(`${ORACLE_AAD_PREFIX}:${cardId}:${cycle}`);
+
+    const normalizeOracleState = (payload) => {
+      const fallback = buildFallbackState();
+      const history = {};
+      oracleEntriesById.clear();
+
+      const responses = Array.isArray(payload?.responses) ? payload.responses : [];
+      responses.forEach((response) => {
+        const cardId = Number(response?.card_id || 0);
+        if (!Number.isFinite(cardId) || cardId < 1 || cardId > TOTAL_CARDS) return;
+
+        const entry = {
+          id: Number(response?.id || 0),
+          cardId,
+          cycle: Number(response?.cycle || 1),
+          type: String(response?.response_type || "heart"),
+          text: response?.text_public || "",
+          ciphertextHex: response?.ciphertext_hex || "",
+          nonceHex: response?.nonce_hex || "",
+          date: response?.created_at || new Date().toISOString(),
+        };
+
+        if (!history[cardId]) history[cardId] = [];
+        history[cardId].push(entry);
+        if (entry.id > 0) {
+          oracleEntriesById.set(entry.id, entry);
+        }
+      });
+
+      Object.values(history).forEach((entries) => {
+        entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      });
+
+      const revealedThisCycle = Array.isArray(payload?.revealed_this_cycle)
+        ? payload.revealed_this_cycle
+            .map((value) => Number(value))
+            .filter((value) => Number.isFinite(value) && value >= 1 && value <= TOTAL_CARDS)
+        : [];
+
+      return {
+        cycle: Number(payload?.cycle || fallback.cycle),
+        cycleStartAt: payload?.cycle_started_at
+          ? new Date(payload.cycle_started_at).getTime()
+          : fallback.cycleStartAt,
+        lastPickAt: payload?.last_pick_at ? new Date(payload.last_pick_at).getTime() : null,
+        cooldownMs: Number(payload?.cooldown_ms || COOLDOWN_MS),
+        cooldownRemainingMs: Math.max(0, Number(payload?.cooldown_remaining_ms || 0)),
+        cycleComplete: Boolean(payload?.cycle_complete || revealedThisCycle.length >= TOTAL_CARDS),
+        revealedThisCycle,
+        history,
+      };
+    };
+
+    const shuffleCards = (cards) => {
+      const shuffled = [...cards];
+      for (let i = shuffled.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    };
+
+    const getCardImage = (cardId) => `/css/oracle/Oracle${cardId}.webp`;
+
+    const formatDate = (date) => {
+      const months = [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+      ];
+      const day = date.getDate();
+      const month = months[date.getMonth()];
+      let hours = date.getHours();
+      const minutes = date.getMinutes().toString().padStart(2, "0");
+      const isPm = hours >= 12;
+      hours = hours % 12;
+      hours = hours === 0 ? 12 : hours;
+      const suffix = isPm ? "p.m." : "a.m.";
+      return `${day} de ${month} a las ${hours}:${minutes} ${suffix}`;
+    };
+
+    const formatCooldown = (remainingMs) => {
+      const daysLeft = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+      if (daysLeft <= 1) {
+        return "En 1 día podrás elegir una nueva carta.";
+      }
+      return `En ${daysLeft} días podrás elegir una nueva carta.`;
+    };
+
+    const getCardHistory = (cardId) => {
+      const entries = oracleState.history[cardId] || [];
+      return entries.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    };
+
+    const isUserResponseEntry = (entry) =>
+      Boolean(entry && (entry.type === "public" || entry.type === "secret"));
+
+    const getCardHistoryForDisplay = (cardId) => {
+      const allResponses = getCardHistory(cardId).filter((entry) => isUserResponseEntry(entry));
+      const now = Date.now();
+      const yearlyResponses = allResponses.filter((entry) => {
+        const timestamp = new Date(entry.date).getTime();
+        if (!Number.isFinite(timestamp)) return false;
+        return now - timestamp <= YEAR_MS;
+      });
+      const source = yearlyResponses.length ? yearlyResponses : allResponses;
+      return {
+        visible: source.slice(0, MAX_HISTORY_ENTRIES),
+        total: allResponses.length,
+        sourceType: yearlyResponses.length ? "year" : "all",
+      };
+    };
+
+    const getCurrentCycleEntries = (cardId) =>
+      getCardHistory(cardId).filter((entry) => Number(entry.cycle) === Number(oracleState.cycle));
+
+    const updateCooldownStatus = () => {
+      const now = Date.now();
+      const cooldownMs = Number(oracleState.cooldownMs || COOLDOWN_MS);
+      const remainingMs = oracleState.lastPickAt
+        ? Math.max(0, cooldownMs - (now - oracleState.lastPickAt))
+        : 0;
+      const cooldownActive = remainingMs > 0;
+      const cycleComplete = Boolean(oracleState.cycleComplete || oracleState.revealedThisCycle.length >= TOTAL_CARDS);
+
+      if (!cooldownActive && !cycleComplete) {
+        oracleStatus.textContent = "Selecciona una carta";
+        oracleCooldown.textContent = "";
+      } else {
+        oracleStatus.textContent = "Carta bloqueada temporalmente";
+        oracleCooldown.textContent = formatCooldown(remainingMs || cooldownMs);
+      }
+
+      return { cooldownActive, cycleComplete, remainingMs };
+    };
+
+    const summarizeEntry = (entry) => {
+      if (!entry) return "Carta revelada.";
+      if (entry.type === "heart") {
+        return `${oracleUserName} decidió no responder inmediatamente y dejó esta respuesta asentándose en su corazón.`;
+      }
+      if (entry.type === "secret") {
+        return "Respuesta secreta cifrada en tu vault privado.";
+      }
+      return entry.text || "Respuesta registrada.";
+    };
+
+    const renderOracleDeck = (cards, cooldownActive, cycleComplete, remainingMs) => {
+      oracleDeck.innerHTML = "";
+      oracleDeckEmpty.classList.add("hidden");
+
+      const remainingCards = cards.filter((card) => !oracleState.revealedThisCycle.includes(card.id));
+
+      if (remainingCards.length === 0) {
+        oracleDeckEmpty.textContent = cooldownActive
+          ? formatCooldown(remainingMs || COOLDOWN_MS)
+          : "En 3 días podrás elegir una nueva carta.";
+        oracleDeckEmpty.classList.remove("hidden");
+        return;
+      }
+
+      remainingCards.forEach((card) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "oracle-deck-card";
+        button.dataset.cardId = `${card.id}`;
+        if (cooldownActive || cycleComplete) {
+          button.classList.add("is-locked");
+          button.disabled = true;
+        }
+        button.innerHTML = `<img src="/css/oracle/carta.webp" alt="Carta del Oráculo" />`;
+        button.addEventListener("click", () => openOracleModal(card.id));
+        oracleDeck.appendChild(button);
+      });
+    };
+
+    const renderRevealed = () => {
+      oracleRevealed.innerHTML = "";
+      const revealedIds = oracleState.revealedThisCycle;
+
+      if (!revealedIds.length) {
+        oracleRevealedEmpty.style.display = "block";
+        return;
+      }
+
+      oracleRevealedEmpty.style.display = "none";
+
+      revealedIds.forEach((cardId) => {
+        const card = oracleCards.find((item) => item.id === cardId);
+        const entries = getCardHistory(cardId);
+        const latest = entries[0];
+        const formattedDate = latest ? formatDate(new Date(latest.date)) : "";
+
+        const cardItem = document.createElement("button");
+        cardItem.type = "button";
+        cardItem.className = "oracle-revealed-card";
+
+        const figure = document.createElement("div");
+        figure.className = "oracle-revealed-figure";
+        const image = document.createElement("img");
+        image.src = getCardImage(cardId);
+        image.alt = card?.name || "Carta revelada";
+        figure.appendChild(image);
+
+        const body = document.createElement("div");
+        body.className = "oracle-revealed-body";
+        const title = document.createElement("strong");
+        title.textContent = card?.name || "Carta revelada";
+        const paragraph = document.createElement("p");
+        paragraph.textContent = summarizeEntry(latest);
+        body.appendChild(title);
+        body.appendChild(paragraph);
+        if (formattedDate) {
+          const dateLabel = document.createElement("span");
+          dateLabel.textContent = `Respuesta del ${formattedDate}`;
+          body.appendChild(dateLabel);
+        }
+
+        cardItem.appendChild(figure);
+        cardItem.appendChild(body);
+        cardItem.addEventListener("click", () => openOracleModal(cardId));
+        oracleRevealed.appendChild(cardItem);
+      });
+    };
+
+    const renderHistory = (cardId) => {
+      const { visible: entries, total: totalEntries, sourceType } = getCardHistoryForDisplay(cardId);
+      oracleHistoryList.innerHTML = "";
+
+      if (!entries.length) {
+        oracleHistory.style.display = "none";
+        if (oracleHistoryNote) {
+          oracleHistoryNote.textContent = "";
+        }
+        return;
+      }
+
+      oracleHistory.style.display = "block";
+      if (oracleHistoryNote) {
+        if (sourceType === "year") {
+          const hiddenCount = Math.max(0, totalEntries - entries.length);
+          oracleHistoryNote.textContent = hiddenCount > 0
+            ? `Mostrando ${entries.length} respuestas (públicas o privadas) del último año. ${hiddenCount} registros más no se muestran aquí.`
+            : "Mostrando hasta 4 respuestas (públicas o privadas) del último año.";
+        } else {
+          oracleHistoryNote.textContent =
+            "No hay respuestas del último año. Mostrando hasta 4 respuestas previas registradas.";
+        }
+      }
+
+      entries.forEach((entry) => {
+        const item = document.createElement("div");
+        item.className = "oracle-history-item";
+        const isPastCycle = Number(entry.cycle) < Number(oracleState.cycle);
+
+        const head = document.createElement("div");
+        head.className = "oracle-history-head";
+        const label = document.createElement("span");
+        label.textContent = entry.type === "public"
+          ? "Respuesta pública"
+          : entry.type === "secret"
+            ? "Respuesta secreta"
+            : "Respuesta";
+        const dateText = document.createElement("span");
+        dateText.textContent = formatDate(new Date(entry.date));
+        head.appendChild(label);
+        head.appendChild(dateText);
+        item.appendChild(head);
+
+        const body = document.createElement("p");
+        if (entry.type === "secret") {
+          body.textContent = "Contenido secreto cifrado. Para visualizarlo debes digitar tu clave privada personal.";
+          item.appendChild(body);
+        } else {
+          body.textContent = entry.text || "";
+          item.appendChild(body);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "oracle-history-item-actions";
+
+        if (entry.type === "secret" && entry.id > 0) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "btn btn-outline btn-compact oracle-secret-history-btn";
+          button.dataset.entryId = `${entry.id}`;
+          button.textContent = "Visualizar respuesta secreta";
+          actions.appendChild(button);
+        }
+
+        if (isPastCycle && entry.id > 0) {
+          const deleteButton = document.createElement("button");
+          deleteButton.type = "button";
+          deleteButton.className = "oracle-history-delete-btn";
+          deleteButton.dataset.entryId = `${entry.id}`;
+          deleteButton.title = "Borrar respuesta de forma permanente";
+          deleteButton.innerHTML = '<img src="/css/icons/icondelete.webp" alt="Borrar respuesta" />';
+          actions.appendChild(deleteButton);
+        }
+
+        if (actions.childElementCount > 0) {
+          item.appendChild(actions);
+        }
+
+        oracleHistoryList.appendChild(item);
+      });
+    };
+
+    const closeModal = () => {
+      oracleModalOverlay.classList.add("hidden");
+      oracleModalOverlay.setAttribute("aria-hidden", "true");
+      oracleConfirm.classList.add("hidden");
+      resetPrivatePasswordUi();
+      resetSecretUnlockUi();
+      if (oracleSecretActions) {
+        oracleSecretActions.classList.add("hidden");
+      }
+      if (oracleRevealSecretBtn) {
+        delete oracleRevealSecretBtn.dataset.entryId;
+      }
+      pendingAction = null;
+      pendingDeleteEntryId = null;
+      selectedCard = null;
+    };
+
+    const openOracleModal = (cardId) => {
+      selectedCard = oracleCards.find((card) => card.id === cardId);
+      if (!selectedCard) return;
+
+      const currentEntries = getCurrentCycleEntries(cardId);
+      const answeredEntry = currentEntries.find((entry) => entry.type === "public" || entry.type === "secret");
+      const hasAnswered = Boolean(answeredEntry);
+      const hasHeart = currentEntries.some((entry) => entry.type === "heart");
+
+      oracleCardName.textContent = selectedCard.name;
+      oracleCardQuestion.textContent = selectedCard.question;
+      oracleCardImage.src = getCardImage(selectedCard.id);
+      oracleCardContext.textContent = selectedCard.context;
+
+      oracleCardResponse.disabled = hasAnswered;
+      oracleCardResponse.placeholder = "Escribe tu respuesta...";
+      oracleCardResponse.value = "";
+      oracleConfirm.classList.add("hidden");
+      resetPrivatePasswordUi();
+      resetSecretUnlockUi();
+      pendingDeleteEntryId = null;
+      pendingAction = null;
+      if (oracleSecretActions) oracleSecretActions.classList.add("hidden");
+
+      if (hasAnswered) {
+        oracleActionRow.style.display = "none";
+        if (answeredEntry?.type === "secret") {
+          oracleModalNote.textContent = answeredEntry?.date
+            ? `Respuesta secreta registrada el ${formatDate(new Date(answeredEntry.date))}. Para verla debes digitar tu clave privada.`
+            : "Respuesta secreta registrada. Para verla debes digitar tu clave privada.";
+          oracleCardResponse.placeholder = "Respuesta secreta cifrada en tu vault.";
+          if (oracleSecretActions && oracleRevealSecretBtn && answeredEntry?.id > 0) {
+            oracleRevealSecretBtn.dataset.entryId = `${answeredEntry.id}`;
+            oracleSecretActions.classList.remove("hidden");
           }
-        };
-    
-        const saveState = (state) => {
-          localStorage.setItem(ORACLE_STATE_KEY, JSON.stringify(state));
-        };
-    
-        let oracleState = loadState();
-    
-        const shuffleCards = (cards) => {
-          const shuffled = [...cards];
-          for (let i = shuffled.length - 1; i > 0; i -= 1) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-          }
-          return shuffled;
-        };
-    
-        const getCardImage = (cardId) => {
-          if (cardId === 1) return "/css/oracle/Oracle9.png";
-          const index = ((cardId - 1) % 13) + 1;
-          return `/css/oracle/Oracle${index}.png`;
-        };
-    
-        const formatDate = (date) => {
-          const months = [
-            "enero", "febrero", "marzo", "abril", "mayo", "junio",
-            "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
-          ];
-          const day = date.getDate();
-          const month = months[date.getMonth()];
-          let hours = date.getHours();
-          const minutes = date.getMinutes().toString().padStart(2, "0");
-          const isPm = hours >= 12;
-          hours = hours % 12;
-          hours = hours === 0 ? 12 : hours;
-          const suffix = isPm ? "p.m." : "a.m.";
-          return `${day} de ${month} a las ${hours}:${minutes} ${suffix}`;
-        };
-    
-        const formatCooldown = (remainingMs) => {
-          const daysLeft = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
-          if (daysLeft <= 1) {
-            return "En 1 día podrás elegir una nueva carta.";
-          }
-          return `En ${daysLeft} días podrás elegir una nueva carta.`;
-        };
-    
-        const getCardHistory = (cardId) => {
-          const entries = oracleState.history[cardId] || [];
-          return entries.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        };
-    
-        const getCurrentCycleEntries = (cardId) => {
-          return getCardHistory(cardId).filter((entry) => entry.cycle === oracleState.cycle);
-        };
-    
-        const updateCooldownStatus = () => {
-          const now = Date.now();
-          const remainingMs = oracleState.lastPickAt ? Math.max(0, COOLDOWN_MS - (now - oracleState.lastPickAt)) : 0;
-          const cooldownActive = remainingMs > 0;
-    
-          let cycleComplete = oracleState.revealedThisCycle.length >= TOTAL_CARDS;
-          if (cycleComplete && remainingMs === 0) {
-            oracleState = {
-              ...oracleState,
-              cycle: oracleState.cycle + 1,
-              cycleStartAt: Date.now(),
-              revealedThisCycle: []
-            };
-            saveState(oracleState);
-            cycleComplete = false;
-          }
-    
-          if (!cooldownActive && !cycleComplete) {
-            oracleStatus.textContent = "Selecciona una carta";
-            oracleCooldown.textContent = "";
-          } else {
-            const message = formatCooldown(remainingMs || COOLDOWN_MS);
-            oracleStatus.textContent = "Carta bloqueada temporalmente";
-            oracleCooldown.textContent = message;
-          }
-    
-          return { cooldownActive, cycleComplete, remainingMs };
-        };
-    
-        const renderOracleDeck = (cards, cooldownActive, cycleComplete, remainingMs) => {
-          oracleDeck.innerHTML = "";
-          oracleDeckEmpty.classList.add("hidden");
-    
-          const remainingCards = cards.filter((card) => !oracleState.revealedThisCycle.includes(card.id));
-    
-          if (remainingCards.length === 0) {
-            oracleDeckEmpty.textContent = cooldownActive
-              ? formatCooldown(remainingMs || COOLDOWN_MS)
-              : "En 3 días podrás elegir una nueva carta.";
-            oracleDeckEmpty.classList.remove("hidden");
-            return;
-          }
-    
-          remainingCards.forEach((card) => {
-            const button = document.createElement("button");
-            button.type = "button";
-            button.className = "oracle-deck-card";
-            button.dataset.cardId = card.id;
-            if (cooldownActive || cycleComplete) {
-              button.classList.add("is-locked");
-              button.disabled = true;
-            }
-            button.innerHTML = `<img src="/css/oracle/carta.webp" alt="Carta del Oráculo" />`;
-            button.addEventListener("click", () => openOracleModal(card.id));
-            oracleDeck.appendChild(button);
-          });
-        };
-    
-        const renderRevealed = () => {
-          oracleRevealed.innerHTML = "";
-          const revealedIds = oracleState.revealedThisCycle;
-    
-          if (!revealedIds.length) {
-            oracleRevealedEmpty.style.display = "block";
-            return;
-          }
-    
-          oracleRevealedEmpty.style.display = "none";
-    
-          revealedIds.forEach((cardId) => {
-            const card = oracleCards.find((item) => item.id === cardId);
-            const entries = getCardHistory(cardId);
-            const latest = entries[0];
-            const formattedDate = latest ? formatDate(new Date(latest.date)) : "";
-            const summary = latest
-              ? latest.type === "heart"
-                ? `${oracleUserName} decidió no responder inmediatamente y dejó esta respuesta asentándose en su corazón.`
-                : latest.text || "Respuesta registrada."
-              : "Carta revelada.";
-    
-            const cardItem = document.createElement("button");
-            cardItem.type = "button";
-            cardItem.className = "oracle-revealed-card";
-            cardItem.innerHTML = `
-              <div class="oracle-revealed-figure">
-                <img src="${getCardImage(cardId)}" alt="${card?.name || "Carta revelada"}" />
-              </div>
-              <div class="oracle-revealed-body">
-                <strong>${card?.name || "Carta revelada"}</strong>
-                <p>${summary}</p>
-                ${formattedDate ? `<span>Respuesta del ${formattedDate}</span>` : ""}
-              </div>
-            `;
-            cardItem.addEventListener("click", () => openOracleModal(cardId, true));
-            oracleRevealed.appendChild(cardItem);
-          });
-        };
-    
-        const renderHistory = (cardId) => {
-          const entries = getCardHistory(cardId);
-          oracleHistoryList.innerHTML = "";
-    
-          if (!entries.length) {
-            oracleHistory.style.display = "none";
-            return;
-          }
-    
-          oracleHistory.style.display = "block";
-    
-          entries.forEach((entry) => {
-            const item = document.createElement("div");
-            item.className = "oracle-history-item";
-            const dateText = formatDate(new Date(entry.date));
-            const label = entry.type === "public"
-              ? "Respuesta pública"
-              : entry.type === "secret"
-                ? "Respuesta secreta"
-                : "Reposo en el corazón";
-            const body = entry.type === "heart"
-              ? `${oracleUserName} decidió no responder inmediatamente y dejó esta respuesta asentándose en su corazón.`
-              : entry.text || "";
-            item.innerHTML = `
-              <div class="oracle-history-head">
-                <span>${label}</span>
-                <span>${dateText}</span>
-              </div>
-              <p>${body}</p>
-            `;
-            oracleHistoryList.appendChild(item);
-          });
-        };
-    
-        const openOracleModal = (cardId) => {
-          selectedCard = oracleCards.find((card) => card.id === cardId);
-          if (!selectedCard) return;
-    
-          const currentEntries = getCurrentCycleEntries(cardId);
-          const hasAnswered = currentEntries.some((entry) => entry.type === "public" || entry.type === "secret");
-          const hasHeart = currentEntries.some((entry) => entry.type === "heart");
-          const latestEntry = getCardHistory(cardId)[0];
-    
-          oracleCardName.textContent = selectedCard.name;
-          oracleCardQuestion.textContent = selectedCard.question;
-          oracleCardImage.src = getCardImage(selectedCard.id);
-          oracleCardContext.textContent = selectedCard.context;
-    
-          oracleCardResponse.value = hasAnswered && latestEntry ? latestEntry.text : "";
-          oracleCardResponse.disabled = hasAnswered;
-    
-          if (hasAnswered) {
-            const latest = currentEntries.find((entry) => entry.type === "public" || entry.type === "secret");
-            oracleModalNote.textContent = latest
-              ? `Respuesta registrada el ${formatDate(new Date(latest.date))}. Este texto es inmodificable.`
-              : "Respuesta registrada. Este texto es inmodificable.";
-            oracleActionRow.style.display = "none";
-          } else {
-            oracleModalNote.textContent = hasHeart
-              ? "Esta carta quedó reposando en tu corazón. Puedes responder cuando lo desees durante este ciclo."
-              : "Puedes responder ahora, en secreto o dejar la pregunta reposando en tu corazón.";
-            oracleActionRow.style.display = "flex";
-          }
-    
-          oracleConfirm.classList.add("hidden");
-          renderHistory(cardId);
-    
-          oracleModalOverlay.classList.remove("hidden");
-          oracleModalOverlay.setAttribute("aria-hidden", "false");
-        };
-    
-        const closeModal = () => {
-          oracleModalOverlay.classList.add("hidden");
-          oracleModalOverlay.setAttribute("aria-hidden", "true");
+        } else {
+          oracleCardResponse.value = answeredEntry?.text || "";
+          oracleModalNote.textContent = answeredEntry?.date
+            ? `Respuesta registrada el ${formatDate(new Date(answeredEntry.date))}. Este texto es inmodificable.`
+            : "Respuesta registrada. Este texto es inmodificable.";
+        }
+      } else {
+        oracleActionRow.style.display = "flex";
+        oracleModalNote.textContent = hasHeart
+          ? "Esta carta quedó reposando en tu corazón. Puedes responder cuando lo desees durante este ciclo."
+          : "Puedes responder ahora, en secreto o dejar la pregunta reposando en tu corazón.";
+      }
+
+      updateWordCounter();
+      renderHistory(cardId);
+      oracleModalOverlay.classList.remove("hidden");
+      oracleModalOverlay.setAttribute("aria-hidden", "false");
+    };
+
+    const triggerConfirm = (action) => {
+      pendingAction = action;
+      pendingDeleteEntryId = null;
+      resetSecretUnlockUi();
+      if (action === "public") {
+        oracleConfirmText.textContent = "¿Estás seguro de tu respuesta pública?";
+        resetPrivatePasswordUi();
+      } else if (action === "secret") {
+        oracleConfirmText.textContent =
+          "¿Estás seguro de tu respuesta secreta? Deberás digitar tu clave privada para cifrarla.";
+        showPrivatePasswordUi();
+      } else {
+        oracleConfirmText.textContent =
+          "¿Deseas dejar esta pregunta reposando en tu corazón?";
+        resetPrivatePasswordUi();
+      }
+      oracleConfirm.classList.remove("hidden");
+    };
+
+    const extractSecretText = (raw) => {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          return String(parsed.text || parsed.response || "");
+        }
+      } catch {
+        // No-op: if payload is not JSON, fallback to plaintext body.
+      }
+      return String(raw || "");
+    };
+
+    const revealSecretEntry = async (entryId, privatePassword, { renderIntoTextarea = true } = {}) => {
+      const id = Number(entryId || 0);
+      const entry = oracleEntriesById.get(id);
+      if (!entry || entry.type !== "secret") {
+        throw new Error("No se encontró la respuesta secreta.");
+      }
+
+      if (!String(privatePassword || "").trim()) {
+        throw new Error("Debes digitar tu clave privada personal.");
+      }
+
+      const dekKey = await decryptDekFromPassword(String(privatePassword));
+      const plaintext = await aesGcmDecryptText(
+        dekKey,
+        entry.ciphertextHex,
+        entry.nonceHex,
+        buildOracleAad(entry.cardId, entry.cycle)
+      );
+      const secretText = extractSecretText(plaintext);
+
+      if (renderIntoTextarea) {
+        oracleCardResponse.value = secretText;
+        updateWordCounter();
+        oracleModalNote.textContent = "Respuesta secreta descifrada localmente en tu navegador.";
+      } else {
+        window.alert(secretText || "La respuesta secreta está vacía.");
+      }
+    };
+
+    const triggerDeleteHistoryConfirm = (entryId) => {
+      const id = Number(entryId || 0);
+      if (!Number.isFinite(id) || id <= 0) return;
+      pendingDeleteEntryId = id;
+      pendingAction = "delete_history";
+      resetPrivatePasswordUi();
+      resetSecretUnlockUi();
+      oracleConfirmText.textContent =
+        "Vas a borrar esta respuesta de forma permanente. Una vez elimines este recuerdo, no volverás a visualizarlo. ¿Deseas continuar?";
+      oracleConfirm.classList.remove("hidden");
+    };
+
+    const submitOracleResponse = async (payload) => {
+      const res = await apiFetch("/oracle/respond", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo registrar la respuesta del Oráculo.");
+      }
+      oracleState = normalizeOracleState(data);
+    };
+
+    const deleteOracleResponse = async (entryId) => {
+      const responseId = Number(entryId || 0);
+      if (!Number.isFinite(responseId) || responseId <= 0) {
+        throw new Error("Respuesta inválida para borrar.");
+      }
+
+      const res = await apiFetch(`/oracle/responses/${responseId}`, {
+        method: "DELETE",
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo borrar la respuesta.");
+      }
+      oracleState = normalizeOracleState(data);
+    };
+
+    const finalizeResponse = async () => {
+      if (!selectedCard || !pendingAction || isSubmitting) return;
+
+      if (pendingAction === "delete_history") {
+        const responseId = Number(pendingDeleteEntryId || 0);
+        if (!Number.isFinite(responseId) || responseId <= 0) {
           oracleConfirm.classList.add("hidden");
           pendingAction = null;
-          selectedCard = null;
-        };
-    
-        const triggerConfirm = (action) => {
-          pendingAction = action;
-          if (action === "public") {
-            oracleConfirmText.textContent = "¿Estás seguro de tu respuesta?";
-          } else if (action === "secret") {
-            oracleConfirmText.textContent =
-              "¿Estás seguro de tu respuesta? Este mensaje quedará encriptado y privado con tu clave personal.";
-          } else {
-            oracleConfirmText.textContent =
-              "¿Deseas dejar esta pregunta reposando en tu corazón?";
-          }
-          oracleConfirm.classList.remove("hidden");
-        };
-    
-        const finalizeResponse = () => {
-          if (!selectedCard || !pendingAction) return;
-          const now = new Date();
-          const responseText = oracleCardResponse.value.trim();
-    
-          const entry = {
-            type: pendingAction,
-            text: responseText,
-            date: now.toISOString(),
-            cycle: oracleState.cycle
-          };
-    
-          if (!oracleState.history[selectedCard.id]) {
-            oracleState.history[selectedCard.id] = [];
-          }
-          if (pendingAction === "heart") {
-            entry.text = "";
-          }
-    
-          oracleState.history[selectedCard.id].push(entry);
-    
-          const isNewReveal = !oracleState.revealedThisCycle.includes(selectedCard.id);
-          if (isNewReveal) {
-            oracleState.revealedThisCycle.push(selectedCard.id);
-            oracleState.lastPickAt = now.getTime();
-          }
-          saveState(oracleState);
-    
-          closeModal();
+          pendingDeleteEntryId = null;
+          return;
+        }
+
+        isSubmitting = true;
+        oracleConfirmYes.disabled = true;
+        oracleConfirmNo.disabled = true;
+
+        try {
+          await deleteOracleResponse(responseId);
+          oracleConfirm.classList.add("hidden");
+          pendingAction = null;
+          pendingDeleteEntryId = null;
           renderAll();
-        };
-    
-        const renderAll = () => {
-          const shuffled = shuffleCards(oracleCards);
-          const { cooldownActive, cycleComplete, remainingMs } = updateCooldownStatus();
-          renderOracleDeck(shuffled, cooldownActive, cycleComplete, remainingMs);
-          renderRevealed();
-        };
-    
-        oraclePublishBtn.addEventListener("click", () => triggerConfirm("public"));
-        oracleSecretBtn.addEventListener("click", () => triggerConfirm("secret"));
-        oracleHeartBtn.addEventListener("click", () => triggerConfirm("heart"));
-    
-        oracleConfirmYes.addEventListener("click", finalizeResponse);
-        oracleConfirmNo.addEventListener("click", () => {
-          oracleConfirm.classList.add("hidden");
-          pendingAction = null;
-        });
-    
-        closeOracleModal.addEventListener("click", closeModal);
-        oracleModalOverlay.addEventListener("click", (event) => {
-          if (event.target === oracleModalOverlay) closeModal();
-        });
-    
+          openOracleModal(selectedCard.id);
+        } catch (err) {
+          oracleModalNote.textContent = err?.message || "No se pudo borrar la respuesta.";
+        } finally {
+          isSubmitting = false;
+          oracleConfirmYes.disabled = false;
+          oracleConfirmNo.disabled = false;
+        }
+        return;
+      }
+
+      const responseText = oracleCardResponse.value.trim();
+      if (pendingAction !== "heart" && !responseText) {
+        oracleModalNote.textContent = "Escribe una respuesta antes de confirmar esta acción.";
+        updateWordCounter();
+        return;
+      }
+
+      if (pendingAction !== "heart") {
+        const words = countWords(responseText);
+        updateWordCounter();
+        if (words > MAX_RESPONSE_WORDS) {
+          oracleModalNote.textContent = `Tu respuesta supera el máximo permitido de ${MAX_RESPONSE_WORDS} palabras.`;
+          return;
+        }
+      } else {
+        updateWordCounter();
+      }
+
+      const payload = {
+        card_id: selectedCard.id,
+        response_type: pendingAction,
+      };
+
+      let privatePassword = "";
+      if (pendingAction === "secret") {
+        privatePassword = String(oraclePrivatePasswordInput?.value || "");
+        if (!privatePassword.trim()) {
+          setPrivatePasswordError("Digita tu clave privada personal");
+          oraclePrivatePasswordInput?.focus();
+          return;
+        }
+        setPrivatePasswordError("");
+      }
+
+      isSubmitting = true;
+      oracleConfirmYes.disabled = true;
+      oracleConfirmNo.disabled = true;
+      let completed = false;
+
+      try {
+        if (pendingAction === "public") {
+          payload.text_public = responseText;
+        } else if (pendingAction === "secret") {
+          const dekKey = await decryptDekFromPassword(privatePassword);
+          const encoded = JSON.stringify({ text: responseText });
+          const encrypted = await aesGcmEncryptText(
+            dekKey,
+            encoded,
+            buildOracleAad(selectedCard.id, oracleState.cycle)
+          );
+
+          payload.ciphertext_hex = bufToHex(encrypted.ciphertext);
+          payload.nonce_hex = bufToHex(encrypted.nonce.buffer);
+        }
+
+        await submitOracleResponse(payload);
+        completed = true;
+        closeModal();
         renderAll();
+      } catch (err) {
+        const message = err?.message || "No se pudo registrar la respuesta.";
+        if (pendingAction === "secret") {
+          setPrivatePasswordError(message);
+        } else {
+          oracleModalNote.textContent = message;
+        }
+      } finally {
+        isSubmitting = false;
+        oracleConfirmYes.disabled = false;
+        oracleConfirmNo.disabled = false;
+        if (completed) {
+          pendingAction = null;
+          pendingDeleteEntryId = null;
+        }
+      }
+    };
+
+    const renderAll = () => {
+      const shuffled = shuffleCards(oracleCards);
+      const { cooldownActive, cycleComplete, remainingMs } = updateCooldownStatus();
+      renderOracleDeck(shuffled, cooldownActive, cycleComplete, remainingMs);
+      renderRevealed();
+    };
+
+    const loadOracleState = async () => {
+      try {
+        oracleStatus.textContent = "Cargando cartas...";
+        const res = await apiFetch("/oracle/state");
+        const data = await parseResponseJson(res);
+        if (!res.ok) {
+          throw new Error(data.detail || "No se pudo cargar el estado del Oráculo.");
+        }
+        oracleState = normalizeOracleState(data);
+        renderAll();
+      } catch (err) {
+        oracleStatus.textContent = "No se pudo cargar el Oráculo";
+        oracleCooldown.textContent = err?.message || "Inténtalo de nuevo.";
+      }
+    };
+
+    oraclePublishBtn.addEventListener("click", () => triggerConfirm("public"));
+    oracleSecretBtn.addEventListener("click", () => triggerConfirm("secret"));
+    oracleHeartBtn.addEventListener("click", () => triggerConfirm("heart"));
+
+    oracleConfirmYes.addEventListener("click", () => void finalizeResponse());
+    oracleConfirmNo.addEventListener("click", () => {
+      oracleConfirm.classList.add("hidden");
+      resetPrivatePasswordUi();
+      pendingDeleteEntryId = null;
+      pendingAction = null;
+    });
+
+    if (oraclePrivatePasswordInput) {
+      oraclePrivatePasswordInput.addEventListener("input", () => setPrivatePasswordError(""));
+      oraclePrivatePasswordInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          void finalizeResponse();
+        }
+      });
+    }
+
+    if (oracleCardResponse) {
+      oracleCardResponse.addEventListener("input", () => {
+        updateWordCounter();
+      });
+    }
+
+    if (oracleRevealSecretBtn) {
+      oracleRevealSecretBtn.addEventListener("click", () => {
+        const entryId = Number(oracleRevealSecretBtn.dataset.entryId || 0);
+        if (!entryId) return;
+        openSecretUnlockUi(entryId);
+      });
+    }
+
+    if (oracleHistoryList) {
+      oracleHistoryList.addEventListener("click", (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const secretTrigger = target ? target.closest(".oracle-secret-history-btn") : null;
+        if (secretTrigger) {
+          const entryId = Number(secretTrigger.dataset.entryId || 0);
+          if (!entryId) return;
+          openSecretUnlockUi(entryId);
+          return;
+        }
+
+        const deleteTrigger = target ? target.closest(".oracle-history-delete-btn") : null;
+        if (deleteTrigger) {
+          const entryId = Number(deleteTrigger.dataset.entryId || 0);
+          if (!entryId) return;
+          triggerDeleteHistoryConfirm(entryId);
+        }
+      });
+    }
+
+    if (oracleSecretUnlockConfirm) {
+      oracleSecretUnlockConfirm.addEventListener("click", async () => {
+        const password = String(oracleSecretUnlockPassword?.value || "");
+        if (!password.trim()) {
+          setSecretUnlockError("Digita tu clave privada personal");
+          oracleSecretUnlockPassword?.focus();
+          return;
+        }
+
+        try {
+          await revealSecretEntry(pendingSecretRevealEntryId, password, { renderIntoTextarea: true });
+          resetSecretUnlockUi();
+        } catch (err) {
+          setSecretUnlockError(err?.message || "No se pudo descifrar la respuesta secreta.");
+        }
+      });
+    }
+
+    if (oracleSecretUnlockCancel) {
+      oracleSecretUnlockCancel.addEventListener("click", () => {
+        resetSecretUnlockUi();
+      });
+    }
+
+    if (oracleSecretUnlockPassword) {
+      oracleSecretUnlockPassword.addEventListener("input", () => setSecretUnlockError(""));
+      oracleSecretUnlockPassword.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          oracleSecretUnlockConfirm?.click();
+        }
+      });
+    }
+
+    closeOracleModal.addEventListener("click", closeModal);
+    oracleModalOverlay.addEventListener("click", (event) => {
+      if (event.target === oracleModalOverlay) closeModal();
+    });
+
+    updateWordCounter();
+    void loadOracleState();
   });
 </script>
 
@@ -585,6 +1179,55 @@
 </svelte:head>
 
 <div class="page-background page-background-user oracle-background">
+  <header class="feed-topbar">
+    <div class="feed-topbar-zone feed-topbar-left">
+      <a class="topbar-logo" href="/feed.html" aria-label="Kiadez">
+        <img src="/css/logo-kiadez.webp" alt="Kiadez" />
+      </a>
+      <form class="topbar-search" role="search" on:submit|preventDefault>
+        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+      </form>
+    </div>
+
+    <div class="feed-topbar-zone feed-topbar-center">
+      <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
+      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+      <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+    </div>
+
+    <div class="feed-topbar-zone feed-topbar-right">
+      <details class="topbar-dropdown" id="profileDropdown">
+        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
+          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+        </summary>
+        <div class="dropdown-menu" role="menu">
+          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
+          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+        </div>
+      </details>
+
+      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+        🔔
+        <span class="topbar-badge">3</span>
+      </button>
+
+      <details class="topbar-dropdown" id="menuDropdown">
+        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+          <span class="topbar-menu-icon" aria-hidden="true">☰</span>
+          <span class="topbar-menu-label">Menú</span>
+        </summary>
+        <div class="dropdown-menu" role="menu">
+          <a href="/home_user.html" role="menuitem">Mi Home</a>
+          <a href="/achievements.html" role="menuitem">Logros recientes</a>
+          <a href="/gallery.html" role="menuitem">Galería</a>
+          <a href="/calendar.html" role="menuitem">Calendario</a>
+          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+        </div>
+      </details>
+    </div>
+  </header>
 
     <main class="user-home">
 
@@ -593,35 +1236,86 @@
        *  ========================= -->
       <section class="cover" id="cover">
         <div class="cover-media" id="coverMedia">
-          <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
+          <img id="coverImg" class="cover-img" src="/assets/cover-default.jpg" alt="Portada" />
 
-          <div class="cover-actions">
-            <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
-              Cambiar portada
-            </button>
-            <button class="icon-btn" id="btnEditPurposes" type="button" title="Editar deseos de propósito">
-              Editar propósito
+          <div class="cover-actions cover-actions-purpose">
+            <details class="cover-menu">
+              <summary class="icon-btn" id="btnChangeCover" title="Editar imagen de portada">
+                Editar imagen de portada
+              </summary>
+              <div class="cover-menu-panel">
+                <button class="cover-menu-item" type="button" id="coverSelectExisting">
+                  Seleccionar imagen
+                </button>
+                <button class="cover-menu-item" type="button" id="coverUpload">
+                  Subir imagen
+                </button>
+                <button class="cover-menu-item" type="button" id="coverMove">
+                  Mover imagen
+                </button>
+              </div>
+            </details>
+            <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button"
+              title="Editar mi propósito de vida">
+              Editar mi propósito de vida
             </button>
 
             <input id="coverFile" type="file" accept="image/*" class="hidden" />
           </div>
 
-          <div class="purpose-triangle" aria-label="Deseos de propósito">
-            <button class="purpose-pill purpose-top" type="button" id="purpose1">
-              Deseo #1: Secreto
+          <div class="cover-save-actions hidden" id="coverSaveActions">
+            <button class="btn btn-primary btn-compact" type="button" id="coverSaveBtn">
+              Guardar cambios
             </button>
-
-            <button class="purpose-pill purpose-left" type="button" id="purpose2">
-              Deseo construir el Reino de Combray
-            </button>
-
-            <button class="purpose-pill purpose-right" type="button" id="purpose3">
-              Deseo estar unido a Jesús
+            <button class="btn btn-outline btn-compact" type="button" id="coverCancelBtn">
+              Cancelar
             </button>
           </div>
 
-          <div class="cover-hint" id="coverHint">
-            Arrastra la portada para encuadrarla
+          <div class="purpose-stack purpose-stack-modern" aria-label="Deseos de propósito">
+            <div class="purpose-list">
+              <div class="purpose-pill-row">
+                <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="1"
+                  title="Marcar deseo 1 como cumplido">
+                  <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+                </button>
+                <button class="purpose-pill" type="button" id="purpose1">
+                  Deseo #1: Secreto
+                </button>
+                <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock1"
+                  data-slot="1" title="Desbloquear deseo 1">
+                  <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+                </button>
+              </div>
+
+              <div class="purpose-pill-row">
+                <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="2"
+                  title="Marcar deseo 2 como cumplido">
+                  <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+                </button>
+                <button class="purpose-pill" type="button" id="purpose2">
+                  Deseo de propósito sin definir
+                </button>
+                <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock2"
+                  data-slot="2" title="Desbloquear deseo 2">
+                  <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+                </button>
+              </div>
+
+              <div class="purpose-pill-row">
+                <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="3"
+                  title="Marcar deseo 3 como cumplido">
+                  <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+                </button>
+                <button class="purpose-pill" type="button" id="purpose3">
+                  Deseo estar unido a Jesús
+                </button>
+                <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock3"
+                  data-slot="3" title="Desbloquear deseo 3">
+                  <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -654,17 +1348,11 @@
                 Selecciona una carta para comprender tu presente. Solo una carta cada 3 días.
               </p>
             </div>
-            <div class="oracle-tags">
-              <span class="panel-badge">30 cartas</span>
-              <span class="panel-badge">Ciclos de 90 días</span>
-              <span class="panel-badge">Reflexión personal</span>
-            </div>
           </header>
 
           <section class="panel oracle-intro" aria-label="¿Qué es el Oráculo?">
             <div class="panel-head">
               <h3 class="panel-title">¿Qué es el Oráculo?</h3>
-              <span class="panel-badge">Herramienta de reflexión</span>
             </div>
             <p class="panel-text">
               El Oráculo es una herramienta de reflexión de Kiadez.com. Eliges una carta, no para adivinar tu futuro,
@@ -779,10 +1467,36 @@
           </div>
         </div>
 
-        <label class="modal-label" for="oracleCardResponse">Cajón de texto</label>
         <textarea class="modal-textarea" id="oracleCardResponse" rows="6"
           placeholder="Escribe tu respuesta..."></textarea>
+        <p class="oracle-word-counter" id="oracleWordCounter">0/500 palabras</p>
         <div class="oracle-modal-note" id="oracleModalNote"></div>
+        <div class="oracle-action-row hidden" id="oracleSecretActions">
+          <button class="btn btn-outline btn-compact" type="button" id="oracleRevealSecretBtn">
+            Digitar clave privada para visualizar respuesta secreta
+          </button>
+        </div>
+        <div class="oracle-secret-unlock hidden" id="oracleSecretUnlock">
+          <p class="oracle-secret-unlock-text">
+            Digita tu clave privada personal para visualizar esta respuesta secreta.
+          </p>
+          <input
+            class="oracle-private-password-input"
+            id="oracleSecretUnlockPassword"
+            type="password"
+            placeholder="Digita tu clave privada personal"
+            autocomplete="current-password"
+          />
+          <p class="oracle-private-password-error" id="oracleSecretUnlockError"></p>
+          <div class="oracle-confirm-actions">
+            <button class="btn btn-primary btn-compact" type="button" id="oracleSecretUnlockConfirm">
+              Visualizar
+            </button>
+            <button class="btn btn-outline btn-compact" type="button" id="oracleSecretUnlockCancel">
+              Cancelar
+            </button>
+          </div>
+        </div>
 
         <div class="oracle-action-row" id="oracleActionRow">
           <button class="btn btn-primary btn-compact" type="button" id="oraclePublishBtn">Responder ahora y
@@ -794,6 +1508,16 @@
 
         <div class="oracle-confirm hidden" id="oracleConfirm">
           <p id="oracleConfirmText"></p>
+          <div class="oracle-private-password hidden" id="oraclePrivatePasswordWrap">
+            <input
+              class="oracle-private-password-input"
+              id="oraclePrivatePassword"
+              type="password"
+              placeholder="Digita tu clave privada personal"
+              autocomplete="current-password"
+            />
+            <p class="oracle-private-password-error" id="oraclePrivatePasswordError"></p>
+          </div>
           <div class="oracle-confirm-actions">
             <button class="btn btn-primary btn-compact" type="button" id="oracleConfirmYes">Sí</button>
             <button class="btn btn-outline btn-compact" type="button" id="oracleConfirmNo">No</button>
@@ -802,6 +1526,7 @@
 
         <div class="oracle-history" id="oracleHistory">
           <h4>Respuestas anteriores</h4>
+          <p class="oracle-history-note" id="oracleHistoryNote"></p>
           <div class="oracle-history-list" id="oracleHistoryList"></div>
         </div>
       </div>

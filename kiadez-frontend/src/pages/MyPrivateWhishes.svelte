@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { logout } from "../lib/logout";
+  import { syncProfileStarsTotal } from "../lib/starsCounter";
 
   const PRIVATE_FULFILLED_VISIBLE_SLOTS = 10;
   const PLACEHOLDER_PRIVATE_FULFILLED_MESSAGE =
@@ -128,6 +129,7 @@
   onMount(() => {
     document.body.dataset.visitor = "false";
     initPurposeCoverModule();
+    void syncProfileStarsTotal("privateWishesStarsTotal");
 
     const API = "http://127.0.0.1:8000";
     const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
@@ -1946,7 +1948,8 @@
       <div class="feed-topbar-zone feed-topbar-center">
         <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
         <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-        <a class="topbar-btn is-active" href="/my-private-whishes.html">🔒 Deseos privados</a>
+        <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
+      <a class="topbar-btn is-active" href="/my-private-whishes.html">🔒 Deseos privados</a>
         <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
       </div>
 
@@ -2030,7 +2033,7 @@
           <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
           <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
             <span class="nav-icon">⭐</span>
-            <span><strong>5.000.000</strong> estrellas</span>
+            <span><strong id="privateWishesStarsTotal">0</strong> estrellas</span>
           </a>
           <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
           <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>

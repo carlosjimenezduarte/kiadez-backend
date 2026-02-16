@@ -12,6 +12,7 @@ from app.posts.routes import router as posts_router
 from app.biography.routes import router as biography_router
 from app.public_wishes.routes import router as public_wishes_router
 from app.private_wishes.routes import router as private_wishes_router
+from app.oracle.routes import router as oracle_router
 
 
 app = FastAPI(
@@ -39,6 +40,7 @@ app.include_router(posts_router)
 app.include_router(biography_router)
 app.include_router(public_wishes_router)
 app.include_router(private_wishes_router)
+app.include_router(oracle_router)
 
 if settings.APP_ENV.lower() in {"dev", "local", "test"} and settings.DEV_LOGIN_AS_ENABLED:
     app.include_router(dev_router)

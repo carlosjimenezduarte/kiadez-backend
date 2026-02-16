@@ -1,9 +1,88 @@
 <script>
   import { onMount } from "svelte";
+  import { logout } from "../lib/logout";
   import { initPurposeCoverModule } from "../lib/purposeCover";
+
+  const API = "http://127.0.0.1:8000";
+  let starsSyncError = "";
+
+  const getAccessToken = () => localStorage.getItem("access_token") || "";
+
+  const normalizeImagePath = (rawSrc) => {
+    if (!rawSrc) return "";
+    try {
+      return new URL(rawSrc, window.location.origin).pathname;
+    } catch (_error) {
+      return rawSrc;
+    }
+  };
+
+  const applyBadgeUnlockState = (containerId, achievements) => {
+    const container = document.getElementById(containerId);
+    if (!container || !Array.isArray(achievements)) return;
+
+    const unlockByImagePath = new Map(
+      achievements.map((achievement) => [
+        normalizeImagePath(achievement.image_url),
+        Boolean(achievement.unlocked),
+      ]),
+    );
+
+    const badgeItems = container.querySelectorAll(".badge-item");
+    badgeItems.forEach((badgeItem) => {
+      const badgeImage = badgeItem.querySelector("img");
+      const imagePath = normalizeImagePath(badgeImage?.getAttribute("src") || "");
+      if (!unlockByImagePath.has(imagePath)) return;
+
+      const isUnlocked = unlockByImagePath.get(imagePath);
+      badgeItem.classList.toggle("is-unlocked", isUnlocked);
+      badgeItem.classList.toggle("is-locked", !isUnlocked);
+    });
+  };
+
+  const loadStarAchievementsState = async () => {
+    starsSyncError = "";
+
+    const token = getAccessToken();
+    if (!token) {
+      window.location.href = "/login.html";
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API}/posts/star-pool`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        window.location.href = "/login.html";
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(data.detail || "No se pudieron sincronizar los logros de estrellas.");
+      }
+
+      const totalStarsLabel = document.getElementById("achievementsStarsTotal");
+      if (totalStarsLabel) {
+        totalStarsLabel.textContent = Number(data.my_received_stars_total || 0).toLocaleString("es-CO");
+      }
+
+      applyBadgeUnlockState("publicationStarsBadges", data.publication_achievements || []);
+      applyBadgeUnlockState("donationStarsBadges", data.donation_achievements || []);
+    } catch (error) {
+      starsSyncError = error.message || "No se pudieron sincronizar los logros de estrellas.";
+    }
+  };
 
   onMount(() => {
     initPurposeCoverModule();
+    void loadStarAchievementsState();
   });
 </script>
 
@@ -15,6 +94,55 @@
 </svelte:head>
 
 <div class="page-background page-background-user achievements-background">
+    <header class="feed-topbar">
+      <div class="feed-topbar-zone feed-topbar-left">
+        <a class="topbar-logo" href="/feed.html" aria-label="Kiadez">
+          <img src="/css/logo-kiadez.webp" alt="Kiadez" />
+        </a>
+        <form class="topbar-search" role="search" on:submit|preventDefault>
+          <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+        </form>
+      </div>
+
+      <div class="feed-topbar-zone feed-topbar-center">
+        <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
+        <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+        <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
+        <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+      </div>
+
+      <div class="feed-topbar-zone feed-topbar-right">
+        <details class="topbar-dropdown">
+          <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
+            <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+          </summary>
+          <div class="dropdown-menu" role="menu">
+            <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
+            <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+          </div>
+        </details>
+
+        <button class="topbar-icon" type="button" aria-label="Notificaciones">
+          🔔
+          <span class="topbar-badge">3</span>
+        </button>
+
+        <details class="topbar-dropdown">
+          <summary class="topbar-menu-btn" aria-label="Abrir menú">
+            <span class="topbar-menu-icon" aria-hidden="true">☰</span>
+            <span class="topbar-menu-label">Menú</span>
+          </summary>
+          <div class="dropdown-menu" role="menu">
+            <a href="/home_user.html" role="menuitem">Mi Home</a>
+            <a href="/achievements.html" role="menuitem">Logros recientes</a>
+            <a href="/gallery.html" role="menuitem">Galería</a>
+            <a href="/calendar.html" role="menuitem">Calendario</a>
+            <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+          </div>
+        </details>
+      </div>
+    </header>
 
     <main class="user-home">
 
@@ -64,7 +192,7 @@
         <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
         <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
           <span class="nav-icon">⭐</span>
-          <span><strong>5.000.000</strong> estrellas</span>
+          <span><strong id="achievementsStarsTotal">0</strong> estrellas</span>
         </a>
 
         <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
@@ -88,6 +216,10 @@
             <span class="panel-badge">Reinicio cada lunes</span>
           </div>
         </header>
+
+        {#if starsSyncError}
+          <p class="achievements-sync-error">{starsSyncError}</p>
+        {/if}
 
         <article class="panel weekly-achievements">
           <div class="panel-head">
@@ -135,7 +267,7 @@
           <!-- =========================
            *  ESTRELLAS POR PUBLICACIONES
            *  ========================= -->
-          <article class="panel badge-group">
+          <article class="panel badge-group" id="publicationStarsBadges">
             <div>
               <h3 class="panel-title">Del nacimiento de la luz a la soberanía estelar</h3>
               <p class="panel-muted">Sistema de logros — Estrellas por publicaciones.</p>
@@ -505,7 +637,7 @@
           <!-- =========================
            *  DESEOS CUMPLIDOS
            *  ========================= -->
-          <article class="panel badge-group">
+          <article class="panel badge-group" id="donationStarsBadges">
             <div>
               <h3 class="panel-title">El camino de orden, la palabra y la acción</h3>
               <p class="panel-muted">Logros de deseos cumplidos.</p>

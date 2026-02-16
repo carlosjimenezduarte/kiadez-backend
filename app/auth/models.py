@@ -26,6 +26,8 @@ class UserPublic(BaseModel):
     email: EmailStr
     role: Role
     guardian_rank: Optional[int] = None
+    username: Optional[str] = None
+    username_updated_at: Optional[datetime] = None
     is_active: bool = True
 
 class UserInternal(UserPublic):
@@ -49,3 +51,26 @@ class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8)
     new_password_confirm: str = Field(min_length=8)
+
+
+class UsernameState(BaseModel):
+    username: Optional[str] = None
+    can_update: bool
+    cooldown_until: Optional[datetime] = None
+    cooldown_remaining_days: int = 0
+    profile_url: str
+
+
+class UsernameAvailabilityOut(BaseModel):
+    username: str
+    available: bool
+    detail: Optional[str] = None
+
+
+class UsernameUpdateRequest(BaseModel):
+    username: str = Field(min_length=4, max_length=30)
+
+
+class UsernameUpdateResponse(BaseModel):
+    updated: bool
+    state: UsernameState

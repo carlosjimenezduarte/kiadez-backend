@@ -33,9 +33,58 @@ from app.posts.schemas import (
     PostReportResponse,
     PostShareResponse,
     PostStarResponse,
+    StarAchievementOut,
+    StarPoolDonateResponse,
+    StarPoolStateOut,
 )
 
 router = APIRouter(prefix="/posts", tags=["posts"])
+
+PUBLICATION_STAR_ACHIEVEMENTS: list[tuple[str, str, int, str]] = [
+    ("astral_1a", "Alumbramiento", 1, "/css/AKI/Astral/Star1/1a.webp"),
+    ("astral_1b", "Estelar", 5, "/css/AKI/Astral/Star1/1b.webp"),
+    ("astral_1c", "Astral", 10, "/css/AKI/Astral/Star1/1c.webp"),
+    ("astral_1d", "Coleccionista de Estrellas", 30, "/css/AKI/Astral/Star1/1d.webp"),
+    ("astral_1e", "Astrónomo", 100, "/css/AKI/Astral/Star1/1e.webp"),
+    ("astral_2a", "Cartógrafo del Cielo", 200, "/css/AKI/Astral/Star2/2a.webp"),
+    ("astral_2b", "Vigilante del Firmamento", 300, "/css/AKI/Astral/Star2/2b.webp"),
+    ("astral_2c", "Tejedor de Constelaciones", 500, "/css/AKI/Astral/Star2/2c.webp"),
+    ("astral_2d", "Cronista Celeste", 800, "/css/AKI/Astral/Star2/2d.webp"),
+    ("astral_2e", "Intérprete de las Estrellas", 1000, "/css/AKI/Astral/Star2/2e.webp"),
+    ("astral_3a", "Arquitecto de Constelaciones", 1500, "/css/AKI/Astral/Star3/3a.webp"),
+    ("astral_3b", "Guardián del Cielo Nocturno", 2000, "/css/AKI/Astral/Star3/3b.webp"),
+    ("astral_3c", "Sabio del Firmamento", 2500, "/css/AKI/Astral/Star3/3c.webp"),
+    ("astral_3d", "Navegante Astral", 3000, "/css/AKI/Astral/Star3/3d.webp"),
+    ("astral_3e", "Custodio de la Luz", 4000, "/css/AKI/Astral/Star3/3e.webp"),
+    ("astral_4a", "Heraldo Estelar", 5000, "/css/AKI/Astral/Star4/4a.webp"),
+    ("astral_4b", "Señor de las Constelaciones", 10000, "/css/AKI/Astral/Star4/4b.webp"),
+    ("astral_4c", "Maestro del Cielo Profundo", 20000, "/css/AKI/Astral/Star4/4c.webp"),
+    ("astral_4d", "Orquestador de Astros", 30000, "/css/AKI/Astral/Star4/4d.webp"),
+    ("astral_4e", "Regente del Firmamento", 50000, "/css/AKI/Astral/Star4/4e.webp"),
+    ("astral_5a", "Forjador de Universos", 70000, "/css/AKI/Astral/Star5/5a.webp"),
+    ("astral_5b", "Portador del Cielo", 100000, "/css/AKI/Astral/Star5/5b.webp"),
+    ("astral_5c", "Soberano de las Estrellas", 150000, "/css/AKI/Astral/Star5/5c.webp"),
+    ("astral_5d", "Arquitecto del Cosmos", 200000, "/css/AKI/Astral/Star5/5d.webp"),
+    ("astral_5e", "Vigía del Infinito", 300000, "/css/AKI/Astral/Star5/5e.webp"),
+    ("astral_6a", "Hijo del Cosmos", 600000, "/css/AKI/Astral/Star6/6a.webp"),
+    ("astral_6b", "Conciencia Estelar", 1000000, "/css/AKI/Astral/Star6/6b.webp"),
+    ("astral_6c", "Alma del Firmamento", 1500000, "/css/AKI/Astral/Star6/6c.webp"),
+    ("astral_6d", "Trono de las Estrellas", 2000000, "/css/AKI/Astral/Star6/6d.webp"),
+    ("astral_6e", "Estrella Eterna", 5000000, "/css/AKI/Astral/Star6/6e.webp"),
+]
+
+DONATION_STAR_ACHIEVEMENTS: list[tuple[str, str, int, str]] = [
+    ("donation_1", "Explorador del Misterio", 1000, "/css/AKI/Donation/1.webp"),
+    ("donation_2", "Confiado en el Universo", 5000, "/css/AKI/Donation/2.webp"),
+    ("donation_3", "Creyente de las Nebulosas", 10000, "/css/AKI/Donation/3.webp"),
+    ("donation_4", "Guardián del Flujo Estelar", 20000, "/css/AKI/Donation/4.webp"),
+    ("donation_5", "Portador del Vacío Fértil", 50000, "/css/AKI/Donation/5.webp"),
+    ("donation_6", "Custodio del Fondo Común", 100000, "/css/AKI/Donation/6.webp"),
+    ("donation_7", "Tejedor de Constelaciones", 200000, "/css/AKI/Donation/7.webp"),
+    ("donation_8", "Voz del Silencio Cósmico", 300000, "/css/AKI/Donation/8.webp"),
+    ("donation_9", "Arquitecto del Bien Común", 500000, "/css/AKI/Donation/9.webp"),
+    ("donation_10", "Semilla del Infinito", 1000000, "/css/AKI/Donation/10.webp"),
+]
 
 
 def _author_out(user: User) -> PostAuthorOut:
@@ -92,6 +141,58 @@ def _post_out(
         starred_by_me=starred_by_me,
         is_mine=is_mine,
         created_at=post.created_at,
+    )
+
+
+def _normalized_star_totals(user: User) -> tuple[int, int]:
+    received = max(0, int(user.received_stars_total or 0))
+    donated = max(0, int(user.donated_stars_total or 0))
+    donated = min(donated, received)
+    return received, donated
+
+
+def _build_achievements(
+    *,
+    current_total: int,
+    definitions: list[tuple[str, str, int, str]],
+) -> list[StarAchievementOut]:
+    return [
+        StarAchievementOut(
+            key=key,
+            title=title,
+            threshold=threshold,
+            image_url=image_url,
+            unlocked=current_total >= threshold,
+        )
+        for key, title, threshold, image_url in definitions
+    ]
+
+
+def _build_star_pool_state(*, user: User, db: Session) -> StarPoolStateOut:
+    received, donated = _normalized_star_totals(user)
+    common_pool_total = int(
+        db.execute(select(func.coalesce(func.sum(User.donated_stars_total), 0))).scalar_one()
+        or 0
+    )
+
+    publication_achievements = _build_achievements(
+        current_total=received,
+        definitions=PUBLICATION_STAR_ACHIEVEMENTS,
+    )
+    donation_achievements = _build_achievements(
+        current_total=donated,
+        definitions=DONATION_STAR_ACHIEVEMENTS,
+    )
+
+    return StarPoolStateOut(
+        my_received_stars_total=received,
+        my_donated_stars_total=donated,
+        my_donatable_stars_total=max(0, received - donated),
+        common_pool_stars_total=max(0, common_pool_total),
+        unlocked_publication_achievements=sum(1 for item in publication_achievements if item.unlocked),
+        unlocked_donation_achievements=sum(1 for item in donation_achievements if item.unlocked),
+        publication_achievements=publication_achievements,
+        donation_achievements=donation_achievements,
     )
 
 
@@ -167,6 +268,37 @@ def my_post_stats(
     )
 
 
+@router.get("/star-pool", response_model=StarPoolStateOut)
+def star_pool_state(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    me = db.execute(select(User).where(User.id == current.user_number)).scalar_one()
+    return _build_star_pool_state(user=me, db=db)
+
+
+@router.post("/star-pool/donate", response_model=StarPoolDonateResponse)
+def donate_stars_to_pool(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    me = db.execute(select(User).where(User.id == current.user_number)).scalar_one()
+    received, donated = _normalized_star_totals(me)
+
+    if donated != (me.donated_stars_total or 0):
+        me.donated_stars_total = donated
+
+    donated_now = max(0, received - donated)
+    me.donated_stars_total = received
+    db.commit()
+    db.refresh(me)
+
+    return StarPoolDonateResponse(
+        donated_now=donated_now,
+        state=_build_star_pool_state(user=me, db=db),
+    )
+
+
 @router.post("", response_model=PostOut)
 def create_post(
     payload: PostCreateRequest,
@@ -235,6 +367,8 @@ def delete_post(
 
     me = db.execute(select(User).where(User.id == current.user_number)).scalar_one()
     me.received_stars_total = max(0, (me.received_stars_total or 0) - removed_stars)
+    if (me.donated_stars_total or 0) > me.received_stars_total:
+        me.donated_stars_total = me.received_stars_total
 
     db.commit()
     return PostDeleteResponse(deleted=True, removed_stars=removed_stars)

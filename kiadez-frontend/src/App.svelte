@@ -1,4 +1,6 @@
 <script>
+  import { onMount } from 'svelte';
+  import { syncTopbarAvatar } from './lib/topbarAvatar';
   import Landing from './pages/Landing.svelte';
   import StarPoolFound from './pages/StarPoolFound.svelte';
   import HomeUser from './pages/HomeUser.svelte';
@@ -101,6 +103,10 @@
   };
 
   const Component = routes[route] || Landing;
+
+  onMount(() => {
+    void syncTopbarAvatar();
+  });
 </script>
 
 <svelte:component this={Component} />

@@ -14,3 +14,4 @@ class VaultResetOut(BaseModel):
     life_purpose_private_cleared: int
     private_wishes_cleared: int = 0
     private_media_deleted: int = 0
+    oracle_secret_responses_cleared: int = 0

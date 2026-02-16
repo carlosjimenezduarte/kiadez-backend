@@ -412,6 +412,7 @@
     <div class="feed-topbar-zone feed-topbar-center">
       <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
       <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+      <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
       <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
       <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
     </div>

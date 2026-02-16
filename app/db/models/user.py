@@ -35,6 +35,13 @@ class User(Base):
         index=True,
     )
 
+    username: Mapped[str | None] = mapped_column(
+        String(30),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
+
     birth_date: Mapped[date] = mapped_column(
         Date,
         nullable=False,
@@ -77,6 +84,17 @@ class User(Base):
         Integer,
         nullable=False,
         default=0,
+    )
+
+    donated_stars_total: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    username_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
 
     is_active: Mapped[bool] = mapped_column(

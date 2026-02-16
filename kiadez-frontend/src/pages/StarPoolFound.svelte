@@ -1,11 +1,35 @@
 <script>
   import { onMount } from 'svelte';
   import { initPurposeCoverModule } from '../lib/purposeCover';
+  import { logout } from '../lib/logout';
+
+  const API = 'http://127.0.0.1:8000';
 
   let showModal = false;
-  let showConfirm = true;
-  let showSummary = false;
-  let isVisitor = false;
+  let isLoading = true;
+  let isDonating = false;
+  let statusMessage = '';
+  let statusError = '';
+  let justDonated = false;
+  let recentDonationAmount = 0;
+
+  let starPool = {
+    my_received_stars_total: 0,
+    my_donated_stars_total: 0,
+    my_donatable_stars_total: 0,
+    common_pool_stars_total: 0,
+    unlocked_publication_achievements: 0,
+    unlocked_donation_achievements: 0,
+    publication_achievements: [],
+    donation_achievements: [],
+  };
+
+  $: canDonate = Number(starPool.my_donatable_stars_total || 0) > 0;
+  $: unlockedDonationAchievements = (starPool.donation_achievements || []).filter((achievement) =>
+    Boolean(achievement.unlocked)
+  );
+
+  const formatStars = (value) => Number(value || 0).toLocaleString('es-CO');
 
   const openStars = (event) => {
     event?.preventDefault();
@@ -22,32 +46,100 @@
     }
   };
 
-  const handleDonateClick = (event) => {
+  const getAccessToken = () => localStorage.getItem('access_token') || '';
+
+  const apiFetch = async (path, options = {}) => {
+    const token = getAccessToken();
+    if (!token) {
+      window.location.href = '/login.html';
+      throw new Error('No hay sesión activa.');
+    }
+
+    const headers = {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${token}`,
+    };
+
+    const response = await fetch(`${API}${path}`, {
+      ...options,
+      headers,
+    });
+
+    if (response.status === 401) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      window.location.href = '/login.html';
+      throw new Error('Sesión expirada.');
+    }
+
+    return response;
+  };
+
+  const loadStarPoolState = async () => {
+    isLoading = true;
+    statusError = '';
+
+    try {
+      const response = await apiFetch('/posts/star-pool');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'No se pudieron cargar las estrellas.');
+      }
+
+      starPool = data;
+    } catch (error) {
+      statusError = error.message || 'No se pudieron cargar las estrellas.';
+    } finally {
+      isLoading = false;
+    }
+  };
+
+  const handleDonateClick = async (event) => {
     event.preventDefault();
-    sessionStorage.setItem('star_pool_force_confirm', '1');
-    window.location.href = event.currentTarget.getAttribute('href');
+
+    if (isDonating || isLoading) {
+      return;
+    }
+
+    if (!canDonate) {
+      statusError = 'No tienes estrellas nuevas por donar en este momento.';
+      return;
+    }
+
+    isDonating = true;
+    statusError = '';
+    statusMessage = '';
+
+    try {
+      const response = await apiFetch('/posts/star-pool/donate', { method: 'POST' });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'No se pudo registrar la donación.');
+      }
+
+      starPool = data.state;
+      recentDonationAmount = Number(data.donated_now || 0);
+      justDonated = recentDonationAmount > 0;
+
+      if (justDonated) {
+        statusMessage = `Donación registrada: ${formatStars(recentDonationAmount)} estrellas.`;
+      } else {
+        statusMessage = 'Tus estrellas ya estaban donadas al Fondo Común.';
+      }
+
+      showModal = false;
+    } catch (error) {
+      statusError = error.message || 'No se pudo registrar la donación.';
+    } finally {
+      isDonating = false;
+    }
   };
 
   onMount(() => {
-    document.body.dataset.visitor = isVisitor ? 'true' : 'false';
     initPurposeCoverModule();
-
-    const forceConfirm = sessionStorage.getItem('star_pool_force_confirm') === '1';
-    const confirmShown = sessionStorage.getItem('star_pool_confirm_shown') === '1';
-
-    if (forceConfirm) {
-      showConfirm = true;
-      showSummary = false;
-      sessionStorage.setItem('star_pool_confirm_shown', '1');
-      sessionStorage.removeItem('star_pool_force_confirm');
-    } else if (confirmShown) {
-      showConfirm = false;
-      showSummary = true;
-    } else {
-      showConfirm = true;
-      showSummary = false;
-      sessionStorage.setItem('star_pool_confirm_shown', '1');
-    }
+    void loadStarPoolState();
   });
 </script>
 
@@ -59,6 +151,56 @@
 </svelte:head>
 
 <div class="page-background page-background-user star-pool-background">
+  <header class="feed-topbar">
+    <div class="feed-topbar-zone feed-topbar-left">
+      <a class="topbar-logo" href="/feed.html" aria-label="Kiadez">
+        <img src="/css/logo-kiadez.webp" alt="Kiadez" />
+      </a>
+      <form class="topbar-search" role="search" on:submit|preventDefault>
+        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+      </form>
+    </div>
+
+    <div class="feed-topbar-zone feed-topbar-center">
+      <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
+      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+      <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+    </div>
+
+    <div class="feed-topbar-zone feed-topbar-right">
+      <details class="topbar-dropdown" id="profileDropdown">
+        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
+          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+        </summary>
+        <div class="dropdown-menu" role="menu">
+          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
+          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+        </div>
+      </details>
+
+      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+        🔔
+        <span class="topbar-badge">3</span>
+      </button>
+
+      <details class="topbar-dropdown" id="menuDropdown">
+        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+          <span class="topbar-menu-icon" aria-hidden="true">☰</span>
+          <span class="topbar-menu-label">Menú</span>
+        </summary>
+        <div class="dropdown-menu" role="menu">
+          <a href="/home_user.html" role="menuitem">Mi Home</a>
+          <a href="/achievements.html" role="menuitem">Logros recientes</a>
+          <a href="/gallery.html" role="menuitem">Galería</a>
+          <a href="/calendar.html" role="menuitem">Calendario</a>
+          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+        </div>
+      </details>
+    </div>
+  </header>
+
   <main class="user-home">
     <section class="cover" id="cover">
       <div class="cover-media" id="coverMedia">
@@ -81,7 +223,7 @@
           </button>
 
           <button class="purpose-pill purpose-left" type="button" id="purpose2">
-            Deseo construir el Reino de Combray
+            Deseo de propósito sin definir
           </button>
 
           <button class="purpose-pill purpose-right" type="button" id="purpose3">
@@ -97,17 +239,17 @@
 
     <div class="star-pool-body">
       <nav class="profile-nav" aria-label="Navegación de perfil">
-        <a class="nav-pill" href="home_user.html" title="Home">Home</a>
+        <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
         <a class="nav-pill" href="/star-pool-found.html" id="openStarModal" title="Estrellas" on:click={openStars}>
           <span class="nav-icon">⭐</span>
-          <span><strong>5.000.000</strong> estrellas</span>
+          <span><strong>{formatStars(starPool.my_received_stars_total)}</strong> estrellas</span>
         </a>
 
         <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-        <a class="nav-pill" href="achievements.html" title="Logros recientes">Logros recientes</a>
+        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
         <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-        <a class="nav-pill" href="calendar.html" title="Calendario">Calendario</a>
-        <a class="nav-pill" href="my-biography.html" title="Mi biografía">Mi biografía</a>
+        <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
+        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
       </nav>
 
       <section class="star-pool-shell" aria-label="Fondo Común de Estrellas">
@@ -117,18 +259,45 @@
             <p class="star-pool-subtitle">Gracias por sostener el brillo colectivo.</p>
           </div>
           <div class="star-pool-tags">
-            <span class="panel-badge">Donación confirmada</span>
+            <span class="panel-badge">{justDonated ? 'Donación confirmada' : 'Estado actual'}</span>
+            <span class="panel-badge">
+              {starPool.unlocked_donation_achievements}/{starPool.donation_achievements.length || 10}
+              logros por donación
+            </span>
+            <span class="panel-badge">
+              {starPool.unlocked_publication_achievements}/{starPool.publication_achievements.length || 30}
+              logros por publicaciones
+            </span>
           </div>
         </header>
 
-        <article class="panel star-pool-card" id="donationConfirm" class:hidden={!showConfirm}>
+        {#if isLoading}
+          <p class="star-pool-status">Cargando estado del Fondo Común...</p>
+        {/if}
+
+        {#if statusMessage}
+          <p class="star-pool-status">{statusMessage}</p>
+        {/if}
+
+        {#if statusError}
+          <p class="star-pool-status is-error">{statusError}</p>
+        {/if}
+
+        <article class="panel star-pool-card" id="donationSummary">
           <div class="star-pool-highlight">
             <div class="star-circle star-circle-lg">
-              <img src="/css/star.webp" alt="Estrella" />
+              <img src={justDonated ? '/css/star.webp' : '/css/fundstar.webp'} alt="Fondo Común de Estrellas" />
             </div>
             <div>
-              <h3 class="star-pool-message">Acabas de donar 5 estrellas al Fondo Común de Estrellas</h3>
-              <p class="star-pool-thanks">¡Muchas gracias por tu donación!</p>
+              {#if justDonated}
+                <h3 class="star-pool-message">
+                  Acabas de donar {formatStars(recentDonationAmount)} estrellas al Fondo Común de Estrellas
+                </h3>
+                <p class="star-pool-thanks">¡Muchas gracias por tu donación!</p>
+              {:else}
+                <h3 class="star-pool-message">Estrellas donadas por ti hasta ahora al Fondo Común de Estrellas</h3>
+                <p class="star-pool-thanks"><strong>{formatStars(starPool.my_donated_stars_total)}</strong> estrellas</p>
+              {/if}
             </div>
           </div>
 
@@ -139,91 +308,45 @@
               </div>
               <div>
                 <div class="star-pool-stat-label">Estrellas donadas por ti hasta ahora al Fondo Común de Estrellas</div>
-                <div class="star-pool-stat-value">434</div>
+                <div class="star-pool-stat-value">{formatStars(starPool.my_donated_stars_total)}</div>
               </div>
             </div>
 
-            <div class="star-pool-total">
-              <div class="star-pool-total-label">Con tu donación el Fondo Común de Estrellas ha ascendido a un total de:</div>
-              <div class="star-pool-total-value">5.400.321 estrellas</div>
-            </div>
-          </div>
-
-          <div class="star-pool-achievements">
-            <h4>Esto te ha permitido obtener los siguientes Logros:</h4>
-            <div class="donation-badges">
-              <div class="donation-badge">
-                <div class="star-circle star-circle-sm">
-                  <img src="/css/AKI/Donation/1.webp" alt="Explorador del Misterio" />
-                </div>
-                <span>Explorador del Misterio</span>
-              </div>
-              <div class="donation-badge">
-                <div class="star-circle star-circle-sm">
-                  <img src="/css/AKI/Donation/2.webp" alt="Confiado en el Universo" />
-                </div>
-                <span>Confiado en el Universo</span>
-              </div>
-              <div class="donation-badge">
-                <div class="star-circle star-circle-sm">
-                  <img src="/css/AKI/Donation/3.webp" alt="Creyente de las Nebulosas" />
-                </div>
-                <span>Creyente de las Nebulosas</span>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <article class="panel star-pool-card" id="donationSummary" class:hidden={!showSummary}>
-          <div class="star-pool-highlight">
-            <div class="star-circle star-circle-lg">
-              <img src="/css/fundstar.webp" alt="Fondo Común de Estrellas" />
-            </div>
-            <div>
-              <h3 class="star-pool-message">Estrellas donadas por ti hasta ahora al Fondo Común de Estrellas</h3>
-              <p class="star-pool-thanks"><strong>434</strong> estrellas</p>
-            </div>
-          </div>
-
-          <div class="star-pool-stats">
             <div class="star-pool-stat">
               <div class="star-circle star-circle-md">
-                <img src="/css/fundstar.webp" alt="Estrellas donadas" />
+                <img src="/css/star.webp" alt="Estrellas disponibles" />
               </div>
               <div>
-                <div class="star-pool-stat-label">Estrellas donadas por ti hasta ahora al Fondo Común de Estrellas</div>
-                <div class="star-pool-stat-value">434</div>
+                <div class="star-pool-stat-label">Estrellas actualmente disponibles para donar</div>
+                <div class="star-pool-stat-value">{formatStars(starPool.my_donatable_stars_total)}</div>
               </div>
             </div>
 
             <div class="star-pool-total">
-              <div class="star-pool-total-label">Con tu donación el Fondo Común de Estrellas ha ascendido a un total de:</div>
-              <div class="star-pool-total-value">5.400.321 estrellas</div>
+              <div class="star-pool-total-label">Total actual del Fondo Común de Estrellas:</div>
+              <div class="star-pool-total-value">{formatStars(starPool.common_pool_stars_total)} estrellas</div>
             </div>
           </div>
 
           <div class="star-pool-achievements">
-            <h4>Esto te ha permitido obtener los siguientes Logros:</h4>
-            <div class="donation-badges">
-              <div class="donation-badge">
-                <div class="star-circle star-circle-sm">
-                  <img src="/css/AKI/Donation/1.webp" alt="Explorador del Misterio" />
-                </div>
-                <span>Explorador del Misterio</span>
+            <h4>Logros de donación desbloqueados</h4>
+
+            {#if unlockedDonationAchievements.length === 0}
+              <p class="panel-muted">
+                Aún no tienes logros de donación desbloqueados. Tu primer logro aparece al llegar a 1.000 estrellas donadas.
+              </p>
+            {:else}
+              <div class="donation-badges">
+                {#each unlockedDonationAchievements as achievement}
+                  <div class="donation-badge">
+                    <div class="star-circle star-circle-sm">
+                      <img src={achievement.image_url} alt={achievement.title} />
+                    </div>
+                    <span>{achievement.title}</span>
+                  </div>
+                {/each}
               </div>
-              <div class="donation-badge">
-                <div class="star-circle star-circle-sm">
-                  <img src="/css/AKI/Donation/2.webp" alt="Confiado en el Universo" />
-                </div>
-                <span>Confiado en el Universo</span>
-              </div>
-              <div class="donation-badge">
-                <div class="star-circle star-circle-sm">
-                  <img src="/css/AKI/Donation/3.webp" alt="Creyente de las Nebulosas" />
-                </div>
-                <span>Creyente de las Nebulosas</span>
-              </div>
-            </div>
+            {/if}
           </div>
         </article>
       </section>
@@ -257,6 +380,7 @@
             <li><a href="/?lang=es">Español</a></li>
             <li><a href="/?lang=en">English</a></li>
             <li><a href="/?lang=fr">Français</a></li>
+            <li><a href="/?lang=pt">Português</a></li>
           </ul>
         </div>
 
@@ -304,22 +428,46 @@
         <div class="star-circle star-circle-lg">
           <img src="/css/star.webp" alt="Estrella acumulada" />
         </div>
-        <div class="star-modal-number">5.000.000</div>
+        <div class="star-modal-number">{formatStars(starPool.my_received_stars_total)}</div>
+      </div>
+
+      <div class="star-modal-metrics">
+        <div>
+          <strong>Disponibles para donar:</strong>
+          {formatStars(starPool.my_donatable_stars_total)}
+        </div>
+        <div>
+          <strong>Ya donadas al Fondo Común:</strong>
+          {formatStars(starPool.my_donated_stars_total)}
+        </div>
       </div>
     </div>
 
     <div class="modal-actions">
-      <a class="btn btn-primary btn-compact" href="/star-pool" id="donateStarsBtn" on:click={handleDonateClick}>
-        Donar mis estrellas al Fondo Común de Estrellas
-      </a>
-      <a class="btn btn-outline btn-compact visitor-only" href="game-star.html">
+      <button
+        class="btn btn-primary btn-compact"
+        type="button"
+        id="donateStarsBtn"
+        on:click={handleDonateClick}
+        disabled={!canDonate || isDonating || isLoading}
+      >
+        {#if isDonating}
+          Donando...
+        {:else if canDonate}
+          Donar mis estrellas al Fondo Común de Estrellas
+        {:else}
+          No tienes estrellas nuevas por donar
+        {/if}
+      </button>
+      <a class="btn btn-outline btn-compact visitor-only" href="/game-star.html">
         Regalarle una estrella
       </a>
     </div>
 
-    <div class="star-modal-note">
-      Esta opción solo aparece para visitantes. Para simularlo, cambia <code>isVisitor</code> a <code>true</code> en el
-      script (eso actualiza <code>data-visitor</code> en <code>body</code>).
-    </div>
+    {#if statusError}
+      <div class="star-modal-note star-modal-note-error">{statusError}</div>
+    {:else if statusMessage}
+      <div class="star-modal-note">{statusMessage}</div>
+    {/if}
   </div>
 </div>

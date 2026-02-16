@@ -19,6 +19,7 @@ DEMO_USERS = [
         "password": "CarlosDemo*2026",
         "role": "guardian",
         "guardian_rank": 1,
+        "username": "carlosjimenezduarte",
     },
     {
         "first_name": "David",
@@ -29,6 +30,7 @@ DEMO_USERS = [
         "password": "DavidDemo*2026",
         "role": "user",
         "guardian_rank": None,
+        "username": "davidjimenezflorez",
     },
 ]
 
@@ -51,6 +53,7 @@ def upsert_demo_users() -> None:
                     password_hash=hash_password(payload["password"]),
                     role=payload["role"],
                     guardian_rank=payload["guardian_rank"],
+                    username=payload["username"],
                     is_active=True,
                 )
                 db.add(user)
@@ -62,6 +65,7 @@ def upsert_demo_users() -> None:
                 user.password_hash = hash_password(payload["password"])
                 user.role = payload["role"]
                 user.guardian_rank = payload["guardian_rank"]
+                user.username = payload["username"]
                 user.is_active = True
 
         db.commit()

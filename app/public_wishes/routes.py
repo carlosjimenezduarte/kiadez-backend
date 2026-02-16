@@ -93,7 +93,7 @@ def list_personal_wishes(
         select(PublicPersonalWish)
         .where(PublicPersonalWish.user_id == current.user_number)
         .where(PublicPersonalWish.status == PublicPersonalWishStatus.active)
-        .order_by(PublicPersonalWish.created_at.asc())
+        .order_by(PublicPersonalWish.created_at.desc(), PublicPersonalWish.id.desc())
     ).scalars().all()
 
     fulfilled_total = db.execute(

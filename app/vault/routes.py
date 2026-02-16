@@ -9,6 +9,7 @@ from app.db.models.user_vault import UserVault
 from app.db.models.life_purpose import LifePurpose
 from app.db.models.private_personal_wish import PrivatePersonalWish
 from app.db.models.media import Media, MediaVisibility
+from app.db.models.oracle import OracleResponse, OracleResponseType
 from app.core.storage import S3NotConfiguredError, delete_object
 from app.vault.schemas import VaultResetKeywordsOut, VaultResetOut, VaultResetRequest
 
@@ -138,6 +139,16 @@ def vault_reset(payload: VaultResetRequest, current: UserPublic = Depends(get_cu
         .delete(synchronize_session=False)
     )
 
+    # Respuestas secretas del Oráculo (cifradas) dejan de ser recuperables tras resetear el vault.
+    cleared_oracle_secret_responses = (
+        db.query(OracleResponse)
+        .filter(
+            OracleResponse.user_id == current.user_number,
+            OracleResponse.response_type == OracleResponseType.secret,
+        )
+        .delete(synchronize_session=False)
+    )
+
     deleted_media = 0
     if media_ids:
         medias = db.query(Media).filter(Media.id.in_(media_ids)).all()
@@ -162,4 +173,5 @@ def vault_reset(payload: VaultResetRequest, current: UserPublic = Depends(get_cu
         "life_purpose_private_cleared": int(cleared_life_purpose or 0),
         "private_wishes_cleared": int(cleared_private_wishes or 0),
         "private_media_deleted": int(deleted_media or 0),
+        "oracle_secret_responses_cleared": int(cleared_oracle_secret_responses or 0),
     }
