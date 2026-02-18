@@ -261,3 +261,7 @@ class BiographyFavoriteQuotesOut(BaseModel):
     section_title: str | None = None
     section_text: str | None = None
     word_count: int = 0
+
+
+class BiographyActivityStatsOut(BaseModel):
+    wishes_granted: int = 0

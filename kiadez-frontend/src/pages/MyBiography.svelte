@@ -177,6 +177,7 @@
     const professionalActiveYearsInput = document.getElementById("professionalActiveYearsInput");
     const professionalOccupationValue = document.getElementById("professionalOccupationValue");
     const professionalActiveYearsValue = document.getElementById("professionalActiveYearsValue");
+    const wishesGrantedValue = document.getElementById("wishesGrantedValue");
 
     const defaultProfilePhotoSrc = profilePhoto?.getAttribute("src") || "/css/logo-kiadez.webp";
     const defaultEmblemSrc = emblemImage?.getAttribute("src") || "/css/logo-kiadez.webp";
@@ -344,6 +345,12 @@
     const applyProfessionalInfoToView = (professionalInfo) => {
       setTextOrFallback(professionalOccupationValue, professionalInfo?.occupation);
       setTextOrFallback(professionalActiveYearsValue, professionalInfo?.active_years);
+    };
+
+    const applyActivityStatsToView = (stats) => {
+      if (!wishesGrantedValue) return;
+      const totalGranted = Number(stats?.wishes_granted);
+      wishesGrantedValue.textContent = Number.isFinite(totalGranted) ? String(Math.max(0, Math.trunc(totalGranted))) : "0";
     };
 
     const applyAboutToView = (about) => {
@@ -810,6 +817,16 @@
       }
       currentFavoriteQuotes = data;
       applyQuotesToView(data);
+      return data;
+    };
+
+    const loadActivityStats = async () => {
+      const res = await apiFetch("/biography/activity-stats");
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo cargar la actividad de Kiadez.");
+      }
+      applyActivityStatsToView(data);
       return data;
     };
 
@@ -1758,6 +1775,7 @@
     void loadProAchievements().catch(() => {});
     void loadLifeAchievements().catch(() => {});
     void loadFavoriteQuotes().catch(() => {});
+    void loadActivityStats().catch(() => {});
 
     return () => {
       personalInfoEditBtn?.removeEventListener("click", handleOpenPersonalInfoModal);
@@ -2274,7 +2292,7 @@
                 </tr>
                 <tr data-field="wishes_granted">
                   <th>Deseos concedidos</th>
-                  <td><span data-value>57</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
+                  <td><span id="wishesGrantedValue" data-value>0</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
                       decirlo</span>
                   </td>
                 </tr>

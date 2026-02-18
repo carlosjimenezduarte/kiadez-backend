@@ -14,6 +14,7 @@ from app.private_wishes.routes import router as private_wishes_router
 from app.oracle.routes import router as oracle_router
 from app.follows.routes import router as follows_router
 from app.privacy.routes import router as privacy_router
+from app.guardian_center.routes import router as guardian_center_router
 
 
 app = FastAPI(
@@ -44,6 +45,7 @@ app.include_router(private_wishes_router)
 app.include_router(oracle_router)
 app.include_router(follows_router)
 app.include_router(privacy_router)
+app.include_router(guardian_center_router)
 
 
 @app.get("/health")

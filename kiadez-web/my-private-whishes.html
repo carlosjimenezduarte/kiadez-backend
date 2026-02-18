@@ -89,11 +89,6 @@
             <article class="panel wish-list-panel">
               <div class="panel-head">
                 <h3 class="panel-title">Deseos privados</h3>
-                <div class="panel-actions">
-                  <button class="btn btn-outline btn-compact" type="button" id="private-toggle-visitor-view">
-                    Ver como visitante
-                  </button>
-                </div>
                 <span class="panel-badge"><span id="private-personal-wish-count">7</span> / 50</span>
               </div>
 
@@ -595,7 +590,6 @@
     const personalWishList = document.getElementById("private-personal-wish-list");
     const personalWishAdd = document.getElementById("private-personal-wish-add");
     const personalWishCount = document.getElementById("private-personal-wish-count");
-    const toggleVisitorView = document.getElementById("private-toggle-visitor-view");
     const personalWishModal = document.getElementById("private-personal-wish-modal");
     const closePersonalWishModal = document.getElementById("private-close-personal-wish-modal");
     const deleteWishModal = document.getElementById("private-delete-wish-modal");
@@ -1160,25 +1154,6 @@
           resetSlotToEmpty(activeDeleteSlot);
         }
         closeDeleteWishModalFn();
-      });
-    }
-
-    const rerenderPersonalSlots = () => {
-      if (!personalWishList) return;
-      const slots = Array.from(personalWishList.querySelectorAll(".wish-slot.is-filled"));
-      slots.forEach((slot) => {
-        const description = slot.dataset.description || "";
-        const type = slot.dataset.type || "Espiritual";
-        const imageUrl = slot.dataset.imageUrl || null;
-        renderPersonalWishSlot(slot, description, imageUrl, type);
-      });
-    };
-
-    if (toggleVisitorView) {
-      toggleVisitorView.addEventListener("click", () => {
-        isVisitorView = !isVisitorView;
-        toggleVisitorView.textContent = isVisitorView ? "Ver como propietario" : "Ver como visitante";
-        rerenderPersonalSlots();
       });
     }
 

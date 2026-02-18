@@ -522,14 +522,25 @@
 	                              />
 	                            </button>
 	                            <br />
-	                            <div class="wish-slot-title">{item.wish.wish_text}</div>
-	                            <div class="wish-slot-meta wish-slot-meta-fulfilled">
+                            <div class="wish-slot-title">{item.wish.wish_text}</div>
+                            <div class="wish-slot-meta wish-slot-meta-fulfilled">
                               {#if item.wish.fulfilled_at}
                                 <span class="wish-type-pill wish-fulfilled-date-pill">
                                   Cumplido el {formatFulfilledDate(item.wish.fulfilled_at)}
                                 </span>
                               {/if}
                             </div>
+                            {#if item.wish.fulfillment_message}
+                              {#if item.wish.fulfilled_by_profile_url}
+                                <a class="wish-fulfilled-grant-bubble" href={item.wish.fulfilled_by_profile_url}>
+                                  {item.wish.fulfillment_message}
+                                </a>
+                              {:else}
+                                <span class="wish-fulfilled-grant-bubble">
+                                  {item.wish.fulfillment_message}
+                                </span>
+                              {/if}
+                            {/if}
                           </div>
                         </div>
 

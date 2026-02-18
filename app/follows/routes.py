@@ -25,6 +25,7 @@ PAGE_SIZE_DEFAULT = 25
 PAGE_SIZE_MAX = 25
 SUGGESTIONS_MAX_PAGES = 20
 SUGGESTIONS_RECENT_DAYS = 90
+GUARDIANS_MIN_RANK = 3
 
 
 def _build_profile_url(username: str | None, *, user_id: int) -> str:
@@ -367,6 +368,57 @@ def list_follow_suggestions(
         current_user_id=current_user_id,
         target_ids=user_ids,
     )
+    items = _rows_to_items(
+        db=db,
+        rows=rows,
+        current_user_id=current_user_id,
+        is_following_ids=is_following_ids,
+        follows_me_ids=follows_me_ids,
+    )
+    return _build_follow_list_response(page_data=page_data, items=items)
+
+
+@router.get("/guardians", response_model=FollowListResponse)
+def list_guardians(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=4, ge=1, le=PAGE_SIZE_MAX),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user_id = current.user_number
+
+    base_filters = (
+        User.is_active.is_(True),
+        User.guardian_rank.is_not(None),
+        User.guardian_rank >= GUARDIANS_MIN_RANK,
+    )
+
+    total = int(db.execute(select(func.count(User.id)).where(*base_filters)).scalar_one() or 0)
+    page_data = _paginate(total=total, page=page, page_size=page_size, max_pages=None)
+
+    followers_count_sq = _followers_count_subquery()
+    rows = db.execute(
+        select(
+            User.id.label("user_id"),
+            User.first_name.label("first_name"),
+            User.last_name.label("last_name"),
+            User.username.label("username"),
+            User.role.label("role"),
+            User.guardian_rank.label("guardian_rank"),
+            User.profile_photo_media_id.label("profile_photo_media_id"),
+            User.received_stars_total.label("received_stars_total"),
+            func.coalesce(followers_count_sq.c.followers_count, 0).label("followers_count"),
+        )
+        .outerjoin(followers_count_sq, followers_count_sq.c.user_id == User.id)
+        .where(*base_filters)
+        .order_by(desc(User.guardian_rank), asc(User.id))
+        .offset(page_data["offset"])
+        .limit(page_data["page_size"])
+    ).all()
+
+    user_ids = [int(row._mapping["user_id"]) for row in rows]
+    is_following_ids = _fetch_following_ids(db, current_user_id=current_user_id, target_ids=user_ids)
+    follows_me_ids = _fetch_follows_me_ids(db, current_user_id=current_user_id, target_ids=user_ids)
     items = _rows_to_items(
         db=db,
         rows=rows,

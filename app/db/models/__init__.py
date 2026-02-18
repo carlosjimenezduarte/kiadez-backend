@@ -21,5 +21,16 @@ from .biography_life_achievements import BiographyLifeAchievements  # noqa
 from .biography_favorite_quotes import BiographyFavoriteQuotes  # noqa
 from .public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus  # noqa
 from .private_personal_wish import PrivatePersonalWish, PrivatePersonalWishStatus  # noqa
+from .public_wish_freeze_audit import (
+    PublicWishFreezeAudit,
+    PublicWishFreezeAuditAction,
+    PublicWishUnfreezeReasonType,
+)  # noqa
+from .public_wish_fulfillment import (
+    PublicWishFulfillment,
+    PublicWishFulfillmentAttributionMode,
+)  # noqa
 from .oracle import OracleUserState, OracleResponse, OracleResponseType  # noqa
 from .user_follow import UserFollow  # noqa
+from .guardian_wish_request import GuardianWishRequest, GuardianWishRequestStatus  # noqa
+from .guardian_wish_message import GuardianWishMessage, GuardianWishMessageKind  # noqa

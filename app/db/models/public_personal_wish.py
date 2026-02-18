@@ -42,6 +42,12 @@ class PublicPersonalWish(Base):
         nullable=True,
         index=True,
     )
+    frozen_by_guardian_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    frozen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     status: Mapped[PublicPersonalWishStatus] = mapped_column(
         SAEnum(PublicPersonalWishStatus, name="public_personal_wish_status"),

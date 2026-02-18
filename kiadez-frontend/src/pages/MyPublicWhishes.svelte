@@ -127,7 +127,6 @@
     const personalWishList = document.getElementById("personalWishList");
     const personalWishAdd = document.getElementById("personalWishAdd");
     const personalWishCount = document.getElementById("personalWishCount");
-    const toggleVisitorView = document.getElementById("toggleVisitorView");
     const cooperativeWishList = document.getElementById("cooperativeWishList");
     const cooperativeWishAdd = document.getElementById("cooperativeWishAdd");
     const cooperativeWishCountLabel = document.getElementById("cooperativeWishCountLabel");
@@ -199,6 +198,51 @@
     const icanConfirmNo = document.getElementById("icanConfirmNo");
     const guardianContactModal = document.getElementById("guardianContactModal");
     const cancelGuardianModal = document.getElementById("cancelGuardianModal");
+    const guardianSelect = document.getElementById("guardianSelect");
+    const guardianPrevPage = document.getElementById("guardianPrevPage");
+    const guardianNextPage = document.getElementById("guardianNextPage");
+    const guardianPageLabel = document.getElementById("guardianPageLabel");
+    const guardianStatus = document.getElementById("guardianStatus");
+    const guardianReasonVisitor = document.getElementById("guardianReasonVisitor");
+    const guardianReasonError = document.getElementById("guardianReasonError");
+    const guardianPhoneVisitor = document.getElementById("guardianPhoneVisitor");
+    const guardianPhoneError = document.getElementById("guardianPhoneError");
+    const guardianEmailVisitor = document.getElementById("guardianEmailVisitor");
+    const guardianEmailError = document.getElementById("guardianEmailError");
+    const guardianEvidenceRow = document.getElementById("guardianEvidenceRow");
+    const guardianEvidenceInput = document.getElementById("guardianEvidenceVisitor");
+    const guardianEvidencePreview = document.getElementById("guardianEvidencePreview");
+    const guardianEvidenceThumb = document.getElementById("guardianEvidenceThumb");
+    const guardianEvidenceName = document.getElementById("guardianEvidenceName");
+    const guardianEvidenceError = document.getElementById("guardianEvidenceError");
+    const guardianSendBtn = document.getElementById("guardianSendBtn");
+    const guardianRequestContext = document.getElementById("guardianRequestContext");
+    const freezeWishConfirmModal = document.getElementById("freezeWishConfirmModal");
+    const freezeWishConfirmYes = document.getElementById("freezeWishConfirmYes");
+    const freezeWishConfirmNo = document.getElementById("freezeWishConfirmNo");
+    const unfreezeWishReasonModal = document.getElementById("unfreezeWishReasonModal");
+    const unfreezeReasonModalClose = document.getElementById("unfreezeReasonModalClose");
+    const unfreezeReasonErrorBtn = document.getElementById("unfreezeReasonErrorBtn");
+    const unfreezeReasonUnexpectedBtn = document.getElementById("unfreezeReasonUnexpectedBtn");
+    const unfreezeReasonCancel = document.getElementById("unfreezeReasonCancel");
+    const unfreezeWishUnexpectedModal = document.getElementById("unfreezeWishUnexpectedModal");
+    const unfreezeUnexpectedModalClose = document.getElementById("unfreezeUnexpectedModalClose");
+    const unfreezeUnexpectedText = document.getElementById("unfreezeUnexpectedText");
+    const unfreezeUnexpectedWordCount = document.getElementById("unfreezeUnexpectedWordCount");
+    const unfreezeUnexpectedError = document.getElementById("unfreezeUnexpectedError");
+    const unfreezeUnexpectedSubmit = document.getElementById("unfreezeUnexpectedSubmit");
+    const unfreezeUnexpectedCancel = document.getElementById("unfreezeUnexpectedCancel");
+    const guardianFulfillModal = document.getElementById("guardianFulfillModal");
+    const guardianFulfillClose = document.getElementById("guardianFulfillClose");
+    const guardianFulfillCancel = document.getElementById("guardianFulfillCancel");
+    const guardianFulfillSubmit = document.getElementById("guardianFulfillSubmit");
+    const guardianFulfillEvidence = document.getElementById("guardianFulfillEvidence");
+    const guardianFulfillEvidencePreview = document.getElementById("guardianFulfillEvidencePreview");
+    const guardianFulfillCommitmentCode = document.getElementById("guardianFulfillCommitmentCode");
+    const guardianFulfillCodeError = document.getElementById("guardianFulfillCodeError");
+    const guardianFulfillAttributionSecret = document.getElementById("guardianFulfillAttributionSecret");
+    const guardianFulfillAttributionPublic = document.getElementById("guardianFulfillAttributionPublic");
+    const guardianFulfillAttributionError = document.getElementById("guardianFulfillAttributionError");
     const cooperativeParticipateModal = document.getElementById("cooperativeParticipateModal");
     const cooperativeParticipateDescription = document.getElementById("cooperativeParticipateDescription");
     const cooperativeParticipateQuote = document.getElementById("cooperativeParticipateQuote");
@@ -251,15 +295,43 @@
 	    let coverSavedOffsetX = 0;
 	    let coverSavedOffsetY = 0;
 	    let coverPendingUrl = null;
-	    let isVisitorView = false;
 	    let isViewingOwnProfile = true;
 	    let viewerUserId = null;
 	    let viewerUsername = "";
+	    let viewerGuardianRank = 0;
+	    let viewerIsGuardian = false;
 	    let activeProfileUserId = null;
 	    let activeProfileUsername = "";
 	    let activeProfileFullName = "";
+	    let highlightWishId = null;
 	    let fulfillEvidenceUrl = null;
 	    let fulfillEvidenceImage = null;
+	    const GUARDIANS_PAGE_SIZE = 4;
+	    const GUARDIAN_REQUIRED_RANK = 3;
+	    const GUARDIAN_AVATAR_PLACEHOLDERS = [
+	      "/css/icons/Guardian1.png",
+	      "/css/icons/Guardian2.png",
+	      "/css/icons/Guardian3.png",
+	      "/css/icons/Guardian4.png",
+	    ];
+	    let guardiansPage = 1;
+	    let guardiansTotalPages = 1;
+	    let guardiansItems = [];
+	    let guardiansLoading = false;
+	    let guardiansError = "";
+	    let selectedGuardianUserId = null;
+	    let guardianRequestWishId = null;
+	    let guardianRequestWishText = "";
+	    let guardianEvidenceUrl = null;
+	    let guardianEvidenceMedia = null;
+	    let guardianSubmitting = false;
+	    let activeGuardianFreezeSlot = null;
+	    let guardianFreezeSubmitting = false;
+	    let activeGuardianFulfillSlot = null;
+	    let guardianFulfillSubmitting = false;
+	    let guardianFulfillEvidenceUrl = null;
+	    let guardianFulfillEvidenceImage = null;
+	    let guardianFulfillAttributionMode = null;
 
     const addLampSlot = () => {
       if (!lampSlotTemplate || !personalWishList) return;
@@ -570,9 +642,11 @@
 	        throw new Error(data.detail || "No se pudo cargar tu perfil.");
 	      }
 	      const userId = Number(data?.user_number);
+	      const guardianRank = Number(data?.guardian_rank || 0) || 0;
 	      return {
 	        user_id: Number.isFinite(userId) && userId > 0 ? userId : null,
 	        username: normalizeUsername(data?.username || ""),
+	        guardian_rank: guardianRank,
 	      };
 	    };
 
@@ -655,9 +729,7 @@
 	    };
 
 	    const applyForeignViewMode = () => {
-	      isVisitorView = true;
 	      document.body.dataset.visitor = "true";
-	      if (toggleVisitorView) toggleVisitorView.classList.add("hidden");
 	      if (personalWishAdd) personalWishAdd.classList.add("hidden");
 	      if (cooperativeWishAdd) cooperativeWishAdd.classList.add("hidden");
 	      document.querySelectorAll(".wish-add-row").forEach((row) => row.classList.add("hidden"));
@@ -665,6 +737,7 @@
 
 	    const resolveProfileContext = async () => {
 	      const params = new URLSearchParams(window.location.search);
+	      highlightWishId = parsePositiveId(params.get("wish"));
 	      const requestedIdRaw = params.get("id");
 	      const requestedId = Number(requestedIdRaw);
 	      const requestedUserId =
@@ -674,6 +747,8 @@
 	      const me = await fetchViewerIdentity();
 	      viewerUserId = me.user_id;
 	      viewerUsername = me.username;
+	      viewerGuardianRank = Number(me.guardian_rank || 0) || 0;
+	      viewerIsGuardian = viewerGuardianRank >= GUARDIAN_REQUIRED_RANK;
 
 	      activeProfileUserId = viewerUserId;
 	      activeProfileUsername = viewerUsername;
@@ -720,8 +795,82 @@
       if (!res.ok) {
         throw new Error(data.detail || "No se pudo subir la imagen.");
       }
-      return data;
-    };
+	      return data;
+	    };
+
+	    const uploadPublicImageMedia = async (file) => {
+	      if (!file) return null;
+	      const formData = new FormData();
+	      formData.append("visibility", "public");
+	      formData.append("file", file);
+	      const res = await apiFetch("/media/upload/direct", {
+	        method: "POST",
+	        body: formData
+	      });
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo subir la imagen.");
+	      }
+	      return data;
+	    };
+
+	    const uploadGuardianEvidenceFile = async (file) => {
+	      if (!file) return null;
+	      const mime = String(file.type || "").toLowerCase();
+
+	      if (mime.startsWith("image/")) {
+	        const formData = new FormData();
+	        formData.append("visibility", "private");
+	        formData.append("file", file);
+	        const res = await apiFetch("/media/upload/direct", {
+	          method: "POST",
+	          body: formData
+	        });
+	        const data = await parseResponseJson(res);
+	        if (!res.ok) {
+	          throw new Error(data.detail || "No se pudo subir la evidencia.");
+	        }
+	        return { media_id: data.media_id };
+	      }
+
+	      if (!mime.startsWith("video/")) {
+	        throw new Error("Solo se permiten archivos de imagen o video.");
+	      }
+
+	      const presignRes = await apiFetch("/media/presign/upload", {
+	        method: "POST",
+	        headers: { "Content-Type": "application/json" },
+	        body: JSON.stringify({
+	          filename: file.name,
+	          content_type: file.type,
+	          size_bytes: file.size,
+	          visibility: "private"
+	        })
+	      });
+	      const presignData = await parseResponseJson(presignRes);
+	      if (!presignRes.ok) {
+	        throw new Error(presignData.detail || "No se pudo preparar la carga del video.");
+	      }
+
+	      const mediaId = Number(presignData?.media_id || 0);
+	      if (!Number.isFinite(mediaId) || mediaId <= 0) {
+	        throw new Error("No se pudo preparar la carga (media_id inválido).");
+	      }
+
+	      const proxyForm = new FormData();
+	      proxyForm.append("media_id", String(mediaId));
+	      proxyForm.append("file", file);
+	      const proxyRes = await apiFetch("/media/upload/proxy", {
+	        method: "POST",
+	        body: proxyForm
+	      });
+	      const proxyData = await parseResponseJson(proxyRes);
+	      if (!proxyRes.ok) {
+	        throw new Error(proxyData.detail || "No se pudo subir el video.");
+	      }
+
+	      return { media_id: mediaId };
+	    };
 
 	    const fetchPersonalWishList = async () => {
 	      const profileId = Number(activeProfileUserId);
@@ -798,6 +947,52 @@
       }
       return data;
     };
+
+	    const freezePersonalWishRecord = async (wishId) => {
+	      if (!viewerIsGuardian) {
+	        throw new Error("Acceso restringido (rango de Guardián requerido).");
+	      }
+	      const res = await apiFetch(`/public-wishes/personal/${wishId}/freeze`, {
+	        method: "POST"
+	      });
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo congelar el deseo.");
+	      }
+	      return data;
+	    };
+
+	    const fulfillPersonalWishFromGuardianRecord = async (wishId, payload) => {
+	      if (!viewerIsGuardian) {
+	        throw new Error("Acceso restringido (rango de Guardián requerido).");
+	      }
+	      const res = await apiFetch(`/public-wishes/personal/${wishId}/guardian-fulfill`, {
+	        method: "POST",
+	        headers: { "Content-Type": "application/json" },
+	        body: JSON.stringify(payload)
+	      });
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo marcar el deseo como cumplido.");
+	      }
+	      return data;
+	    };
+
+	    const unfreezePersonalWishRecord = async (wishId, payload) => {
+	      if (!viewerIsGuardian) {
+	        throw new Error("Acceso restringido (rango de Guardián requerido).");
+	      }
+	      const res = await apiFetch(`/public-wishes/personal/${wishId}/unfreeze`, {
+	        method: "POST",
+	        headers: { "Content-Type": "application/json" },
+	        body: JSON.stringify(payload)
+	      });
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo descongelar el deseo.");
+	      }
+	      return data;
+	    };
 
     const fetchPurposeSlotsFromApi = async () => {
       const token = getAccessToken();
@@ -1221,11 +1416,306 @@
       activeIcanSlot = null;
     };
 
+	    const renderGuardianSelect = () => {
+	      if (!guardianSelect) return;
+
+	      guardianSelect.innerHTML = "";
+
+	      const setStatus = (message) => {
+	        if (!guardianStatus) return;
+	        const normalized = String(message || "").trim();
+	        guardianStatus.textContent = normalized;
+	        guardianStatus.classList.toggle("hidden", !normalized);
+	      };
+
+	      if (guardiansLoading) {
+	        setStatus("Cargando guardianes...");
+	      } else if (guardiansError) {
+	        setStatus(guardiansError);
+	      } else if (!guardiansItems.length) {
+	        setStatus("Aún no hay guardianes disponibles.");
+	      } else {
+	        setStatus("Pulsa un avatar para visitar el perfil del Guardián.");
+	      }
+
+	      const availableGuardianIds = guardiansItems
+	        .map((guardian) => parsePositiveId(guardian?.user_id))
+	        .filter(Boolean);
+	      const firstGuardianId = availableGuardianIds[0] || null;
+	      if (!selectedGuardianUserId && firstGuardianId) {
+	        selectedGuardianUserId = firstGuardianId;
+	      }
+	      if (selectedGuardianUserId && !availableGuardianIds.includes(selectedGuardianUserId)) {
+	        selectedGuardianUserId = firstGuardianId;
+	      }
+
+	      guardiansItems.slice(0, GUARDIANS_PAGE_SIZE).forEach((guardian, index) => {
+	        const profileUrl = String(guardian?.profile_url || "").trim();
+	        if (!profileUrl) return;
+
+	        const guardianUserId = parsePositiveId(guardian?.user_id);
+	        if (!guardianUserId) return;
+
+	        const fullName = String(guardian?.full_name || "Guardián").trim() || "Guardián";
+	        const handle = String(guardian?.handle || "").trim();
+	        const imgSrc = GUARDIAN_AVATAR_PLACEHOLDERS[index] || GUARDIAN_AVATAR_PLACEHOLDERS[0];
+
+	        const link = document.createElement("a");
+	        link.className = "guardian-option";
+	        link.href = profileUrl;
+	        link.target = "_blank";
+	        link.rel = "noopener noreferrer";
+	        link.title = handle ? `${fullName} (${handle})` : fullName;
+	        link.setAttribute("aria-label", `Visitar perfil de ${fullName}`);
+	        link.dataset.guardianUserId = `${guardianUserId}`;
+	        if (selectedGuardianUserId && guardianUserId === selectedGuardianUserId) {
+	          link.classList.add("is-selected");
+	          link.setAttribute("aria-current", "true");
+	        }
+
+	        const img = document.createElement("img");
+	        img.className = "guardian-avatar";
+	        img.src = imgSrc;
+	        img.alt = fullName;
+	        link.appendChild(img);
+
+	        guardianSelect.appendChild(link);
+	      });
+
+	      if (guardianPageLabel) {
+	        const safeTotalPages = Math.max(1, Number(guardiansTotalPages || 1));
+	        const safePage = Math.max(1, Math.min(Number(guardiansPage || 1), safeTotalPages));
+	        guardianPageLabel.textContent = `${safePage} / ${safeTotalPages}`;
+	      }
+
+	      if (guardianPrevPage) {
+	        guardianPrevPage.disabled = guardiansLoading || guardiansPage <= 1;
+	      }
+	      if (guardianNextPage) {
+	        guardianNextPage.disabled = guardiansLoading || guardiansPage >= guardiansTotalPages;
+	      }
+	    };
+
+	    const loadGuardiansPage = async (page = 1) => {
+	      const requestedPage = Math.max(1, Number(page || 1));
+	      guardiansLoading = true;
+	      guardiansError = "";
+	      guardiansItems = [];
+	      guardiansPage = requestedPage;
+	      renderGuardianSelect();
+
+	      try {
+	        const res = await apiFetch(
+	          `/follows/guardians?page=${encodeURIComponent(String(requestedPage))}&page_size=${encodeURIComponent(String(GUARDIANS_PAGE_SIZE))}`
+	        );
+	        const data = await parseResponseJson(res);
+	        if (!res.ok) {
+	          throw new Error(data.detail || "No se pudieron cargar los guardianes.");
+	        }
+	        guardiansItems = Array.isArray(data?.items) ? data.items : [];
+	        guardiansTotalPages = Math.max(1, Number(data?.total_pages || 1));
+	        guardiansPage = Math.max(1, Math.min(Number(data?.page || requestedPage), guardiansTotalPages));
+	      } catch (error) {
+	        console.error(error);
+	        guardiansError = error?.message || "No se pudieron cargar los guardianes.";
+	      } finally {
+	        guardiansLoading = false;
+	        renderGuardianSelect();
+	      }
+	    };
+
+	    const updateGuardianEvidencePreview = (file) => {
+	      if (!guardianEvidencePreview || !guardianEvidenceThumb) return;
+
+	      if (guardianEvidenceUrl) {
+	        URL.revokeObjectURL(guardianEvidenceUrl);
+	        guardianEvidenceUrl = null;
+	      }
+
+	      guardianEvidencePreview.classList.add("hidden");
+	      if (guardianEvidenceMedia) {
+	        guardianEvidenceMedia.remove();
+	        guardianEvidenceMedia = null;
+	      }
+	      guardianEvidenceThumb.innerHTML = "";
+	      if (guardianEvidenceName) guardianEvidenceName.textContent = "";
+
+	      if (!file) return;
+
+	      guardianEvidenceUrl = URL.createObjectURL(file);
+	      const mime = String(file.type || "").toLowerCase();
+
+	      if (mime.startsWith("video/")) {
+	        const video = document.createElement("video");
+	        video.src = guardianEvidenceUrl;
+	        video.controls = true;
+	        video.muted = true;
+	        video.playsInline = true;
+	        video.preload = "metadata";
+	        video.setAttribute("aria-label", "Evidencia seleccionada (video)");
+	        guardianEvidenceMedia = video;
+	      } else if (mime.startsWith("image/")) {
+	        const img = document.createElement("img");
+	        img.src = guardianEvidenceUrl;
+	        img.alt = "Evidencia seleccionada";
+	        guardianEvidenceMedia = img;
+	      } else {
+	        const fallback = document.createElement("div");
+	        fallback.textContent = "Archivo adjunto";
+	        guardianEvidenceMedia = fallback;
+	      }
+
+	      if (guardianEvidenceMedia) {
+	        guardianEvidenceMedia.className = "guardian-evidence-media";
+	        guardianEvidenceThumb.appendChild(guardianEvidenceMedia);
+	      }
+
+	      if (guardianEvidenceName) guardianEvidenceName.textContent = file.name || "";
+	      guardianEvidencePreview.classList.remove("hidden");
+	    };
+
+	    const setGuardianFieldError = (fieldEl, errorEl, show, message = "") => {
+	      if (fieldEl) fieldEl.classList.toggle("is-error", Boolean(show));
+	      if (!errorEl) return;
+	      if (show && message) errorEl.textContent = message;
+	      errorEl.classList.toggle("is-visible", Boolean(show));
+	    };
+
+	    const clearGuardianFormErrors = () => {
+	      setGuardianFieldError(guardianReasonVisitor, guardianReasonError, false);
+	      setGuardianFieldError(guardianPhoneVisitor, guardianPhoneError, false);
+	      setGuardianFieldError(guardianEmailVisitor, guardianEmailError, false);
+	      setGuardianFieldError(null, guardianEvidenceError, false);
+	      guardianEvidenceRow?.classList.remove("is-error");
+	    };
+
+	    const clearGuardianFormValues = () => {
+	      if (guardianReasonVisitor) guardianReasonVisitor.value = "";
+	      if (guardianPhoneVisitor) guardianPhoneVisitor.value = "";
+	      if (guardianEmailVisitor) guardianEmailVisitor.value = "";
+	      if (guardianEvidenceInput) guardianEvidenceInput.value = "";
+	      updateGuardianEvidencePreview(null);
+	    };
+
+	    const syncGuardianRequestContext = () => {
+	      if (!guardianRequestContext) return;
+	      const wishId = parsePositiveId(guardianRequestWishId);
+	      const text = String(guardianRequestWishText || "").trim();
+	      const prefix = wishId ? `Deseo #${wishId}` : "Deseo";
+	      const label = text ? `${prefix}: ${text}` : (wishId ? prefix : "");
+	      guardianRequestContext.textContent = label;
+	      guardianRequestContext.classList.toggle("hidden", !label);
+	    };
+
+	    const validateGuardianWishRequest = () => {
+	      clearGuardianFormErrors();
+
+	      const wishId = parsePositiveId(guardianRequestWishId);
+	      if (!wishId) {
+	        window.alert("No se pudo identificar el deseo. Cierra y vuelve a intentarlo.");
+	        return null;
+	      }
+
+	      const guardianId = parsePositiveId(selectedGuardianUserId);
+	      if (!guardianId) {
+	        window.alert("Aún no hay guardianes disponibles para recibir esta solicitud.");
+	        return null;
+	      }
+
+	      const reason = String(guardianReasonVisitor?.value || "").trim();
+	      const phone = String(guardianPhoneVisitor?.value || "").trim();
+	      const email = String(guardianEmailVisitor?.value || "").trim();
+	      const evidenceFile = guardianEvidenceInput?.files?.[0] || null;
+
+	      let firstInvalid = null;
+
+	      if (!reason) {
+	        setGuardianFieldError(guardianReasonVisitor, guardianReasonError, true, "Debes describir el motivo.");
+	        firstInvalid = firstInvalid || guardianReasonVisitor;
+	      }
+
+	      if (!phone) {
+	        setGuardianFieldError(guardianPhoneVisitor, guardianPhoneError, true, "Debes indicar tu número telefónico.");
+	        firstInvalid = firstInvalid || guardianPhoneVisitor;
+	      }
+
+	      const emailOk = guardianEmailVisitor ? guardianEmailVisitor.checkValidity() : Boolean(email);
+	      if (!email || !emailOk) {
+	        setGuardianFieldError(guardianEmailVisitor, guardianEmailError, true, "Debes indicar un e-mail válido.");
+	        firstInvalid = firstInvalid || guardianEmailVisitor;
+	      }
+
+	      if (!evidenceFile) {
+	        setGuardianFieldError(null, guardianEvidenceError, true, "Debes adjuntar una evidencia (imagen o video).");
+	        guardianEvidenceRow?.classList.add("is-error");
+	        firstInvalid = firstInvalid || guardianEvidenceInput;
+	      }
+
+	      if (firstInvalid?.focus) firstInvalid.focus();
+	      if (firstInvalid) return null;
+
+	      return { wishId, guardianId, reason, phone, email, evidenceFile };
+	    };
+
+	    const submitGuardianWishRequest = async () => {
+	      if (guardianSubmitting) return;
+	      const validated = validateGuardianWishRequest();
+	      if (!validated) return;
+
+	      guardianSubmitting = true;
+	      const oldLabel = guardianSendBtn?.textContent || "Enviar";
+	      if (guardianSendBtn) {
+	        guardianSendBtn.disabled = true;
+	        guardianSendBtn.textContent = "Enviando...";
+	      }
+
+	      try {
+	        const uploaded = await uploadGuardianEvidenceFile(validated.evidenceFile);
+	        const evidenceMediaId = Number(uploaded?.media_id || 0);
+	        if (!Number.isFinite(evidenceMediaId) || evidenceMediaId <= 0) {
+	          throw new Error("No se pudo subir la evidencia (media_id inválido).");
+	        }
+
+	        const res = await apiFetch("/guardian-center/wish-requests", {
+	          method: "POST",
+	          headers: { "Content-Type": "application/json" },
+	          body: JSON.stringify({
+	            public_wish_id: validated.wishId,
+	            guardian_user_id: validated.guardianId,
+	            reason: validated.reason,
+	            phone: validated.phone,
+	            email: validated.email,
+	            evidence_media_id: evidenceMediaId
+	          })
+	        });
+	        const data = await parseResponseJson(res);
+	        if (!res.ok) {
+	          throw new Error(data.detail || "No se pudo enviar la solicitud.");
+	        }
+
+	        window.alert("Solicitud enviada. Un Guardián la recibirá en el Centro del Guardián.");
+	        closeGuardianContactModalFn();
+	      } catch (error) {
+	        console.error(error);
+	        window.alert(error?.message || "No se pudo enviar la solicitud.");
+	      } finally {
+	        guardianSubmitting = false;
+	        if (guardianSendBtn) {
+	          guardianSendBtn.disabled = false;
+	          guardianSendBtn.textContent = oldLabel;
+	        }
+	      }
+	    };
+
     const openGuardianContactModal = () => {
       if (!guardianContactModal) return;
       guardianContactModal.classList.remove("hidden");
       guardianContactModal.setAttribute("aria-hidden", "false");
       updateModalScrollLock();
+	      clearGuardianFormErrors();
+	      clearGuardianFormValues();
+	      syncGuardianRequestContext();
+	      void loadGuardiansPage(1);
     };
 
     const closeGuardianContactModalFn = () => {
@@ -1233,6 +1723,328 @@
       guardianContactModal.classList.add("hidden");
       guardianContactModal.setAttribute("aria-hidden", "true");
       updateModalScrollLock();
+	      clearGuardianFormErrors();
+	      clearGuardianFormValues();
+	      selectedGuardianUserId = null;
+	      guardianRequestWishId = null;
+	      guardianRequestWishText = "";
+	      syncGuardianRequestContext();
+    };
+
+    const openFreezeWishConfirmModal = (slot) => {
+      if (!freezeWishConfirmModal || !slot) return;
+      activeGuardianFreezeSlot = slot;
+      freezeWishConfirmModal.classList.remove("hidden");
+      freezeWishConfirmModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+    };
+
+    const closeFreezeWishConfirmModalFn = () => {
+      if (!freezeWishConfirmModal) return;
+      freezeWishConfirmModal.classList.add("hidden");
+      freezeWishConfirmModal.setAttribute("aria-hidden", "true");
+      updateModalScrollLock();
+      activeGuardianFreezeSlot = null;
+    };
+
+    const openUnfreezeWishReasonModal = (slot) => {
+      if (!unfreezeWishReasonModal || !slot) return;
+      activeGuardianFreezeSlot = slot;
+      unfreezeWishReasonModal.classList.remove("hidden");
+      unfreezeWishReasonModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+    };
+
+    const closeUnfreezeWishReasonModalFn = ({ keepActiveSlot = false } = {}) => {
+      if (!unfreezeWishReasonModal) return;
+      unfreezeWishReasonModal.classList.add("hidden");
+      unfreezeWishReasonModal.setAttribute("aria-hidden", "true");
+      updateModalScrollLock();
+      if (!keepActiveSlot) {
+        activeGuardianFreezeSlot = null;
+      }
+    };
+
+    const openUnfreezeUnexpectedModal = () => {
+      if (!unfreezeWishUnexpectedModal) return;
+      closeUnfreezeWishReasonModalFn({ keepActiveSlot: true });
+      if (unfreezeUnexpectedText) {
+        unfreezeUnexpectedText.value = "";
+      }
+      setUnfreezeUnexpectedError(false);
+      syncUnexpectedWordCount();
+      unfreezeWishUnexpectedModal.classList.remove("hidden");
+      unfreezeWishUnexpectedModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+    };
+
+    const closeUnfreezeUnexpectedModalFn = ({ keepActiveSlot = false } = {}) => {
+      if (!unfreezeWishUnexpectedModal) return;
+      unfreezeWishUnexpectedModal.classList.add("hidden");
+      unfreezeWishUnexpectedModal.setAttribute("aria-hidden", "true");
+      setUnfreezeUnexpectedError(false);
+      if (unfreezeUnexpectedText) {
+        unfreezeUnexpectedText.value = "";
+      }
+      syncUnexpectedWordCount();
+      updateModalScrollLock();
+      if (!keepActiveSlot) {
+        activeGuardianFreezeSlot = null;
+      }
+    };
+
+    const setGuardianFulfillCodeError = (show, message = "") => {
+      if (!guardianFulfillCodeError) return;
+      if (show && message) guardianFulfillCodeError.textContent = message;
+      guardianFulfillCodeError.classList.toggle("is-visible", Boolean(show));
+    };
+
+    const setGuardianFulfillAttributionError = (show, message = "") => {
+      if (!guardianFulfillAttributionError) return;
+      if (show && message) guardianFulfillAttributionError.textContent = message;
+      guardianFulfillAttributionError.classList.toggle("is-visible", Boolean(show));
+    };
+
+    const syncGuardianFulfillAttributionButtons = () => {
+      if (guardianFulfillAttributionSecret) {
+        guardianFulfillAttributionSecret.classList.toggle(
+          "is-selected",
+          guardianFulfillAttributionMode === "secret"
+        );
+      }
+      if (guardianFulfillAttributionPublic) {
+        guardianFulfillAttributionPublic.classList.toggle(
+          "is-selected",
+          guardianFulfillAttributionMode === "public"
+        );
+      }
+    };
+
+    const setGuardianFulfillAttributionMode = (mode) => {
+      guardianFulfillAttributionMode = mode === "public" ? "public" : (mode === "secret" ? "secret" : null);
+      syncGuardianFulfillAttributionButtons();
+      if (guardianFulfillAttributionMode) {
+        setGuardianFulfillAttributionError(false);
+      }
+    };
+
+    const updateGuardianFulfillEvidencePreview = (file) => {
+      if (!guardianFulfillEvidencePreview) return;
+      const previewPlaceholder = guardianFulfillEvidencePreview.querySelector(".wish-preview-placeholder");
+      const previewName = guardianFulfillEvidencePreview.querySelector(".wish-preview-name");
+
+      if (guardianFulfillEvidenceUrl) {
+        URL.revokeObjectURL(guardianFulfillEvidenceUrl);
+        guardianFulfillEvidenceUrl = null;
+      }
+
+      if (!file) {
+        guardianFulfillEvidencePreview.classList.remove("has-image");
+        if (guardianFulfillEvidenceImage) {
+          guardianFulfillEvidenceImage.remove();
+          guardianFulfillEvidenceImage = null;
+        }
+        if (previewPlaceholder) previewPlaceholder.textContent = "Sube la evidencia visual.";
+        if (previewName) previewName.textContent = "PNG, WEBP, JPEG, etc.";
+        return;
+      }
+
+      guardianFulfillEvidenceUrl = URL.createObjectURL(file);
+      guardianFulfillEvidencePreview.classList.add("has-image");
+      if (!guardianFulfillEvidenceImage) {
+        guardianFulfillEvidenceImage = document.createElement("img");
+        guardianFulfillEvidenceImage.className = "wish-preview-image";
+        guardianFulfillEvidenceImage.alt = "Evidencia seleccionada";
+        guardianFulfillEvidencePreview.insertBefore(
+          guardianFulfillEvidenceImage,
+          guardianFulfillEvidencePreview.firstChild
+        );
+      }
+      guardianFulfillEvidenceImage.src = guardianFulfillEvidenceUrl;
+      if (previewPlaceholder) previewPlaceholder.textContent = "Imagen seleccionada";
+      if (previewName) previewName.textContent = file.name;
+    };
+
+    const openGuardianFulfillWishModal = (slot) => {
+      if (!guardianFulfillModal || !slot) return;
+      activeGuardianFulfillSlot = slot;
+      guardianFulfillModal.classList.remove("hidden");
+      guardianFulfillModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+      if (guardianFulfillEvidence) guardianFulfillEvidence.value = "";
+      if (guardianFulfillCommitmentCode) guardianFulfillCommitmentCode.value = "";
+      setGuardianFulfillCodeError(false);
+      setGuardianFulfillAttributionError(false);
+      setGuardianFulfillAttributionMode(null);
+      updateGuardianFulfillEvidencePreview(null);
+    };
+
+    const closeGuardianFulfillWishModalFn = () => {
+      if (!guardianFulfillModal) return;
+      guardianFulfillModal.classList.add("hidden");
+      guardianFulfillModal.setAttribute("aria-hidden", "true");
+      updateModalScrollLock();
+      if (guardianFulfillEvidence) guardianFulfillEvidence.value = "";
+      if (guardianFulfillCommitmentCode) guardianFulfillCommitmentCode.value = "";
+      setGuardianFulfillCodeError(false);
+      setGuardianFulfillAttributionError(false);
+      setGuardianFulfillAttributionMode(null);
+      updateGuardianFulfillEvidencePreview(null);
+      activeGuardianFulfillSlot = null;
+    };
+
+    const submitGuardianFulfillWish = async () => {
+      if (guardianFulfillSubmitting) return;
+      const slot = activeGuardianFulfillSlot;
+      const wishId = parsePositiveId(slot?.dataset?.wishId);
+      if (!slot || !wishId) {
+        closeGuardianFulfillWishModalFn();
+        return;
+      }
+
+      const frozenBy = parsePositiveId(slot?.dataset?.frozenByUserId);
+      if (!viewerUserId || !frozenBy || frozenBy !== viewerUserId) {
+        window.alert("Solo el guardián que congeló este deseo puede marcarlo como cumplido.");
+        closeGuardianFulfillWishModalFn();
+        return;
+      }
+
+      const commitmentCode = String(guardianFulfillCommitmentCode?.value || "").trim().toUpperCase();
+      let hasError = false;
+      if (!commitmentCode) {
+        setGuardianFulfillCodeError(true, "Debes indicar el código de compromiso.");
+        hasError = true;
+      }
+      if (!guardianFulfillAttributionMode) {
+        setGuardianFulfillAttributionError(true, "Debes seleccionar cómo se publicará esta concesión.");
+        hasError = true;
+      }
+      if (hasError) return;
+
+      guardianFulfillSubmitting = true;
+      const oldLabel = guardianFulfillSubmit?.textContent || "Confirmar y publicar deseo cumplido";
+      if (guardianFulfillSubmit) {
+        guardianFulfillSubmit.disabled = true;
+        guardianFulfillSubmit.textContent = "Procesando...";
+      }
+
+      try {
+        const evidenceFile = guardianFulfillEvidence?.files?.[0] || null;
+        const uploadedEvidence = evidenceFile ? await uploadPublicImageMedia(evidenceFile) : null;
+        await fulfillPersonalWishFromGuardianRecord(wishId, {
+          commitment_code: commitmentCode,
+          attribution_mode: guardianFulfillAttributionMode,
+          evidence_media_id: uploadedEvidence?.media_id || null,
+        });
+        closeGuardianFulfillWishModalFn();
+        await loadPersonalWishesFromApi();
+        window.dispatchEvent(new CustomEvent("kiadez:fulfilled-wishes-changed", { detail: { scope: "public" } }));
+        window.alert("Deseo marcado como cumplido.");
+      } catch (error) {
+        console.error(error);
+        window.alert(error?.message || "No se pudo marcar el deseo como cumplido.");
+      } finally {
+        guardianFulfillSubmitting = false;
+        if (guardianFulfillSubmit) {
+          guardianFulfillSubmit.disabled = false;
+          guardianFulfillSubmit.textContent = oldLabel;
+        }
+      }
+    };
+
+    const applyGuardianWishResultToActiveSlot = (wishRecord) => {
+      const slot = activeGuardianFreezeSlot;
+      if (!slot || !wishRecord) return;
+      applyPersonalWishRecordToSlot(slot, wishRecord);
+    };
+
+    const submitFreezeFromGuardianModal = async () => {
+      if (guardianFreezeSubmitting) return;
+      const slot = activeGuardianFreezeSlot;
+      const wishId = parsePositiveId(slot?.dataset?.wishId);
+      if (!slot || !wishId) {
+        closeFreezeWishConfirmModalFn();
+        return;
+      }
+
+      guardianFreezeSubmitting = true;
+      const oldLabel = freezeWishConfirmYes?.textContent || "Sí";
+      if (freezeWishConfirmYes) {
+        freezeWishConfirmYes.disabled = true;
+        freezeWishConfirmYes.textContent = "Procesando...";
+      }
+
+      try {
+        const updatedWish = await freezePersonalWishRecord(wishId);
+        applyGuardianWishResultToActiveSlot(updatedWish);
+        closeFreezeWishConfirmModalFn();
+      } catch (error) {
+        console.error(error);
+        window.alert(error?.message || "No se pudo congelar el deseo.");
+      } finally {
+        guardianFreezeSubmitting = false;
+        if (freezeWishConfirmYes) {
+          freezeWishConfirmYes.disabled = false;
+          freezeWishConfirmYes.textContent = oldLabel;
+        }
+      }
+    };
+
+    const submitUnfreezeFromGuardianModal = async ({ reasonType, reasonText = null } = {}) => {
+      if (guardianFreezeSubmitting) return false;
+      const slot = activeGuardianFreezeSlot;
+      const wishId = parsePositiveId(slot?.dataset?.wishId);
+      if (!slot || !wishId) {
+        closeUnfreezeWishReasonModalFn();
+        closeUnfreezeUnexpectedModalFn();
+        return false;
+      }
+
+      guardianFreezeSubmitting = true;
+      const oldUnexpectedLabel = unfreezeUnexpectedSubmit?.textContent || "Descongelar deseo";
+      const oldErrorLabel = unfreezeReasonErrorBtn?.textContent || "Deseo congelado por error";
+      const oldUnexpectedBtnLabel = unfreezeReasonUnexpectedBtn?.textContent || "Se presentó un imprevisto";
+
+      if (unfreezeUnexpectedSubmit) {
+        unfreezeUnexpectedSubmit.disabled = true;
+        unfreezeUnexpectedSubmit.textContent = "Procesando...";
+      }
+      if (unfreezeReasonErrorBtn) {
+        unfreezeReasonErrorBtn.disabled = true;
+        unfreezeReasonErrorBtn.textContent = "Procesando...";
+      }
+      if (unfreezeReasonUnexpectedBtn) {
+        unfreezeReasonUnexpectedBtn.disabled = true;
+      }
+
+      try {
+        const updatedWish = await unfreezePersonalWishRecord(wishId, {
+          reason_type: reasonType,
+          reason_text: reasonText,
+        });
+        applyGuardianWishResultToActiveSlot(updatedWish);
+        closeUnfreezeWishReasonModalFn();
+        closeUnfreezeUnexpectedModalFn();
+        return true;
+      } catch (error) {
+        console.error(error);
+        window.alert(error?.message || "No se pudo descongelar el deseo.");
+        return false;
+      } finally {
+        guardianFreezeSubmitting = false;
+        if (unfreezeUnexpectedSubmit) {
+          unfreezeUnexpectedSubmit.disabled = false;
+          unfreezeUnexpectedSubmit.textContent = oldUnexpectedLabel;
+        }
+        if (unfreezeReasonErrorBtn) {
+          unfreezeReasonErrorBtn.disabled = false;
+          unfreezeReasonErrorBtn.textContent = oldErrorLabel;
+        }
+        if (unfreezeReasonUnexpectedBtn) {
+          unfreezeReasonUnexpectedBtn.disabled = false;
+          unfreezeReasonUnexpectedBtn.textContent = oldUnexpectedBtnLabel;
+        }
+      }
     };
 
     const openCooperativeParticipateModal = (slot, mode = "create") => {
@@ -1590,6 +2402,7 @@
           await fulfillPersonalWishRecord(wishId, uploadedEvidence?.media_id || null);
           resetSlotToEmpty(activeFulfillSlot);
           closeFulfillWishModalFn();
+          window.dispatchEvent(new CustomEvent("kiadez:fulfilled-wishes-changed", { detail: { scope: "public" } }));
         } catch (error) {
           console.error(error);
           window.alert(error?.message || "No se pudo marcar el deseo como cumplido.");
@@ -1609,6 +2422,8 @@
 
     if (icanConfirmYes) {
       icanConfirmYes.addEventListener("click", () => {
+	        guardianRequestWishId = parsePositiveId(activeIcanSlot?.dataset?.wishId);
+	        guardianRequestWishText = String(activeIcanSlot?.dataset?.description || "").trim();
         closeIcanConfirmModalFn();
         openGuardianContactModal();
       });
@@ -1630,6 +2445,195 @@
       });
     }
 
+    if (freezeWishConfirmNo) {
+      freezeWishConfirmNo.addEventListener("click", closeFreezeWishConfirmModalFn);
+    }
+
+    if (freezeWishConfirmYes) {
+      freezeWishConfirmYes.addEventListener("click", () => {
+        void submitFreezeFromGuardianModal();
+      });
+    }
+
+    if (freezeWishConfirmModal) {
+      freezeWishConfirmModal.addEventListener("click", (event) => {
+        if (event.target === freezeWishConfirmModal) closeFreezeWishConfirmModalFn();
+      });
+    }
+
+    if (unfreezeReasonModalClose) {
+      unfreezeReasonModalClose.addEventListener("click", closeUnfreezeWishReasonModalFn);
+    }
+
+    if (unfreezeReasonCancel) {
+      unfreezeReasonCancel.addEventListener("click", closeUnfreezeWishReasonModalFn);
+    }
+
+    if (unfreezeReasonErrorBtn) {
+      unfreezeReasonErrorBtn.addEventListener("click", () => {
+        void submitUnfreezeFromGuardianModal({ reasonType: "error", reasonText: null });
+      });
+    }
+
+    if (unfreezeReasonUnexpectedBtn) {
+      unfreezeReasonUnexpectedBtn.addEventListener("click", () => {
+        openUnfreezeUnexpectedModal();
+      });
+    }
+
+    if (unfreezeWishReasonModal) {
+      unfreezeWishReasonModal.addEventListener("click", (event) => {
+        if (event.target === unfreezeWishReasonModal) closeUnfreezeWishReasonModalFn();
+      });
+    }
+
+    if (unfreezeUnexpectedModalClose) {
+      unfreezeUnexpectedModalClose.addEventListener("click", closeUnfreezeUnexpectedModalFn);
+    }
+
+    if (unfreezeUnexpectedCancel) {
+      unfreezeUnexpectedCancel.addEventListener("click", closeUnfreezeUnexpectedModalFn);
+    }
+
+    if (unfreezeWishUnexpectedModal) {
+      unfreezeWishUnexpectedModal.addEventListener("click", (event) => {
+        if (event.target === unfreezeWishUnexpectedModal) closeUnfreezeUnexpectedModalFn();
+      });
+    }
+
+    if (unfreezeUnexpectedText) {
+      unfreezeUnexpectedText.addEventListener("input", () => {
+        setUnfreezeUnexpectedError(false);
+        syncUnexpectedWordCount();
+      });
+    }
+
+    if (unfreezeUnexpectedSubmit) {
+      unfreezeUnexpectedSubmit.addEventListener("click", () => {
+        const text = String(unfreezeUnexpectedText?.value || "").trim();
+        const words = countWords(text);
+        if (!text) {
+          setUnfreezeUnexpectedError(true, "Debes describir el imprevisto para descongelar el deseo.");
+          unfreezeUnexpectedText?.focus();
+          return;
+        }
+        if (words > 100) {
+          setUnfreezeUnexpectedError(true, "La explicación no puede superar 100 palabras.");
+          unfreezeUnexpectedText?.focus();
+          return;
+        }
+        void submitUnfreezeFromGuardianModal({ reasonType: "unexpected", reasonText: text });
+      });
+    }
+
+    if (guardianFulfillClose) {
+      guardianFulfillClose.addEventListener("click", closeGuardianFulfillWishModalFn);
+    }
+
+    if (guardianFulfillCancel) {
+      guardianFulfillCancel.addEventListener("click", closeGuardianFulfillWishModalFn);
+    }
+
+    if (guardianFulfillModal) {
+      guardianFulfillModal.addEventListener("click", (event) => {
+        if (event.target === guardianFulfillModal) closeGuardianFulfillWishModalFn();
+      });
+    }
+
+    if (guardianFulfillEvidence) {
+      guardianFulfillEvidence.addEventListener("change", () => {
+        const file = guardianFulfillEvidence.files && guardianFulfillEvidence.files[0];
+        updateGuardianFulfillEvidencePreview(file || null);
+      });
+    }
+
+    if (guardianFulfillCommitmentCode) {
+      guardianFulfillCommitmentCode.addEventListener("input", () => {
+        guardianFulfillCommitmentCode.value = guardianFulfillCommitmentCode.value.toUpperCase().replace(/\s+/g, "");
+        if (String(guardianFulfillCommitmentCode.value || "").trim()) {
+          setGuardianFulfillCodeError(false);
+        }
+      });
+    }
+
+    if (guardianFulfillAttributionSecret) {
+      guardianFulfillAttributionSecret.addEventListener("click", () => {
+        setGuardianFulfillAttributionMode("secret");
+      });
+    }
+
+    if (guardianFulfillAttributionPublic) {
+      guardianFulfillAttributionPublic.addEventListener("click", () => {
+        setGuardianFulfillAttributionMode("public");
+      });
+    }
+
+    if (guardianFulfillSubmit) {
+      guardianFulfillSubmit.addEventListener("click", () => {
+        void submitGuardianFulfillWish();
+      });
+    }
+
+	    if (guardianEvidenceInput) {
+	      guardianEvidenceInput.addEventListener("change", () => {
+	        const file = guardianEvidenceInput.files && guardianEvidenceInput.files[0];
+	        updateGuardianEvidencePreview(file || null);
+	        if (file) setGuardianFieldError(null, guardianEvidenceError, false);
+	        if (file) guardianEvidenceRow?.classList.remove("is-error");
+	      });
+	    }
+
+	    if (guardianReasonVisitor) {
+	      guardianReasonVisitor.addEventListener("input", () => {
+	        if (String(guardianReasonVisitor.value || "").trim()) {
+	          setGuardianFieldError(guardianReasonVisitor, guardianReasonError, false);
+	        }
+	      });
+	    }
+
+	    if (guardianPhoneVisitor) {
+	      guardianPhoneVisitor.addEventListener("input", () => {
+	        if (String(guardianPhoneVisitor.value || "").trim()) {
+	          setGuardianFieldError(guardianPhoneVisitor, guardianPhoneError, false);
+	        }
+	      });
+	    }
+
+	    if (guardianEmailVisitor) {
+	      guardianEmailVisitor.addEventListener("input", () => {
+	        const email = String(guardianEmailVisitor.value || "").trim();
+	        if (email && guardianEmailVisitor.checkValidity()) {
+	          setGuardianFieldError(guardianEmailVisitor, guardianEmailError, false);
+	        }
+	      });
+	    }
+
+	    if (guardianSelect) {
+	      guardianSelect.addEventListener("click", (event) => {
+	        const option = event.target.closest(".guardian-option");
+	        if (!option || !guardianSelect.contains(option)) return;
+	        const nextId = parsePositiveId(option.dataset.guardianUserId);
+	        if (!nextId) return;
+	        selectedGuardianUserId = nextId;
+	        guardianSelect.querySelectorAll(".guardian-option").forEach((el) => {
+	          const id = parsePositiveId(el.dataset.guardianUserId);
+	          const isSelected = Boolean(id && id === selectedGuardianUserId);
+	          el.classList.toggle("is-selected", isSelected);
+	          if (isSelected) {
+	            el.setAttribute("aria-current", "true");
+	          } else {
+	            el.removeAttribute("aria-current");
+	          }
+	        });
+	      });
+	    }
+
+	    if (guardianSendBtn) {
+	      guardianSendBtn.addEventListener("click", () => {
+	        void submitGuardianWishRequest();
+	      });
+	    }
+
     if (cancelCooperativeParticipate) {
       cancelCooperativeParticipate.addEventListener("click", closeCooperativeParticipateModalFn);
     }
@@ -1646,17 +2650,21 @@
       });
     }
 
-    const guardianOptions = document.querySelectorAll(".guardian-option");
-    if (guardianOptions.length) {
-      guardianOptions.forEach((option) => {
-        option.addEventListener("click", () => {
-          guardianOptions.forEach((btn) => btn.classList.remove("is-selected"));
-          option.classList.add("is-selected");
-          guardianOptions.forEach((btn) => btn.setAttribute("aria-pressed", "false"));
-          option.setAttribute("aria-pressed", "true");
-        });
-      });
-    }
+	    if (guardianPrevPage) {
+	      guardianPrevPage.addEventListener("click", () => {
+	        if (guardiansLoading) return;
+	        if (guardiansPage <= 1) return;
+	        void loadGuardiansPage(guardiansPage - 1);
+	      });
+	    }
+
+	    if (guardianNextPage) {
+	      guardianNextPage.addEventListener("click", () => {
+	        if (guardiansLoading) return;
+	        if (guardiansPage >= guardiansTotalPages) return;
+	        void loadGuardiansPage(guardiansPage + 1);
+	      });
+	    }
 
     const updateFulfillEvidencePreview = (file) => {
       if (!fulfillEvidencePreview) return;
@@ -1932,6 +2940,24 @@
       return icon;
     };
 
+	    const createFreezeWishBtn = (mode = "freeze") => {
+	      const isUnfreeze = mode === "unfreeze";
+	      const title = isUnfreeze ? "Descongelar deseo" : "Congelar deseo";
+	      const iconSrc = isUnfreeze ? "/css/icons/unfrezee.webp" : "/css/icons/freeze.webp";
+	      const btn = document.createElement("button");
+	      btn.type = "button";
+	      btn.className = `wish-icon-btn wish-freeze-btn${isUnfreeze ? " is-unfreeze" : ""}`;
+	      btn.dataset.action = isUnfreeze ? "guardian-unfreeze" : "guardian-freeze";
+	      btn.setAttribute("aria-label", title);
+	      btn.title = title;
+
+	      const img = document.createElement("img");
+	      img.src = iconSrc;
+	      img.alt = title;
+	      btn.appendChild(img);
+	      return btn;
+	    };
+
     const createVisitorCooperativeIcon = () => {
       const icon = document.createElement("div");
       icon.className = "wish-icon-btn wish-icon-static";
@@ -1959,7 +2985,11 @@
       delete slot.dataset.template;
       delete slot.dataset.wishId;
       delete slot.dataset.mediaId;
-      slot.classList.remove("is-choosing", "is-filled");
+      delete slot.dataset.frozen;
+      delete slot.dataset.frozenByUserId;
+      delete slot.dataset.frozenByGuardianName;
+      delete slot.dataset.frozenByGuardianProfileUrl;
+      slot.classList.remove("is-choosing", "is-filled", "is-frozen", "is-frozen-opaque", "is-frozen-soft");
       slot.classList.add("is-empty");
       slot.innerHTML = "";
       slot.appendChild(lampSlotTemplate.content.cloneNode(true));
@@ -1973,13 +3003,18 @@
       delete slot.dataset.imageUrl;
       delete slot.dataset.imageObjectUrl;
 
-      slot.classList.remove("is-empty", "is-choosing");
+      slot.classList.remove("is-empty", "is-choosing", "is-frozen", "is-frozen-opaque", "is-frozen-soft");
       slot.classList.add("is-filled");
       slot.innerHTML = "";
       slot.dataset.description = description;
       if (type) {
         slot.dataset.type = type;
       }
+
+	      const wishId = parsePositiveId(slot?.dataset?.wishId);
+	      const isFrozen = Boolean(wishId && slot?.dataset?.frozen === "true");
+	      const frozenByUserId = parsePositiveId(slot?.dataset?.frozenByUserId);
+	      const isFrozenByMe = Boolean(isFrozen && viewerUserId && frozenByUserId === viewerUserId);
 
       const row = document.createElement("div");
       row.className = "wish-slot-row";
@@ -2011,12 +3046,17 @@
 
       const actions = document.createElement("div");
       actions.className = "wish-slot-actions wish-slot-actions-inline";
-      if (isVisitorView) {
+      const canUseGuardianActions = Boolean(viewerIsGuardian && wishId);
+      if (!isViewingOwnProfile) {
         actions.appendChild(createVisitorIcon());
-      } else {
+      }
+      if (isViewingOwnProfile) {
         actions.appendChild(createWishActionBtn("/css/icons/iconedit.webp", "Editar deseo", "edit"));
         actions.appendChild(createWishActionBtn("/css/icons/iconfulfill.webp", "Marcar como cumplido", "fulfill"));
         actions.appendChild(createWishActionBtn("/css/icons/icondelete.webp", "Borrar deseo", "delete"));
+      }
+      if (canUseGuardianActions && !isFrozen) {
+        actions.appendChild(createFreezeWishBtn("freeze"));
       }
       leftCol.appendChild(actions);
       body.appendChild(leftCol);
@@ -2036,13 +3076,112 @@
         body.classList.add("single");
       }
 
-      row.appendChild(body);
-      slot.appendChild(row);
+	      row.appendChild(body);
+	      slot.appendChild(row);
+
+	      if (isFrozen) {
+	        const softMode = isViewingOwnProfile || isFrozenByMe;
+	        const canManageFrozenWish = Boolean(viewerIsGuardian && isFrozenByMe && wishId);
+	        slot.classList.add("is-frozen", softMode ? "is-frozen-soft" : "is-frozen-opaque");
+
+	        const overlay = document.createElement("div");
+	        overlay.className = `wish-freeze-overlay ${softMode ? "is-soft" : "is-opaque"}${canManageFrozenWish ? " is-interactive" : ""}`;
+	        overlay.setAttribute("aria-label", FROZEN_WISH_MESSAGE);
+
+	        const card = document.createElement("div");
+	        card.className = "wish-freeze-card";
+	        if (!canManageFrozenWish) {
+	          card.textContent = FROZEN_WISH_MESSAGE;
+	        } else {
+	          const content = document.createElement("div");
+	          content.className = "wish-freeze-card-content";
+
+	          const text = document.createElement("span");
+	          text.className = "wish-freeze-card-message";
+	          text.textContent = FROZEN_WISH_MESSAGE;
+	          content.appendChild(text);
+
+	          const overlayActions = document.createElement("div");
+	          overlayActions.className = "wish-freeze-overlay-actions";
+	          overlayActions.appendChild(createFreezeWishBtn("unfreeze"));
+	          overlayActions.appendChild(
+	            createWishActionBtn(
+	              "/css/icons/iconfulfill.webp",
+	              "Marcar deseo como cumplido (Guardián)",
+	              "guardian-fulfill"
+	            )
+	          );
+	          content.appendChild(overlayActions);
+	          card.appendChild(content);
+	        }
+	        overlay.appendChild(card);
+
+	        slot.appendChild(overlay);
+	      }
     };
 
     const parsePositiveId = (value) => {
       const id = Number(value || 0);
       return Number.isFinite(id) && id > 0 ? id : null;
+    };
+
+    const FROZEN_WISH_MESSAGE =
+      "Este deseo está siendo auditado por un guardián y posiblemente se cumpla pronto.";
+
+    const countWords = (text) => {
+      return String(text || "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean).length;
+    };
+
+    const setUnfreezeUnexpectedError = (show, message = "") => {
+      if (!unfreezeUnexpectedError) return;
+      if (show && message) {
+        unfreezeUnexpectedError.textContent = message;
+      }
+      unfreezeUnexpectedError.classList.toggle("is-visible", Boolean(show));
+    };
+
+    const syncUnexpectedWordCount = () => {
+      if (!unfreezeUnexpectedWordCount || !unfreezeUnexpectedText) return;
+      const words = countWords(unfreezeUnexpectedText.value);
+      unfreezeUnexpectedWordCount.textContent = `${words} / 100 palabras`;
+      unfreezeUnexpectedWordCount.classList.toggle("is-error", words > 100);
+    };
+
+    const applyFrozenDatasetToSlotFromRecord = (slot, wish) => {
+      if (!slot) return;
+      const isFrozen = Boolean(wish?.is_frozen);
+      if (!isFrozen) {
+        delete slot.dataset.frozen;
+        delete slot.dataset.frozenByUserId;
+        delete slot.dataset.frozenByGuardianName;
+        delete slot.dataset.frozenByGuardianProfileUrl;
+        return;
+      }
+
+      slot.dataset.frozen = "true";
+      const frozenBy = parsePositiveId(wish?.frozen_by_guardian_id);
+      if (frozenBy) {
+        slot.dataset.frozenByUserId = `${frozenBy}`;
+      } else {
+        delete slot.dataset.frozenByUserId;
+      }
+
+      const guardianName = String(wish?.frozen_by_guardian_full_name || "").trim();
+      if (guardianName) {
+        slot.dataset.frozenByGuardianName = guardianName;
+      } else {
+        delete slot.dataset.frozenByGuardianName;
+      }
+
+      const guardianProfileUrl = String(wish?.frozen_by_guardian_profile_url || "").trim();
+      if (guardianProfileUrl) {
+        slot.dataset.frozenByGuardianProfileUrl = guardianProfileUrl;
+      } else {
+        delete slot.dataset.frozenByGuardianProfileUrl;
+      }
     };
 
     const applyPersonalWishRecordToSlot = (slot, wish) => {
@@ -2054,6 +3193,7 @@
       } else {
         delete slot.dataset.wishId;
       }
+      applyFrozenDatasetToSlotFromRecord(slot, wish);
       if (mediaId) {
         slot.dataset.mediaId = `${mediaId}`;
       } else {
@@ -2085,6 +3225,25 @@
         if (!slot) return;
         applyPersonalWishRecordToSlot(slot, wish);
       });
+
+	      if (highlightWishId) {
+	        const targetWishId = highlightWishId;
+	        requestAnimationFrame(() => {
+	          const allSlots = Array.from(personalWishList.querySelectorAll(".wish-slot"));
+	          const targetSlot = allSlots.find((slotEl) => parsePositiveId(slotEl?.dataset?.wishId) === targetWishId);
+	          highlightWishId = null;
+	          if (!targetSlot) return;
+	          targetSlot.classList.add("wish-slot-highlight");
+	          try {
+	            targetSlot.scrollIntoView({ behavior: "smooth", block: "center" });
+	          } catch {
+	            targetSlot.scrollIntoView();
+	          }
+	          window.setTimeout(() => {
+	            targetSlot.classList.remove("wish-slot-highlight");
+	          }, 3500);
+	        });
+	      }
     };
 
     const loadPersonalWishesFromApi = async () => {
@@ -2145,7 +3304,7 @@
       title.className = "wish-slot-title";
       title.textContent = description;
       descWrap.appendChild(title);
-      if (!isVisitorView) {
+      if (isViewingOwnProfile) {
         const securityField = document.createElement("div");
         securityField.className = "wish-security-field";
         const securityLabel = document.createElement("span");
@@ -2177,7 +3336,7 @@
 
       const actions = document.createElement("div");
       actions.className = "wish-slot-actions wish-slot-actions-inline";
-      if (isVisitorView) {
+      if (!isViewingOwnProfile) {
         actions.appendChild(createVisitorCooperativeIcon());
       } else {
         actions.appendChild(createWishActionBtn("/css/icons/iconedit.webp", "Editar deseo", "edit"));
@@ -2250,7 +3409,7 @@
       typePill.textContent = "Cooperativo";
       descWrap.appendChild(title);
       descWrap.appendChild(typePill);
-      if (!isVisitorView) {
+      if (isViewingOwnProfile) {
         const securityField = document.createElement("div");
         securityField.className = "wish-security-field";
         const securityLabel = document.createElement("span");
@@ -2777,50 +3936,6 @@
       });
     }
 
-    const rerenderPersonalSlots = () => {
-      if (!personalWishList) return;
-      const slots = Array.from(personalWishList.querySelectorAll(".wish-slot.is-filled"));
-      slots.forEach((slot) => {
-        const description = slot.dataset.description || "";
-        const type = slot.dataset.type || "Espiritual";
-        const imageUrl = slot.dataset.imageUrl || null;
-        renderPersonalWishSlot(slot, description, imageUrl, type);
-      });
-    };
-
-    const rerenderCooperativeSlots = () => {
-      if (!cooperativeWishList) return;
-      const slots = Array.from(cooperativeWishList.querySelectorAll(".wish-slot.is-filled"));
-      slots.forEach((slot) => {
-        if (slot.classList.contains("is-participation")) {
-          const participationText = slot.dataset.participationText || "";
-          const rootDescription = slot.dataset.rootDescription || "";
-          const rootImageUrl = slot.dataset.rootImageUrl || null;
-          const rootUser = slot.dataset.rootUser || "Carlos Jiménez Duarte";
-          const template = slot.dataset.template || "";
-          renderParticipationWishSlot(slot, participationText, rootDescription, rootImageUrl, rootUser, template);
-          return;
-        }
-        const description = slot.dataset.description || "";
-        const type = slot.dataset.type || "Espiritual";
-        const imageUrl = slot.dataset.imageUrl || null;
-        const current = Number(slot.dataset.current || 0);
-        const goal = Number(slot.dataset.goal || 0);
-        const template = slot.dataset.template || "";
-        const securityCode = slot.dataset.securityCode || "";
-        renderCooperativeWishSlot(slot, description, imageUrl, type, current, goal, template, securityCode);
-      });
-    };
-
-    if (toggleVisitorView) {
-      toggleVisitorView.addEventListener("click", () => {
-        isVisitorView = !isVisitorView;
-        toggleVisitorView.textContent = isVisitorView ? "Ver como propietario" : "Ver como visitante";
-        rerenderPersonalSlots();
-        rerenderCooperativeSlots();
-      });
-    }
-
 	    if (personalWishList) {
 	      personalWishList.addEventListener("click", (event) => {
 	        const lampBtn = event.target.closest(".wish-lamp-btn");
@@ -2829,7 +3944,7 @@
 	        const actionBtn = event.target.closest(".wish-icon-btn");
 
 	        if (lampBtn) {
-	          if (isVisitorView) return;
+	          if (!isViewingOwnProfile) return;
 	          const slot = lampBtn.closest(".wish-slot");
 	          if (!slot) return;
 	          activePersonalSlot = slot;
@@ -2838,7 +3953,7 @@
 	        }
 
 	        if (cancelBtn) {
-	          if (isVisitorView) return;
+	          if (!isViewingOwnProfile) return;
 	          const slot = cancelBtn.closest(".wish-slot");
 	          if (!slot) return;
 	          resetSlotToEmpty(slot);
@@ -2847,7 +3962,7 @@
 	        }
 
 	        if (choiceBtn) {
-	          if (isVisitorView) return;
+	          if (!isViewingOwnProfile) return;
 	          const slot = choiceBtn.closest(".wish-slot");
 	          if (choiceBtn.dataset.choice === "personal") {
 	            activePersonalSlot = slot;
@@ -2860,7 +3975,12 @@
         }
 
         if (actionBtn) {
-          if (isVisitorView && !["ican", "help-coop"].includes(actionBtn.dataset.action)) return;
+          if (
+            !isViewingOwnProfile &&
+            !["ican", "help-coop", "guardian-freeze", "guardian-unfreeze", "guardian-fulfill"].includes(
+              actionBtn.dataset.action
+            )
+          ) return;
           const slot = actionBtn.closest(".wish-slot");
           if (!slot) return;
           if (actionBtn.dataset.action === "delete") {
@@ -2924,8 +4044,33 @@
             openFulfillWishModal(slot);
           } else if (actionBtn.dataset.action === "ican") {
             openIcanConfirmModal(slot);
+          } else if (actionBtn.dataset.action === "guardian-freeze") {
+            if (!viewerIsGuardian) return;
+            const wishId = parsePositiveId(slot.dataset.wishId);
+            if (!wishId) return;
+            openFreezeWishConfirmModal(slot);
+          } else if (actionBtn.dataset.action === "guardian-unfreeze") {
+            if (!viewerIsGuardian) return;
+            const wishId = parsePositiveId(slot.dataset.wishId);
+            if (!wishId) return;
+            const frozenBy = parsePositiveId(slot.dataset.frozenByUserId);
+            if (!viewerUserId || !frozenBy || frozenBy !== viewerUserId) {
+              window.alert("Solo el guardián que congeló este deseo puede descongelarlo.");
+              return;
+            }
+            openUnfreezeWishReasonModal(slot);
+          } else if (actionBtn.dataset.action === "guardian-fulfill") {
+            if (!viewerIsGuardian) return;
+            const wishId = parsePositiveId(slot.dataset.wishId);
+            if (!wishId) return;
+            const frozenBy = parsePositiveId(slot.dataset.frozenByUserId);
+            if (!viewerUserId || !frozenBy || frozenBy !== viewerUserId) {
+              window.alert("Solo el guardián que congeló este deseo puede marcarlo como cumplido.");
+              return;
+            }
+            openGuardianFulfillWishModal(slot);
           } else if (actionBtn.dataset.action === "help-coop") {
-            if (isVisitorView) {
+            if (!isViewingOwnProfile) {
               openCooperativeSecurityModal(slot);
             } else {
               openCooperativeParticipateModal(slot);
@@ -2950,7 +4095,7 @@
           return;
         }
         if (!actionBtn) return;
-        if (isVisitorView && !["help-coop"].includes(actionBtn.dataset.action)) return;
+        if (!isViewingOwnProfile && !["help-coop"].includes(actionBtn.dataset.action)) return;
         const slot = actionBtn.closest(".wish-slot");
         if (!slot) return;
 
@@ -2990,7 +4135,7 @@
           activeParticipateSlot = slot;
           openCooperativeParticipateModal(slot, "edit");
         } else if (actionBtn.dataset.action === "help-coop") {
-          if (isVisitorView) {
+          if (!isViewingOwnProfile) {
             openCooperativeSecurityModal(slot);
           } else {
             openCooperativeParticipateModal(slot);
@@ -3417,11 +4562,6 @@
           <article class="panel wish-list-panel">
             <div class="panel-head">
               <h3 class="panel-title">Deseos personales</h3>
-              <div class="panel-actions">
-                <button class="btn btn-outline btn-compact" type="button" id="toggleVisitorView">
-                  Ver como visitante
-                </button>
-              </div>
               <span class="panel-badge"><span id="personalWishCount">7</span> / 50</span>
             </div>
 
@@ -3755,6 +4895,60 @@
           </div>
         </div>
 
+        <div class="modal-overlay hidden" id="guardianFulfillModal" aria-hidden="true">
+          <div class="modal wish-modal fulfill-wish-modal guardian-fulfill-modal" role="dialog" aria-modal="true"
+            aria-label="Marcar deseo como cumplido (Guardián)">
+            <div class="modal-head">
+              <h3>¡Sube la evidencia!</h3>
+              <button class="modal-close" type="button" id="guardianFulfillClose">✕</button>
+            </div>
+            <div class="modal-body">
+              <label class="modal-label" for="guardianFulfillCommitmentCode">Espacio para el código de compromiso</label>
+              <input
+                class="modal-input guardian-fulfill-commitment-input"
+                id="guardianFulfillCommitmentCode"
+                type="text"
+                maxlength="32"
+                autocomplete="off"
+                placeholder="KZ-204-00045"
+              />
+              <div class="wish-error" id="guardianFulfillCodeError" role="alert">
+                Debes indicar el código de compromiso.
+              </div>
+
+              <input id="guardianFulfillEvidence" type="file" accept="image/*" class="hidden" />
+              <div class="wish-image-preview" id="guardianFulfillEvidencePreview" aria-live="polite">
+                <label class="wish-image-btn" for="guardianFulfillEvidence" aria-label="Sube la evidencia visual">+</label>
+                <div class="wish-preview-content">
+                  <span class="wish-preview-placeholder">Sube la evidencia visual.</span>
+                  <span class="wish-preview-name">PNG, WEBP, JPEG, etc.</span>
+                </div>
+              </div>
+
+              <p class="panel-muted">
+                <strong>¿Cómo deseas publicar la concesión de este deseo?</strong>
+              </p>
+              <div class="guardian-fulfill-attribution">
+                <button class="guardian-fulfill-attribution-btn" type="button" id="guardianFulfillAttributionSecret">
+                  Quien cumple el deseo decidió obrar desde lo secreto
+                </button>
+                <button class="guardian-fulfill-attribution-btn" type="button" id="guardianFulfillAttributionPublic">
+                  Quien cumple el deseo desea atribuirse públicamente la concesión del deseo
+                </button>
+              </div>
+              <div class="wish-error" id="guardianFulfillAttributionError" role="alert">
+                Debes seleccionar cómo se publicará esta concesión.
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-primary btn-compact" type="button" id="guardianFulfillSubmit">
+                Confirmar y publicar deseo cumplido
+              </button>
+              <button class="btn btn-outline btn-compact" type="button" id="guardianFulfillCancel">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
         <div class="modal-overlay hidden" id="icanConfirmModal" aria-hidden="true">
           <div class="modal wish-modal ican-confirm-modal" role="dialog" aria-modal="true"
             aria-label="Conceder deseo">
@@ -3771,6 +4965,73 @@
           </div>
         </div>
 
+        <div class="modal-overlay hidden" id="freezeWishConfirmModal" aria-hidden="true">
+          <div class="modal wish-modal freeze-confirm-modal" role="dialog" aria-modal="true"
+            aria-label="Confirmar congelar deseo">
+            <div class="modal-head">
+              <h3>¿Estás seguro de que deseas congelar este deseo?</h3>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-primary btn-compact" type="button" id="freezeWishConfirmYes">Sí</button>
+              <button class="btn btn-outline btn-compact" type="button" id="freezeWishConfirmNo">No</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-overlay hidden" id="unfreezeWishReasonModal" aria-hidden="true">
+          <div class="modal wish-modal unfreeze-reason-modal" role="dialog" aria-modal="true"
+            aria-label="Seleccionar motivo de descongelación">
+            <div class="modal-head">
+              <h3>Descongelar deseo</h3>
+              <button class="modal-close" type="button" id="unfreezeReasonModalClose">✕</button>
+            </div>
+            <div class="modal-body">
+              <p class="panel-muted">Selecciona el motivo para descongelar este deseo.</p>
+              <div class="unfreeze-reason-actions">
+                <button class="btn btn-outline" type="button" id="unfreezeReasonErrorBtn">
+                  Deseo congelado por error.
+                </button>
+                <button class="btn btn-outline" type="button" id="unfreezeReasonUnexpectedBtn">
+                  Se presentó un imprevisto
+                </button>
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-outline btn-compact" type="button" id="unfreezeReasonCancel">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-overlay hidden" id="unfreezeWishUnexpectedModal" aria-hidden="true">
+          <div class="modal wish-modal unfreeze-unexpected-modal" role="dialog" aria-modal="true"
+            aria-label="Describir imprevisto">
+            <div class="modal-head">
+              <h3>Describe el imprevisto</h3>
+              <button class="modal-close" type="button" id="unfreezeUnexpectedModalClose">✕</button>
+            </div>
+            <div class="modal-body">
+              <p class="panel-muted">
+                Explica brevemente qué ocurrió. Máximo 100 palabras.
+              </p>
+              <label class="modal-label hidden" for="unfreezeUnexpectedText">Describe el imprevisto</label>
+              <textarea class="modal-textarea" id="unfreezeUnexpectedText" rows="4"
+                placeholder="Describe aquí lo sucedido..."></textarea>
+              <p class="wish-word-count" id="unfreezeUnexpectedWordCount">0 / 100 palabras</p>
+              <div class="wish-error" id="unfreezeUnexpectedError" role="alert">
+                Debes describir el imprevisto para descongelar el deseo.
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-primary btn-compact" type="button" id="unfreezeUnexpectedSubmit">
+                Descongelar deseo
+              </button>
+              <button class="btn btn-outline btn-compact" type="button" id="unfreezeUnexpectedCancel">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div class="modal-overlay hidden" id="guardianContactModal" aria-hidden="true">
           <div class="modal wish-modal guardian-contact-modal" role="dialog" aria-modal="true"
             aria-label="Contactar a un Guardián">
@@ -3778,45 +5039,50 @@
               <h3>Contactar a un Guardián</h3>
             </div>
             <div class="modal-body">
+              <p class="panel-muted guardian-request-context hidden" id="guardianRequestContext"></p>
               <h2 class="guardian-section-title">Selecciona a un Guardián</h2>
-              <div class="guardian-row guardian-select">
-                <button class="guardian-option" type="button" aria-pressed="false">
-                  <img class="guardian-avatar" src="/css/icons/Guardian1.png" alt="Guardián 1" />
-                </button>
-                <button class="guardian-option" type="button" aria-pressed="false">
-                  <img class="guardian-avatar" src="/css/icons/Guardian2.png" alt="Guardián 2" />
-                </button>
-                <button class="guardian-option" type="button" aria-pressed="false">
-                  <img class="guardian-avatar" src="/css/icons/Guardian3.png" alt="Guardián 3" />
-                </button>
-                <button class="guardian-option" type="button" aria-pressed="false">
-                  <img class="guardian-avatar" src="/css/icons/Guardian4.png" alt="Guardián 4" />
-                </button>
+              <div class="guardian-row guardian-select" id="guardianSelect"></div>
+              <div class="guardian-pagination">
+                <button class="btn btn-outline btn-compact" type="button" id="guardianPrevPage">Anterior</button>
+                <span class="guardian-page" id="guardianPageLabel">1 / 1</span>
+                <button class="btn btn-outline btn-compact" type="button" id="guardianNextPage">Siguiente</button>
               </div>
+              <p class="panel-muted guardian-status hidden" id="guardianStatus"></p>
 
               <h2 class="guardian-section-title">Describe por qué deseas conceder ese deseo</h2>
               <label class="modal-label hidden" for="guardianReasonVisitor">Describe por qué deseas conceder ese
                 deseo</label>
               <textarea class="modal-textarea" id="guardianReasonVisitor" rows="3"></textarea>
+              <div class="wish-error" id="guardianReasonError" role="alert">Debes describir el motivo.</div>
 
               <h2 class="guardian-section-title">Número telefónico</h2>
               <label class="modal-label hidden" for="guardianPhoneVisitor">Número telefónico</label>
               <input class="modal-input" id="guardianPhoneVisitor" type="tel" inputmode="tel"
                 placeholder="+57 300 000 0000" />
+              <div class="wish-error" id="guardianPhoneError" role="alert">Debes indicar tu número telefónico.</div>
 
               <h2 class="guardian-section-title">E-mail</h2>
               <label class="modal-label hidden" for="guardianEmailVisitor">E-mail</label>
               <input class="modal-input" id="guardianEmailVisitor" type="email" placeholder="correo@ejemplo.com" />
+              <div class="wish-error" id="guardianEmailError" role="alert">Debes indicar un e-mail válido.</div>
 
               <h2 class="guardian-section-title">Evidencia</h2>
-              <div class="upload-row">
+              <div class="upload-row" id="guardianEvidenceRow">
                 <label class="upload-btn" for="guardianEvidenceVisitor">Adjuntar imagen o video</label>
                 <input id="guardianEvidenceVisitor" type="file" accept="image/*,video/*" class="hidden" />
                 <div class="upload-hint">Envíanos una evidencia de tu buena intención</div>
               </div>
+              <div class="guardian-evidence-preview hidden" id="guardianEvidencePreview" aria-live="polite">
+                <div class="guardian-evidence-thumb" id="guardianEvidenceThumb"></div>
+                <div class="guardian-evidence-meta">
+                  <span class="guardian-evidence-label">Evidencia seleccionada</span>
+                  <span class="guardian-evidence-name" id="guardianEvidenceName"></span>
+                </div>
+              </div>
+              <div class="wish-error" id="guardianEvidenceError" role="alert">Debes adjuntar una evidencia.</div>
             </div>
             <div class="modal-actions">
-              <button class="btn btn-primary btn-compact" type="button">Enviar</button>
+              <button class="btn btn-primary btn-compact" type="button" id="guardianSendBtn">Enviar</button>
               <button class="btn btn-outline btn-compact" type="button" id="cancelGuardianModal">Cancelar</button>
             </div>
           </div>

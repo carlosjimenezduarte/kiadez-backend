@@ -803,7 +803,6 @@
     const personalWishList = document.getElementById("private-personal-wish-list");
     const personalWishAdd = document.getElementById("private-personal-wish-add");
     const personalWishCount = document.getElementById("private-personal-wish-count");
-    const toggleVisitorView = document.getElementById("private-toggle-visitor-view");
     const personalWishModal = document.getElementById("private-personal-wish-modal");
     const closePersonalWishModal = document.getElementById("private-close-personal-wish-modal");
     const deleteWishModal = document.getElementById("private-delete-wish-modal");
@@ -837,7 +836,6 @@
     let activeDeleteSlot = null;
     let activeFulfillSlot = null;
     let activeIcanSlot = null;
-    let isVisitorView = false;
     let fulfillEvidenceUrl = null;
     let fulfillEvidenceImage = null;
 
@@ -1269,19 +1267,6 @@
       return button;
     };
 
-    const createVisitorIcon = () => {
-      const icon = document.createElement("div");
-      icon.className = "wish-icon-btn wish-icon-static";
-      icon.dataset.action = "ican";
-      icon.setAttribute("aria-label", "Yo puedo cumplir ese deseo");
-      icon.title = "Yo puedo cumplir ese deseo";
-      const img = document.createElement("img");
-      img.src = "/css/icons/iconican.webp";
-      img.alt = "Yo puedo cumplir ese deseo";
-      icon.appendChild(img);
-      return icon;
-    };
-
     const resetSlotToEmpty = (slot) => {
       if (!slot || !lampSlotTemplate) return;
       if (slot.dataset.imageUrl && slot.dataset.imageObjectUrl === "true") {
@@ -1350,13 +1335,9 @@
 
       const actions = document.createElement("div");
       actions.className = "wish-slot-actions wish-slot-actions-inline";
-      if (isVisitorView) {
-        actions.appendChild(createVisitorIcon());
-      } else {
-        actions.appendChild(createWishActionBtn("/css/icons/iconedit.webp", "Editar deseo", "edit"));
-        actions.appendChild(createWishActionBtn("/css/icons/iconfulfill.webp", "Marcar como cumplido", "fulfill"));
-        actions.appendChild(createWishActionBtn("/css/icons/icondelete.webp", "Borrar deseo", "delete"));
-      }
+      actions.appendChild(createWishActionBtn("/css/icons/iconedit.webp", "Editar deseo", "edit"));
+      actions.appendChild(createWishActionBtn("/css/icons/iconfulfill.webp", "Marcar como cumplido", "fulfill"));
+      actions.appendChild(createWishActionBtn("/css/icons/icondelete.webp", "Borrar deseo", "delete"));
       leftCol.appendChild(actions);
       body.appendChild(leftCol);
 
@@ -1853,25 +1834,6 @@
       confirmFulfillWish.addEventListener("click", () => void handleConfirmFulfillWish());
     }
 
-    const rerenderPersonalSlots = () => {
-      if (!personalWishList) return;
-      const slots = Array.from(personalWishList.querySelectorAll(".wish-slot.is-filled"));
-      slots.forEach((slot) => {
-        const description = slot.dataset.description || "";
-        const type = slot.dataset.type || "Espiritual";
-        const imageUrl = slot.dataset.imageUrl || null;
-        renderPersonalWishSlot(slot, description, imageUrl, type);
-      });
-    };
-
-    if (toggleVisitorView) {
-      toggleVisitorView.addEventListener("click", () => {
-        isVisitorView = !isVisitorView;
-        toggleVisitorView.textContent = isVisitorView ? "Ver como propietario" : "Ver como visitante";
-        rerenderPersonalSlots();
-      });
-    }
-
     if (personalWishList) {
       personalWishList.addEventListener("click", (event) => {
         const lampBtn = event.target.closest(".wish-lamp-btn");
@@ -1886,7 +1848,6 @@
         }
 
         if (actionBtn) {
-          if (isVisitorView && actionBtn.dataset.action !== "ican") return;
           const slot = actionBtn.closest(".wish-slot");
           if (!slot) return;
           if (actionBtn.dataset.action === "delete") {
@@ -1916,8 +1877,6 @@
             openPersonalWishModal();
           } else if (actionBtn.dataset.action === "fulfill") {
             openFulfillWishModal(slot);
-          } else if (actionBtn.dataset.action === "ican") {
-            openIcanConfirmModal(slot);
           }
           return;
         }
@@ -2066,11 +2025,6 @@
             <article class="panel wish-list-panel">
               <div class="panel-head">
                 <h3 class="panel-title">Deseos privados</h3>
-                <div class="panel-actions">
-                  <button class="btn btn-outline btn-compact" type="button" id="private-toggle-visitor-view">
-                    Ver como visitante
-                  </button>
-                </div>
                 <span class="panel-badge"><span id="private-personal-wish-count">7</span> / 50</span>
               </div>
 

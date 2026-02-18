@@ -89,11 +89,6 @@
             <article class="panel wish-list-panel">
               <div class="panel-head">
                 <h3 class="panel-title">Deseos personales</h3>
-                <div class="panel-actions">
-                  <button class="btn btn-outline btn-compact" type="button" id="toggleVisitorView">
-                    Ver como visitante
-                  </button>
-                </div>
                 <span class="panel-badge"><span id="personalWishCount">7</span> / 50</span>
               </div>
 
@@ -732,7 +727,6 @@
     const personalWishList = document.getElementById("personalWishList");
     const personalWishAdd = document.getElementById("personalWishAdd");
     const personalWishCount = document.getElementById("personalWishCount");
-    const toggleVisitorView = document.getElementById("toggleVisitorView");
     const cooperativeWishList = document.getElementById("cooperativeWishList");
     const cooperativeWishAdd = document.getElementById("cooperativeWishAdd");
     const cooperativeWishCountLabel = document.getElementById("cooperativeWishCountLabel");
@@ -1772,49 +1766,6 @@
           }
         }
         closeDeleteWishModalFn();
-      });
-    }
-
-    const rerenderPersonalSlots = () => {
-      if (!personalWishList) return;
-      const slots = Array.from(personalWishList.querySelectorAll(".wish-slot.is-filled"));
-      slots.forEach((slot) => {
-        const description = slot.dataset.description || "";
-        const type = slot.dataset.type || "Espiritual";
-        const imageUrl = slot.dataset.imageUrl || null;
-        renderPersonalWishSlot(slot, description, imageUrl, type);
-      });
-    };
-
-    const rerenderCooperativeSlots = () => {
-      if (!cooperativeWishList) return;
-      const slots = Array.from(cooperativeWishList.querySelectorAll(".wish-slot.is-filled"));
-      slots.forEach((slot) => {
-        if (slot.classList.contains("is-participation")) {
-          const participationText = slot.dataset.participationText || "";
-          const rootDescription = slot.dataset.rootDescription || "";
-          const rootImageUrl = slot.dataset.rootImageUrl || null;
-          const rootUser = slot.dataset.rootUser || "Carlos Jiménez Duarte";
-          const template = slot.dataset.template || "";
-          renderParticipationWishSlot(slot, participationText, rootDescription, rootImageUrl, rootUser, template);
-          return;
-        }
-        const description = slot.dataset.description || "";
-        const type = slot.dataset.type || "Espiritual";
-        const imageUrl = slot.dataset.imageUrl || null;
-        const current = Number(slot.dataset.current || 0);
-        const goal = Number(slot.dataset.goal || 0);
-        const template = slot.dataset.template || "";
-        renderCooperativeWishSlot(slot, description, imageUrl, type, current, goal, template);
-      });
-    };
-
-    if (toggleVisitorView) {
-      toggleVisitorView.addEventListener("click", () => {
-        isVisitorView = !isVisitorView;
-        toggleVisitorView.textContent = isVisitorView ? "Ver como propietario" : "Ver como visitante";
-        rerenderPersonalSlots();
-        rerenderCooperativeSlots();
       });
     }
 

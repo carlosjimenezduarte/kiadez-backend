@@ -1,7 +1,7 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import UserPublic
@@ -9,6 +9,7 @@ from app.auth.routes import get_current_user
 from app.biography.schemas import (
     BiographyAboutOut,
     BiographyAboutUpdateRequest,
+    BiographyActivityStatsOut,
     BiographyCuriositiesOut,
     BiographyCuriositiesUpdateRequest,
     BiographyDreamOut,
@@ -39,6 +40,7 @@ from app.db.models.biography_life_achievements import BiographyLifeAchievements
 from app.db.models.biography_professional_achievements import BiographyProfessionalAchievements
 from app.db.models.biography_professional_info import BiographyProfessionalInfo
 from app.db.models.biography_physical_traits import BiographyPhysicalTraits
+from app.db.models.public_wish_fulfillment import PublicWishFulfillment
 from app.db.models.user import User
 
 router = APIRouter(prefix="/biography", tags=["biography"])
@@ -249,6 +251,24 @@ def _serialize_favorite_quotes(
         section_text=section_text,
         word_count=_count_words(section_text),
     )
+
+
+@router.get("/activity-stats", response_model=BiographyActivityStatsOut)
+def get_activity_stats(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    wishes_granted = db.execute(
+        select(func.count(PublicWishFulfillment.id)).where(
+            PublicWishFulfillment.fulfiller_user_id == current.user_number
+        )
+    ).scalar_one()
+
+    return BiographyActivityStatsOut(wishes_granted=int(wishes_granted or 0))
 
 
 @router.get("/personal-info", response_model=BiographyPersonalInfoOut)
