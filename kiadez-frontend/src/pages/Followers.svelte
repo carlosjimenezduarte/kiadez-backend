@@ -3,10 +3,197 @@
   import { logout } from "../lib/logout";
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
+  import { followApi } from "../lib/api";
+
+  const PAGE_SIZE = 25;
+  const PAGE_WINDOW = 7;
+  const DEFAULT_AVATAR_SRC = "/assets/avatar-default.jpg";
+
+  const createSectionState = () => ({
+    items: [],
+    page: 1,
+    page_size: PAGE_SIZE,
+    total: 0,
+    total_pages: 1,
+    range_start: 0,
+    range_end: 0,
+    loading: false,
+    error: "",
+  });
+
+  let suggestions = createSectionState();
+  let followers = createSectionState();
+  let following = createSectionState();
+
+  let followActionError = "";
+  let pendingFollowIds = new Set();
+
+  const parseErrorMessage = (error) => {
+    const message = String(error?.message || "").trim();
+    return message || "No se pudo completar la solicitud.";
+  };
+
+  const formatCount = (value) => Number(value || 0).toLocaleString("es-CO");
+
+  const getDisplayName = (item) => {
+    const fullName = String(item?.full_name || "").trim();
+    if (fullName) return fullName;
+    const userId = Number(item?.user_id || 0);
+    return userId > 0 ? `Usuario ${userId}` : "Usuario";
+  };
+
+  const getHandle = (item) => {
+    const handle = String(item?.handle || "").trim();
+    if (handle) return handle;
+    const username = String(item?.username || "").trim();
+    if (username) return `@${username}`;
+    const userId = Number(item?.user_id || 0);
+    return userId > 0 ? `@id${userId}` : "@usuario";
+  };
+
+  const getProfileHref = (item) => {
+    const href = String(item?.profile_url || "").trim();
+    return href || "/home_user.html";
+  };
+
+  const getAvatarSrc = (item) => {
+    const url = String(item?.avatar_url || "").trim();
+    return url || DEFAULT_AVATAR_SRC;
+  };
+
+  const isFollowPending = (userId) => pendingFollowIds.has(Number(userId));
+
+  const setFollowPending = (userId, pending) => {
+    const normalizedId = Number(userId);
+    const next = new Set(pendingFollowIds);
+    if (pending) {
+      next.add(normalizedId);
+    } else {
+      next.delete(normalizedId);
+    }
+    pendingFollowIds = next;
+  };
+
+  const getState = (section) => {
+    if (section === "suggestions") return suggestions;
+    if (section === "followers") return followers;
+    return following;
+  };
+
+  const setState = (section, patch) => {
+    if (section === "suggestions") {
+      suggestions = { ...suggestions, ...patch };
+      return;
+    }
+    if (section === "followers") {
+      followers = { ...followers, ...patch };
+      return;
+    }
+    following = { ...following, ...patch };
+  };
+
+  const getFetcher = (section) => {
+    if (section === "suggestions") return followApi.listSuggestions;
+    if (section === "followers") return followApi.listFollowers;
+    return followApi.listFollowing;
+  };
+
+  const buildVisiblePages = (sectionState) => {
+    const totalPages = Math.max(1, Number(sectionState?.total_pages || 1));
+    const currentPage = Math.max(1, Math.min(Number(sectionState?.page || 1), totalPages));
+
+    if (totalPages <= PAGE_WINDOW) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const side = Math.floor(PAGE_WINDOW / 2);
+    let start = Math.max(1, currentPage - side);
+    let end = Math.min(totalPages, start + PAGE_WINDOW - 1);
+
+    if (end - start + 1 < PAGE_WINDOW) {
+      start = Math.max(1, end - PAGE_WINDOW + 1);
+    }
+
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  };
+
+  const loadSection = async (section, requestedPage = 1) => {
+    const fetcher = getFetcher(section);
+    const normalizedPage = Math.max(1, Number(requestedPage || 1));
+
+    setState(section, {
+      loading: true,
+      error: "",
+    });
+
+    try {
+      const data = await fetcher({
+        page: normalizedPage,
+        page_size: PAGE_SIZE,
+      });
+
+      setState(section, {
+        items: Array.isArray(data?.items) ? data.items : [],
+        page: Math.max(1, Number(data?.page) || normalizedPage),
+        page_size: Math.max(1, Number(data?.page_size) || PAGE_SIZE),
+        total: Math.max(0, Number(data?.total) || 0),
+        total_pages: Math.max(1, Number(data?.total_pages) || 1),
+        range_start: Math.max(0, Number(data?.range_start) || 0),
+        range_end: Math.max(0, Number(data?.range_end) || 0),
+        loading: false,
+        error: "",
+      });
+    } catch (error) {
+      setState(section, {
+        loading: false,
+        items: [],
+        error: parseErrorMessage(error),
+      });
+    }
+  };
+
+  const refreshAllSections = async () => {
+    await Promise.all([
+      loadSection("suggestions", suggestions.page),
+      loadSection("followers", followers.page),
+      loadSection("following", following.page),
+    ]);
+  };
+
+  const goToPage = (section, page) => {
+    const state = getState(section);
+    const totalPages = Math.max(1, Number(state.total_pages || 1));
+    const normalizedPage = Math.max(1, Math.min(Number(page || 1), totalPages));
+    if (normalizedPage === state.page) return;
+    void loadSection(section, normalizedPage);
+  };
+
+  const toggleFollow = async (item) => {
+    const userId = Number(item?.user_id || 0);
+    if (!userId || isFollowPending(userId)) return;
+
+    const shouldFollow = !item.is_following;
+    followActionError = "";
+    setFollowPending(userId, true);
+
+    try {
+      if (shouldFollow) {
+        await followApi.follow(userId);
+      } else {
+        await followApi.unfollow(userId);
+      }
+      await refreshAllSections();
+    } catch (error) {
+      followActionError = parseErrorMessage(error);
+    } finally {
+      setFollowPending(userId, false);
+    }
+  };
 
   onMount(() => {
     initPurposeCoverModule();
     void syncProfileStarsTotal("followersStarsTotal");
+    void refreshAllSections();
   });
 </script>
 
@@ -17,7 +204,7 @@
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
-<div class="page-background page-background-user home-background">
+<div class="page-background page-background-user home-background followers-page">
   <header class="feed-topbar">
     <div class="feed-topbar-zone feed-topbar-left">
       <a class="topbar-logo" href="/feed.html" aria-label="Kiadez">
@@ -39,7 +226,7 @@
     <div class="feed-topbar-zone feed-topbar-right">
       <details class="topbar-dropdown">
         <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+          <img src="/assets/avatar-default.jpg" alt="Perfil del usuario" />
         </summary>
         <div class="dropdown-menu" role="menu">
           <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
@@ -67,8 +254,9 @@
       </details>
     </div>
   </header>
+
   <main class="user-home">
-  <section class="cover" id="cover">
+    <section class="cover" id="cover">
       <div class="cover-media" id="coverMedia">
         <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
 
@@ -110,7 +298,6 @@
           <span class="nav-icon">⭐</span>
           <span><strong id="followersStarsTotal">0</strong> estrellas</span>
         </a>
-
         <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
         <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
         <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
@@ -118,57 +305,275 @@
         <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
       </nav>
 
-      <section class="panel">
+      {#if followActionError}
+        <section class="panel followers-message-panel" aria-live="polite">
+          <p class="followers-status is-error">{followActionError}</p>
+        </section>
+      {/if}
+
+      <section class="panel followers-section" aria-label="Sugerencias de usuarios a seguir">
+        <div class="panel-head">
+          <h2 class="panel-title">Sugerencias de usuarios a seguir</h2>
+          <span class="panel-badge">{formatCount(suggestions.total)} sugerencias</span>
+        </div>
+        <p class="panel-muted">
+          Modelos a seguir priorizados por guardianes, usuarios recientes y perfiles destacados.
+        </p>
+
+        {#if suggestions.error}
+          <p class="followers-status is-error">{suggestions.error}</p>
+        {:else if suggestions.loading}
+          <p class="followers-status">Cargando sugerencias...</p>
+        {:else if suggestions.items.length === 0}
+          <p class="followers-status">No hay sugerencias disponibles por ahora.</p>
+        {:else}
+          <div class="followers-grid">
+            {#each suggestions.items as item (item.user_id)}
+              <article class="follower-card">
+                <a class="follower-avatar-link" href={getProfileHref(item)} aria-label={`Ver perfil de ${getDisplayName(item)}`}>
+                  <img class="follower-avatar" src={getAvatarSrc(item)} alt={`Foto de perfil de ${getDisplayName(item)}`} loading="lazy" />
+                </a>
+                <h3 class="follower-name">{getDisplayName(item)}</h3>
+                <p class="follower-handle">{getHandle(item)}</p>
+                <p class="follower-count">{formatCount(item.followers_count)} seguidores</p>
+                <div class="follower-actions">
+                  <button
+                    class={`btn btn-compact${item.is_following ? " btn-outline" : " btn-primary"}`}
+                    type="button"
+                    disabled={isFollowPending(item.user_id)}
+                    on:click={() => toggleFollow(item)}
+                  >
+                    {#if isFollowPending(item.user_id)}
+                      Procesando...
+                    {:else if item.is_following}
+                      Dejar de seguir
+                    {:else}
+                      Seguir
+                    {/if}
+                  </button>
+                  <a class="btn btn-outline btn-compact" href={getProfileHref(item)}>Ver perfil</a>
+                </div>
+              </article>
+            {/each}
+          </div>
+        {/if}
+
+        {#if suggestions.total_pages > 1}
+          <nav class="followers-pagination" aria-label="Paginación de sugerencias">
+            <button
+              class="followers-page-btn is-arrow"
+              type="button"
+              aria-label="Página anterior"
+              on:click={() => goToPage("suggestions", suggestions.page - 1)}
+              disabled={suggestions.page <= 1}
+            >
+              &lt;&lt;
+            </button>
+            {#each buildVisiblePages(suggestions) as page}
+              <button
+                class={`followers-page-btn${page === suggestions.page ? " is-active" : ""}`}
+                type="button"
+                aria-current={page === suggestions.page ? "page" : undefined}
+                on:click={() => goToPage("suggestions", page)}
+              >
+                {page}
+              </button>
+            {/each}
+            <button
+              class="followers-page-btn is-arrow"
+              type="button"
+              aria-label="Página siguiente"
+              on:click={() => goToPage("suggestions", suggestions.page + 1)}
+              disabled={suggestions.page >= suggestions.total_pages}
+            >
+              &gt;&gt;
+            </button>
+          </nav>
+        {/if}
+
+        {#if !suggestions.loading && !suggestions.error && suggestions.total > 0}
+          <p class="followers-range">
+            Mostrando {suggestions.range_start}-{suggestions.range_end} de {formatCount(suggestions.total)} sugerencias.
+          </p>
+        {/if}
+      </section>
+
+      <section class="panel followers-section" aria-label="Seguidores">
         <div class="panel-head">
           <h2 class="panel-title">Seguidores</h2>
-          <span class="panel-badge">12 seguidores</span>
+          <span class="panel-badge">{formatCount(followers.total)} seguidores</span>
         </div>
-        <p class="panel-muted">Personas que siguen tu camino y celebran tus logros.</p>
+        <p class="panel-muted">
+          Personas que siguen tu camino y celebran tus logros.
+        </p>
+
+        {#if followers.error}
+          <p class="followers-status is-error">{followers.error}</p>
+        {:else if followers.loading}
+          <p class="followers-status">Cargando seguidores...</p>
+        {:else if followers.items.length === 0}
+          <p class="followers-status">Aún no tienes seguidores registrados.</p>
+        {:else}
+          <div class="followers-grid">
+            {#each followers.items as item (item.user_id)}
+              <article class="follower-card">
+                <a class="follower-avatar-link" href={getProfileHref(item)} aria-label={`Ver perfil de ${getDisplayName(item)}`}>
+                  <img class="follower-avatar" src={getAvatarSrc(item)} alt={`Foto de perfil de ${getDisplayName(item)}`} loading="lazy" />
+                </a>
+                <h3 class="follower-name">{getDisplayName(item)}</h3>
+                <p class="follower-handle">{getHandle(item)}</p>
+                <p class="follower-count">{formatCount(item.followers_count)} seguidores</p>
+                <div class="follower-actions">
+                  <button
+                    class={`btn btn-compact${item.is_following ? " btn-outline" : " btn-primary"}`}
+                    type="button"
+                    disabled={isFollowPending(item.user_id)}
+                    on:click={() => toggleFollow(item)}
+                  >
+                    {#if isFollowPending(item.user_id)}
+                      Procesando...
+                    {:else if item.is_following}
+                      Dejar de seguir
+                    {:else}
+                      Seguir
+                    {/if}
+                  </button>
+                  <a class="btn btn-outline btn-compact" href={getProfileHref(item)}>Ver perfil</a>
+                </div>
+              </article>
+            {/each}
+          </div>
+        {/if}
+
+        {#if followers.total_pages > 1}
+          <nav class="followers-pagination" aria-label="Paginación de seguidores">
+            <button
+              class="followers-page-btn is-arrow"
+              type="button"
+              aria-label="Página anterior"
+              on:click={() => goToPage("followers", followers.page - 1)}
+              disabled={followers.page <= 1}
+            >
+              &lt;&lt;
+            </button>
+            {#each buildVisiblePages(followers) as page}
+              <button
+                class={`followers-page-btn${page === followers.page ? " is-active" : ""}`}
+                type="button"
+                aria-current={page === followers.page ? "page" : undefined}
+                on:click={() => goToPage("followers", page)}
+              >
+                {page}
+              </button>
+            {/each}
+            <button
+              class="followers-page-btn is-arrow"
+              type="button"
+              aria-label="Página siguiente"
+              on:click={() => goToPage("followers", followers.page + 1)}
+              disabled={followers.page >= followers.total_pages}
+            >
+              &gt;&gt;
+            </button>
+          </nav>
+        {/if}
+
+        {#if !followers.loading && !followers.error && followers.total > 0}
+          <p class="followers-range">
+            Mostrando {followers.range_start}-{followers.range_end} de {formatCount(followers.total)} seguidores.
+          </p>
+        {/if}
       </section>
 
-      <section class="panel">
-        <div class="profile-row">
-          <img class="avatar avatar-sm" src="assets/avatar-default.jpg" alt="Avatar" />
-          <div class="profile-meta">
-            <div class="profile-name">Sofía Rojas</div>
-            <div class="profile-rank">Rango 3 · Guardiana</div>
-            <div class="profile-actions">
-              <button class="btn btn-outline btn-compact" type="button">Ver perfil</button>
-              <button class="btn btn-primary btn-compact" type="button">Enviar mensaje</button>
-            </div>
-          </div>
+      <section class="panel followers-section" aria-label="Siguiendo">
+        <div class="panel-head">
+          <h2 class="panel-title">Siguiendo</h2>
+          <span class="panel-badge">{formatCount(following.total)} siguiendo</span>
         </div>
-      </section>
+        <p class="panel-muted">
+          Usuarios a quienes sigues actualmente.
+        </p>
 
-      <section class="panel">
-        <div class="profile-row">
-          <img class="avatar avatar-sm" src="assets/avatar-default.jpg" alt="Avatar" />
-          <div class="profile-meta">
-            <div class="profile-name">Mateo Castillo</div>
-            <div class="profile-rank">Rango 2 · Aprendiz</div>
-            <div class="profile-actions">
-              <button class="btn btn-outline btn-compact" type="button">Ver perfil</button>
-              <button class="btn btn-primary btn-compact" type="button">Enviar mensaje</button>
-            </div>
+        {#if following.error}
+          <p class="followers-status is-error">{following.error}</p>
+        {:else if following.loading}
+          <p class="followers-status">Cargando usuarios seguidos...</p>
+        {:else if following.items.length === 0}
+          <p class="followers-status">Aún no sigues a ningún usuario.</p>
+        {:else}
+          <div class="followers-grid">
+            {#each following.items as item (item.user_id)}
+              <article class="follower-card">
+                <a class="follower-avatar-link" href={getProfileHref(item)} aria-label={`Ver perfil de ${getDisplayName(item)}`}>
+                  <img class="follower-avatar" src={getAvatarSrc(item)} alt={`Foto de perfil de ${getDisplayName(item)}`} loading="lazy" />
+                </a>
+                <h3 class="follower-name">{getDisplayName(item)}</h3>
+                <p class="follower-handle">{getHandle(item)}</p>
+                <p class="follower-count">{formatCount(item.followers_count)} seguidores</p>
+                <div class="follower-actions">
+                  <button
+                    class={`btn btn-compact${item.is_following ? " btn-outline" : " btn-primary"}`}
+                    type="button"
+                    disabled={isFollowPending(item.user_id)}
+                    on:click={() => toggleFollow(item)}
+                  >
+                    {#if isFollowPending(item.user_id)}
+                      Procesando...
+                    {:else if item.is_following}
+                      Dejar de seguir
+                    {:else}
+                      Seguir
+                    {/if}
+                  </button>
+                  <a class="btn btn-outline btn-compact" href={getProfileHref(item)}>Ver perfil</a>
+                </div>
+              </article>
+            {/each}
           </div>
-        </div>
-      </section>
+        {/if}
 
-      <section class="panel">
-        <div class="profile-row">
-          <img class="avatar avatar-sm" src="assets/avatar-default.jpg" alt="Avatar" />
-          <div class="profile-meta">
-            <div class="profile-name">Lina Duarte</div>
-            <div class="profile-rank">Rango 1 · Buscadora</div>
-            <div class="profile-actions">
-              <button class="btn btn-outline btn-compact" type="button">Ver perfil</button>
-              <button class="btn btn-primary btn-compact" type="button">Enviar mensaje</button>
-            </div>
-          </div>
-        </div>
+        {#if following.total_pages > 1}
+          <nav class="followers-pagination" aria-label="Paginación de siguiendo">
+            <button
+              class="followers-page-btn is-arrow"
+              type="button"
+              aria-label="Página anterior"
+              on:click={() => goToPage("following", following.page - 1)}
+              disabled={following.page <= 1}
+            >
+              &lt;&lt;
+            </button>
+            {#each buildVisiblePages(following) as page}
+              <button
+                class={`followers-page-btn${page === following.page ? " is-active" : ""}`}
+                type="button"
+                aria-current={page === following.page ? "page" : undefined}
+                on:click={() => goToPage("following", page)}
+              >
+                {page}
+              </button>
+            {/each}
+            <button
+              class="followers-page-btn is-arrow"
+              type="button"
+              aria-label="Página siguiente"
+              on:click={() => goToPage("following", following.page + 1)}
+              disabled={following.page >= following.total_pages}
+            >
+              &gt;&gt;
+            </button>
+          </nav>
+        {/if}
+
+        {#if !following.loading && !following.error && following.total > 0}
+          <p class="followers-range">
+            Mostrando {following.range_start}-{following.range_end} de {formatCount(following.total)} seguidos.
+          </p>
+        {/if}
       </section>
     </div>
   </main>
+
   <footer class="kiadez-footer">
     <div class="footer-main">
       <div class="footer-column footer-origin">
@@ -222,5 +627,4 @@
       © 2026 Kiadez — Una red social para cumplir deseos.
     </div>
   </footer>
-
 </div>

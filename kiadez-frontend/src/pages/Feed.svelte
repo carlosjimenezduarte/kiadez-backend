@@ -360,7 +360,7 @@
           <article class="panel guardian-panel">
             <h3 class="panel-title">Yo soy Guardián</h3>
             <p class="panel-muted">Escenario de gestión y notificaciones para Guardianes activos.</p>
-            <a class="btn btn-primary btn-compact" href="#">Entrar al módulo de Guardianes</a>
+            <a class="btn btn-primary btn-compact" href="/guardiancenter.html">Entrar al módulo de Guardianes</a>
           </article>
 
           <div class="feed-mini-footer">

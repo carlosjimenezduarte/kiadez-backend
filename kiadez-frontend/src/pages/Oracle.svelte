@@ -228,7 +228,13 @@
     const MAX_HISTORY_ENTRIES = 4;
     const MAX_RESPONSE_WORDS = 500;
     const TOTAL_CARDS = oracleCards.length;
-    const oracleUserName = "Carlos Jiménez Duarte";
+    let isViewingOwnProfile = true;
+    let viewerUserId = null;
+    let viewerUsername = "";
+    let activeProfileUserId = null;
+    let activeProfileUsername = "";
+    let activeProfileFullName = "";
+    let oracleUserName = "Usuario Kiadez";
 
     const oracleDeck = document.getElementById("oracleDeck");
     const oracleStatus = document.getElementById("oracleStatus");
@@ -398,6 +404,168 @@
         throw new Error("Sesión expirada.");
       }
       return res;
+    };
+
+    const normalizeUsername = (value) => {
+      let normalized = String(value || "").trim().toLowerCase();
+      while (normalized.startsWith("@")) normalized = normalized.slice(1);
+      return normalized;
+    };
+
+    const fetchViewerIdentity = async () => {
+      const res = await apiFetch("/auth/me");
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo cargar tu perfil.");
+      }
+      const userId = Number(data?.user_number);
+      return {
+        user_id: Number.isFinite(userId) && userId > 0 ? userId : null,
+        username: normalizeUsername(data?.username || ""),
+      };
+    };
+
+    const fetchFollowProfile = async ({ userId = null, username = null } = {}) => {
+      const idValue = Number(userId);
+      const usernameValue = normalizeUsername(username || "");
+      if (Number.isFinite(idValue) && idValue > 0) {
+        const res = await apiFetch(`/follows/profile?user_id=${encodeURIComponent(String(idValue))}`);
+        const data = await parseResponseJson(res);
+        if (!res.ok) throw new Error(data.detail || "No se pudo cargar el perfil.");
+        return data;
+      }
+      if (usernameValue) {
+        const res = await apiFetch(`/follows/profile?username=${encodeURIComponent(usernameValue)}`);
+        const data = await parseResponseJson(res);
+        if (!res.ok) throw new Error(data.detail || "No se pudo cargar el perfil.");
+        return data;
+      }
+      throw new Error("Parámetros inválidos para cargar perfil.");
+    };
+
+    const buildViewerHomeUrl = () => {
+      if (viewerUsername) return `/home_user.html?u=${encodeURIComponent(viewerUsername)}`;
+      if (viewerUserId) return `/home_user.html?id=${encodeURIComponent(String(viewerUserId))}`;
+      return "/home_user.html";
+    };
+
+    const buildProfileQueryParams = () => {
+      if (activeProfileUsername) return { key: "u", value: activeProfileUsername };
+      if (activeProfileUserId) return { key: "id", value: String(activeProfileUserId) };
+      return null;
+    };
+
+    const buildProfileModuleUrl = (path) => {
+      const raw = String(path || "").trim();
+      if (!raw) return "";
+      try {
+        const url = new URL(raw, window.location.origin);
+        const qp = buildProfileQueryParams();
+        url.searchParams.delete("u");
+        url.searchParams.delete("id");
+        if (qp) url.searchParams.set(qp.key, qp.value);
+        return `${url.pathname}${url.search}`;
+      } catch {
+        return raw;
+      }
+    };
+
+    const PROFILE_MODULE_ROUTES = {
+      home: "/home_user.html",
+      public_wishes: "/my-public-whishes.html",
+      fulfilled_wishes: "/my-fulfilled-whises.html",
+      calendar: "/calendar.html",
+      oracle: "/oracle.html",
+    };
+
+    const syncProfileModuleLinks = () => {
+      document.querySelectorAll("a[data-profile-module]").forEach((link) => {
+        const key = String(link.getAttribute("data-profile-module") || "").trim();
+        const basePath = PROFILE_MODULE_ROUTES[key] || link.getAttribute("href") || "";
+        const nextHref = buildProfileModuleUrl(basePath);
+        if (nextHref) link.href = nextHref;
+      });
+    };
+
+    const setMyHomeLinks = (href) => {
+      const nextHref = String(href || "").trim();
+      if (!nextHref) return;
+      document.querySelectorAll("a[data-my-home]").forEach((link) => {
+        link.href = nextHref;
+      });
+    };
+
+    const applyReadOnlyProfileMode = () => {
+      document.body.dataset.visitor = "true";
+      document.querySelectorAll('a[href="/my-private-whishes.html"]').forEach((link) => link.classList.add("hidden"));
+      document.getElementById("btnChangeCover")?.classList.add("hidden");
+      document.getElementById("btnEditPurposes")?.classList.add("hidden");
+      document.querySelectorAll(".purpose-side-btn").forEach((btn) => btn.classList.add("hidden"));
+      document.querySelector(".oracle-deck")?.classList.add("hidden");
+    };
+
+    const applyOracleHeader = () => {
+      const title = document.querySelector(".oracle-title");
+      if (title) {
+        title.textContent = isViewingOwnProfile
+          ? "El Oráculo"
+          : `Oráculo de ${activeProfileFullName || "usuario"}`;
+      }
+      const subtitle = document.querySelector(".oracle-subtitle");
+      if (subtitle) {
+        subtitle.textContent = isViewingOwnProfile
+          ? "Selecciona una carta para comprender tu presente. Solo una carta cada 3 días."
+          : "Solo podrás ver las respuestas públicas de este usuario.";
+      }
+      document.title = isViewingOwnProfile
+        ? "Kiadez — Oráculo"
+        : `Kiadez — Oráculo de ${activeProfileFullName || "usuario"}`;
+      if (!isViewingOwnProfile && oracleRevealedEmpty) {
+        oracleRevealedEmpty.textContent = "Aún no hay cartas públicas reveladas.";
+      }
+    };
+
+    const resolveProfileContext = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const requestedIdRaw = params.get("id");
+      const requestedId = Number(requestedIdRaw);
+      const requestedUserId =
+        Number.isFinite(requestedId) && requestedId > 0 ? requestedId : null;
+      const requestedUsername = normalizeUsername(params.get("u") || "");
+
+      const me = await fetchViewerIdentity();
+      viewerUserId = me.user_id;
+      viewerUsername = me.username;
+
+      activeProfileUserId = viewerUserId;
+      activeProfileUsername = viewerUsername;
+      activeProfileFullName = "";
+      isViewingOwnProfile = true;
+      document.body.dataset.visitor = "false";
+
+      const wantsOtherProfile = Boolean(requestedUserId || requestedUsername);
+      if (wantsOtherProfile) {
+        const isSelfById = requestedUserId && viewerUserId && requestedUserId === viewerUserId;
+        const isSelfByUsername = requestedUsername && viewerUsername && requestedUsername === viewerUsername;
+        if (!isSelfById && !isSelfByUsername) {
+          const profile = await fetchFollowProfile({
+            userId: requestedUserId,
+            username: requestedUserId ? null : requestedUsername,
+          });
+          activeProfileUserId = Number(profile?.user_id) || requestedUserId;
+          activeProfileUsername = normalizeUsername(profile?.username || requestedUsername);
+          activeProfileFullName = String(profile?.full_name || "").trim();
+          isViewingOwnProfile = Boolean(viewerUserId && activeProfileUserId === viewerUserId);
+          if (!isViewingOwnProfile) {
+            applyReadOnlyProfileMode();
+          }
+        }
+      }
+
+      oracleUserName = activeProfileFullName || "Este usuario";
+      applyOracleHeader();
+      setMyHomeLinks(buildViewerHomeUrl());
+      syncProfileModuleLinks();
     };
 
     const pbkdf2Key = async (password, saltBuf, iters) => {
@@ -787,6 +955,36 @@
       selectedCard = oracleCards.find((card) => card.id === cardId);
       if (!selectedCard) return;
 
+      if (!isViewingOwnProfile) {
+        const entries = getCardHistory(cardId);
+        const latest = entries[0];
+        oracleCardName.textContent = selectedCard.name;
+        oracleCardQuestion.textContent = selectedCard.question;
+        oracleCardImage.src = getCardImage(selectedCard.id);
+        oracleCardContext.textContent = selectedCard.context;
+
+        oracleCardResponse.disabled = true;
+        oracleCardResponse.placeholder = "Sin respuesta pública.";
+        oracleCardResponse.value = latest?.text || "";
+        oracleActionRow.style.display = "none";
+        oracleConfirm.classList.add("hidden");
+        resetPrivatePasswordUi();
+        resetSecretUnlockUi();
+        pendingDeleteEntryId = null;
+        pendingAction = null;
+        if (oracleSecretActions) oracleSecretActions.classList.add("hidden");
+
+        oracleModalNote.textContent = latest?.date
+          ? `Respuesta pública registrada el ${formatDate(new Date(latest.date))}.`
+          : "Esta carta no tiene respuesta pública.";
+
+        updateWordCounter();
+        renderHistory(cardId);
+        oracleModalOverlay.classList.remove("hidden");
+        oracleModalOverlay.setAttribute("aria-hidden", "false");
+        return;
+      }
+
       const currentEntries = getCurrentCycleEntries(cardId);
       const answeredEntry = currentEntries.find((entry) => entry.type === "public" || entry.type === "secret");
       const hasAnswered = Boolean(answeredEntry);
@@ -1058,7 +1256,12 @@
     const loadOracleState = async () => {
       try {
         oracleStatus.textContent = "Cargando cartas...";
-        const res = await apiFetch("/oracle/state");
+        const profileId = Number(activeProfileUserId);
+        const endpoint =
+          !isViewingOwnProfile && Number.isFinite(profileId) && profileId > 0
+            ? `/oracle/public/${encodeURIComponent(String(profileId))}`
+            : "/oracle/state";
+        const res = await apiFetch(endpoint);
         const data = await parseResponseJson(res);
         if (!res.ok) {
           throw new Error(data.detail || "No se pudo cargar el estado del Oráculo.");
@@ -1068,6 +1271,11 @@
       } catch (err) {
         oracleStatus.textContent = "No se pudo cargar el Oráculo";
         oracleCooldown.textContent = err?.message || "Inténtalo de nuevo.";
+        if (!isViewingOwnProfile && oracleRevealedEmpty) {
+          oracleRevealed.innerHTML = "";
+          oracleRevealedEmpty.textContent = err?.message || "Este módulo es privado.";
+          oracleRevealedEmpty.style.display = "block";
+        }
       }
     };
 
@@ -1167,7 +1375,15 @@
     });
 
     updateWordCounter();
-    void loadOracleState();
+    (async () => {
+      try {
+        await resolveProfileContext();
+      } catch (error) {
+        console.error(error);
+      } finally {
+        void loadOracleState();
+      }
+    })();
   });
 </script>
 
@@ -1190,11 +1406,11 @@
     </div>
 
     <div class="feed-topbar-zone feed-topbar-center">
-      <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
+      <a class="topbar-btn" href="/home_user.html" data-profile-module="home">🏠 Home</a>
       <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-      <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
+      <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 Deseos públicos</a>
       <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ Deseos cumplidos</a>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
@@ -1219,10 +1435,10 @@
           <span class="topbar-menu-label">Menú</span>
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/home_user.html" role="menuitem">Mi Home</a>
+          <a href="/home_user.html" role="menuitem" data-my-home>Mi Home</a>
           <a href="/achievements.html" role="menuitem">Logros recientes</a>
           <a href="/gallery.html" role="menuitem">Galería</a>
-          <a href="/calendar.html" role="menuitem">Calendario</a>
+          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
           <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
         </div>
       </details>
@@ -1325,7 +1541,7 @@
          *  NAV / LINKS
          *  ========================= -->
         <nav class="profile-nav" aria-label="Navegación de perfil">
-          <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
+          <a class="nav-pill" href="/home_user.html" title="Home" data-profile-module="home">Home</a>
           <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
             <span class="nav-icon">⭐</span>
             <span><strong>5.000.000</strong> estrellas</span>
@@ -1333,7 +1549,7 @@
           <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
           <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
           <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-          <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
+          <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
           <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
         </nav>
 

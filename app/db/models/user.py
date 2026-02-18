@@ -92,6 +92,31 @@ class User(Base):
         default=0,
     )
 
+    # Public profile visibility toggles (apply only to other viewers; owner can always access).
+    public_profile_show_public_wishes: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    public_profile_show_fulfilled_wishes: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    public_profile_show_calendar: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    public_profile_show_oracle: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
     username_updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

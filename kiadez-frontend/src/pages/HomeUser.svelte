@@ -45,7 +45,17 @@
     const commentInput = document.getElementById('postCommentInput');
     const sendComment = document.getElementById('sendPostComment');
     const commentsTitle = document.getElementById('postCommentsTitle');
+    const homeAvatarDropdown = document.getElementById('homeAvatarDropdown');
     const homeAvatarButton = document.getElementById('homeAvatarButton');
+    const homeAvatarViewBtn = document.getElementById('homeAvatarViewBtn');
+    const homeAvatarUploadBtn = document.getElementById('homeAvatarUploadBtn');
+    const homeAvatarGalleryBtn = document.getElementById('homeAvatarGalleryBtn');
+    const homeAvatarFile = document.getElementById('homeAvatarFile');
+    const homeAvatarGalleryModalOverlay = document.getElementById('homeAvatarGalleryModalOverlay');
+    const closeHomeAvatarGalleryModal = document.getElementById('closeHomeAvatarGalleryModal');
+    const cancelHomeAvatarGalleryModal = document.getElementById('cancelHomeAvatarGalleryModal');
+    const homeAvatarGalleryGrid = document.getElementById('homeAvatarGalleryGrid');
+    const homeAvatarGalleryStatus = document.getElementById('homeAvatarGalleryStatus');
     const homeProfileName = document.getElementById('homeProfileName');
     const homeUsernameLink = document.getElementById('homeUsernameLink');
     const homeUsernameValue = document.getElementById('homeUsernameValue');
@@ -68,10 +78,12 @@
     const homeFulfilledWishList = document.getElementById('homeFulfilledWishList');
     const homeFulfilledWishCount = document.getElementById('homeFulfilledWishCount');
     const homeFulfilledWishStatus = document.getElementById('homeFulfilledWishStatus');
-    const homePrivateWishCount = document.getElementById('homePrivateWishCount');
-    const homePrivateWishTotal = document.getElementById('homePrivateWishTotal');
-    const homePrivateWishStatus = document.getElementById('homePrivateWishStatus');
-    const homeAboutTextValue = document.getElementById('homeAboutTextValue');
+	    const homePrivateWishCount = document.getElementById('homePrivateWishCount');
+	    const homePrivateWishTotal = document.getElementById('homePrivateWishTotal');
+	    const homePrivateWishStatus = document.getElementById('homePrivateWishStatus');
+	    const btnChangeCover = document.getElementById('btnChangeCover');
+	    const btnEditPurposes = document.getElementById('btnEditPurposes');
+	    const homeAboutTextValue = document.getElementById('homeAboutTextValue');
     const homeAboutEmptyState = document.getElementById('homeAboutEmptyState');
     const homeAboutEditBtn = document.getElementById('homeAboutEditBtn');
     const homeAboutModalOverlay = document.getElementById('homeAboutModalOverlay');
@@ -84,6 +96,9 @@
     const profilePhotoPostOverlay = document.getElementById('profilePhotoPostModalOverlay');
     const closeProfilePhotoPostModal = document.getElementById('closeProfilePhotoPostModal');
     const cancelProfilePhotoPostModal = document.getElementById('cancelProfilePhotoPostModal');
+    const profilePhotoPrevBtn = document.getElementById('profilePhotoPrevBtn');
+    const profilePhotoNextBtn = document.getElementById('profilePhotoNextBtn');
+    const profilePhotoNavLabel = document.getElementById('profilePhotoNavLabel');
     const profilePhotoPostImage = document.getElementById('profilePhotoPostImage');
     const profilePhotoPostAuthor = document.getElementById('profilePhotoPostAuthor');
     const profilePhotoPostMeta = document.getElementById('profilePhotoPostMeta');
@@ -91,7 +106,8 @@
     const profilePhotoCommentPost = document.getElementById('profilePhotoCommentPost');
     const profilePhotoSharePost = document.getElementById('profilePhotoSharePost');
     const profilePhotoPostStatus = document.getElementById('profilePhotoPostStatus');
-    const homeAvatarImages = Array.from(document.querySelectorAll('[data-home-avatar]'));
+    const viewerAvatarImages = Array.from(document.querySelectorAll('[data-viewer-avatar]'));
+    const profileAvatarImages = Array.from(document.querySelectorAll('[data-profile-avatar]'));
 
     let selectedFile = null;
     let selectedFileURL = null;
@@ -102,9 +118,20 @@
     let profilePhotoMediaId = null;
     let profilePhotoPost = null;
     let profilePhotoPostId = null;
+    let profilePhotoViewerPostId = null;
+    let profilePhotoHistory = [];
+    let profilePhotoHistoryIndex = 0;
+    let homeAvatarGalleryHasImages = false;
+    let homeAvatarProfilePhotoBusy = false;
     let currentAboutDisplayName = (homeProfileName?.textContent || 'Usuario Kiadez').trim();
     let currentUsername = '';
     let pendingUsername = '';
+    let viewerUserId = null;
+    let viewerUsername = '';
+    let activeProfileUserId = null;
+    let activeProfileUsername = '';
+    let activeProfileUrl = '/home_user.html';
+    let isViewingOwnProfile = true;
 
     const HOME_ABOUT_MAX_WORDS = 50;
     const USERNAME_MIN_LENGTH = 4;
@@ -191,9 +218,64 @@
       });
     };
 
-    const setHomeCanonicalLinks = (profilePath) => {
+	    const buildViewerHomeUrl = () => {
+	      if (viewerUsername) return `/home_user.html?u=${encodeURIComponent(viewerUsername)}`;
+	      if (viewerUserId) return `/home_user.html?id=${encodeURIComponent(String(viewerUserId))}`;
+	      return '/home_user.html';
+	    };
+
+	    const buildProfileQueryParams = () => {
+	      if (activeProfileUsername) {
+	        return { key: 'u', value: activeProfileUsername };
+	      }
+	      if (activeProfileUserId) {
+	        return { key: 'id', value: String(activeProfileUserId) };
+	      }
+	      return null;
+	    };
+
+	    const buildProfileModuleUrl = (path) => {
+	      const raw = String(path || '').trim();
+	      if (!raw) return '';
+	      try {
+	        const url = new URL(raw, window.location.origin);
+	        const qp = buildProfileQueryParams();
+	        url.searchParams.delete('u');
+	        url.searchParams.delete('id');
+	        if (qp) url.searchParams.set(qp.key, qp.value);
+	        return `${url.pathname}${url.search}`;
+	      } catch {
+	        return raw;
+	      }
+	    };
+
+	    const PROFILE_MODULE_ROUTES = {
+	      home: '/home_user.html',
+	      public_wishes: '/my-public-whishes.html',
+	      fulfilled_wishes: '/my-fulfilled-whises.html',
+	      calendar: '/calendar.html',
+	      oracle: '/oracle.html'
+	    };
+
+	    const syncProfileModuleLinks = () => {
+	      document.querySelectorAll('a[data-profile-module]').forEach((link) => {
+	        const key = String(link.getAttribute('data-profile-module') || '').trim();
+	        const basePath = PROFILE_MODULE_ROUTES[key] || link.getAttribute('href') || '';
+	        const nextHref = buildProfileModuleUrl(basePath);
+	        if (nextHref) link.href = nextHref;
+	      });
+	    };
+
+    const setMyHomeLinks = (profilePath) => {
       const normalizedPath = profilePath || '/home_user.html';
-      document.querySelectorAll('a[data-home-link="true"]').forEach((link) => {
+      document.querySelectorAll('a[data-my-home-link="true"]').forEach((link) => {
+        link.href = normalizedPath;
+      });
+    };
+
+    const setProfileCanonicalLinks = (profilePath) => {
+      const normalizedPath = profilePath || '/home_user.html';
+      document.querySelectorAll('a[data-profile-link="true"]').forEach((link) => {
         link.href = normalizedPath;
       });
 
@@ -207,10 +289,16 @@
 
     const setHomeAvatarSource = (url) => {
       const avatarUrl = (url || '').trim() || DEFAULT_AVATAR_SRC;
-      homeAvatarImages.forEach((img) => {
+      const shouldUpdateViewer = isViewingOwnProfile;
+      if (shouldUpdateViewer) {
+        viewerAvatarImages.forEach((img) => {
+          img.src = avatarUrl;
+        });
+      }
+      profileAvatarImages.forEach((img) => {
         img.src = avatarUrl;
       });
-      if (profilePhotoPostImage && !profilePhotoPost) {
+      if (isViewingOwnProfile && profilePhotoPostImage && !profilePhotoPost) {
         profilePhotoPostImage.src = avatarUrl;
       }
     };
@@ -266,6 +354,123 @@
       return res;
     };
 
+    const applyReadOnlyProfileMode = () => {
+      // When viewing someone else's profile, hide any "my account" panels and editing actions.
+      homeUsernameEditBtn?.classList.add('hidden');
+      homeUsernameCooldown?.classList.add('hidden');
+      homeAboutEditBtn?.classList.add('hidden');
+      homeAvatarUploadBtn?.classList.add('hidden');
+	      homeAvatarGalleryBtn?.classList.add('hidden');
+	      homeAvatarViewBtn?.classList.add('hidden');
+	      menuPublishBtn?.classList.add('hidden');
+	      btnChangeCover?.classList.add('hidden');
+	      btnEditPurposes?.classList.add('hidden');
+
+      homeAvatarDropdown?.removeAttribute('open');
+
+	      homePrivateWishCount?.closest('article.panel')?.classList.add('hidden');
+
+	      openPostModal?.closest('.composer')?.classList.add('hidden');
+	    };
+
+    const fetchViewerIdentity = async () => {
+      const res = await apiFetch('/auth/me');
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'No se pudo cargar tu perfil.');
+      }
+      const userId = Number(data?.user_number);
+      return {
+        user_id: Number.isFinite(userId) && userId > 0 ? userId : null,
+        username: normalizeUsername(data?.username || ''),
+      };
+    };
+
+    const fetchFollowProfile = async ({ userId = null, username = null } = {}) => {
+      const idValue = Number(userId);
+      const usernameValue = normalizeUsername(username || '');
+      if (Number.isFinite(idValue) && idValue > 0) {
+        const res = await apiFetch(`/follows/profile?user_id=${encodeURIComponent(String(idValue))}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar el perfil.');
+        return data;
+      }
+      if (usernameValue) {
+        const res = await apiFetch(`/follows/profile?username=${encodeURIComponent(usernameValue)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar el perfil.');
+        return data;
+      }
+      throw new Error('Parámetros inválidos para cargar perfil.');
+    };
+
+    const applyForeignProfileHeader = (profile) => {
+      const profileId = Number(profile?.user_id);
+      activeProfileUserId = Number.isFinite(profileId) && profileId > 0 ? profileId : null;
+      activeProfileUsername = normalizeUsername(profile?.username || '');
+      activeProfileUrl = String(profile?.profile_url || '').trim() || '/home_user.html';
+
+      const handleText =
+        String(profile?.handle || '').trim() ||
+        (activeProfileUsername ? `@${activeProfileUsername}` : activeProfileUserId ? `@id${activeProfileUserId}` : '@usuario');
+
+      if (homeUsernameValue) homeUsernameValue.textContent = handleText;
+      if (homeUsernameLink) {
+        homeUsernameLink.href = activeProfileUrl;
+        homeUsernameLink.classList.toggle('is-empty', false);
+      }
+      if (homeUsernameCooldown) homeUsernameCooldown.textContent = '';
+
+      const fullName = String(profile?.full_name || '').trim();
+      if (fullName && homeProfileName) homeProfileName.textContent = fullName;
+
+	      setProfileCanonicalLinks(activeProfileUrl);
+	      setMyHomeLinks(buildViewerHomeUrl());
+	      syncProfileModuleLinks();
+	      setHomeAvatarSource(String(profile?.avatar_url || '').trim() || DEFAULT_AVATAR_SRC);
+	    };
+
+    const resolveProfileContext = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const requestedIdRaw = params.get('id');
+      const requestedId = Number(requestedIdRaw);
+      const requestedUserId =
+        Number.isFinite(requestedId) && requestedId > 0 ? requestedId : null;
+      const requestedUsername = normalizeUsername(params.get('u') || '');
+
+      try {
+        const me = await fetchViewerIdentity();
+        viewerUserId = me.user_id;
+        viewerUsername = me.username;
+      } catch (error) {
+        console.error(error);
+      }
+
+	      activeProfileUserId = viewerUserId;
+	      activeProfileUsername = viewerUsername;
+	      activeProfileUrl = '/home_user.html';
+	      isViewingOwnProfile = true;
+	      setMyHomeLinks(buildViewerHomeUrl());
+	      syncProfileModuleLinks();
+
+      const wantsOtherProfile = Boolean(requestedUserId || requestedUsername);
+      if (!wantsOtherProfile) return null;
+
+      const isSelfById = requestedUserId && viewerUserId && requestedUserId === viewerUserId;
+      const isSelfByUsername = requestedUsername && viewerUsername && requestedUsername === viewerUsername;
+      if (isSelfById || isSelfByUsername) return null;
+
+      const profile = await fetchFollowProfile({
+        userId: requestedUserId,
+        username: requestedUserId ? null : requestedUsername,
+      });
+
+      isViewingOwnProfile = false;
+      applyReadOnlyProfileMode();
+      applyForeignProfileHeader(profile);
+      return profile;
+    };
+
     const applyHomeAbout = (about) => {
       const displayName = (about?.display_name || '').trim() || (homeProfileName?.textContent || '').trim() || 'Usuario Kiadez';
       const aboutText = (about?.about_text || '').trim();
@@ -282,9 +487,13 @@
       }
     };
 
-    const loadHomeAbout = async () => {
+    const loadHomeAbout = async (userId = null) => {
       try {
-        const res = await apiFetch('/biography/about');
+        const endpoint =
+          Number.isFinite(Number(userId)) && Number(userId) > 0
+            ? `/biography/about/${encodeURIComponent(String(Number(userId)))}`
+            : '/biography/about';
+        const res = await apiFetch(endpoint);
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'No se pudo cargar "Acerca de mi".');
         applyHomeAbout(data);
@@ -294,6 +503,7 @@
     };
 
     const openHomeAboutModalPanel = () => {
+      if (!isViewingOwnProfile) return;
       if (homeAboutInput) {
         homeAboutInput.value = (homeAboutTextValue?.textContent || '').trim();
       }
@@ -309,10 +519,45 @@
       setHomeAboutModalStatus('');
     };
 
+    const collectProfilePhotoHistoryFromFeed = (posts) => {
+      const items = Array.isArray(posts) ? posts : [];
+      // Profile photo publications are the ones this page creates automatically.
+      return items.filter((post) => {
+        if (!post?.is_mine) return false;
+        if (post?.media_kind !== 'image') return false;
+        if (!post?.media_id) return false;
+        const text = (post?.text || '').trim();
+        return text === PROFILE_PHOTO_POST_TEXT;
+      });
+    };
+
+    const updateProfilePhotoNavigation = () => {
+      const total = Array.isArray(profilePhotoHistory) ? profilePhotoHistory.length : 0;
+      const hasMany = total > 1;
+      profilePhotoPrevBtn?.classList.toggle('hidden', !hasMany);
+      profilePhotoNextBtn?.classList.toggle('hidden', !hasMany);
+      profilePhotoNavLabel?.classList.toggle('hidden', !hasMany);
+
+      if (!hasMany) {
+        if (profilePhotoNavLabel) profilePhotoNavLabel.textContent = '';
+        if (profilePhotoPrevBtn) profilePhotoPrevBtn.disabled = true;
+        if (profilePhotoNextBtn) profilePhotoNextBtn.disabled = true;
+        return;
+      }
+
+      const safeIndex = Math.max(0, Math.min(total - 1, Number(profilePhotoHistoryIndex) || 0));
+      profilePhotoHistoryIndex = safeIndex;
+      if (profilePhotoNavLabel) profilePhotoNavLabel.textContent = `${safeIndex + 1} / ${total}`;
+
+      // Feed is sorted newest -> oldest; "Anterior" goes to older photos.
+      if (profilePhotoPrevBtn) profilePhotoPrevBtn.disabled = safeIndex >= total - 1;
+      if (profilePhotoNextBtn) profilePhotoNextBtn.disabled = safeIndex <= 0;
+    };
+
     const renderProfilePhotoPost = (post) => {
       profilePhotoPost = post || null;
       if (profilePhotoPostImage) {
-        const imageUrl = post?.media_url || homeAvatarImages[0]?.src || DEFAULT_AVATAR_SRC;
+        const imageUrl = post?.media_url || profileAvatarImages[0]?.src || DEFAULT_AVATAR_SRC;
         profilePhotoPostImage.src = imageUrl;
       }
       if (profilePhotoPostMeta) {
@@ -344,26 +589,56 @@
     const syncProfilePhotoPostFromFeed = () => {
       if (!Array.isArray(currentFeedPosts) || currentFeedPosts.length === 0) {
         renderProfilePhotoPost(null);
+        profilePhotoHistory = [];
+        profilePhotoHistoryIndex = 0;
+        updateProfilePhotoNavigation();
         return;
       }
 
-      let foundPost = null;
+      // 1) Keep a stable reference to the *current* profile photo post (by id or by media id).
+      let currentProfilePost = null;
       if (profilePhotoPostId) {
-        foundPost = currentFeedPosts.find((post) => post.id === profilePhotoPostId) || null;
+        currentProfilePost =
+          currentFeedPosts.find((post) => post.id === profilePhotoPostId && post.is_mine) || null;
       }
-      if (!foundPost && profilePhotoMediaId) {
-        foundPost = currentFeedPosts.find(
+      if (!currentProfilePost && profilePhotoMediaId) {
+        currentProfilePost = currentFeedPosts.find(
           (post) => post.is_mine && post.media_id === profilePhotoMediaId && post.media_kind === 'image'
         ) || null;
-        if (foundPost) setProfilePhotoPostId(foundPost.id);
+        if (currentProfilePost) setProfilePhotoPostId(currentProfilePost.id);
       }
-      if (!foundPost && profilePhotoPostId) {
-        setProfilePhotoPostId(null);
+      if (!currentProfilePost && profilePhotoPostId) setProfilePhotoPostId(null);
+
+      // 2) Build the profile photo history (newest -> oldest).
+      profilePhotoHistory = collectProfilePhotoHistoryFromFeed(currentFeedPosts);
+
+      // 3) Render the viewer-selected post (if any), otherwise render current profile photo post.
+      let viewerPost = null;
+      if (profilePhotoViewerPostId) {
+        viewerPost = profilePhotoHistory.find((post) => post.id === profilePhotoViewerPostId) || null;
       }
-      renderProfilePhotoPost(foundPost);
+      if (!viewerPost) {
+        viewerPost = currentProfilePost;
+        profilePhotoViewerPostId = viewerPost?.id || null;
+      }
+
+      // Keep the index in sync for the navigation UI.
+      if (profilePhotoViewerPostId) {
+        const idx = profilePhotoHistory.findIndex((post) => post.id === profilePhotoViewerPostId);
+        if (idx >= 0) profilePhotoHistoryIndex = idx;
+      } else if (viewerPost?.id) {
+        const idx = profilePhotoHistory.findIndex((post) => post.id === viewerPost.id);
+        profilePhotoHistoryIndex = idx >= 0 ? idx : 0;
+      } else {
+        profilePhotoHistoryIndex = 0;
+      }
+
+      renderProfilePhotoPost(viewerPost);
+      updateProfilePhotoNavigation();
     };
 
     const loadProfilePhoto = async () => {
+      if (!isViewingOwnProfile) return;
       try {
         const res = await apiFetch('/media/profile-photo');
         const data = await res.json();
@@ -375,11 +650,63 @@
       }
     };
 
+    const setHomeAvatarGalleryStatus = (message, isError = false) => {
+      if (!homeAvatarGalleryStatus) return;
+      homeAvatarGalleryStatus.textContent = message || '';
+      homeAvatarGalleryStatus.classList.toggle('posts-status-error', Boolean(isError));
+    };
+
+    const closeHomeAvatarDropdown = () => {
+      homeAvatarDropdown?.removeAttribute('open');
+    };
+
+    const closeHomeAvatarGalleryModalPanel = () => {
+      homeAvatarGalleryModalOverlay?.classList.add('hidden');
+      homeAvatarGalleryModalOverlay?.setAttribute('aria-hidden', 'true');
+      setHomeAvatarGalleryStatus('');
+      if (homeAvatarGalleryGrid) homeAvatarGalleryGrid.innerHTML = '';
+    };
+
+    const handleHomeAvatarGalleryOverlayClick = (event) => {
+      if (event.target === homeAvatarGalleryModalOverlay) closeHomeAvatarGalleryModalPanel();
+    };
+
+    const fetchMyImageOptions = async (limit = 24) => {
+      const res = await apiFetch(`/media/mine/images?limit=${limit}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'No se pudo cargar tu galería.');
+      }
+      const items = Array.isArray(data.items) ? data.items : [];
+      return items;
+    };
+
+    const refreshHomeAvatarMenuOptions = async () => {
+      const hasProfilePhoto = Boolean(profilePhotoMediaId);
+      homeAvatarViewBtn?.classList.toggle('hidden', !hasProfilePhoto);
+      if (!homeAvatarGalleryBtn) return;
+
+      try {
+        const items = await fetchMyImageOptions(1);
+        homeAvatarGalleryHasImages = items.length > 0;
+      } catch (error) {
+        homeAvatarGalleryHasImages = false;
+      }
+
+      homeAvatarGalleryBtn.classList.toggle('hidden', !homeAvatarGalleryHasImages);
+    };
+
     const applyUsernameState = (state) => {
       const username = normalizeUsername(state?.username || '');
       currentUsername = username;
       const hasUsername = Boolean(username);
       const profilePath = state?.profile_url || (hasUsername ? `/home_user.html?u=${encodeURIComponent(username)}` : '/home_user.html');
+	      if (isViewingOwnProfile) {
+	        activeProfileUsername = username;
+	        activeProfileUrl = profilePath;
+	        if (viewerUserId) activeProfileUserId = viewerUserId;
+	        syncProfileModuleLinks();
+	      }
       if (homeUsernameValue) homeUsernameValue.textContent = hasUsername ? `@${username}` : '@elige-tu-usuario';
       if (homeUsernameLink) {
         homeUsernameLink.href = profilePath;
@@ -400,10 +727,12 @@
           homeUsernameCooldown.textContent = 'Nombre de usuario bloqueado temporalmente.';
         }
       }
-      setHomeCanonicalLinks(profilePath);
+      setProfileCanonicalLinks(profilePath);
+      if (isViewingOwnProfile) setMyHomeLinks(profilePath);
     };
 
     const loadUsernameState = async () => {
+      if (!isViewingOwnProfile) return;
       try {
         const res = await apiFetch('/auth/username');
         const data = await res.json();
@@ -423,6 +752,7 @@
     };
 
     const openHomeUsernameModalPanel = () => {
+      if (!isViewingOwnProfile) return;
       if (homeUsernameInput) homeUsernameInput.value = currentUsername;
       pendingUsername = '';
       setHomeUsernameModalStatus('');
@@ -591,13 +921,18 @@
         .join('');
     };
 
-    const loadHomePublicWishes = async () => {
-      try {
-        const res = await apiFetch('/public-wishes/personal');
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudieron cargar tus deseos públicos.');
-        renderHomePublicWishes(data?.items || [], data?.active_count || 0, data?.active_limit || 50);
-        setHomePublicWishStatus('');
+	    const loadHomePublicWishes = async () => {
+	      try {
+	        const profileId = Number(activeProfileUserId);
+	        const endpoint =
+	          !isViewingOwnProfile && Number.isFinite(profileId) && profileId > 0
+	            ? `/public-wishes/user/${encodeURIComponent(String(profileId))}/personal`
+	            : '/public-wishes/personal';
+	        const res = await apiFetch(endpoint);
+	        const data = await res.json();
+	        if (!res.ok) throw new Error(data.detail || 'No se pudieron cargar tus deseos públicos.');
+	        renderHomePublicWishes(data?.items || [], data?.active_count || 0, data?.active_limit || 50);
+	        setHomePublicWishStatus('');
       } catch (error) {
         renderHomePublicWishes([], 0, 50);
         setHomePublicWishStatus(error.message || 'No se pudieron cargar tus deseos públicos.', true);
@@ -652,13 +987,18 @@
         .join('');
     };
 
-    const loadHomeFulfilledWishes = async () => {
-      try {
-        const res = await apiFetch('/public-wishes/personal/fulfilled?limit=7&offset=0');
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudieron cargar tus deseos cumplidos.');
-        renderHomeFulfilledWishes(data?.items || [], data?.total || 0);
-        setHomeFulfilledWishStatus('');
+	    const loadHomeFulfilledWishes = async () => {
+	      try {
+	        const profileId = Number(activeProfileUserId);
+	        const endpoint =
+	          !isViewingOwnProfile && Number.isFinite(profileId) && profileId > 0
+	            ? `/public-wishes/user/${encodeURIComponent(String(profileId))}/personal/fulfilled?limit=7&offset=0`
+	            : '/public-wishes/personal/fulfilled?limit=7&offset=0';
+	        const res = await apiFetch(endpoint);
+	        const data = await res.json();
+	        if (!res.ok) throw new Error(data.detail || 'No se pudieron cargar tus deseos cumplidos.');
+	        renderHomeFulfilledWishes(data?.items || [], data?.total || 0);
+	        setHomeFulfilledWishStatus('');
       } catch (error) {
         renderHomeFulfilledWishes([], 0);
         setHomeFulfilledWishStatus(error.message || 'No se pudieron cargar tus deseos cumplidos.', true);
@@ -709,7 +1049,7 @@
               ? `<div class="post-media"><video src="${post.media_url}" controls></video></div>`
               : `<div class="post-media"><img src="${post.media_url}" alt="Media de la publicacion" /></div>`
             : '';
-          const starDisabled = post.starred_by_me ? 'disabled' : '';
+          const starDisabled = post.starred_by_me || post.is_mine ? 'disabled' : '';
           const starLabel = post.starred_by_me
             ? `⭐ Estrella donada (${post.star_count})`
             : `⭐ Donar estrella (${post.star_count})`;
@@ -760,15 +1100,22 @@
 
     const loadFeed = async () => {
       try {
-        const res = await apiFetch('/posts/feed?limit=40');
+        const profileId = Number(activeProfileUserId);
+        const endpoint = isViewingOwnProfile
+          ? '/posts/mine?limit=40'
+          : Number.isFinite(profileId) && profileId > 0
+            ? `/posts/user/${encodeURIComponent(String(profileId))}?limit=40`
+            : '/posts/mine?limit=40';
+
+        const res = await apiFetch(endpoint);
         const data = await res.json();
         if (!res.ok) {
-          setPostsStatus(data.detail || 'No se pudo cargar el feed.', true);
+          setPostsStatus(data.detail || 'No se pudo cargar las publicaciones.', true);
           return;
         }
         currentFeedPosts = Array.isArray(data) ? data : [];
         renderPosts(data);
-        syncProfilePhotoPostFromFeed();
+        if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
         setPostsStatus('');
       } catch (error) {
         setPostsStatus('No se pudo conectar con el servidor de publicaciones.', true);
@@ -776,6 +1123,7 @@
     };
 
     const openPost = () => {
+      if (!isViewingOwnProfile) return;
       postModalOverlay?.classList.remove('hidden');
       postModalOverlay?.setAttribute('aria-hidden', 'false');
     };
@@ -836,6 +1184,26 @@
 
     const uploadMediaFile = async (file, visibilityValue) => {
       if (!file) return null;
+      const mediaKind = file.type.startsWith('video/') ? 'video' : 'image';
+
+      // Imagen: upload directo al backend (evita CORS del bucket).
+      if (mediaKind === 'image') {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('visibility', (visibilityValue || 'private').toLowerCase());
+
+        const uploadRes = await apiFetch('/media/upload/direct', {
+          method: 'POST',
+          body: formData
+        });
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) {
+          throw new Error(uploadData.detail || 'No se pudo subir la imagen.');
+        }
+        return { media_id: uploadData.media_id, media_kind: 'image' };
+      }
+
+      // Video (y otros): registro + subida por proxy (evita CORS del bucket).
       const presignRes = await apiFetch('/media/presign/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -843,7 +1211,7 @@
           filename: file.name,
           content_type: file.type,
           size_bytes: file.size,
-          visibility: visibilityValue
+          visibility: (visibilityValue || 'private').toLowerCase()
         })
       });
       const presignData = await presignRes.json();
@@ -851,13 +1219,59 @@
         throw new Error(presignData.detail || 'No se pudo preparar la carga de media.');
       }
 
-      const uploadRes = await fetch(presignData.upload_url, {
-        method: 'PUT',
-        headers: presignData.required_headers || { 'Content-Type': file.type },
-        body: file
+      const proxyForm = new FormData();
+      proxyForm.append('media_id', String(presignData.media_id));
+      proxyForm.append('file', file);
+      const proxyRes = await apiFetch('/media/upload/proxy', {
+        method: 'POST',
+        body: proxyForm
       });
-      if (!uploadRes.ok) {
-        throw new Error('No se pudo subir el archivo.');
+      const proxyData = await proxyRes.json();
+      if (!proxyRes.ok) {
+        throw new Error(proxyData.detail || 'No se pudo subir el archivo.');
+      }
+
+      return { media_id: presignData.media_id, media_kind: 'video' };
+    };
+
+    const uploadProfilePhotoFilePresigned = async (file) => {
+      if (!file) return null;
+      if (!file.type?.startsWith('image/')) {
+        throw new Error('Solo se permiten imágenes para la foto de perfil.');
+      }
+
+      const presignRes = await apiFetch('/media/presign/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          content_type: file.type,
+          size_bytes: file.size,
+          visibility: 'public'
+        })
+      });
+      const presignData = await presignRes.json();
+      if (!presignRes.ok) {
+        throw new Error(presignData.detail || 'No se pudo preparar la carga de la foto de perfil.');
+      }
+
+      try {
+        const uploadRes = await fetch(presignData.upload_url, {
+          method: 'PUT',
+          headers: presignData.required_headers || { 'Content-Type': file.type },
+          body: file
+        });
+        if (!uploadRes.ok) {
+          throw new Error('No se pudo subir la imagen al storage.');
+        }
+      } catch (error) {
+        const message = (error?.message || '').toLowerCase();
+        if (message.includes('failed to fetch') || message.includes('cors')) {
+          throw new Error(
+            'La subida directa al bucket fue bloqueada por CORS. Debes habilitar CORS en tu bucket de media para permitir PUT desde tu frontend.'
+          );
+        }
+        throw error;
       }
 
       const confirmRes = await apiFetch('/media/confirm', {
@@ -867,11 +1281,10 @@
       });
       const confirmData = await confirmRes.json();
       if (!confirmRes.ok) {
-        throw new Error(confirmData.detail || 'No se pudo confirmar la media.');
+        throw new Error(confirmData.detail || 'No se pudo confirmar la foto de perfil.');
       }
 
-      const mediaKind = file.type.startsWith('video/') ? 'video' : 'image';
-      return { media_id: presignData.media_id, media_kind: mediaKind };
+      return { media_id: presignData.media_id, media_kind: 'image' };
     };
 
     const uploadMediaIfNeeded = async (visibilityValue) => {
@@ -880,6 +1293,7 @@
     };
 
     const handlePublishPost = async () => {
+      if (!isViewingOwnProfile) return;
       const text = (postText?.value || '').trim();
       if (!text && !selectedFile) {
         setPostsStatus('Debes escribir texto o adjuntar imagen/video.', true);
@@ -955,7 +1369,19 @@
       } else {
         syncProfilePhotoPostFromFeed();
       }
-      if (profilePhotoPost?.id) return true;
+
+      let currentProfilePost = null;
+      if (profilePhotoPostId) {
+        currentProfilePost =
+          currentFeedPosts.find((post) => post.id === profilePhotoPostId && post.is_mine) || null;
+      }
+      if (!currentProfilePost && profilePhotoMediaId) {
+        currentProfilePost = currentFeedPosts.find(
+          (post) => post.is_mine && post.media_id === profilePhotoMediaId && post.media_kind === 'image'
+        ) || null;
+        if (currentProfilePost) setProfilePhotoPostId(currentProfilePost.id);
+      }
+      if (currentProfilePost) return true;
 
       const created = await createPost({
         text: PROFILE_PHOTO_POST_TEXT,
@@ -966,16 +1392,154 @@
       setProfilePhotoPostId(created.id);
       await loadFeed();
       syncProfilePhotoPostFromFeed();
-      return Boolean(profilePhotoPost?.id);
+      return Boolean(profilePhotoPostId);
     };
 
     const openProfilePhotoPost = async () => {
+      if (!isViewingOwnProfile) return;
+      profilePhotoViewerPostId = null;
+      profilePhotoHistory = [];
+      profilePhotoHistoryIndex = 0;
+      updateProfilePhotoNavigation();
       profilePhotoPostOverlay?.classList.remove('hidden');
       profilePhotoPostOverlay?.setAttribute('aria-hidden', 'false');
       try {
         await ensureProfilePhotoPost();
+        // Always open on the *current* profile photo.
+        profilePhotoViewerPostId = profilePhotoPostId || null;
+        syncProfilePhotoPostFromFeed();
       } catch (error) {
         setProfilePhotoPostStatus(error.message || 'No se pudo abrir la publicacion de la foto de perfil.', true);
+      }
+    };
+
+    const setProfilePhotoFromMediaId = async (mediaId) => {
+      if (!isViewingOwnProfile) {
+        throw new Error('No autorizado para cambiar esta foto de perfil.');
+      }
+      const normalized = Number(mediaId);
+      if (!Number.isFinite(normalized) || normalized <= 0) {
+        throw new Error('Media inválida para foto de perfil.');
+      }
+      const res = await apiFetch('/media/profile-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ media_id: normalized })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'No se pudo actualizar la foto de perfil.');
+      }
+      profilePhotoMediaId = data.media_id || null;
+      setProfilePhotoPostId(null);
+      setHomeAvatarSource(data.url || DEFAULT_AVATAR_SRC);
+      renderProfilePhotoPost(null);
+      return data;
+    };
+
+    const handleHomeAvatarButtonClick = () => {
+      if (!isViewingOwnProfile) return;
+      void refreshHomeAvatarMenuOptions();
+    };
+
+    const handleHomeAvatarViewClick = () => {
+      if (!isViewingOwnProfile) return;
+      closeHomeAvatarDropdown();
+      void openProfilePhotoPost();
+    };
+
+    const handleHomeAvatarUploadClick = () => {
+      if (!isViewingOwnProfile) return;
+      closeHomeAvatarDropdown();
+      homeAvatarFile?.click();
+    };
+
+    const handleHomeAvatarFileChange = async (event) => {
+      if (!isViewingOwnProfile) return;
+      const file = event?.target?.files?.[0];
+      if (!file) return;
+      closeHomeAvatarDropdown();
+      if (homeAvatarProfilePhotoBusy) return;
+      if (!file.type?.startsWith('image/')) {
+        setPostsStatus('Solo se permiten imágenes para la foto de perfil.', true);
+        if (homeAvatarFile) homeAvatarFile.value = '';
+        return;
+      }
+
+      homeAvatarProfilePhotoBusy = true;
+      setPostsStatus('Subiendo foto de perfil...');
+      try {
+        const uploaded = await uploadProfilePhotoFilePresigned(file);
+        await setProfilePhotoFromMediaId(uploaded?.media_id);
+        setPostsStatus('Foto de perfil actualizada.');
+        void ensureProfilePhotoPost().catch((error) => console.error(error));
+      } catch (error) {
+        setPostsStatus(error.message || 'No se pudo actualizar tu foto de perfil.', true);
+      } finally {
+        homeAvatarProfilePhotoBusy = false;
+        if (homeAvatarFile) homeAvatarFile.value = '';
+      }
+    };
+
+    const renderHomeAvatarGallery = (items) => {
+      if (!homeAvatarGalleryGrid) return;
+      if (!Array.isArray(items) || items.length === 0) {
+        homeAvatarGalleryGrid.innerHTML = '';
+        return;
+      }
+
+      homeAvatarGalleryGrid.innerHTML = items
+        .map(
+          (item) => `
+            <button class="avatar-gallery-option" type="button" data-media-id="${Number(item.media_id) || ''}" title="Usar como foto de perfil">
+              <img src="${escapeHtml(item.url)}" alt="Imagen de galería" loading="lazy" />
+            </button>
+          `
+        )
+        .join('');
+    };
+
+    const openHomeAvatarGalleryModalPanel = async () => {
+      if (!isViewingOwnProfile) return;
+      closeHomeAvatarDropdown();
+      homeAvatarGalleryModalOverlay?.classList.remove('hidden');
+      homeAvatarGalleryModalOverlay?.setAttribute('aria-hidden', 'false');
+      setHomeAvatarGalleryStatus('Cargando imágenes...');
+      if (homeAvatarGalleryGrid) homeAvatarGalleryGrid.innerHTML = '';
+
+      try {
+        const items = await fetchMyImageOptions(60);
+        if (items.length === 0) {
+          setHomeAvatarGalleryStatus('Aún no tienes imágenes en tu galería.', false);
+          renderHomeAvatarGallery([]);
+          return;
+        }
+        setHomeAvatarGalleryStatus('Selecciona una imagen para tu foto de perfil.');
+        renderHomeAvatarGallery(items);
+      } catch (error) {
+        setHomeAvatarGalleryStatus(error.message || 'No se pudo cargar tu galería.', true);
+      }
+    };
+
+    const handleHomeAvatarGalleryPick = async (event) => {
+      if (!isViewingOwnProfile) return;
+      const button = event.target?.closest?.('[data-media-id]');
+      if (!button) return;
+      const mediaId = Number(button.dataset.mediaId);
+      if (!Number.isFinite(mediaId) || mediaId <= 0) return;
+      if (homeAvatarProfilePhotoBusy) return;
+
+      homeAvatarProfilePhotoBusy = true;
+      setHomeAvatarGalleryStatus('Actualizando foto de perfil...');
+      try {
+        await setProfilePhotoFromMediaId(mediaId);
+        closeHomeAvatarGalleryModalPanel();
+        setPostsStatus('Foto de perfil actualizada.');
+        void ensureProfilePhotoPost().catch((error) => console.error(error));
+      } catch (error) {
+        setHomeAvatarGalleryStatus(error.message || 'No se pudo actualizar tu foto de perfil.', true);
+      } finally {
+        homeAvatarProfilePhotoBusy = false;
       }
     };
 
@@ -983,6 +1547,10 @@
       profilePhotoPostOverlay?.classList.add('hidden');
       profilePhotoPostOverlay?.setAttribute('aria-hidden', 'true');
       setProfilePhotoPostStatus('');
+      profilePhotoViewerPostId = null;
+      profilePhotoHistory = [];
+      profilePhotoHistoryIndex = 0;
+      updateProfilePhotoNavigation();
     };
 
     const handleProfilePhotoPostOverlayClick = (event) => {
@@ -1061,7 +1629,7 @@
         if (!res.ok) throw new Error(data.detail || 'No se pudo donar la estrella.');
         setStatus('Estrella donada. Esta accion es irreversible.');
         await Promise.all([loadFeed(), loadMyStats()]);
-        syncProfilePhotoPostFromFeed();
+        if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
       } catch (error) {
         setStatus(error.message || 'No se pudo donar la estrella.', true);
       }
@@ -1071,8 +1639,10 @@
       try {
         await apiFetch(`/posts/${postId}/share`, { method: 'POST' });
         const shareUrlObject = new URL('/home_user.html', window.location.origin);
-        if (currentUsername) {
-          shareUrlObject.searchParams.set('u', currentUsername);
+        if (activeProfileUsername) {
+          shareUrlObject.searchParams.set('u', activeProfileUsername);
+        } else if (activeProfileUserId) {
+          shareUrlObject.searchParams.set('id', String(activeProfileUserId));
         }
         shareUrlObject.searchParams.set('post', String(postId));
         const shareUrl = shareUrlObject.toString();
@@ -1083,7 +1653,7 @@
         }
         setStatus('Publicacion compartida.');
         await loadFeed();
-        syncProfilePhotoPostFromFeed();
+        if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
       } catch (error) {
         setStatus(error.message || 'No se pudo compartir.', true);
       }
@@ -1148,6 +1718,34 @@
     const handleProfilePhotoShare = async () => {
       if (!profilePhotoPost?.id) return;
       await sharePost(profilePhotoPost.id, setProfilePhotoPostStatus);
+    };
+
+    const setProfilePhotoViewerByIndex = (nextIndex) => {
+      const total = Array.isArray(profilePhotoHistory) ? profilePhotoHistory.length : 0;
+      if (total === 0) {
+        profilePhotoViewerPostId = null;
+        profilePhotoHistoryIndex = 0;
+        renderProfilePhotoPost(null);
+        updateProfilePhotoNavigation();
+        return;
+      }
+
+      const safeIndex = Math.max(0, Math.min(total - 1, Number(nextIndex) || 0));
+      profilePhotoHistoryIndex = safeIndex;
+      const nextPost = profilePhotoHistory[safeIndex] || null;
+      profilePhotoViewerPostId = nextPost?.id || null;
+      renderProfilePhotoPost(nextPost);
+      updateProfilePhotoNavigation();
+    };
+
+    const handleProfilePhotoPrevNav = () => {
+      if (profilePhotoPrevBtn?.disabled) return;
+      setProfilePhotoViewerByIndex(profilePhotoHistoryIndex + 1);
+    };
+
+    const handleProfilePhotoNextNav = () => {
+      if (profilePhotoNextBtn?.disabled) return;
+      setProfilePhotoViewerByIndex(profilePhotoHistoryIndex - 1);
     };
 
     const handlePostsClick = async (event) => {
@@ -1262,7 +1860,15 @@
     openPostModal?.addEventListener('click', openPost);
     menuPublishBtn?.addEventListener('click', handleMenuPublishClick);
     homeTopbarBtn?.addEventListener('click', handleTopbarHomeClick);
-    homeAvatarButton?.addEventListener('click', openProfilePhotoPost);
+    homeAvatarButton?.addEventListener('click', handleHomeAvatarButtonClick);
+    homeAvatarViewBtn?.addEventListener('click', handleHomeAvatarViewClick);
+    homeAvatarUploadBtn?.addEventListener('click', handleHomeAvatarUploadClick);
+    homeAvatarFile?.addEventListener('change', handleHomeAvatarFileChange);
+    homeAvatarGalleryBtn?.addEventListener('click', openHomeAvatarGalleryModalPanel);
+    closeHomeAvatarGalleryModal?.addEventListener('click', closeHomeAvatarGalleryModalPanel);
+    cancelHomeAvatarGalleryModal?.addEventListener('click', closeHomeAvatarGalleryModalPanel);
+    homeAvatarGalleryModalOverlay?.addEventListener('click', handleHomeAvatarGalleryOverlayClick);
+    homeAvatarGalleryGrid?.addEventListener('click', handleHomeAvatarGalleryPick);
     homeUsernameEditBtn?.addEventListener('click', openHomeUsernameModalPanel);
     closeHomeUsernameModal?.addEventListener('click', closeHomeUsernameModalPanel);
     cancelHomeUsernameModal?.addEventListener('click', closeHomeUsernameModalPanel);
@@ -1274,6 +1880,8 @@
     closeProfilePhotoPostModal?.addEventListener('click', closeProfilePhotoPost);
     cancelProfilePhotoPostModal?.addEventListener('click', closeProfilePhotoPost);
     profilePhotoPostOverlay?.addEventListener('click', handleProfilePhotoPostOverlayClick);
+    profilePhotoPrevBtn?.addEventListener('click', handleProfilePhotoPrevNav);
+    profilePhotoNextBtn?.addEventListener('click', handleProfilePhotoNextNav);
     profilePhotoStarPost?.addEventListener('click', handleProfilePhotoStar);
     profilePhotoCommentPost?.addEventListener('click', handleProfilePhotoComment);
     profilePhotoSharePost?.addEventListener('click', handleProfilePhotoShare);
@@ -1315,18 +1923,36 @@
     });
 
     void (async () => {
-      await Promise.all([
-        loadHomeAbout(),
-        loadProfilePhoto(),
-        loadUsernameState(),
-        loadHomePublicWishes(),
-        loadHomeFulfilledWishes(),
-        loadHomePrivateWishes(),
-        loadMyStats()
-      ]);
-      await loadFeed();
-      syncProfilePhotoPostFromFeed();
-    })();
+      try {
+        await resolveProfileContext();
+      } catch (error) {
+        console.error(error);
+        setPostsStatus(error.message || 'No se pudo cargar el perfil.', true);
+      }
+
+      if (isViewingOwnProfile) {
+        await Promise.all([
+          loadHomeAbout(),
+          loadProfilePhoto(),
+          loadUsernameState(),
+          loadHomePublicWishes(),
+          loadHomeFulfilledWishes(),
+          loadHomePrivateWishes(),
+          loadMyStats()
+        ]);
+        await loadFeed();
+        syncProfilePhotoPostFromFeed();
+        return;
+      }
+
+	      await Promise.all([
+	        loadHomeAbout(activeProfileUserId),
+	        loadHomePublicWishes(),
+	        loadHomeFulfilledWishes(),
+	        loadMyStats(),
+	      ]);
+	      await loadFeed();
+	    })();
 
     return () => {
       if (selectedFileURL) URL.revokeObjectURL(selectedFileURL);
@@ -1334,7 +1960,15 @@
       openPostModal?.removeEventListener('click', openPost);
       menuPublishBtn?.removeEventListener('click', handleMenuPublishClick);
       homeTopbarBtn?.removeEventListener('click', handleTopbarHomeClick);
-      homeAvatarButton?.removeEventListener('click', openProfilePhotoPost);
+      homeAvatarButton?.removeEventListener('click', handleHomeAvatarButtonClick);
+      homeAvatarViewBtn?.removeEventListener('click', handleHomeAvatarViewClick);
+      homeAvatarUploadBtn?.removeEventListener('click', handleHomeAvatarUploadClick);
+      homeAvatarFile?.removeEventListener('change', handleHomeAvatarFileChange);
+      homeAvatarGalleryBtn?.removeEventListener('click', openHomeAvatarGalleryModalPanel);
+      closeHomeAvatarGalleryModal?.removeEventListener('click', closeHomeAvatarGalleryModalPanel);
+      cancelHomeAvatarGalleryModal?.removeEventListener('click', closeHomeAvatarGalleryModalPanel);
+      homeAvatarGalleryModalOverlay?.removeEventListener('click', handleHomeAvatarGalleryOverlayClick);
+      homeAvatarGalleryGrid?.removeEventListener('click', handleHomeAvatarGalleryPick);
       homeUsernameEditBtn?.removeEventListener('click', openHomeUsernameModalPanel);
       closeHomeUsernameModal?.removeEventListener('click', closeHomeUsernameModalPanel);
       cancelHomeUsernameModal?.removeEventListener('click', closeHomeUsernameModalPanel);
@@ -1346,6 +1980,8 @@
       closeProfilePhotoPostModal?.removeEventListener('click', closeProfilePhotoPost);
       cancelProfilePhotoPostModal?.removeEventListener('click', closeProfilePhotoPost);
       profilePhotoPostOverlay?.removeEventListener('click', handleProfilePhotoPostOverlayClick);
+      profilePhotoPrevBtn?.removeEventListener('click', handleProfilePhotoPrevNav);
+      profilePhotoNextBtn?.removeEventListener('click', handleProfilePhotoNextNav);
       profilePhotoStarPost?.removeEventListener('click', handleProfilePhotoStar);
       profilePhotoCommentPost?.removeEventListener('click', handleProfilePhotoComment);
       profilePhotoSharePost?.removeEventListener('click', handleProfilePhotoShare);
@@ -1400,17 +2036,17 @@
     </div>
 
     <div class="feed-topbar-zone feed-topbar-center">
-      <button class="topbar-btn is-active" id="homeTopbarBtn" type="button">🏠 Home</button>
-      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-      <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
-      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
-    </div>
+	      <button class="topbar-btn is-active" id="homeTopbarBtn" type="button">🏠 Home</button>
+	      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+	      <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 Deseos públicos</a>
+	      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
+	      <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ Deseos cumplidos</a>
+	    </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
       <details class="topbar-dropdown" id="profileDropdown">
         <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" data-home-avatar />
+          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" data-viewer-avatar />
         </summary>
         <div class="dropdown-menu" role="menu">
           <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
@@ -1432,10 +2068,10 @@
           <button class="dropdown-action" id="menuPublishBtn" type="button" role="menuitem">
             Publicar
           </button>
-          <a href="/home_user.html" role="menuitem" data-home-link="true">Mi Home</a>
+          <a href="/home_user.html" role="menuitem" data-my-home-link="true">Mi Home</a>
           <a href="/achievements.html" role="menuitem">Logros recientes</a>
           <a href="/gallery.html" role="menuitem">Galería</a>
-          <a href="/calendar.html" role="menuitem">Calendario</a>
+	          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
           <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
         </div>
       </details>
@@ -1480,7 +2116,7 @@
 
     <div class="home-body">
       <nav class="profile-nav" aria-label="Navegación de perfil">
-        <a class="nav-pill" href="/home_user.html" title="Home" data-home-link="true">Home</a>
+        <a class="nav-pill" href="/home_user.html" title="Home" data-profile-link="true">Home</a>
         <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
           <span class="nav-icon">⭐</span>
           <span><strong id="homeStarsTotal">0</strong> estrellas</span>
@@ -1489,7 +2125,7 @@
         <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
         <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
         <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-        <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
+	        <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
         <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
       </nav>
 
@@ -1497,14 +2133,28 @@
         <aside class="left-col">
           <article class="panel profile-card">
             <div class="profile-row">
-              <button class="profile-avatar-btn" id="homeAvatarButton" type="button" title="Ver foto de perfil como publicación">
-                <img class="avatar profile-avatar-image" src="/assets/avatar-default.jpg" alt="Foto de perfil" data-home-avatar />
-              </button>
+              <details class="topbar-dropdown profile-avatar-dropdown" id="homeAvatarDropdown">
+                <summary class="profile-avatar-btn" id="homeAvatarButton" aria-label="Foto de perfil" title="Foto de perfil">
+                  <img class="avatar profile-avatar-image" src="/assets/avatar-default.jpg" alt="Foto de perfil" data-profile-avatar />
+                </summary>
+                <div class="dropdown-menu" role="menu">
+                  <button class="dropdown-action hidden" id="homeAvatarViewBtn" type="button" role="menuitem">
+                    Ver imagen de perfil
+                  </button>
+                  <button class="dropdown-action" id="homeAvatarUploadBtn" type="button" role="menuitem">
+                    Subir imagen de perfil
+                  </button>
+                  <button class="dropdown-action hidden" id="homeAvatarGalleryBtn" type="button" role="menuitem">
+                    Elegir imagen de perfil
+                  </button>
+                </div>
+              </details>
+              <input id="homeAvatarFile" type="file" accept="image/*" class="hidden" />
               <div class="profile-meta">
                 <h2 class="profile-name" id="homeProfileName">Carlos Jiménez Duarte</h2>
                 <p class="profile-rank">Rango 2 · Aprendiz</p>
                 <div class="home-username-row">
-                  <a class="home-username-link is-empty" id="homeUsernameLink" href="/home_user.html" data-home-link="true">
+                  <a class="home-username-link is-empty" id="homeUsernameLink" href="/home_user.html" data-profile-link="true">
                     <span id="homeUsernameValue">@elige-tu-usuario</span>
                   </a>
                   <button class="infobox-edit-btn home-username-edit-btn" id="homeUsernameEditBtn" type="button" title="Modificar nombre de usuario">
@@ -1547,7 +2197,7 @@
             </ul>
             <p class="home-public-wish-status" id="homeFulfilledWishStatus" aria-live="polite"></p>
 
-            <a href="/my-fulfilled-whises.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn">Ver más</a>
+	            <a href="/my-fulfilled-whises.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="fulfilled_wishes">Ver más</a>
           </article>
 
           <article class="panel">
@@ -1564,7 +2214,7 @@
             </ul>
             <p class="home-public-wish-status" id="homePublicWishStatus" aria-live="polite"></p>
 
-            <a href="/my-public-whishes.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn">Ver más</a>
+	            <a href="/my-public-whishes.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="public_wishes">Ver más</a>
           </article>
 
           <article class="panel">
@@ -1627,7 +2277,7 @@
               </div>
             </div>
 
-            <a href="/calendar.html" class="btn btn-outline btn-compact btn-inline">Ver calendario</a>
+	            <a href="/calendar.html" class="btn btn-outline btn-compact btn-inline" data-profile-module="calendar">Ver calendario</a>
           </article>
 
           <article class="panel">
@@ -1640,14 +2290,14 @@
               <img src="assets/oracle-default.jpg" alt="Última carta del Oráculo" />
             </div>
 
-            <a href="/oracle.html" class="btn btn-outline btn-compact btn-inline">Abrir Oráculo</a>
+	            <a href="/oracle.html" class="btn btn-outline btn-compact btn-inline" data-profile-module="oracle">Abrir Oráculo</a>
           </article>
         </aside>
 
         <section class="right-col">
           <article class="panel composer">
             <div class="composer-row">
-              <img class="avatar avatar-sm" src="/assets/avatar-default.jpg" alt="Avatar" data-home-avatar />
+              <img class="avatar avatar-sm" src="/assets/avatar-default.jpg" alt="Avatar" data-viewer-avatar />
               <button class="composer-input" id="openPostModal" type="button">
                 ¿Qué estás pensando?
               </button>
@@ -1730,7 +2380,7 @@
 
     <div class="modal-body">
       <div class="post-modal-top">
-        <img class="avatar avatar-sm" src="/assets/avatar-default.jpg" alt="Avatar" data-home-avatar />
+        <img class="avatar avatar-sm" src="/assets/avatar-default.jpg" alt="Avatar" data-viewer-avatar />
         <div>
           <div class="post-modal-name"><strong>Carlos Jiménez Duarte</strong></div>
           <select class="modal-select" id="postVisibility">
@@ -1761,7 +2411,7 @@
 <div class="modal-overlay hidden" id="profilePhotoPostModalOverlay" aria-hidden="true">
   <div class="modal modal-wide profile-photo-post-modal" role="dialog" aria-modal="true" aria-label="Publicación de foto de perfil">
     <div class="modal-head">
-      <h3>Foto de perfil publicada</h3>
+      <h3>Foto de perfil</h3>
       <button class="modal-close" type="button" id="closeProfilePhotoPostModal">✕</button>
     </div>
     <div class="modal-body">
@@ -1773,9 +2423,28 @@
           </div>
         </div>
         <p class="post-text">Actualice mi foto de perfil.</p>
-        <div class="post-media">
-          <img id="profilePhotoPostImage" src="/assets/avatar-default.jpg" alt="Foto de perfil publicada" />
+        <div class="post-media profile-photo-media">
+          <button
+            class="profile-photo-nav profile-photo-nav-prev hidden"
+            type="button"
+            id="profilePhotoPrevBtn"
+            aria-label="Foto de perfil anterior"
+            title="Foto anterior"
+          >
+            ‹
+          </button>
+          <img id="profilePhotoPostImage" src="/assets/avatar-default.jpg" alt="Foto de perfil" />
+          <button
+            class="profile-photo-nav profile-photo-nav-next hidden"
+            type="button"
+            id="profilePhotoNextBtn"
+            aria-label="Foto de perfil siguiente"
+            title="Foto siguiente"
+          >
+            ›
+          </button>
         </div>
+        <p class="profile-photo-nav-label hidden" id="profilePhotoNavLabel"></p>
         <p class="post-warning">La donación de estrella es irreversible.</p>
         <div class="post-actions">
           <button class="post-btn" type="button" id="profilePhotoStarPost">⭐ Donar estrella (0)</button>
@@ -1787,6 +2456,23 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline btn-compact" type="button" id="cancelProfilePhotoPostModal">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="homeAvatarGalleryModalOverlay" aria-hidden="true">
+  <div class="modal modal-wide avatar-gallery-modal" role="dialog" aria-modal="true" aria-label="Seleccionar foto de perfil">
+    <div class="modal-head">
+      <h3>Elegir foto de perfil</h3>
+      <button class="modal-close" type="button" id="closeHomeAvatarGalleryModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="panel-muted">Selecciona una imagen de tu galería para usarla como foto de perfil.</p>
+      <p class="posts-status" id="homeAvatarGalleryStatus" aria-live="polite"></p>
+      <div class="avatar-gallery-grid" id="homeAvatarGalleryGrid"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-compact" type="button" id="cancelHomeAvatarGalleryModal">Cancelar</button>
     </div>
   </div>
 </div>
@@ -1809,7 +2495,7 @@
           minlength="4"
           maxlength="30"
           autocomplete="off"
-          placeholder="carlosjimenezduarte"
+          placeholder="tunombredeusuario"
         />
       </div>
       <p class="home-username-preview" id="homeUsernamePreview">Enlace: /home_user.html</p>

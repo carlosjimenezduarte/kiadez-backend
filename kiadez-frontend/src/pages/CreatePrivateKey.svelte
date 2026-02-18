@@ -9,6 +9,39 @@
   let isSubmitting = false;
   let ppw = "";
   let ppw2 = "";
+  let ppwVisible = false;
+  let ppw2Visible = false;
+
+  const PASSWORD_POLICY_MESSAGE =
+    "Debe incluir 8+ caracteres, 1 mayúscula, 1 número y 1 símbolo.";
+
+  const passwordMeetsPolicy = (value) => {
+    const password = String(value || "");
+    if (password.length < 8) return false;
+    if (!/[A-Z]/.test(password)) return false;
+    if (!/[0-9]/.test(password)) return false;
+    if (!/[^a-zA-Z0-9]/.test(password)) return false;
+    return true;
+  };
+
+  let passwordWarningText = "";
+
+  $: {
+    const password = String(ppw || "");
+    const confirm = String(ppw2 || "");
+
+    if (password && !passwordMeetsPolicy(password)) {
+      passwordWarningText = PASSWORD_POLICY_MESSAGE;
+    } else if (passwordMeetsPolicy(password) && confirm && password !== confirm) {
+      if (confirm.length >= password.length) {
+        passwordWarningText = "Las claves privadas deben coincidir.";
+      } else {
+        passwordWarningText = "";
+      }
+    } else {
+      passwordWarningText = "";
+    }
+  }
 
   let feedbackModalOpen = false;
   let feedbackTitle = "Aviso";
@@ -185,18 +218,18 @@
       return;
     }
 
-    if (ppw !== ppw2) {
+    if (!passwordMeetsPolicy(ppw)) {
       openFeedbackModal({
-        title: "Claves no coinciden",
-        message: "Verifica que ambas claves privadas sean exactamente iguales.",
+        title: "Clave inválida",
+        message: PASSWORD_POLICY_MESSAGE,
       });
       return;
     }
 
-    if (ppw.length < 8) {
+    if (ppw !== ppw2) {
       openFeedbackModal({
-        title: "Clave muy corta",
-        message: "Tu clave privada debe tener al menos 8 caracteres.",
+        title: "Claves no coinciden",
+        message: "Verifica que ambas claves privadas sean exactamente iguales.",
       });
       return;
     }
@@ -268,8 +301,70 @@
                 </div>
 
                 <form id="vault-form" on:submit={handleSubmit}>
-                    <input type="password" name="ppw" placeholder="Clave privada personal" bind:value={ppw} required />
-                    <input type="password" name="ppw2" placeholder="Confirmar clave privada" bind:value={ppw2} required />
+                    <div class="password-field">
+                      <input
+                        type={ppwVisible ? "text" : "password"}
+                        name="ppw"
+                        placeholder="Clave privada personal"
+                        bind:value={ppw}
+                        required
+                      />
+                      <button
+                        class="password-toggle"
+                        class:is-visible={ppwVisible}
+                        type="button"
+                        aria-label={ppwVisible ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        aria-pressed={ppwVisible ? "true" : "false"}
+                        title={ppwVisible ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        on:click={() => (ppwVisible = !ppwVisible)}
+                      >
+                        <svg class="password-toggle-icon password-toggle-icon-show" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M2.2 12c1.7-4.2 5.6-7 9.8-7s8.1 2.8 9.8 7c-1.7 4.2-5.6 7-9.8 7s-8.1-2.8-9.8-7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                          <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8" />
+                        </svg>
+                        <svg class="password-toggle-icon password-toggle-icon-hide" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M2.2 12c1.7-4.2 5.6-7 9.8-7s8.1 2.8 9.8 7c-1.7 4.2-5.6 7-9.8 7s-8.1-2.8-9.8-7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                          <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8" />
+                          <path d="M4 4l16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div class="password-field">
+                      <input
+                        type={ppw2Visible ? "text" : "password"}
+                        name="ppw2"
+                        placeholder="Confirmar clave privada"
+                        bind:value={ppw2}
+                        required
+                      />
+                      <button
+                        class="password-toggle"
+                        class:is-visible={ppw2Visible}
+                        type="button"
+                        aria-label={ppw2Visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        aria-pressed={ppw2Visible ? "true" : "false"}
+                        title={ppw2Visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        on:click={() => (ppw2Visible = !ppw2Visible)}
+                      >
+                        <svg class="password-toggle-icon password-toggle-icon-show" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M2.2 12c1.7-4.2 5.6-7 9.8-7s8.1 2.8 9.8 7c-1.7 4.2-5.6 7-9.8 7s-8.1-2.8-9.8-7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                          <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8" />
+                        </svg>
+                        <svg class="password-toggle-icon password-toggle-icon-hide" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M2.2 12c1.7-4.2 5.6-7 9.8-7s8.1 2.8 9.8 7c-1.7 4.2-5.6 7-9.8 7s-8.1-2.8-9.8-7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                          <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8" />
+                          <path d="M4 4l16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <p class={"form-warning" + (passwordWarningText ? "" : " is-hidden")} aria-live="polite">
+                      <span class="form-warning-reserve">
+                        Debe incluir 8+ caracteres, 1 mayúscula, 1 número y 1 símbolo.
+                      </span>
+                      <span class="form-warning-live">{passwordWarningText}</span>
+                    </p>
 
 
                     <button type="submit" class="btn btn-primary" id="submit-btn" disabled={isSubmitting}>

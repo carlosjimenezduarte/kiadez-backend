@@ -21,6 +21,7 @@ from app.db.models.post import (
     PostVisibility,
 )
 from app.db.models.user import User
+from app.db.models.user_follow import UserFollow
 from app.posts.schemas import (
     MyPostStatsOut,
     PostAuthorOut,
@@ -143,6 +144,47 @@ def _post_out(
         created_at=post.created_at,
     )
 
+def _query_posts(
+    *,
+    stmt,
+    current_user_id: int,
+    db: Session,
+) -> list[PostOut]:
+    rows = db.execute(stmt).all()
+    if not rows:
+        return []
+
+    post_ids = [row[0].id for row in rows]
+    media_ids = [row[0].media_id for row in rows if row[0].media_id is not None]
+
+    starred_ids: set[int] = set()
+    if post_ids:
+        starred_rows = db.execute(
+            select(PostStar.post_id).where(
+                PostStar.user_id == current_user_id,
+                PostStar.post_id.in_(post_ids),
+            )
+        ).all()
+        starred_ids = {int(row[0]) for row in starred_rows}
+
+    media_map: dict[int, Media] = {}
+    if media_ids:
+        media_rows = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
+        media_map = {int(media.id): media for media in media_rows}
+
+    result: list[PostOut] = []
+    for post, author in rows:
+        result.append(
+            _post_out(
+                post=post,
+                author=author,
+                is_mine=post.author_id == current_user_id,
+                starred_by_me=post.id in starred_ids,
+                media_url=_build_media_url(post, media_map),
+            )
+        )
+    return result
+
 
 def _normalized_star_totals(user: User) -> tuple[int, int]:
     received = max(0, int(user.received_stars_total or 0))
@@ -204,53 +246,81 @@ def get_feed(
     db: Session = Depends(get_db),
 ):
     current_user_id = current.user_number
+    following_ids = (
+        db.execute(
+            select(UserFollow.followed_id).where(UserFollow.follower_id == current_user_id)
+        )
+        .scalars()
+        .all()
+    )
+    following_ids = [int(user_id) for user_id in following_ids]
+    author_ids = set(following_ids)
+    author_ids.add(int(current_user_id))
 
     stmt = (
         select(Post, User)
         .join(User, User.id == Post.author_id)
         .where(
-            (Post.visibility == PostVisibility.public)
-            | (Post.author_id == current_user_id)
+            Post.visibility == PostVisibility.public,
+            Post.author_id.in_(author_ids),
         )
         .order_by(Post.created_at.desc())
         .offset(offset)
         .limit(limit)
     )
-    rows = db.execute(stmt).all()
+    return _query_posts(stmt=stmt, current_user_id=current_user_id, db=db)
 
-    if not rows:
-        return []
 
-    post_ids = [row[0].id for row in rows]
-    media_ids = [row[0].media_id for row in rows if row[0].media_id is not None]
+@router.get("/mine", response_model=list[PostOut])
+def list_my_posts(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user_id = current.user_number
+    stmt = (
+        select(Post, User)
+        .join(User, User.id == Post.author_id)
+        .where(Post.author_id == current_user_id)
+        .order_by(Post.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    return _query_posts(stmt=stmt, current_user_id=current_user_id, db=db)
 
-    starred_ids: set[int] = set()
-    if post_ids:
-        starred_rows = db.execute(
-            select(PostStar.post_id).where(
-                PostStar.user_id == current_user_id,
-                PostStar.post_id.in_(post_ids),
-            )
-        ).all()
-        starred_ids = {row[0] for row in starred_rows}
 
-    media_map: dict[int, Media] = {}
-    if media_ids:
-        media_rows = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
-        media_map = {media.id: media for media in media_rows}
-
-    result: list[PostOut] = []
-    for post, author in rows:
-        result.append(
-            _post_out(
-                post=post,
-                author=author,
-                is_mine=post.author_id == current_user_id,
-                starred_by_me=post.id in starred_ids,
-                media_url=_build_media_url(post, media_map),
-            )
+@router.get("/user/{user_id}", response_model=list[PostOut])
+def list_user_posts(
+    user_id: int,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user_id = current.user_number
+    target = db.execute(
+        select(User).where(
+            User.id == user_id,
+            User.is_active.is_(True),
         )
-    return result
+    ).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    filters = [Post.author_id == user_id]
+    if int(user_id) != int(current_user_id):
+        filters.append(Post.visibility == PostVisibility.public)
+
+    stmt = (
+        select(Post, User)
+        .join(User, User.id == Post.author_id)
+        .where(*filters)
+        .order_by(Post.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    return _query_posts(stmt=stmt, current_user_id=current_user_id, db=db)
 
 
 @router.get("/me/stats", response_model=MyPostStatsOut)

@@ -482,6 +482,26 @@ def get_about(
     return _serialize_about(user=user, about=about)
 
 
+@router.get("/about/{user_id}", response_model=BiographyAboutOut)
+def get_about_for_user(
+    user_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Public profile about section (requires auth, but exposes only non-sensitive fields).
+    user = db.execute(
+        select(User).where(
+            User.id == user_id,
+            User.is_active.is_(True),
+        )
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    about = db.execute(select(BiographyAbout).where(BiographyAbout.user_id == user_id)).scalar_one_or_none()
+    return _serialize_about(user=user, about=about)
+
+
 @router.put("/about", response_model=BiographyAboutOut)
 def upsert_about(
     payload: BiographyAboutUpdateRequest,

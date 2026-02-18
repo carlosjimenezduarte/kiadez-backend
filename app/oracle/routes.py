@@ -9,6 +9,7 @@ from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.db.database import get_db
 from app.db.models.oracle import OracleResponse, OracleResponseType, OracleUserState
+from app.db.models.user import User
 from app.db.models.user_vault import UserVault
 from app.oracle.schemas import OracleRespondRequest, OracleResponseOut, OracleStateOut
 
@@ -132,6 +133,53 @@ def get_oracle_state(
         db.refresh(state)
 
     return _build_state_payload(db=db, user_id=user_id, state=state, now=_utcnow())
+
+
+@router.get("/public/{user_id}", response_model=OracleStateOut)
+def get_public_oracle_state(
+    user_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    target = (
+        db.query(User)
+        .filter(
+            User.id == user_id,
+            User.is_active.is_(True),
+        )
+        .one_or_none()
+    )
+    if target is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = int(current.user_number) == int(user_id)
+    if not is_owner and not bool(target.public_profile_show_oracle):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+
+    responses = (
+        db.query(OracleResponse)
+        .filter(
+            OracleResponse.user_id == user_id,
+            OracleResponse.response_type == OracleResponseType.public,
+        )
+        .order_by(OracleResponse.created_at.desc(), OracleResponse.id.desc())
+        .all()
+    )
+    revealed_public = sorted(
+        {int(response.card_id) for response in responses if response.card_id is not None}
+    )
+
+    now = _utcnow()
+    return OracleStateOut(
+        cycle=1,
+        cycle_started_at=now,
+        last_pick_at=None,
+        cooldown_ms=COOLDOWN_MS,
+        cooldown_remaining_ms=0,
+        cycle_complete=False,
+        revealed_this_cycle=revealed_public,
+        responses=[_response_out(response) for response in responses],
+    )
 
 
 @router.post("/respond", response_model=OracleStateOut)

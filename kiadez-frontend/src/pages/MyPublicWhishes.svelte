@@ -248,12 +248,18 @@
     let coverMaxOffsetY = 0;
     let coverDirty = false;
     let coverSavedSrc = "";
-    let coverSavedOffsetX = 0;
-    let coverSavedOffsetY = 0;
-    let coverPendingUrl = null;
-    let isVisitorView = false;
-    let fulfillEvidenceUrl = null;
-    let fulfillEvidenceImage = null;
+	    let coverSavedOffsetX = 0;
+	    let coverSavedOffsetY = 0;
+	    let coverPendingUrl = null;
+	    let isVisitorView = false;
+	    let isViewingOwnProfile = true;
+	    let viewerUserId = null;
+	    let viewerUsername = "";
+	    let activeProfileUserId = null;
+	    let activeProfileUsername = "";
+	    let activeProfileFullName = "";
+	    let fulfillEvidenceUrl = null;
+	    let fulfillEvidenceImage = null;
 
     const addLampSlot = () => {
       if (!lampSlotTemplate || !personalWishList) return;
@@ -534,11 +540,11 @@
       }
     };
 
-    const apiFetch = async (path, options = {}) => {
-      const token = getAccessToken();
-      if (!token) {
-        throw new Error("No hay sesión activa.");
-      }
+	    const apiFetch = async (path, options = {}) => {
+	      const token = getAccessToken();
+	      if (!token) {
+	        throw new Error("No hay sesión activa.");
+	      }
 
       const headers = {
         ...(options.headers || {}),
@@ -548,13 +554,163 @@
       if (res.status === 401) {
         throw new Error("Sesión expirada. Inicia sesión nuevamente.");
       }
-      return res;
-    };
+	      return res;
+	    };
 
-    const uploadWishImage = async (file) => {
-      if (!file) return null;
-      const formData = new FormData();
-      formData.append("visibility", "public");
+	    const normalizeUsername = (value) => {
+	      let normalized = String(value || "").trim().toLowerCase();
+	      while (normalized.startsWith("@")) normalized = normalized.slice(1);
+	      return normalized;
+	    };
+
+	    const fetchViewerIdentity = async () => {
+	      const res = await apiFetch("/auth/me");
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo cargar tu perfil.");
+	      }
+	      const userId = Number(data?.user_number);
+	      return {
+	        user_id: Number.isFinite(userId) && userId > 0 ? userId : null,
+	        username: normalizeUsername(data?.username || ""),
+	      };
+	    };
+
+	    const fetchFollowProfile = async ({ userId = null, username = null } = {}) => {
+	      const idValue = Number(userId);
+	      const usernameValue = normalizeUsername(username || "");
+	      if (Number.isFinite(idValue) && idValue > 0) {
+	        const res = await apiFetch(`/follows/profile?user_id=${encodeURIComponent(String(idValue))}`);
+	        const data = await parseResponseJson(res);
+	        if (!res.ok) throw new Error(data.detail || "No se pudo cargar el perfil.");
+	        return data;
+	      }
+	      if (usernameValue) {
+	        const res = await apiFetch(`/follows/profile?username=${encodeURIComponent(usernameValue)}`);
+	        const data = await parseResponseJson(res);
+	        if (!res.ok) throw new Error(data.detail || "No se pudo cargar el perfil.");
+	        return data;
+	      }
+	      throw new Error("Parámetros inválidos para cargar perfil.");
+	    };
+
+	    const buildViewerHomeUrl = () => {
+	      if (viewerUsername) return `/home_user.html?u=${encodeURIComponent(viewerUsername)}`;
+	      if (viewerUserId) return `/home_user.html?id=${encodeURIComponent(String(viewerUserId))}`;
+	      return "/home_user.html";
+	    };
+
+	    const buildProfileQueryParams = () => {
+	      if (activeProfileUsername) {
+	        return { key: "u", value: activeProfileUsername };
+	      }
+	      if (activeProfileUserId) {
+	        return { key: "id", value: String(activeProfileUserId) };
+	      }
+	      return null;
+	    };
+
+	    const buildProfileModuleUrl = (path) => {
+	      const raw = String(path || "").trim();
+	      if (!raw) return "";
+	      try {
+	        const url = new URL(raw, window.location.origin);
+	        const qp = buildProfileQueryParams();
+	        url.searchParams.delete("u");
+	        url.searchParams.delete("id");
+	        if (qp) url.searchParams.set(qp.key, qp.value);
+	        return `${url.pathname}${url.search}`;
+	      } catch {
+	        return raw;
+	      }
+	    };
+
+	    const PROFILE_MODULE_ROUTES = {
+	      home: "/home_user.html",
+	      public_wishes: "/my-public-whishes.html",
+	      fulfilled_wishes: "/my-fulfilled-whises.html",
+	      calendar: "/calendar.html",
+	      oracle: "/oracle.html",
+	    };
+
+	    const syncProfileModuleLinks = () => {
+	      document.querySelectorAll("a[data-profile-module]").forEach((link) => {
+	        const key = String(link.getAttribute("data-profile-module") || "").trim();
+	        const basePath = PROFILE_MODULE_ROUTES[key] || link.getAttribute("href") || "";
+	        const nextHref = buildProfileModuleUrl(basePath);
+	        if (nextHref) link.href = nextHref;
+	      });
+	    };
+
+	    const applyProfileHeader = () => {
+	      const title = document.querySelector(".public-wishes-title");
+	      if (title) {
+	        title.textContent = isViewingOwnProfile
+	          ? "Mis deseos públicos"
+	          : `Deseos públicos de ${activeProfileFullName || "usuario"}`;
+	      }
+	      document.title = isViewingOwnProfile
+	        ? "Kiadez — Mis deseos públicos"
+	        : `Kiadez — Deseos públicos de ${activeProfileFullName || "usuario"}`;
+	    };
+
+	    const applyForeignViewMode = () => {
+	      isVisitorView = true;
+	      document.body.dataset.visitor = "true";
+	      if (toggleVisitorView) toggleVisitorView.classList.add("hidden");
+	      if (personalWishAdd) personalWishAdd.classList.add("hidden");
+	      if (cooperativeWishAdd) cooperativeWishAdd.classList.add("hidden");
+	      document.querySelectorAll(".wish-add-row").forEach((row) => row.classList.add("hidden"));
+	    };
+
+	    const resolveProfileContext = async () => {
+	      const params = new URLSearchParams(window.location.search);
+	      const requestedIdRaw = params.get("id");
+	      const requestedId = Number(requestedIdRaw);
+	      const requestedUserId =
+	        Number.isFinite(requestedId) && requestedId > 0 ? requestedId : null;
+	      const requestedUsername = normalizeUsername(params.get("u") || "");
+
+	      const me = await fetchViewerIdentity();
+	      viewerUserId = me.user_id;
+	      viewerUsername = me.username;
+
+	      activeProfileUserId = viewerUserId;
+	      activeProfileUsername = viewerUsername;
+	      activeProfileFullName = "";
+	      isViewingOwnProfile = true;
+	      document.body.dataset.visitor = "false";
+
+	      const wantsOtherProfile = Boolean(requestedUserId || requestedUsername);
+	      if (wantsOtherProfile) {
+	        const isSelfById = requestedUserId && viewerUserId && requestedUserId === viewerUserId;
+	        const isSelfByUsername = requestedUsername && viewerUsername && requestedUsername === viewerUsername;
+	        if (!isSelfById && !isSelfByUsername) {
+	          const profile = await fetchFollowProfile({
+	            userId: requestedUserId,
+	            username: requestedUserId ? null : requestedUsername,
+	          });
+	          activeProfileUserId = Number(profile?.user_id) || requestedUserId;
+	          activeProfileUsername = normalizeUsername(profile?.username || requestedUsername);
+	          activeProfileFullName = String(profile?.full_name || "").trim();
+	          isViewingOwnProfile = Boolean(viewerUserId && activeProfileUserId === viewerUserId);
+	          if (!isViewingOwnProfile) {
+	            applyForeignViewMode();
+	          }
+	        }
+	      }
+
+	      applyProfileHeader();
+	      syncProfileModuleLinks();
+	    };
+
+	    const uploadWishImage = async (file) => {
+	      if (!isViewingOwnProfile) {
+	        throw new Error("No autorizado.");
+	      }
+	      if (!file) return null;
+	      const formData = new FormData();
+	      formData.append("visibility", "public");
       formData.append("file", file);
       const res = await apiFetch("/media/upload/direct", {
         method: "POST",
@@ -567,19 +723,27 @@
       return data;
     };
 
-    const fetchPersonalWishList = async () => {
-      const res = await apiFetch("/public-wishes/personal");
-      const data = await parseResponseJson(res);
-      if (!res.ok) {
-        throw new Error(data.detail || "No se pudieron cargar tus deseos personales.");
-      }
-      return data;
-    };
+	    const fetchPersonalWishList = async () => {
+	      const profileId = Number(activeProfileUserId);
+	      const endpoint =
+	        !isViewingOwnProfile && Number.isFinite(profileId) && profileId > 0
+	          ? `/public-wishes/user/${encodeURIComponent(String(profileId))}/personal`
+	          : "/public-wishes/personal";
+	      const res = await apiFetch(endpoint);
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudieron cargar tus deseos personales.");
+	      }
+	      return data;
+	    };
 
-    const createPersonalWish = async (payload) => {
-      const res = await apiFetch("/public-wishes/personal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+	    const createPersonalWish = async (payload) => {
+	      if (!isViewingOwnProfile) {
+	        throw new Error("No autorizado.");
+	      }
+	      const res = await apiFetch("/public-wishes/personal", {
+	        method: "POST",
+	        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
       const data = await parseResponseJson(res);
@@ -589,10 +753,13 @@
       return data;
     };
 
-    const updatePersonalWishRecord = async (wishId, payload) => {
-      const res = await apiFetch(`/public-wishes/personal/${wishId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+	    const updatePersonalWishRecord = async (wishId, payload) => {
+	      if (!isViewingOwnProfile) {
+	        throw new Error("No autorizado.");
+	      }
+	      const res = await apiFetch(`/public-wishes/personal/${wishId}`, {
+	        method: "PUT",
+	        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
       const data = await parseResponseJson(res);
@@ -602,10 +769,13 @@
       return data;
     };
 
-    const deletePersonalWishRecord = async (wishId) => {
-      const res = await apiFetch(`/public-wishes/personal/${wishId}`, {
-        method: "DELETE"
-      });
+	    const deletePersonalWishRecord = async (wishId) => {
+	      if (!isViewingOwnProfile) {
+	        throw new Error("No autorizado.");
+	      }
+	      const res = await apiFetch(`/public-wishes/personal/${wishId}`, {
+	        method: "DELETE"
+	      });
       const data = await parseResponseJson(res);
       if (!res.ok) {
         throw new Error(data.detail || "No se pudo borrar el deseo personal.");
@@ -613,10 +783,13 @@
       return data;
     };
 
-    const fulfillPersonalWishRecord = async (wishId, evidenceMediaId = null) => {
-      const res = await apiFetch(`/public-wishes/personal/${wishId}/fulfill`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+	    const fulfillPersonalWishRecord = async (wishId, evidenceMediaId = null) => {
+	      if (!isViewingOwnProfile) {
+	        throw new Error("No autorizado.");
+	      }
+	      const res = await apiFetch(`/public-wishes/personal/${wishId}/fulfill`, {
+	        method: "POST",
+	        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ evidence_media_id: evidenceMediaId || null })
       });
       const data = await parseResponseJson(res);
@@ -2648,34 +2821,37 @@
       });
     }
 
-    if (personalWishList) {
-      personalWishList.addEventListener("click", (event) => {
-        const lampBtn = event.target.closest(".wish-lamp-btn");
-        const cancelBtn = event.target.closest(".wish-choice-cancel");
-        const choiceBtn = event.target.closest(".wish-choice-btn");
-        const actionBtn = event.target.closest(".wish-icon-btn");
+	    if (personalWishList) {
+	      personalWishList.addEventListener("click", (event) => {
+	        const lampBtn = event.target.closest(".wish-lamp-btn");
+	        const cancelBtn = event.target.closest(".wish-choice-cancel");
+	        const choiceBtn = event.target.closest(".wish-choice-btn");
+	        const actionBtn = event.target.closest(".wish-icon-btn");
 
-        if (lampBtn) {
-          const slot = lampBtn.closest(".wish-slot");
-          if (!slot) return;
-          activePersonalSlot = slot;
-          openPersonalWishModal();
-          return;
-        }
+	        if (lampBtn) {
+	          if (isVisitorView) return;
+	          const slot = lampBtn.closest(".wish-slot");
+	          if (!slot) return;
+	          activePersonalSlot = slot;
+	          openPersonalWishModal();
+	          return;
+	        }
 
-        if (cancelBtn) {
-          const slot = cancelBtn.closest(".wish-slot");
-          if (!slot) return;
-          resetSlotToEmpty(slot);
-          activePersonalSlot = null;
-          return;
-        }
+	        if (cancelBtn) {
+	          if (isVisitorView) return;
+	          const slot = cancelBtn.closest(".wish-slot");
+	          if (!slot) return;
+	          resetSlotToEmpty(slot);
+	          activePersonalSlot = null;
+	          return;
+	        }
 
-        if (choiceBtn) {
-          const slot = choiceBtn.closest(".wish-slot");
-          if (choiceBtn.dataset.choice === "personal") {
-            activePersonalSlot = slot;
-            openPersonalWishModal();
+	        if (choiceBtn) {
+	          if (isVisitorView) return;
+	          const slot = choiceBtn.closest(".wish-slot");
+	          if (choiceBtn.dataset.choice === "personal") {
+	            activePersonalSlot = slot;
+	            openPersonalWishModal();
           } else if (choiceBtn.dataset.choice === "cooperative") {
             activePersonalSlot = null;
             openCooperativeWishModal();
@@ -2823,8 +2999,15 @@
       });
     }
 
-    void loadPersonalWishesFromApi();
-  });
+	    void (async () => {
+	      try {
+	        await resolveProfileContext();
+	      } catch (error) {
+	        console.error(error);
+	      }
+	      await loadPersonalWishesFromApi();
+	    })();
+	  });
 </script>
 
 <svelte:head>
@@ -2845,13 +3028,13 @@
       </form>
     </div>
 
-    <div class="feed-topbar-zone feed-topbar-center">
-      <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
-      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-      <a class="topbar-btn is-active" href="/my-public-whishes.html">🌐 Deseos públicos</a>
-      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
-    </div>
+	    <div class="feed-topbar-zone feed-topbar-center">
+	      <a class="topbar-btn" href="/home_user.html" data-profile-module="home">🏠 Home</a>
+	      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+	      <a class="topbar-btn is-active" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 Deseos públicos</a>
+	      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
+	      <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ Deseos cumplidos</a>
+	    </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
       <details class="topbar-dropdown" id="profileDropdown">
@@ -2878,7 +3061,7 @@
           <a href="/home_user.html" role="menuitem">Mi Home</a>
           <a href="/achievements.html" role="menuitem">Logros recientes</a>
           <a href="/gallery.html" role="menuitem">Galería</a>
-          <a href="/calendar.html" role="menuitem">Calendario</a>
+          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
           <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
         </div>
       </details>
@@ -3204,18 +3387,18 @@
       <!-- =========================
        *  NAV / LINKS
        *  ========================= -->
-      <nav class="profile-nav" aria-label="Navegación de perfil">
-        <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
-        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
-          <span class="nav-icon">⭐</span>
-          <span><strong id="myPublicWishesStarsTotal">0</strong> estrellas</span>
-        </a>
-        <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-        <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
-        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
-      </nav>
+	      <nav class="profile-nav" aria-label="Navegación de perfil">
+	        <a class="nav-pill" href="/home_user.html" title="Home" data-profile-module="home">Home</a>
+	        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+	          <span class="nav-icon">⭐</span>
+	          <span><strong id="myPublicWishesStarsTotal">0</strong> estrellas</span>
+	        </a>
+	        <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
+	        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
+	        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
+	        <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
+	        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
+	      </nav>
 
       <!-- =========================
        *  MIS DESEOS PUBLICOS

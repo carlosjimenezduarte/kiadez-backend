@@ -23,7 +23,7 @@ class TokenPair(BaseModel):
 
 class UserPublic(BaseModel):
     user_number: int
-    email: EmailStr
+    email: str
     role: Role
     guardian_rank: Optional[int] = None
     username: Optional[str] = None

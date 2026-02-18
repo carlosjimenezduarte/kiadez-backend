@@ -121,6 +121,54 @@ def list_personal_wishes(
     )
 
 
+@router.get("/user/{user_id}/personal", response_model=PublicPersonalWishListOut)
+def list_user_personal_wishes(
+    user_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    target = db.execute(
+        select(User).where(User.id == user_id, User.is_active.is_(True))
+    ).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = int(current.user_number) == int(user_id)
+    if not is_owner and not bool(target.public_profile_show_public_wishes):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+
+    wishes = db.execute(
+        select(PublicPersonalWish)
+        .where(PublicPersonalWish.user_id == user_id)
+        .where(PublicPersonalWish.status == PublicPersonalWishStatus.active)
+        .order_by(PublicPersonalWish.created_at.desc(), PublicPersonalWish.id.desc())
+    ).scalars().all()
+
+    fulfilled_total = db.execute(
+        select(func.count(PublicPersonalWish.id))
+        .where(PublicPersonalWish.user_id == user_id)
+        .where(PublicPersonalWish.status == PublicPersonalWishStatus.fulfilled)
+    ).scalar_one()
+
+    media_ids = {
+        media_id
+        for wish in wishes
+        for media_id in (wish.media_id, wish.fulfilled_evidence_media_id)
+        if media_id is not None
+    }
+    media_map: dict[int, Media] = {}
+    if media_ids:
+        medias = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
+        media_map = {media.id: media for media in medias}
+
+    return PublicPersonalWishListOut(
+        items=[_wish_out(wish=wish, media_map=media_map) for wish in wishes],
+        active_count=len(wishes),
+        active_limit=PERSONAL_ACTIVE_LIMIT,
+        fulfilled_total=fulfilled_total or 0,
+    )
+
+
 @router.get("/personal/fulfilled", response_model=PublicPersonalWishFulfilledListOut)
 def list_fulfilled_personal_wishes(
     limit: int = Query(default=10, ge=1, le=100),
@@ -141,6 +189,58 @@ def list_fulfilled_personal_wishes(
     wishes = db.execute(
         select(PublicPersonalWish)
         .where(PublicPersonalWish.user_id == current.user_number)
+        .where(PublicPersonalWish.status == PublicPersonalWishStatus.fulfilled)
+        .order_by(PublicPersonalWish.fulfilled_at.desc().nullslast(), PublicPersonalWish.id.desc())
+        .offset(offset)
+        .limit(limit)
+    ).scalars().all()
+
+    media_ids = {
+        media_id
+        for wish in wishes
+        for media_id in (wish.media_id, wish.fulfilled_evidence_media_id)
+        if media_id is not None
+    }
+    media_map: dict[int, Media] = {}
+    if media_ids:
+        medias = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
+        media_map = {media.id: media for media in medias}
+
+    return PublicPersonalWishFulfilledListOut(
+        items=[_wish_out(wish=wish, media_map=media_map) for wish in wishes],
+        total=total or 0,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/user/{user_id}/personal/fulfilled", response_model=PublicPersonalWishFulfilledListOut)
+def list_user_fulfilled_personal_wishes(
+    user_id: int,
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    target = db.execute(
+        select(User).where(User.id == user_id, User.is_active.is_(True))
+    ).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = int(current.user_number) == int(user_id)
+    if not is_owner and not bool(target.public_profile_show_fulfilled_wishes):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+
+    total = db.execute(
+        select(func.count(PublicPersonalWish.id))
+        .where(PublicPersonalWish.user_id == user_id)
+        .where(PublicPersonalWish.status == PublicPersonalWishStatus.fulfilled)
+    ).scalar_one()
+
+    wishes = db.execute(
+        select(PublicPersonalWish)
+        .where(PublicPersonalWish.user_id == user_id)
         .where(PublicPersonalWish.status == PublicPersonalWishStatus.fulfilled)
         .order_by(PublicPersonalWish.fulfilled_at.desc().nullslast(), PublicPersonalWish.id.desc())
         .offset(offset)

@@ -27,7 +27,7 @@ body {
     display: flex;
     justify-content: center;
     max-width: 1200px;
-    margin: 0 auto;
+    margin: clamp(24px, 4vh, 56px) auto;
 }
 
 
@@ -65,7 +65,7 @@ body {
     width: 100%;
     background: rgba(255, 255, 255, 0.88);
     backdrop-filter: blur(6px);
-    padding: 28px;
+    padding: 24px;
     border-radius: 22px;
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
 }
@@ -81,15 +81,69 @@ body {
 #register-form {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
 }
 
 #register-form input,
 #register-form select {
-    padding: 14px 18px;
+    padding: 13px 18px;
     border-radius: 999px;
     border: 1px solid rgba(0, 0, 0, 0.15);
     font-family: inherit;
+}
+
+#register-form .password-field {
+    position: relative;
+}
+
+#register-form .password-field input {
+    width: 100%;
+    padding-right: 54px;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: rgba(255, 255, 255, 0.85);
+    color: rgba(11, 95, 42, 0.95);
+    cursor: pointer;
+    transition: 0.15s ease;
+}
+
+.password-toggle:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-50%) scale(1.02);
+}
+
+.password-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(11, 95, 42, 0.25);
+}
+
+.password-toggle-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.password-toggle-icon-hide {
+    display: none;
+}
+
+.password-toggle.is-visible .password-toggle-icon-show {
+    display: none;
+}
+
+.password-toggle.is-visible .password-toggle-icon-hide {
+    display: block;
 }
 
 #register-form select {
@@ -100,6 +154,30 @@ body {
     font-size: 0.85rem;
     color: #8a1f1f;
     text-align: center;
+}
+
+.form-warning {
+    font-size: 0.85rem;
+    line-height: 1.25;
+    color: #8a1f1f;
+    text-align: center;
+    padding: 0 8px;
+    position: relative;
+}
+
+.form-warning.is-hidden {
+    visibility: hidden;
+}
+
+.form-warning-reserve {
+    display: block;
+    visibility: hidden;
+}
+
+.form-warning-live {
+    position: absolute;
+    inset: 0;
+    display: block;
 }
 
 .hidden {
@@ -166,7 +244,7 @@ body {
 
     color: #ffffff;
     font-family: 'Liberation Serif', serif;
-    padding: 28px 64px 18px;
+    padding: 22px 56px 14px;
 }
 
 
@@ -174,7 +252,7 @@ body {
 .footer-main {
     display: grid;
     grid-template-columns: 1.3fr 4fr;
-    gap: 48px;
+    gap: 36px;
     margin-bottom: 12px;
 }
 
@@ -196,13 +274,13 @@ body {
 .footer-columns {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 48px;
+    gap: 36px;
     margin-bottom: 12px;
 }
 
 .footer-column h4 {
     font-size: 1.05rem;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     font-weight: 600;
 }
 
@@ -213,7 +291,7 @@ body {
 }
 
 .footer-column li {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     font-size: 0.95rem;
 }
 

@@ -3,19 +3,32 @@ const API_BASE_URL =
   'http://127.0.0.1:8000';
 
 const TOKEN_KEY = 'kiadez_access_token';
+const LEGACY_TOKEN_KEY = 'access_token';
 
 export function setAccessToken(token) {
   if (token) {
     localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(LEGACY_TOKEN_KEY, token);
   }
 }
 
 export function getAccessToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(LEGACY_TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
 }
 
 export function clearAccessToken() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
+}
+
+function buildQuery(params = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return;
+    query.set(key, String(value));
+  });
+  const str = query.toString();
+  return str ? `?${str}` : '';
 }
 
 async function request(path, { method = 'GET', token, body, headers } = {}) {
@@ -128,3 +141,33 @@ export async function uploadToPresignedUrl({ upload_url, file, content_type }) {
 
   return res;
 }
+
+export const followApi = {
+  listSuggestions({ page = 1, page_size = 25 } = {}) {
+    return request(`/follows/suggestions${buildQuery({ page, page_size })}`, {
+      token: getAccessToken(),
+    });
+  },
+  listFollowers({ page = 1, page_size = 25 } = {}) {
+    return request(`/follows/followers${buildQuery({ page, page_size })}`, {
+      token: getAccessToken(),
+    });
+  },
+  listFollowing({ page = 1, page_size = 25 } = {}) {
+    return request(`/follows/following${buildQuery({ page, page_size })}`, {
+      token: getAccessToken(),
+    });
+  },
+  follow(targetUserId) {
+    return request(`/follows/${targetUserId}`, {
+      method: 'POST',
+      token: getAccessToken(),
+    });
+  },
+  unfollow(targetUserId) {
+    return request(`/follows/${targetUserId}`, {
+      method: 'DELETE',
+      token: getAccessToken(),
+    });
+  },
+};

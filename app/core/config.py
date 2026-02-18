@@ -38,8 +38,6 @@ class Settings(BaseSettings):
 
     # 🧪 Dev tools
     APP_ENV: str = "dev"
-    DEV_LOGIN_AS_ENABLED: bool = False
-    DEV_LOGIN_AS_SECRET: str | None = None
 
     # 📧 SMTP
     SMTP_HOST: str

@@ -328,31 +328,6 @@ body {
     width: 100%;
 }
 
-.dev-login-box {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 100%;
-}
-
-.dev-login-title {
-    text-align: center;
-    color: rgba(0, 0, 0, 0.7);
-    font-size: 0.9rem;
-}
-
-.dev-login-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-}
-
-@media (max-width: 560px) {
-    .dev-login-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
 .muted {
     opacity: 0.75;
     font-size: 0.95rem;
@@ -512,6 +487,84 @@ body {
     background: rgba(255, 255, 255, 0.88);
     border-color: rgba(11, 95, 42, 0.45);
     box-shadow: 0 0 0 3px rgba(11, 95, 42, 0.14);
+}
+
+.password-field {
+    position: relative;
+}
+
+.password-field input {
+    width: 100%;
+    padding-right: 54px;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: rgba(255, 255, 255, 0.85);
+    color: rgba(11, 95, 42, 0.95);
+    cursor: pointer;
+    transition: 0.15s ease;
+}
+
+.password-toggle:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-50%) scale(1.02);
+}
+
+.password-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(11, 95, 42, 0.25);
+}
+
+.password-toggle-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.password-toggle-icon-hide {
+    display: none;
+}
+
+.password-toggle.is-visible .password-toggle-icon-show {
+    display: none;
+}
+
+.password-toggle.is-visible .password-toggle-icon-hide {
+    display: block;
+}
+
+.form-warning {
+    position: relative;
+    font-size: 0.85rem;
+    line-height: 1.25;
+    color: #8a1f1f;
+    text-align: center;
+    padding: 0 8px;
+}
+
+.form-warning.is-hidden {
+    visibility: hidden;
+}
+
+.form-warning-reserve {
+    display: block;
+    visibility: hidden;
+}
+
+.form-warning-live {
+    position: absolute;
+    inset: 0;
+    display: block;
 }
 
 #life-form textarea,
@@ -1561,6 +1614,126 @@ body {
     background: rgba(255, 255, 255, 0.84);
 }
 
+.settings-action-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.settings-action-note {
+    font-size: 0.9rem;
+    color: rgba(0, 0, 0, 0.6);
+    font-weight: 500;
+}
+
+/* =========================
+ *  GUARDIAN CENTER
+ *  ========================= */
+
+.guardian-center-head {
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.guardian-center-subtitle {
+    max-width: 62ch;
+    margin-top: 6px;
+}
+
+.guardian-center-action {
+    position: relative;
+}
+
+.guardian-center-action.is-active {
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.14);
+    border-color: rgba(11, 95, 42, 0.32);
+}
+
+.guardian-center-cta {
+    margin-left: auto;
+    font-size: 0.95rem;
+    color: rgba(11, 95, 42, 0.9);
+    font-weight: 700;
+}
+
+.guardian-center-divider {
+    height: 1px;
+    width: 100%;
+    margin: 18px 0;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.guardian-center-module {
+    display: grid;
+    gap: 10px;
+}
+
+.guardian-center-module-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.guardian-center-module-title {
+    margin: 0;
+    font-size: 1.15rem;
+    color: rgba(0, 0, 0, 0.86);
+}
+
+.guardian-center-module-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(250, 215, 115, 0.26);
+    border: 1px solid rgba(176, 129, 0, 0.18);
+    color: rgba(90, 64, 0, 0.9);
+    font-weight: 700;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.guardian-center-module-note {
+    margin-top: 0;
+}
+
+.guardian-center-empty {
+    padding: 16px 16px;
+    border-radius: 18px;
+    border: 1px dashed rgba(0, 0, 0, 0.18);
+    background: rgba(255, 255, 255, 0.62);
+    color: rgba(0, 0, 0, 0.62);
+}
+
+.guardian-center-empty.is-error {
+    border-color: rgba(170, 35, 35, 0.25);
+    background: rgba(170, 35, 35, 0.06);
+    color: rgba(170, 35, 35, 0.92);
+}
+
+.guardian-center-lock {
+    margin-top: 16px;
+    padding: 16px 16px;
+    border-radius: 18px;
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.guardian-center-lock-text {
+    margin: 0 0 14px;
+    color: rgba(0, 0, 0, 0.7);
+}
+
+.guardian-center-lock-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 .settings-password-row {
     position: relative;
     margin-bottom: 6px;
@@ -1789,6 +1962,62 @@ body {
 .profile-avatar-btn:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px rgba(11, 95, 42, 0.25);
+}
+
+.profile-avatar-dropdown .dropdown-menu {
+    left: 0;
+    right: auto;
+    min-width: 240px;
+}
+
+.avatar-gallery-modal .modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.avatar-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.avatar-gallery-option {
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 14px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+    line-height: 0;
+    transition: 0.12s ease;
+}
+
+.avatar-gallery-option:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+}
+
+.avatar-gallery-option:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(11, 95, 42, 0.25);
+}
+
+.avatar-gallery-option img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    display: block;
+}
+
+@media (max-width: 720px) {
+    .avatar-gallery-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .avatar-gallery-option img {
+        height: 110px;
+    }
 }
 
 .avatar {
@@ -2403,14 +2632,75 @@ body {
     gap: 12px;
 }
 
+.modal-overlay#profilePhotoPostModalOverlay {
+    background: rgba(7, 20, 13, 0.26);
+    backdrop-filter: blur(7px) saturate(135%);
+}
+
+.profile-photo-post-modal {
+    background: rgba(255, 255, 255, 0.90);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 18px 70px rgba(0, 0, 0, 0.18);
+}
+
+.profile-photo-post-modal .modal-head {
+    background: rgba(11, 95, 42, 0.05);
+}
+
 .profile-photo-post-card {
     margin: 0;
+}
+
+.profile-photo-media {
+    position: relative;
+}
+
+.profile-photo-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: rgba(0, 0, 0, 0.35);
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 1.4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+}
+
+.profile-photo-nav:hover {
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.profile-photo-nav:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.profile-photo-nav-prev {
+    left: 12px;
+}
+
+.profile-photo-nav-next {
+    right: 12px;
+}
+
+.profile-photo-nav-label {
+    margin: -4px 0 0;
+    text-align: center;
+    font-size: 0.86rem;
+    color: rgba(0, 0, 0, 0.62);
 }
 
 .profile-photo-post-card .post-media img {
     max-height: min(60vh, 560px);
     object-fit: contain;
-    background: rgba(0, 0, 0, 0.65);
+    background: rgba(0, 0, 0, 0.28);
 }
 
 .profile-photo-post-status {
@@ -3813,6 +4103,209 @@ body {
 
 .home-body .profile-nav {
     margin-top: 0;
+}
+
+/* =========================
+ *  FOLLOWERS PAGE
+ *  ========================= */
+
+.followers-page .home-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.followers-page .followers-message-panel {
+    padding-top: 12px;
+    padding-bottom: 12px;
+}
+
+.followers-page .followers-section .panel-muted {
+    margin: 0;
+}
+
+.followers-page .followers-grid {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.followers-page .follower-card {
+    background: rgba(11, 95, 42, 0.06);
+    border: 1px solid rgba(11, 95, 42, 0.12);
+    border-radius: 18px;
+    padding: 16px 12px 14px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-height: 248px;
+}
+
+.followers-page .follower-avatar-link {
+    width: 84px;
+    height: 84px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(11, 95, 42, 0.2);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+}
+
+.followers-page .follower-avatar-link:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(11, 95, 42, 0.25);
+}
+
+.followers-page .follower-avatar {
+    width: 76px;
+    height: 76px;
+    border-radius: 999px;
+    object-fit: cover;
+}
+
+.followers-page .follower-name {
+    margin: 2px 0 0;
+    color: #152218;
+    font-size: 1.03rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.followers-page .follower-handle {
+    margin: 0;
+    color: rgba(0, 0, 0, 0.68);
+    font-size: 0.92rem;
+}
+
+.followers-page .follower-count {
+    margin: 0;
+    color: rgba(11, 95, 42, 0.92);
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.followers-page .follower-actions {
+    margin-top: auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding-top: 8px;
+}
+
+.followers-page .follower-actions .btn {
+    flex: 1 1 138px;
+    justify-content: center;
+    text-align: center;
+}
+
+.followers-page .followers-status,
+.followers-page .followers-range {
+    margin: 12px 0 0;
+    font-size: 0.92rem;
+    color: rgba(0, 0, 0, 0.68);
+}
+
+.followers-page .followers-status.is-error {
+    color: #8f3325;
+    font-weight: 700;
+}
+
+.followers-page .followers-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+    padding: 6px 0 2px;
+}
+
+.followers-page .followers-page-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    border: 1px solid rgba(31, 107, 69, 0.24);
+    background: rgba(255, 255, 255, 0.86);
+    color: #0b5f2a;
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+    transition: transform 120ms ease, background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.followers-page .followers-page-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: rgba(223, 231, 224, 0.9);
+    border-color: rgba(31, 107, 69, 0.38);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+.followers-page .followers-page-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.followers-page .followers-page-btn:focus {
+    outline: none;
+}
+
+.followers-page .followers-page-btn:focus-visible {
+    outline: 2px solid rgba(11, 95, 42, 0.35);
+    outline-offset: 4px;
+}
+
+.followers-page .followers-page-btn.is-active {
+    background: rgba(11, 95, 42, 0.92);
+    border-color: rgba(11, 95, 42, 0.92);
+    color: #fff;
+    box-shadow: 0 14px 26px rgba(0, 0, 0, 0.16);
+}
+
+@media (max-width: 1180px) {
+    .followers-page .followers-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 980px) {
+    .followers-page .followers-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .followers-page .followers-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .followers-page .follower-actions .btn {
+        flex-basis: 100%;
+    }
+}
+
+@media (max-width: 540px) {
+    .followers-page .followers-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .followers-page .follower-card {
+        min-height: 0;
+    }
 }
 
 /* =========================

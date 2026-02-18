@@ -1045,8 +1045,7 @@
       if (!uploadRes.ok) {
         throw new Error(uploadData.detail || "No se pudo subir la imagen.");
       }
-
-      await assignProfilePhoto(uploadData.media_id);
+      return uploadData;
     };
 
     const uploadEmblemFromFile = async (file) => {
@@ -1075,18 +1074,9 @@
       }
     };
 
-    const handleOpenExisting = async () => {
+    const handleOpenExisting = () => {
       closePhotoMenu();
-      setBioPhotoStatus("Cargando imágenes...");
-      openPhotoSelectModal();
-      try {
-        const items = await loadSelectableImages();
-        renderSelectableImages(items);
-        setBioPhotoStatus("");
-      } catch (error) {
-        renderSelectableImages([]);
-        setBioPhotoStatus(error.message || "No se pudieron cargar imágenes.", true);
-      }
+      window.location.href = "/gallery.html";
     };
 
     const handleEmblemTriggerClick = (event) => {
@@ -1124,10 +1114,10 @@
         setBioPhotoStatus("Solo se permiten imágenes.", true);
         return;
       }
-      setBioPhotoStatus("Subiendo imagen...");
+      setBioPhotoStatus("Subiendo imagen a tu galería...");
       try {
         await uploadProfilePhotoFromFile(file);
-        setBioPhotoStatus("Foto actualizada.");
+        setBioPhotoStatus("Imagen subida. Para usarla como foto de perfil, ve a Home.");
       } catch (error) {
         setBioPhotoStatus(error.message || "No se pudo subir la imagen.", true);
       } finally {
@@ -1158,20 +1148,7 @@
       }
     };
 
-    const handleSelectGridClick = async (event) => {
-      const button = event.target.closest("[data-media-id]");
-      if (!button) return;
-      const mediaId = Number(button.dataset.mediaId || "0");
-      if (!mediaId) return;
-      setBioPhotoStatus("Asignando imagen...");
-      try {
-        await assignProfilePhoto(mediaId);
-        setBioPhotoStatus("Foto actualizada.");
-        closePhotoSelectModal();
-      } catch (error) {
-        setBioPhotoStatus(error.message || "No se pudo asignar la imagen.", true);
-      }
-    };
+    const handleSelectGridClick = () => {};
 
     const handleEmblemSelectGridClick = async (event) => {
       const button = event.target.closest("[data-media-id]");
@@ -1756,7 +1733,6 @@
     bioPhotoSelectExisting?.addEventListener("click", handleOpenExisting);
     bioPhotoUpload?.addEventListener("click", handleUploadClick);
     bioPhotoFile?.addEventListener("change", handlePhotoFileChange);
-    bioPhotoSelectGrid?.addEventListener("click", handleSelectGridClick);
     bioPhotoSelectCancel?.addEventListener("click", closePhotoSelectModal);
     bioPhotoSelectModal?.addEventListener("click", handleModalOverlayClick);
     emblemTrigger?.addEventListener("click", handleEmblemTriggerClick);
@@ -1843,7 +1819,6 @@
       bioPhotoSelectExisting?.removeEventListener("click", handleOpenExisting);
       bioPhotoUpload?.removeEventListener("click", handleUploadClick);
       bioPhotoFile?.removeEventListener("change", handlePhotoFileChange);
-      bioPhotoSelectGrid?.removeEventListener("click", handleSelectGridClick);
       bioPhotoSelectCancel?.removeEventListener("click", closePhotoSelectModal);
       bioPhotoSelectModal?.removeEventListener("click", handleModalOverlayClick);
       emblemTrigger?.removeEventListener("click", handleEmblemTriggerClick);
@@ -2101,13 +2076,13 @@
             <figure class="infobox-photo">
               <div class="infobox-photo-wrap">
                 <button class="infobox-photo-trigger" id="profilePhotoTrigger" type="button"
-                  title="Gestionar foto de perfil">
+                  title="Gestionar imágenes de galería">
                   <img id="profilePhoto" src="/css/logo-kiadez.webp" alt="Foto del usuario" />
                 </button>
 
                 <div class="infobox-photo-menu hidden" id="profilePhotoMenu">
-                  <button type="button" id="bioPhotoSelectExisting">Seleccionar imagen</button>
-                  <button type="button" id="bioPhotoUpload">Subir imagen</button>
+                  <button type="button" id="bioPhotoSelectExisting">Abrir galería</button>
+                  <button type="button" id="bioPhotoUpload">Subir a galería</button>
                 </div>
 
                 <input id="bioPhotoFile" type="file" accept="image/*" class="hidden" />
