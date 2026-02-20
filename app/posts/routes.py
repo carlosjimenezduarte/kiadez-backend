@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,8 @@ from app.db.models.post import (
     PostStar,
     PostVisibility,
 )
+from app.db.models.achievement_unlock_event import AchievementUnlockEvent
+from app.db.models.gallery_folder import GalleryFolder
 from app.db.models.user import User
 from app.db.models.user_follow import UserFollow
 from app.posts.schemas import (
@@ -88,6 +90,73 @@ DONATION_STAR_ACHIEVEMENTS: list[tuple[str, str, int, str]] = [
 ]
 
 
+def _publication_achievement_description(threshold: int) -> str:
+    return f"Has alcanzado {threshold:,} estrellas por tus publicaciones".replace(",", ".")
+
+
+def _donation_achievement_description(threshold: int) -> str:
+    base = f"Has acumulado una donación de más de {threshold:,} estrellas al Fondo Común de Estrellas"
+    return base.replace(",", ".")
+
+
+def _newly_unlocked_thresholds(
+    *,
+    previous_total: int,
+    current_total: int,
+    definitions: list[tuple[str, str, int, str]],
+) -> list[tuple[str, str, int, str]]:
+    if current_total <= previous_total:
+        return []
+    return [
+        (key, title, threshold, image_url)
+        for key, title, threshold, image_url in definitions
+        if previous_total < threshold <= current_total
+    ]
+
+
+def _record_achievement_unlock_events(
+    *,
+    db: Session,
+    user_id: int,
+    category: str,
+    previous_total: int,
+    current_total: int,
+    definitions: list[tuple[str, str, int, str]],
+    description_for_threshold,
+) -> None:
+    unlocked_defs = _newly_unlocked_thresholds(
+        previous_total=previous_total,
+        current_total=current_total,
+        definitions=definitions,
+    )
+    if not unlocked_defs:
+        return
+
+    keys = [key for key, _, _, _ in unlocked_defs]
+    existing_keys = set(
+        db.execute(
+            select(AchievementUnlockEvent.achievement_key).where(
+                AchievementUnlockEvent.user_id == user_id,
+                AchievementUnlockEvent.achievement_key.in_(keys),
+            )
+        ).scalars().all()
+    )
+
+    for key, title, threshold, image_url in unlocked_defs:
+        if key in existing_keys:
+            continue
+        db.add(
+            AchievementUnlockEvent(
+                user_id=user_id,
+                achievement_key=key,
+                category=category,
+                title=title,
+                description=description_for_threshold(threshold),
+                image_url=image_url,
+            )
+        )
+
+
 def _author_out(user: User) -> PostAuthorOut:
     full_name = f"{user.first_name} {user.last_name}".strip()
     return PostAuthorOut(
@@ -101,6 +170,16 @@ def _author_out(user: User) -> PostAuthorOut:
 def _ensure_post_access(post: Post, current_user_id: int) -> None:
     if post.visibility == PostVisibility.private and post.author_id != current_user_id:
         raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+
+
+def _ensure_author_posts_visibility(author: User, viewer_user_id: int) -> None:
+    if int(author.id) == int(viewer_user_id):
+        return
+    if not bool(author.public_profile_show_personal_posts):
+        raise HTTPException(
+            status_code=403,
+            detail="Las publicaciones personales de este perfil están ocultas por privacidad.",
+        )
 
 
 def _build_media_url(post: Post, media_map: dict[int, Media]) -> str | None:
@@ -127,6 +206,7 @@ def _post_out(
     is_mine: bool,
     starred_by_me: bool,
     media_url: str | None,
+    album_name: str | None = None,
 ) -> PostOut:
     return PostOut(
         id=post.id,
@@ -136,6 +216,8 @@ def _post_out(
         media_id=post.media_id,
         media_kind=post.media_kind,
         media_url=media_url,
+        album_id=post.album_id,
+        album_name=album_name,
         star_count=post.star_count,
         comment_count=post.comment_count,
         share_count=post.share_count,
@@ -172,6 +254,14 @@ def _query_posts(
         media_rows = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
         media_map = {int(media.id): media for media in media_rows}
 
+    album_name_map: dict[int, str] = {}
+    album_ids = [int(row[0].album_id) for row in rows if row[0].album_id is not None]
+    if album_ids:
+        album_rows = db.execute(
+            select(GalleryFolder.id, GalleryFolder.name).where(GalleryFolder.id.in_(album_ids))
+        ).all()
+        album_name_map = {int(album_id): str(name) for album_id, name in album_rows}
+
     result: list[PostOut] = []
     for post, author in rows:
         result.append(
@@ -181,6 +271,7 @@ def _query_posts(
                 is_mine=post.author_id == current_user_id,
                 starred_by_me=post.id in starred_ids,
                 media_url=_build_media_url(post, media_map),
+                album_name=album_name_map.get(int(post.album_id)) if post.album_id is not None else None,
             )
         )
     return result
@@ -262,7 +353,12 @@ def get_feed(
         .join(User, User.id == Post.author_id)
         .where(
             Post.visibility == PostVisibility.public,
+            User.is_active.is_(True),
             Post.author_id.in_(author_ids),
+            or_(
+                Post.author_id == current_user_id,
+                User.public_profile_show_personal_posts.is_(True),
+            ),
         )
         .order_by(Post.created_at.desc())
         .offset(offset)
@@ -308,8 +404,15 @@ def list_user_posts(
     if target is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
+    is_owner = int(user_id) == int(current_user_id)
+    if not is_owner and not bool(target.public_profile_show_personal_posts):
+        raise HTTPException(
+            status_code=403,
+            detail="Las publicaciones personales de este perfil están ocultas por privacidad.",
+        )
+
     filters = [Post.author_id == user_id]
-    if int(user_id) != int(current_user_id):
+    if not is_owner:
         filters.append(Post.visibility == PostVisibility.public)
 
     stmt = (
@@ -354,12 +457,24 @@ def donate_stars_to_pool(
 ):
     me = db.execute(select(User).where(User.id == current.user_number)).scalar_one()
     received, donated = _normalized_star_totals(me)
+    previous_donated_total = donated
 
     if donated != (me.donated_stars_total or 0):
         me.donated_stars_total = donated
 
     donated_now = max(0, received - donated)
     me.donated_stars_total = received
+
+    _record_achievement_unlock_events(
+        db=db,
+        user_id=me.id,
+        category="donation_stars",
+        previous_total=previous_donated_total,
+        current_total=received,
+        definitions=DONATION_STAR_ACHIEVEMENTS,
+        description_for_threshold=_donation_achievement_description,
+    )
+
     db.commit()
     db.refresh(me)
 
@@ -417,6 +532,7 @@ def create_post(
         is_mine=True,
         starred_by_me=False,
         media_url=_build_media_url(post, media_map),
+        album_name=None,
     )
 
 
@@ -450,10 +566,16 @@ def donate_star(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    post = db.execute(select(Post).where(Post.id == post_id)).scalar_one_or_none()
-    if not post:
+    row = db.execute(
+        select(Post, User)
+        .join(User, User.id == Post.author_id)
+        .where(Post.id == post_id)
+    ).one_or_none()
+    if row is None:
         raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+    post, author = row
     _ensure_post_access(post, current.user_number)
+    _ensure_author_posts_visibility(author, current.user_number)
 
     if post.author_id == current.user_number:
         raise HTTPException(status_code=400, detail="No puedes donarte estrellas a ti mismo.")
@@ -470,7 +592,19 @@ def donate_star(
 
     post.star_count = (post.star_count or 0) + 1
     author = db.execute(select(User).where(User.id == post.author_id)).scalar_one()
-    author.received_stars_total = (author.received_stars_total or 0) + 1
+    previous_received_total = max(0, int(author.received_stars_total or 0))
+    author.received_stars_total = previous_received_total + 1
+
+    _record_achievement_unlock_events(
+        db=db,
+        user_id=author.id,
+        category="publication_stars",
+        previous_total=previous_received_total,
+        current_total=author.received_stars_total,
+        definitions=PUBLICATION_STAR_ACHIEVEMENTS,
+        description_for_threshold=_publication_achievement_description,
+    )
+
     db.commit()
 
     return PostStarResponse(starred=True, post_id=post.id, star_count=post.star_count)
@@ -482,10 +616,16 @@ def share_post(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    post = db.execute(select(Post).where(Post.id == post_id)).scalar_one_or_none()
-    if not post:
+    row = db.execute(
+        select(Post, User)
+        .join(User, User.id == Post.author_id)
+        .where(Post.id == post_id)
+    ).one_or_none()
+    if row is None:
         raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+    post, author = row
     _ensure_post_access(post, current.user_number)
+    _ensure_author_posts_visibility(author, current.user_number)
 
     post.share_count = (post.share_count or 0) + 1
     db.commit()
@@ -500,10 +640,16 @@ def list_comments(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    post = db.execute(select(Post).where(Post.id == post_id)).scalar_one_or_none()
-    if not post:
+    row = db.execute(
+        select(Post, User)
+        .join(User, User.id == Post.author_id)
+        .where(Post.id == post_id)
+    ).one_or_none()
+    if row is None:
         raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+    post, author = row
     _ensure_post_access(post, current.user_number)
+    _ensure_author_posts_visibility(author, current.user_number)
 
     rows = db.execute(
         select(PostComment, User)
@@ -533,10 +679,16 @@ def create_comment(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    post = db.execute(select(Post).where(Post.id == post_id)).scalar_one_or_none()
-    if not post:
+    row = db.execute(
+        select(Post, User)
+        .join(User, User.id == Post.author_id)
+        .where(Post.id == post_id)
+    ).one_or_none()
+    if row is None:
         raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+    post, author = row
     _ensure_post_access(post, current.user_number)
+    _ensure_author_posts_visibility(author, current.user_number)
 
     comment = PostComment(
         post_id=post.id,
@@ -565,10 +717,16 @@ def report_post(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    post = db.execute(select(Post).where(Post.id == post_id)).scalar_one_or_none()
-    if not post:
+    row = db.execute(
+        select(Post, User)
+        .join(User, User.id == Post.author_id)
+        .where(Post.id == post_id)
+    ).one_or_none()
+    if row is None:
         raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+    post, author = row
     _ensure_post_access(post, current.user_number)
+    _ensure_author_posts_visibility(author, current.user_number)
     if post.author_id == current.user_number:
         raise HTTPException(status_code=400, detail="No puedes reportar tu propia publicación.")
 

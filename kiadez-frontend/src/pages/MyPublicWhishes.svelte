@@ -282,6 +282,7 @@
     let activeParticipateMode = "create";
     let activeParticipateSlot = null;
     let activeSecuritySlot = null;
+    let activeSecurityCode = "";
     let coverMoveEnabled = false;
     let coverDragActive = false;
     let coverStartX = 0;
@@ -378,6 +379,17 @@
     for (let i = 0; i < cooperativeMin; i += 1) {
       addCooperativeSlot();
     }
+
+    const findCooperativeEditorSlot = () => {
+      if (!cooperativeWishList) return null;
+      const slots = Array.from(cooperativeWishList.querySelectorAll(".wish-slot"));
+      const emptySlot = slots.find((slot) => slot.classList.contains("is-empty"));
+      if (emptySlot) return emptySlot;
+      if (cooperativeTotal >= cooperativeMax) return null;
+      addCooperativeSlot();
+      const updatedSlots = Array.from(cooperativeWishList.querySelectorAll(".wish-slot"));
+      return updatedSlots[updatedSlots.length - 1] || null;
+    };
 
     const updateModalScrollLock = () => {
       const hasOpenModal = document.querySelector(".modal-overlay:not(.hidden)");
@@ -994,6 +1006,79 @@
 	      return data;
 	    };
 
+	    const fetchCooperativeWishList = async () => {
+	      const profileId = Number(activeProfileUserId);
+	      const endpoint =
+	        !isViewingOwnProfile && Number.isFinite(profileId) && profileId > 0
+	          ? `/public-wishes/user/${encodeURIComponent(String(profileId))}/cooperative`
+	          : "/public-wishes/cooperative";
+	      const res = await apiFetch(endpoint);
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudieron cargar los deseos cooperativos.");
+	      }
+	      return data;
+	    };
+
+	    const createCooperativeWish = async (payload) => {
+	      if (!isViewingOwnProfile) {
+	        throw new Error("No autorizado.");
+	      }
+	      const res = await apiFetch("/public-wishes/cooperative", {
+	        method: "POST",
+	        headers: { "Content-Type": "application/json" },
+	        body: JSON.stringify(payload)
+	      });
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo crear el deseo cooperativo.");
+	      }
+	      return data;
+	    };
+
+	    const updateCooperativeWishRecord = async (wishId, payload) => {
+	      if (!isViewingOwnProfile) {
+	        throw new Error("No autorizado.");
+	      }
+	      const res = await apiFetch(`/public-wishes/cooperative/${wishId}`, {
+	        method: "PUT",
+	        headers: { "Content-Type": "application/json" },
+	        body: JSON.stringify(payload)
+	      });
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo actualizar el deseo cooperativo.");
+	      }
+	      return data;
+	    };
+
+	    const deleteCooperativeWishRecord = async (wishId) => {
+	      if (!isViewingOwnProfile) {
+	        throw new Error("No autorizado.");
+	      }
+	      const res = await apiFetch(`/public-wishes/cooperative/${wishId}`, {
+	        method: "DELETE"
+	      });
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo borrar el deseo cooperativo.");
+	      }
+	      return data;
+	    };
+
+	    const participateInCooperativeWishRecord = async (wishId, payload) => {
+	      const res = await apiFetch(`/public-wishes/cooperative/${wishId}/participate`, {
+	        method: "POST",
+	        headers: { "Content-Type": "application/json" },
+	        body: JSON.stringify(payload)
+	      });
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo registrar tu participación.");
+	      }
+	      return data;
+	    };
+
     const fetchPurposeSlotsFromApi = async () => {
       const token = getAccessToken();
       if (!token) return null;
@@ -1349,10 +1434,14 @@
 
     const openCooperativeWishModal = () => {
       if (!cooperativeWishModal) return;
+      const isEditing = Boolean(activeCooperativeSlot?.classList?.contains("is-filled"));
+      if (!isEditing) {
+        resetCooperativeWishForm();
+      }
       cooperativeWishModal.classList.remove("hidden");
       cooperativeWishModal.setAttribute("aria-hidden", "false");
       updateModalScrollLock();
-      if (cooperativeWishSecurityCode) {
+      if (cooperativeWishSecurityCode && isEditing) {
         cooperativeWishSecurityCode.value = activeCooperativeSlot?.dataset?.securityCode || "";
       }
     };
@@ -2051,12 +2140,12 @@
       if (!cooperativeParticipateModal) return;
       activeParticipateMode = mode;
       activeParticipateSource = slot;
-      const description = mode === "edit"
-        ? slot?.dataset?.rootDescription || ""
-        : slot?.dataset?.description || "";
-      const template = mode === "edit"
-        ? slot?.dataset?.template || ""
-        : slot?.dataset?.template || "";
+      const description = slot?.dataset?.rootDescription || slot?.dataset?.description || "";
+      const template = slot?.dataset?.template || "";
+      const existingParticipation =
+        slot?.dataset?.viewerParticipationText ||
+        slot?.dataset?.participationText ||
+        "";
       if (cooperativeParticipateDescription) {
         cooperativeParticipateDescription.textContent = description;
       }
@@ -2064,7 +2153,7 @@
         cooperativeParticipateQuote.textContent = template ? `“${template}”` : "";
       }
       if (cooperativeCharacter) {
-        cooperativeCharacter.value = mode === "edit" ? slot?.dataset?.participationText || "" : "";
+        cooperativeCharacter.value = mode === "edit" ? existingParticipation : "";
       }
       cooperativeParticipateModal.classList.remove("hidden");
       cooperativeParticipateModal.setAttribute("aria-hidden", "false");
@@ -2079,11 +2168,13 @@
       activeParticipateSource = null;
       activeParticipateSlot = null;
       activeParticipateMode = "create";
+      activeSecurityCode = "";
     };
 
     const openCooperativeSecurityModal = (slot) => {
       if (!cooperativeSecurityModal) return;
       activeSecuritySlot = slot;
+      activeSecurityCode = "";
       cooperativeSecurityModal.classList.remove("hidden");
       cooperativeSecurityModal.setAttribute("aria-hidden", "false");
       if (cooperativeSecurityCodeInput) {
@@ -2095,11 +2186,14 @@
       updateModalScrollLock();
     };
 
-    const closeCooperativeSecurityModal = () => {
+    const closeCooperativeSecurityModal = ({ clearCode = true } = {}) => {
       if (!cooperativeSecurityModal) return;
       cooperativeSecurityModal.classList.add("hidden");
       cooperativeSecurityModal.setAttribute("aria-hidden", "true");
       activeSecuritySlot = null;
+      if (clearCode) {
+        activeSecurityCode = "";
+      }
       updateModalScrollLock();
     };
 
@@ -2958,15 +3052,18 @@
 	      return btn;
 	    };
 
-    const createVisitorCooperativeIcon = () => {
+    const createVisitorCooperativeIcon = (hasParticipation = false) => {
+      const title = hasParticipation
+        ? "Editar mi participación en este deseo"
+        : "Yo puedo ayudar a cumplir este deseo";
       const icon = document.createElement("div");
       icon.className = "wish-icon-btn wish-icon-static";
       icon.dataset.action = "help-coop";
-      icon.setAttribute("aria-label", "Yo puedo ayudar a cumplir este deseo");
-      icon.title = "Yo puedo ayudar a cumplir este deseo";
+      icon.setAttribute("aria-label", title);
+      icon.title = title;
       const img = document.createElement("img");
       img.src = "/css/icons/iconcooperative2.webp";
-      img.alt = "Yo puedo ayudar a cumplir este deseo";
+      img.alt = title;
       icon.appendChild(img);
       return icon;
     };
@@ -2983,6 +3080,12 @@
       delete slot.dataset.goal;
       delete slot.dataset.current;
       delete slot.dataset.template;
+      delete slot.dataset.securityCode;
+      delete slot.dataset.viewerParticipationText;
+      delete slot.dataset.participationText;
+      delete slot.dataset.rootDescription;
+      delete slot.dataset.rootImageUrl;
+      delete slot.dataset.rootUser;
       delete slot.dataset.wishId;
       delete slot.dataset.mediaId;
       delete slot.dataset.frozen;
@@ -3255,7 +3358,92 @@
       }
     };
 
-    const renderCooperativeWishSlot = (slot, description, imageUrl, type, current, goal, template, securityCode) => {
+    const applyCooperativeWishRecordToSlot = (slot, wish) => {
+      if (!slot || !wish) return;
+      const wishId = parsePositiveId(wish.id);
+      const mediaId = parsePositiveId(wish.media_id);
+      const ownerSecurityCode = String(wish.security_code || "").trim();
+      const viewerParticipationText = String(wish.viewer_participation_text || "").trim();
+
+      if (wishId) {
+        slot.dataset.wishId = `${wishId}`;
+      } else {
+        delete slot.dataset.wishId;
+      }
+      if (mediaId) {
+        slot.dataset.mediaId = `${mediaId}`;
+      } else {
+        delete slot.dataset.mediaId;
+      }
+      if (ownerSecurityCode) {
+        slot.dataset.securityCode = ownerSecurityCode;
+      } else {
+        delete slot.dataset.securityCode;
+      }
+      if (viewerParticipationText) {
+        slot.dataset.viewerParticipationText = viewerParticipationText;
+      } else {
+        delete slot.dataset.viewerParticipationText;
+      }
+
+      renderCooperativeWishSlot(
+        slot,
+        wish.wish_text || "",
+        wish.media_url || null,
+        wish.wish_type || "Espiritual",
+        Number(wish.participants_current || 0),
+        Number(wish.participants_goal || 0),
+        wish.template_text || "",
+        ownerSecurityCode,
+        viewerParticipationText
+      );
+    };
+
+    const clearCooperativeSlots = () => {
+      if (!cooperativeWishList) return;
+      cooperativeWishList.innerHTML = "";
+      cooperativeTotal = 0;
+      if (cooperativeWishAdd) {
+        cooperativeWishAdd.disabled = false;
+      }
+    };
+
+    const hydrateCooperativeSlots = (items) => {
+      if (!cooperativeWishList) return;
+      const records = Array.isArray(items) ? items : [];
+      clearCooperativeSlots();
+      const totalSlots = Math.max(cooperativeMin, Math.min(cooperativeMax, records.length));
+      for (let i = 0; i < totalSlots; i += 1) {
+        addCooperativeSlot();
+      }
+      const slots = Array.from(cooperativeWishList.querySelectorAll(".wish-slot"));
+      records.forEach((wish, index) => {
+        const slot = slots[index];
+        if (!slot) return;
+        applyCooperativeWishRecordToSlot(slot, wish);
+      });
+    };
+
+    const loadCooperativeWishesFromApi = async () => {
+      try {
+        const data = await fetchCooperativeWishList();
+        hydrateCooperativeSlots(data?.items || []);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const renderCooperativeWishSlot = (
+      slot,
+      description,
+      imageUrl,
+      type,
+      current,
+      goal,
+      template,
+      securityCode,
+      viewerParticipationText = ""
+    ) => {
       if (!slot) return;
       if (slot.dataset.imageUrl && slot.dataset.imageUrl !== imageUrl) {
         URL.revokeObjectURL(slot.dataset.imageUrl);
@@ -3277,6 +3465,18 @@
       }
       if (template) {
         slot.dataset.template = template;
+      } else {
+        delete slot.dataset.template;
+      }
+      if (securityCode) {
+        slot.dataset.securityCode = securityCode;
+      } else {
+        delete slot.dataset.securityCode;
+      }
+      if (viewerParticipationText) {
+        slot.dataset.viewerParticipationText = viewerParticipationText;
+      } else {
+        delete slot.dataset.viewerParticipationText;
       }
 
       const row = document.createElement("div");
@@ -3304,6 +3504,13 @@
       title.className = "wish-slot-title";
       title.textContent = description;
       descWrap.appendChild(title);
+      const hasViewerParticipation = Boolean((viewerParticipationText || "").trim());
+      if (!isViewingOwnProfile && hasViewerParticipation) {
+        const participationLine = document.createElement("div");
+        participationLine.className = "wish-root-description";
+        participationLine.textContent = `Tu participación: ${viewerParticipationText}`;
+        descWrap.appendChild(participationLine);
+      }
       if (isViewingOwnProfile) {
         const securityField = document.createElement("div");
         securityField.className = "wish-security-field";
@@ -3337,7 +3544,7 @@
       const actions = document.createElement("div");
       actions.className = "wish-slot-actions wish-slot-actions-inline";
       if (!isViewingOwnProfile) {
-        actions.appendChild(createVisitorCooperativeIcon());
+        actions.appendChild(createVisitorCooperativeIcon(hasViewerParticipation));
       } else {
         actions.appendChild(createWishActionBtn("/css/icons/iconedit.webp", "Editar deseo", "edit"));
         const fulfillBtn = createWishActionBtn("/css/icons/iconfulfill.webp", "Marcar como cumplido", "fulfill");
@@ -3484,6 +3691,29 @@
       setPersonalWishError(false);
     };
 
+    const resetCooperativeWishForm = () => {
+      if (cooperativeWishText) {
+        const prefix = cooperativeWishText.dataset.prefix || "Deseo ";
+        cooperativeWishText.value = prefix;
+        cooperativeWishText.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (cooperativeWishCount) {
+        cooperativeWishCount.value = "50";
+      }
+      if (cooperativeWishTemplate) {
+        const suffix = cooperativeWishTemplate.dataset.suffix || "";
+        cooperativeWishTemplate.value = suffix ? `Deseo ${suffix}` : "";
+        cooperativeWishTemplate.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (cooperativeWishSecurityCode) {
+        cooperativeWishSecurityCode.value = "";
+      }
+      if (cooperativeWishMedia) {
+        cooperativeWishMedia.value = "";
+      }
+      updateCooperativePreview(null);
+    };
+
     const personalTypeIconMap = {
       "Espiritual": "/css/icons/Espiritual.webp",
       "Material": "/css/icons/Material.webp",
@@ -3609,52 +3839,113 @@
       confirmPersonalWish.addEventListener("click", handleConfirmPersonalWish);
     }
 
+    const buildCooperativeParticipationText = ({ mode = "create", template = "", userInput = "" } = {}) => {
+      const cleanedInput = String(userInput || "").trim();
+      if (mode === "edit") {
+        return cleanedInput;
+      }
+      const normalizedTemplate = String(template || "").trim();
+      if (!normalizedTemplate) {
+        return cleanedInput;
+      }
+      if (/\*[^*]*\*/.test(normalizedTemplate)) {
+        return normalizedTemplate.replace(/\*[^*]*\*/, cleanedInput || "…");
+      }
+      return cleanedInput || normalizedTemplate;
+    };
+
+    const handleConfirmCooperativeWish = async () => {
+      if (!cooperativeWishList || !activeCooperativeSlot) return;
+      const description = cooperativeWishText ? cooperativeWishText.value.trim() : "";
+      const prefix = cooperativeWishText ? (cooperativeWishText.dataset.prefix || "") : "";
+      const cleanDescription = prefix && description.startsWith(prefix)
+        ? description.slice(prefix.length).trim()
+        : description;
+      if (!cleanDescription) {
+        window.alert("No has descrito tu deseo cooperativo.");
+        return;
+      }
+
+      const selectedType = Array.from(cooperativeWishTypeInputs).find((input) => input.checked)?.value || "Espiritual";
+      const goalRaw = cooperativeWishCount ? Number(cooperativeWishCount.value) : 0;
+      const goal = Number.isFinite(goalRaw) ? Math.max(1, Math.min(500, Math.floor(goalRaw))) : 1;
+      if (cooperativeWishCount) {
+        cooperativeWishCount.value = `${goal}`;
+      }
+      const template = cooperativeWishTemplate ? cooperativeWishTemplate.value.trim() : "";
+      const securityCodeRaw = cooperativeWishSecurityCode ? cooperativeWishSecurityCode.value : "";
+      const securityCode = securityCodeRaw.replace(/\D/g, "").slice(0, 6);
+      if (securityCode.length !== 6) {
+        window.alert("El código de seguridad debe tener exactamente 6 dígitos.");
+        return;
+      }
+      const file = cooperativeWishMedia && cooperativeWishMedia.files ? cooperativeWishMedia.files[0] : null;
+      const wishId = parsePositiveId(activeCooperativeSlot.dataset.wishId);
+      const currentMediaId = parsePositiveId(activeCooperativeSlot.dataset.mediaId);
+
+      try {
+        const uploadedMedia = file ? await uploadWishImage(file) : null;
+        const payload = {
+          wish_text: description,
+          wish_type: selectedType,
+          participants_goal: goal,
+          template_text: template || null,
+          security_code: securityCode,
+          media_id: uploadedMedia?.media_id || currentMediaId || null
+        };
+        const savedWish = wishId
+          ? await updateCooperativeWishRecord(wishId, payload)
+          : await createCooperativeWish(payload);
+        applyCooperativeWishRecordToSlot(activeCooperativeSlot, savedWish);
+        closeCooperativeWishModalFn();
+        resetCooperativeWishForm();
+        activeCooperativeSlot = null;
+      } catch (error) {
+        window.alert(error?.message || "No se pudo guardar el deseo cooperativo.");
+      }
+    };
+
     if (confirmCooperativeWish) {
       confirmCooperativeWish.addEventListener("click", () => {
-        if (!cooperativeWishList || !activeCooperativeSlot) return;
-        const description = cooperativeWishText ? cooperativeWishText.value.trim() : "";
-        if (!description) return;
-
-        const selectedType = Array.from(cooperativeWishTypeInputs).find((input) => input.checked)?.value || "Espiritual";
-        const goal = cooperativeWishCount ? Number(cooperativeWishCount.value) || 0 : 0;
-        const template = cooperativeWishTemplate ? cooperativeWishTemplate.value : "";
-        const securityCodeRaw = cooperativeWishSecurityCode ? cooperativeWishSecurityCode.value : "";
-        const securityCode = securityCodeRaw.replace(/\D/g, "").slice(0, 6);
-        const file = cooperativeWishMedia && cooperativeWishMedia.files ? cooperativeWishMedia.files[0] : null;
-        const imageUrl = file ? URL.createObjectURL(file) : activeCooperativeSlot?.dataset.imageUrl || null;
-
-        const slot = activeCooperativeSlot;
-        slot.dataset.securityCode = securityCode;
-        renderCooperativeWishSlot(slot, description, imageUrl, selectedType, 0, goal, template, securityCode);
-        activeCooperativeSlot = null;
-        closeCooperativeWishModalFn();
+        void handleConfirmCooperativeWish();
       });
     }
 
     if (confirmCooperativeParticipate) {
-      confirmCooperativeParticipate.addEventListener("click", () => {
-        if (!cooperativeWishList || !activeParticipateSource) return;
-        const rootDescription = activeParticipateSource.dataset.description || "";
-        const rootTemplate = activeParticipateSource.dataset.template || "";
-        const rootImageUrl = activeParticipateSource.dataset.imageUrl || null;
-        const rootUser = "Carlos Jiménez Duarte";
-        const extraText = cooperativeCharacter ? cooperativeCharacter.value.trim() : "";
-        const participationText = rootTemplate
-          ? rootTemplate.replace(/\*[^*]*\*/, extraText || "…")
-          : extraText;
-
-        const slot = activeParticipateMode === "edit" && activeParticipateSlot
-          ? activeParticipateSlot
-          : document.createElement("li");
-
-        if (!activeParticipateSlot) {
-          slot.className = "wish-slot is-filled is-cooperative is-participation";
-          cooperativeWishList.appendChild(slot);
+      confirmCooperativeParticipate.addEventListener("click", async () => {
+        const sourceSlot = activeParticipateSource;
+        const wishId = parsePositiveId(sourceSlot?.dataset?.wishId);
+        if (!sourceSlot || !wishId) return;
+        const enteredCode = String(activeSecurityCode || "").replace(/\D/g, "").slice(0, 6);
+        if (enteredCode.length !== 6) {
+          closeCooperativeParticipateModalFn();
+          openCooperativeSecurityModal(sourceSlot);
+          if (cooperativeSecurityError) {
+            cooperativeSecurityError.classList.add("is-visible");
+          }
+          return;
         }
-
-        renderParticipationWishSlot(slot, participationText, rootDescription, rootImageUrl, rootUser, rootTemplate);
-        activeParticipateSlot = null;
-        closeCooperativeParticipateModalFn();
+        const rootTemplate = String(sourceSlot.dataset.template || "");
+        const extraText = cooperativeCharacter ? cooperativeCharacter.value : "";
+        const participationText = buildCooperativeParticipationText({
+          mode: activeParticipateMode,
+          template: rootTemplate,
+          userInput: extraText,
+        });
+        if (!participationText) {
+          window.alert("Debes describir tu participación.");
+          return;
+        }
+        try {
+          const updatedWish = await participateInCooperativeWishRecord(wishId, {
+            security_code: enteredCode,
+            participation_text: participationText,
+          });
+          applyCooperativeWishRecordToSlot(sourceSlot, updatedWish);
+          closeCooperativeParticipateModalFn();
+        } catch (error) {
+          window.alert(error?.message || "No se pudo registrar tu participación.");
+        }
       });
     }
 
@@ -3670,21 +3961,25 @@
     if (confirmCooperativeSecurity) {
       confirmCooperativeSecurity.addEventListener("click", () => {
         if (!activeSecuritySlot) return;
-        const expected = activeSecuritySlot.dataset.securityCode || "";
-        const entered = cooperativeSecurityCodeInput ? cooperativeSecurityCodeInput.value.trim() : "";
-        const isValid = expected && entered === expected;
-        if (!isValid) {
+        const enteredRaw = cooperativeSecurityCodeInput ? cooperativeSecurityCodeInput.value : "";
+        const entered = enteredRaw.replace(/\D/g, "").slice(0, 6);
+        if (cooperativeSecurityCodeInput && cooperativeSecurityCodeInput.value !== entered) {
+          cooperativeSecurityCodeInput.value = entered;
+        }
+        if (entered.length !== 6) {
           if (cooperativeSecurityError) {
             cooperativeSecurityError.classList.add("is-visible");
           }
           return;
         }
+        activeSecurityCode = entered;
         if (cooperativeSecurityError) {
           cooperativeSecurityError.classList.remove("is-visible");
         }
         const slot = activeSecuritySlot;
-        closeCooperativeSecurityModal();
-        openCooperativeParticipateModal(slot);
+        const mode = slot?.dataset?.viewerParticipationText ? "edit" : "create";
+        closeCooperativeSecurityModal({ clearCode: false });
+        openCooperativeParticipateModal(slot, mode);
       });
     }
 
@@ -3914,10 +4209,17 @@
       confirmDeleteWish.addEventListener("click", async () => {
         if (activeDeleteSlot) {
           if (activeDeleteSlot.classList.contains("is-cooperative")) {
-            if (activeDeleteSlot.dataset.imageUrl) {
-              URL.revokeObjectURL(activeDeleteSlot.dataset.imageUrl);
+            const wishId = parsePositiveId(activeDeleteSlot.dataset.wishId);
+            if (wishId) {
+              try {
+                await deleteCooperativeWishRecord(wishId);
+              } catch (error) {
+                console.error(error);
+                window.alert(error?.message || "No se pudo borrar el deseo cooperativo.");
+                return;
+              }
             }
-            activeDeleteSlot.remove();
+            resetSlotToEmpty(activeDeleteSlot);
           } else {
             const wishId = parsePositiveId(activeDeleteSlot.dataset.wishId);
             if (wishId) {
@@ -3964,11 +4266,16 @@
 	        if (choiceBtn) {
 	          if (!isViewingOwnProfile) return;
 	          const slot = choiceBtn.closest(".wish-slot");
-	          if (choiceBtn.dataset.choice === "personal") {
-	            activePersonalSlot = slot;
-	            openPersonalWishModal();
+          if (choiceBtn.dataset.choice === "personal") {
+            activePersonalSlot = slot;
+            openPersonalWishModal();
           } else if (choiceBtn.dataset.choice === "cooperative") {
             activePersonalSlot = null;
+            activeCooperativeSlot = findCooperativeEditorSlot();
+            if (!activeCooperativeSlot) {
+              window.alert(`Ya alcanzaste el máximo de ${cooperativeMax} deseos cooperativos.`);
+              return;
+            }
             openCooperativeWishModal();
           }
           return;
@@ -4088,6 +4395,7 @@
         const lampBtn = event.target.closest(".wish-lamp-btn");
         const actionBtn = event.target.closest(".wish-icon-btn");
         if (lampBtn) {
+          if (!isViewingOwnProfile) return;
           const slot = lampBtn.closest(".wish-slot");
           if (!slot || slot.classList.contains("is-choosing")) return;
           activeCooperativeSlot = slot;
@@ -4150,7 +4458,10 @@
 	      } catch (error) {
 	        console.error(error);
 	      }
-	      await loadPersonalWishesFromApi();
+	      await Promise.all([
+	        loadPersonalWishesFromApi(),
+	        loadCooperativeWishesFromApi(),
+	      ]);
 	    })();
 	  });
 </script>
@@ -4208,6 +4519,7 @@
           <a href="/gallery.html" role="menuitem">Galería</a>
           <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
           <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+          <a href="/messages.html" role="menuitem">Mensajes</a>
         </div>
       </details>
     </div>
@@ -4543,6 +4855,7 @@
 	        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
 	        <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
 	        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
+        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
 	      </nav>
 
       <!-- =========================

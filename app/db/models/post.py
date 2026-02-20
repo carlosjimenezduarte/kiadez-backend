@@ -52,6 +52,11 @@ class Post(Base):
         SAEnum(PostMediaKind, name="post_media_kind"),
         nullable=True,
     )
+    album_id: Mapped[int | None] = mapped_column(
+        ForeignKey("gallery_folders.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     star_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     comment_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

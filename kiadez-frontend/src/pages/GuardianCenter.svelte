@@ -390,6 +390,7 @@
           <a href="/gallery.html" role="menuitem">Galería</a>
           <a href="/calendar.html" role="menuitem">Calendario</a>
           <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+          <a href="/messages.html" role="menuitem">Mensajes</a>
         </div>
       </details>
     </div>

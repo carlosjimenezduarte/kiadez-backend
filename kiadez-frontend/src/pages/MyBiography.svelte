@@ -119,6 +119,14 @@
     const quotesTitleValue = document.getElementById("quotesTitleValue");
     const quotesTextValue = document.getElementById("quotesTextValue");
     const quotesEmptyState = document.getElementById("quotesEmptyState");
+    const distinctionsEditBtn = document.getElementById("distinctionsEditBtn");
+    const distinctionsModalOverlay = document.getElementById("distinctionsModalOverlay");
+    const closeDistinctionsModal = document.getElementById("closeDistinctionsModal");
+    const cancelDistinctionsModal = document.getElementById("cancelDistinctionsModal");
+    const saveDistinctionsBtn = document.getElementById("saveDistinctionsBtn");
+    const distinctionsModalStatus = document.getElementById("distinctionsModalStatus");
+    const distinctionsRows = document.getElementById("distinctionsRows");
+    const distinctionsForm = document.getElementById("distinctionsForm");
     const tocAboutLabel = document.querySelector('[data-toc="about"]');
     const tocDreamLabel = document.querySelector('[data-toc="dream"]');
     const tocProLabel = document.querySelector('[data-toc="pro"]');
@@ -186,6 +194,8 @@
     const PRO_ACHIEVEMENTS_MAX_WORDS = 500;
     const LIFE_ACHIEVEMENTS_MAX_WORDS = 500;
     const FAVORITE_QUOTES_MAX_WORDS = 500;
+    const DISTINCTIONS_MAX_SLOTS = 10;
+    const GUARDIAN_MIN_RANK = 3;
     const defaultAboutDisplayName = (aboutDisplayNameValue?.textContent || infoName?.textContent || "Usuario Kiadez").trim();
     const defaultDreamTitle = (dreamTitleValue?.textContent || "Sobre su mayor sueño").trim();
     const defaultProAchievementsTitle = (proAchievementsTitleValue?.textContent || "Logros profesionales").trim();
@@ -201,6 +211,14 @@
     let currentProAchievements = null;
     let currentLifeAchievements = null;
     let currentFavoriteQuotes = null;
+    let currentDistinctions = null;
+    let viewerUserId = null;
+    let viewerUsername = "";
+    let viewerGuardianRank = 0;
+    let activeProfileUserId = null;
+    let activeProfileUsername = "";
+    let isViewingOwnProfile = true;
+    let profileContextResolved = false;
 
     const getAccessToken = () => localStorage.getItem("access_token") || "";
 
@@ -290,6 +308,130 @@
       quotesModalStatus.classList.toggle("is-error", Boolean(isError));
     };
 
+    const setDistinctionsModalStatus = (message, isError = false) => {
+      if (!distinctionsModalStatus) return;
+      distinctionsModalStatus.textContent = message || "";
+      distinctionsModalStatus.classList.toggle("is-error", Boolean(isError));
+    };
+
+    const parsePositiveId = (value) => {
+      const normalized = Number(value);
+      if (!Number.isFinite(normalized) || normalized <= 0) return null;
+      return Math.trunc(normalized);
+    };
+
+    const normalizeUsername = (value) => {
+      let normalized = String(value || "").trim().toLowerCase();
+      while (normalized.startsWith("@")) normalized = normalized.slice(1);
+      return normalized;
+    };
+
+    const isViewerGuardian = () => Number(viewerGuardianRank || 0) >= GUARDIAN_MIN_RANK;
+
+    const buildDistinctionsEndpoint = ({ includeTarget = false } = {}) => {
+      if (!includeTarget || isViewingOwnProfile) {
+        return "/biography/distinctions";
+      }
+      const profileId = parsePositiveId(activeProfileUserId);
+      if (!profileId) {
+        throw new Error("No se pudo identificar el perfil a editar.");
+      }
+      return `/biography/distinctions/${encodeURIComponent(String(profileId))}`;
+    };
+
+    const fetchViewerIdentity = async () => {
+      const res = await apiFetch("/auth/me");
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo cargar tu sesión.");
+      }
+      return data;
+    };
+
+    const fetchFollowProfile = async ({ userId = null, username = "" } = {}) => {
+      const safeUserId = parsePositiveId(userId);
+      const safeUsername = normalizeUsername(username);
+      if (!safeUserId && !safeUsername) return null;
+      const query = safeUserId
+        ? `user_id=${encodeURIComponent(String(safeUserId))}`
+        : `username=${encodeURIComponent(safeUsername)}`;
+      const res = await apiFetch(`/follows/profile?${query}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo cargar el perfil solicitado.");
+      }
+      return data;
+    };
+
+    const applyDistinctionsEditorVisibility = () => {
+      const canEdit = isViewerGuardian();
+      if (distinctionsEditBtn) {
+        distinctionsEditBtn.classList.toggle("hidden", !canEdit);
+        distinctionsEditBtn.disabled = !canEdit;
+      }
+    };
+
+    const ensureDistinctionsForm = () => {
+      if (!distinctionsForm) return;
+      if (distinctionsForm.childElementCount > 0) return;
+
+      distinctionsForm.innerHTML = Array.from({ length: DISTINCTIONS_MAX_SLOTS }, (_, index) => {
+        const slotNumber = index + 1;
+        return `
+          <div class="distinction-slot-card">
+            <p class="distinction-slot-title">Distinción ${slotNumber}</p>
+            <label class="modal-label" for="distinctionTypeInput${slotNumber}">Tipo de distinción</label>
+            <input class="modal-input" id="distinctionTypeInput${slotNumber}" type="text" maxlength="120" />
+            <label class="modal-label" for="distinctionDescriptionInput${slotNumber}">Descripción</label>
+            <input class="modal-input" id="distinctionDescriptionInput${slotNumber}" type="text" maxlength="500" />
+          </div>
+        `;
+      }).join("");
+    };
+
+    const getDistinctionTypeInput = (slotNumber) => document.getElementById(`distinctionTypeInput${slotNumber}`);
+    const getDistinctionDescriptionInput = (slotNumber) => document.getElementById(`distinctionDescriptionInput${slotNumber}`);
+
+    const resolveBiographyProfileContext = async () => {
+      if (profileContextResolved) return;
+
+      const me = await fetchViewerIdentity();
+      viewerUserId = parsePositiveId(me?.user_number || me?.user_id);
+      viewerGuardianRank = Number(me?.guardian_rank || 0) || 0;
+      viewerUsername = normalizeUsername(me?.username || "");
+      activeProfileUserId = viewerUserId;
+      activeProfileUsername = viewerUsername;
+      isViewingOwnProfile = true;
+
+      const params = new URLSearchParams(window.location.search);
+      const requestedUserId = parsePositiveId(params.get("id"));
+      const requestedUsername = normalizeUsername(params.get("u"));
+      const wantsOtherProfile = Boolean(requestedUserId || requestedUsername);
+
+      if (wantsOtherProfile) {
+        const isSelfById = requestedUserId && viewerUserId && requestedUserId === viewerUserId;
+        const isSelfByUsername = requestedUsername && viewerUsername && requestedUsername === viewerUsername;
+
+        if (!isSelfById && !isSelfByUsername) {
+          const profile = await fetchFollowProfile({
+            userId: requestedUserId,
+            username: requestedUserId ? "" : requestedUsername,
+          });
+          const targetUserId = parsePositiveId(profile?.user_id);
+          if (targetUserId) {
+            activeProfileUserId = targetUserId;
+            activeProfileUsername = normalizeUsername(profile?.username || "");
+            isViewingOwnProfile = Boolean(viewerUserId && targetUserId === viewerUserId);
+            const fullName = String(profile?.full_name || "").trim();
+            if (fullName && infoName) infoName.textContent = fullName;
+          }
+        }
+      }
+
+      profileContextResolved = true;
+      applyDistinctionsEditorVisibility();
+    };
+
     const countWords = (value) => {
       if (!value) return 0;
       return value
@@ -345,6 +487,70 @@
     const applyProfessionalInfoToView = (professionalInfo) => {
       setTextOrFallback(professionalOccupationValue, professionalInfo?.occupation);
       setTextOrFallback(professionalActiveYearsValue, professionalInfo?.active_years);
+    };
+
+    const normalizeDistinctionSlots = (value) => {
+      const slots = Array.isArray(value?.slots) ? value.slots : [];
+      return Array.from({ length: DISTINCTIONS_MAX_SLOTS }, (_, index) => {
+        const slot = slots[index] || {};
+        return {
+          slot_number: index + 1,
+          distinction_type: String(slot?.distinction_type || "").trim(),
+          description: String(slot?.description || "").trim(),
+        };
+      });
+    };
+
+    const renderDistinctionsRows = (slots) => {
+      if (!distinctionsRows) return;
+      distinctionsRows.innerHTML = "";
+
+      const normalizedSlots = Array.isArray(slots) ? slots : [];
+      const visibleSlots = normalizedSlots.filter((slot) => slot.distinction_type || slot.description);
+      if (!visibleSlots.length) return;
+
+      visibleSlots.forEach((slot) => {
+        const row = document.createElement("tr");
+        const header = document.createElement("th");
+        header.textContent = slot.distinction_type || `Distinción ${slot.slot_number}`;
+        const detail = document.createElement("td");
+        detail.textContent = slot.description || "";
+        row.appendChild(header);
+        row.appendChild(detail);
+        distinctionsRows.appendChild(row);
+      });
+    };
+
+    const applyDistinctionsToView = (distinctions) => {
+      const slots = normalizeDistinctionSlots(distinctions);
+      currentDistinctions = { slots };
+      renderDistinctionsRows(slots);
+    };
+
+    const fillDistinctionsForm = (distinctions) => {
+      ensureDistinctionsForm();
+      const slots = normalizeDistinctionSlots(distinctions);
+      for (let slotNumber = 1; slotNumber <= DISTINCTIONS_MAX_SLOTS; slotNumber += 1) {
+        const slot = slots[slotNumber - 1];
+        const typeInput = getDistinctionTypeInput(slotNumber);
+        const descriptionInput = getDistinctionDescriptionInput(slotNumber);
+        if (typeInput) typeInput.value = slot?.distinction_type || "";
+        if (descriptionInput) descriptionInput.value = slot?.description || "";
+      }
+      setDistinctionsModalStatus("");
+    };
+
+    const buildDistinctionsPayload = () => {
+      const slots = [];
+      for (let slotNumber = 1; slotNumber <= DISTINCTIONS_MAX_SLOTS; slotNumber += 1) {
+        const typeInput = getDistinctionTypeInput(slotNumber);
+        const descriptionInput = getDistinctionDescriptionInput(slotNumber);
+        slots.push({
+          distinction_type: typeInput?.value?.trim() || null,
+          description: descriptionInput?.value?.trim() || null,
+        });
+      }
+      return { slots };
     };
 
     const applyActivityStatsToView = (stats) => {
@@ -630,6 +836,12 @@
       document.body.classList.add("modal-open");
     };
 
+    const openDistinctionsModal = () => {
+      distinctionsModalOverlay?.classList.remove("hidden");
+      distinctionsModalOverlay?.setAttribute("aria-hidden", "false");
+      document.body.classList.add("modal-open");
+    };
+
     const closePersonalInfoModalFn = () => {
       personalInfoModalOverlay?.classList.add("hidden");
       personalInfoModalOverlay?.setAttribute("aria-hidden", "true");
@@ -705,6 +917,14 @@
     const closeQuotesModalFn = () => {
       quotesModalOverlay?.classList.add("hidden");
       quotesModalOverlay?.setAttribute("aria-hidden", "true");
+      if (!document.querySelector(".modal-overlay:not(.hidden)")) {
+        document.body.classList.remove("modal-open");
+      }
+    };
+
+    const closeDistinctionsModalFn = () => {
+      distinctionsModalOverlay?.classList.add("hidden");
+      distinctionsModalOverlay?.setAttribute("aria-hidden", "true");
       if (!document.querySelector(".modal-overlay:not(.hidden)")) {
         document.body.classList.remove("modal-open");
       }
@@ -817,6 +1037,18 @@
       }
       currentFavoriteQuotes = data;
       applyQuotesToView(data);
+      return data;
+    };
+
+    const loadDistinctions = async () => {
+      const endpoint = buildDistinctionsEndpoint({ includeTarget: true });
+      const res = await apiFetch(endpoint);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudieron cargar las distinciones.");
+      }
+      currentDistinctions = data;
+      applyDistinctionsToView(data);
       return data;
     };
 
@@ -1272,6 +1504,12 @@
       }
     };
 
+    const handleDistinctionsOverlayClick = (event) => {
+      if (event.target === distinctionsModalOverlay) {
+        closeDistinctionsModalFn();
+      }
+    };
+
     const handleOpenPersonalInfoModal = async () => {
       setPersonalInfoModalStatus("Cargando datos...");
       try {
@@ -1399,6 +1637,24 @@
         openQuotesModal();
       } catch (error) {
         setQuotesModalStatus(error.message || "No se pudieron cargar tus frases favoritas.", true);
+      }
+    };
+
+    const handleOpenDistinctionsModal = async () => {
+      if (!isViewerGuardian()) {
+        setDistinctionsModalStatus("Esta sección solo puede ser actualizada por los Guardianes de Kiadez.com.", true);
+        return;
+      }
+
+      setDistinctionsModalStatus("Cargando distinciones...");
+      try {
+        if (!currentDistinctions) {
+          await loadDistinctions();
+        }
+        fillDistinctionsForm(currentDistinctions);
+        openDistinctionsModal();
+      } catch (error) {
+        setDistinctionsModalStatus(error.message || "No se pudieron cargar las distinciones.", true);
       }
     };
 
@@ -1691,6 +1947,33 @@
       }
     };
 
+    const handleSaveDistinctions = async () => {
+      if (!isViewerGuardian()) {
+        setDistinctionsModalStatus("Esta sección solo puede ser actualizada por los Guardianes de Kiadez.com.", true);
+        return;
+      }
+
+      setDistinctionsModalStatus("Guardando...");
+      try {
+        const payload = buildDistinctionsPayload();
+        const endpoint = buildDistinctionsEndpoint({ includeTarget: true });
+        const res = await apiFetch(endpoint, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || "No se pudieron guardar las distinciones.");
+        }
+        currentDistinctions = data;
+        applyDistinctionsToView(data);
+        closeDistinctionsModalFn();
+      } catch (error) {
+        setDistinctionsModalStatus(error.message || "No se pudieron guardar las distinciones.", true);
+      }
+    };
+
     personalInfoEditBtn?.addEventListener("click", handleOpenPersonalInfoModal);
     closePersonalInfoModal?.addEventListener("click", closePersonalInfoModalFn);
     cancelPersonalInfoModal?.addEventListener("click", closePersonalInfoModalFn);
@@ -1746,6 +2029,11 @@
     saveQuotesBtn?.addEventListener("click", handleSaveQuotes);
     quotesModalOverlay?.addEventListener("click", handleQuotesOverlayClick);
     quotesTextInput?.addEventListener("input", handleQuotesInputChange);
+    distinctionsEditBtn?.addEventListener("click", handleOpenDistinctionsModal);
+    closeDistinctionsModal?.addEventListener("click", closeDistinctionsModalFn);
+    cancelDistinctionsModal?.addEventListener("click", closeDistinctionsModalFn);
+    saveDistinctionsBtn?.addEventListener("click", handleSaveDistinctions);
+    distinctionsModalOverlay?.addEventListener("click", handleDistinctionsOverlayClick);
     profilePhotoTrigger?.addEventListener("click", handlePhotoTriggerClick);
     bioPhotoSelectExisting?.addEventListener("click", handleOpenExisting);
     bioPhotoUpload?.addEventListener("click", handleUploadClick);
@@ -1760,6 +2048,8 @@
     emblemSelectCancel?.addEventListener("click", closeEmblemSelectModal);
     emblemSelectModal?.addEventListener("click", handleEmblemModalOverlayClick);
     document.addEventListener("click", handlePageClick);
+    ensureDistinctionsForm();
+    applyDistinctionsEditorVisibility();
 
     void loadCurrentProfilePhoto();
     void loadCurrentEmblem();
@@ -1776,6 +2066,17 @@
     void loadLifeAchievements().catch(() => {});
     void loadFavoriteQuotes().catch(() => {});
     void loadActivityStats().catch(() => {});
+    void (async () => {
+      try {
+        await resolveBiographyProfileContext();
+      } catch (error) {
+        setDistinctionsModalStatus(error?.message || "No se pudo cargar el contexto del perfil.", true);
+      }
+      void loadDistinctions().catch((error) => {
+        applyDistinctionsToView({ slots: [] });
+        setDistinctionsModalStatus(error?.message || "No se pudieron cargar las distinciones.", true);
+      });
+    })();
 
     return () => {
       personalInfoEditBtn?.removeEventListener("click", handleOpenPersonalInfoModal);
@@ -1833,6 +2134,11 @@
       saveQuotesBtn?.removeEventListener("click", handleSaveQuotes);
       quotesModalOverlay?.removeEventListener("click", handleQuotesOverlayClick);
       quotesTextInput?.removeEventListener("input", handleQuotesInputChange);
+      distinctionsEditBtn?.removeEventListener("click", handleOpenDistinctionsModal);
+      closeDistinctionsModal?.removeEventListener("click", closeDistinctionsModalFn);
+      cancelDistinctionsModal?.removeEventListener("click", closeDistinctionsModalFn);
+      saveDistinctionsBtn?.removeEventListener("click", handleSaveDistinctions);
+      distinctionsModalOverlay?.removeEventListener("click", handleDistinctionsOverlayClick);
       profilePhotoTrigger?.removeEventListener("click", handlePhotoTriggerClick);
       bioPhotoSelectExisting?.removeEventListener("click", handleOpenExisting);
       bioPhotoUpload?.removeEventListener("click", handleUploadClick);
@@ -1904,6 +2210,7 @@
             <a href="/gallery.html" role="menuitem">Galería</a>
             <a href="/calendar.html" role="menuitem">Calendario</a>
             <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+          <a href="/messages.html" role="menuitem">Mensajes</a>
           </div>
         </details>
       </div>
@@ -1961,6 +2268,7 @@
         <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
         <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
         <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
+        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
       </nav>
       <!-- ======= CUERPO (3 columnas) ======= -->
       <section class="bio-shell">
@@ -2222,20 +2530,17 @@
             </div>
 
             <div class="infobox-section">
-              <div class="infobox-section-title">Distinciones</div>
+              <div class="infobox-section-title is-editable">
+                <span class="infobox-section-title-text">Distinciones</span>
+                <button class="infobox-edit-btn hidden" id="distinctionsEditBtn" type="button" title="Editar distinciones">
+                  <img src="/css/icons/iconedit.webp" alt="Editar distinciones" />
+                </button>
+              </div>
+              <p class="infobox-guardian-note">
+                Esta sección solo puede ser actualizada por los Guardianes de Kiadez.com.
+              </p>
               <table class="infobox-table">
-                <tbody>
-                <tr data-field="awards">
-                  <th>Premio</th>
-                  <td><span data-value>Wattys 2019 — Categoría Ciencia Ficción, La Guerra Solar I</span><span
-                      class="infobox-hidden" data-hidden hidden>Prefiero no decirlo</span></td>
-                </tr>
-                <tr data-field="guardian">
-                  <th>Guardián</th>
-                  <td><span data-value>Kiadez.com</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
-                      decirlo</span></td>
-                </tr>
-                </tbody>
+                <tbody id="distinctionsRows"></tbody>
               </table>
             </div>
 
@@ -2530,6 +2835,23 @@
         <div class="modal-actions">
           <button class="btn btn-outline btn-compact" type="button" id="cancelQuotesModal">Cancelar</button>
           <button class="btn btn-primary btn-compact" type="button" id="saveQuotesBtn">Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="distinctionsModalOverlay" aria-hidden="true">
+      <div class="modal about-modal distinctions-modal" role="dialog" aria-modal="true" aria-label="Editar distinciones">
+        <div class="modal-head">
+          <h3>Editar distinciones</h3>
+          <button class="modal-close" type="button" id="closeDistinctionsModal">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="distinctions-grid" id="distinctionsForm"></div>
+          <p class="infobox-photo-status" id="distinctionsModalStatus" aria-live="polite"></p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-compact" type="button" id="cancelDistinctionsModal">Cancelar</button>
+          <button class="btn btn-primary btn-compact" type="button" id="saveDistinctionsBtn">Guardar</button>
         </div>
       </div>
     </div>

@@ -39,6 +39,8 @@ class PostOut(BaseModel):
     media_id: int | None = None
     media_kind: PostMediaKind | None = None
     media_url: str | None = None
+    album_id: int | None = None
+    album_name: str | None = None
     star_count: int
     comment_count: int
     share_count: int

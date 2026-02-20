@@ -55,6 +55,55 @@
 
   let twofaCodeInput;
 
+  const PRIVACY_TOGGLES = [
+    {
+      key: "public_profile_show_about",
+      label: "Acerca de mí",
+      description: "Controla si otras personas pueden ver tu módulo de presentación personal.",
+    },
+    {
+      key: "public_profile_show_fulfilled_wishes",
+      label: "Mis deseos cumplidos",
+      description: "Permite o bloquea la visibilidad externa de tus deseos ya cumplidos.",
+    },
+    {
+      key: "public_profile_show_public_wishes",
+      label: "Mis deseos públicos",
+      description: "Permite o bloquea la visibilidad externa de tu listado de deseos públicos.",
+    },
+    {
+      key: "public_profile_show_calendar",
+      label: "Calendario",
+      description: "Controla si tu calendario y actividad temporal son visibles para otros.",
+    },
+    {
+      key: "public_profile_show_oracle",
+      label: "Oráculo",
+      description: "Controla si otras personas pueden consultar tu oráculo en tu perfil.",
+    },
+    {
+      key: "public_profile_show_personal_posts",
+      label: "Publicaciones personales",
+      description: "Si lo apagas, tus publicaciones no serán visibles para otros usuarios.",
+    },
+  ];
+
+  const DEFAULT_PRIVACY_SETTINGS = {
+    public_profile_show_about: true,
+    public_profile_show_fulfilled_wishes: true,
+    public_profile_show_public_wishes: true,
+    public_profile_show_calendar: true,
+    public_profile_show_oracle: true,
+    public_profile_show_personal_posts: true,
+  };
+
+  let privacyModalOpen = false;
+  let privacyLoading = false;
+  let privacySaving = false;
+  let privacyError = "";
+  let privacyStatus = "";
+  let privacySettings = { ...DEFAULT_PRIVACY_SETTINGS };
+
   const getAccessToken = () => localStorage.getItem("access_token") || "";
 
   const parseResponseJson = async (res) => {
@@ -386,6 +435,82 @@
     }
   };
 
+  const normalizePrivacySettings = (payload) => ({
+    public_profile_show_about: Boolean(payload?.public_profile_show_about ?? true),
+    public_profile_show_fulfilled_wishes: Boolean(payload?.public_profile_show_fulfilled_wishes ?? true),
+    public_profile_show_public_wishes: Boolean(payload?.public_profile_show_public_wishes ?? true),
+    public_profile_show_calendar: Boolean(payload?.public_profile_show_calendar ?? true),
+    public_profile_show_oracle: Boolean(payload?.public_profile_show_oracle ?? true),
+    public_profile_show_personal_posts: Boolean(payload?.public_profile_show_personal_posts ?? true),
+  });
+
+  const loadPrivacySettings = async () => {
+    privacyLoading = true;
+    privacyError = "";
+    try {
+      const res = await apiFetch("/privacy/mine");
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo cargar tu configuración de privacidad.");
+      }
+      privacySettings = normalizePrivacySettings(data);
+    } catch (err) {
+      privacyError = err?.message || "No se pudo cargar tu configuración de privacidad.";
+      privacySettings = { ...DEFAULT_PRIVACY_SETTINGS };
+    } finally {
+      privacyLoading = false;
+    }
+  };
+
+  const openPrivacyModal = async () => {
+    privacyStatus = "";
+    privacyError = "";
+    privacyModalOpen = true;
+    await loadPrivacySettings();
+  };
+
+  const closePrivacyModal = () => {
+    privacyModalOpen = false;
+    privacyStatus = "";
+    privacyError = "";
+  };
+
+  const togglePrivacy = (key) => {
+    if (privacyLoading || privacySaving) return;
+    if (!(key in privacySettings)) return;
+    privacyStatus = "";
+    privacyError = "";
+    privacySettings = {
+      ...privacySettings,
+      [key]: !Boolean(privacySettings[key]),
+    };
+  };
+
+  const handleSavePrivacy = async () => {
+    if (privacyLoading || privacySaving) return;
+    privacySaving = true;
+    privacyError = "";
+    privacyStatus = "";
+
+    try {
+      const res = await apiFetch("/privacy/mine", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(privacySettings),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo guardar tu configuración de privacidad.");
+      }
+      privacySettings = normalizePrivacySettings(data);
+      privacyStatus = "Privacidad actualizada correctamente.";
+    } catch (err) {
+      privacyError = err?.message || "No se pudo guardar tu configuración de privacidad.";
+    } finally {
+      privacySaving = false;
+    }
+  };
+
   onMount(() => {
     document.body.dataset.visitor = "false";
   });
@@ -444,6 +569,7 @@
           <a href="/gallery.html" role="menuitem">Galería</a>
           <a href="/calendar.html" role="menuitem">Calendario</a>
           <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+          <a href="/messages.html" role="menuitem">Mensajes</a>
         </div>
       </details>
     </div>
@@ -468,7 +594,7 @@
             <span class="settings-action-label">Habilitar autenticación 2FA</span>
           </button>
 
-          <button class="settings-action" type="button">
+          <button class="settings-action" type="button" on:click={openPrivacyModal}>
             <span class="settings-action-icon" aria-hidden="true">🔒</span>
             <span class="settings-action-label">Privacidad</span>
           </button>
@@ -534,6 +660,68 @@
       © 2026 Kiadez — Una red social para cumplir deseos.
     </div>
   </footer>
+
+  <div
+    class="modal-overlay"
+    class:hidden={!privacyModalOpen}
+    aria-hidden={!privacyModalOpen}
+    on:click={(event) => {
+      if (event.target?.classList?.contains("modal-overlay")) closePrivacyModal();
+    }}
+  >
+    <div class="modal settings-privacy-modal" role="dialog" aria-modal="true" aria-label="Privacidad del perfil público">
+      <div class="modal-head">
+        <h3>Privacidad del perfil público</h3>
+        <button class="modal-close" type="button" on:click={closePrivacyModal}>✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="panel-text settings-privacy-intro">
+          Decide qué partes de tu perfil estarán visibles para otros usuarios. Estos cambios no afectan lo que tú puedes ver dentro de Kiadez.
+        </p>
+
+        {#if privacyLoading}
+          <p class="panel-muted">Cargando configuración de privacidad...</p>
+        {:else}
+          <div class="settings-privacy-grid">
+            {#each PRIVACY_TOGGLES as toggle}
+              <div class="privacy-item settings-privacy-item">
+                <div class="settings-privacy-main">
+                  <span class="privacy-label">{toggle.label}</span>
+                  <p class="settings-privacy-help">{toggle.description}</p>
+                </div>
+                <label class="switch" aria-label={`Alternar visibilidad de ${toggle.label}`}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(privacySettings[toggle.key])}
+                    disabled={privacySaving}
+                    on:change={() => togglePrivacy(toggle.key)}
+                  />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            {/each}
+          </div>
+        {/if}
+
+        {#if privacyError}
+          <p class="settings-form-error" role="alert">{privacyError}</p>
+        {/if}
+        {#if privacyStatus}
+          <p class="settings-form-success" role="status">{privacyStatus}</p>
+        {/if}
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-compact" type="button" on:click={handleSavePrivacy} disabled={privacyLoading || privacySaving}>
+          {privacySaving ? "Guardando..." : "Guardar"}
+        </button>
+        <button class="btn btn-outline btn-compact" type="button" on:click={closePrivacyModal}>
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
 
   <div
     class="modal-overlay"

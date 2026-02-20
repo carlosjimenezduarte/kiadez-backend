@@ -66,6 +66,7 @@
         <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
         <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
         <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
+        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
       </nav>
 
       <section class="panel">

@@ -99,6 +99,12 @@ class User(Base):
         default=True,
     )
 
+    public_profile_show_about: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
     public_profile_show_fulfilled_wishes: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
@@ -112,6 +118,12 @@ class User(Base):
     )
 
     public_profile_show_oracle: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    public_profile_show_personal_posts: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         default=True,

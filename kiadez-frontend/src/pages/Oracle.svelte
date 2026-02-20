@@ -1440,6 +1440,7 @@
           <a href="/gallery.html" role="menuitem">Galería</a>
           <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
           <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+          <a href="/messages.html" role="menuitem">Mensajes</a>
         </div>
       </details>
     </div>
@@ -1551,6 +1552,7 @@
           <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
           <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
           <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
+        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
         </nav>
 
         <!-- =========================

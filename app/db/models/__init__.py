@@ -19,7 +19,10 @@ from .biography_dream import BiographyDream  # noqa
 from .biography_professional_achievements import BiographyProfessionalAchievements  # noqa
 from .biography_life_achievements import BiographyLifeAchievements  # noqa
 from .biography_favorite_quotes import BiographyFavoriteQuotes  # noqa
+from .biography_distinctions import BiographyDistinctions  # noqa
 from .public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus  # noqa
+from .public_cooperative_wish import PublicCooperativeWish  # noqa
+from .public_cooperative_wish_participation import PublicCooperativeWishParticipation  # noqa
 from .private_personal_wish import PrivatePersonalWish, PrivatePersonalWishStatus  # noqa
 from .public_wish_freeze_audit import (
     PublicWishFreezeAudit,
@@ -34,3 +37,8 @@ from .oracle import OracleUserState, OracleResponse, OracleResponseType  # noqa
 from .user_follow import UserFollow  # noqa
 from .guardian_wish_request import GuardianWishRequest, GuardianWishRequestStatus  # noqa
 from .guardian_wish_message import GuardianWishMessage, GuardianWishMessageKind  # noqa
+from .message_thread import MessageThread  # noqa
+from .message_entry import MessageEntry  # noqa
+from .gallery_folder import GalleryFolder  # noqa
+from .gallery_folder_item import GalleryFolderItem  # noqa
+from .achievement_unlock_event import AchievementUnlockEvent  # noqa

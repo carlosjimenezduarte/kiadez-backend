@@ -1,12 +1,375 @@
 <script>
   import { onMount } from "svelte";
   import { logout } from "../lib/logout";
+  import { syncTopbarAvatar } from "../lib/topbarAvatar";
+
+  const API = "http://127.0.0.1:8000";
+  const FEED_LIMIT = 40;
+
+  let feedLoading = true;
+  let feedError = "";
+  let feedPosts = [];
+  let displayPosts = [];
+  let postActionBusyMap = {};
+  let postsStatus = "";
+  let postsStatusIsError = false;
+
+  const getAccessToken = () =>
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("kiadez_access_token") ||
+    "";
+
+  const parseResponseJson = async (response) => {
+    try {
+      return await response.json();
+    } catch {
+      return {};
+    }
+  };
+
+  const readApiError = (payload, fallback = "Error inesperado.") => {
+    const detail = payload?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail.trim();
+    if (Array.isArray(detail) && detail.length) {
+      const first = detail[0];
+      if (typeof first === "string" && first.trim()) return first.trim();
+      if (first && typeof first === "object") {
+        if (typeof first.msg === "string" && first.msg.trim()) return first.msg.trim();
+        if (typeof first.message === "string" && first.message.trim()) return first.message.trim();
+      }
+    }
+    if (detail && typeof detail === "object") {
+      if (typeof detail.msg === "string" && detail.msg.trim()) return detail.msg.trim();
+      if (typeof detail.message === "string" && detail.message.trim()) return detail.message.trim();
+    }
+    if (typeof payload?.message === "string" && payload.message.trim()) return payload.message.trim();
+    return fallback;
+  };
+
+  const readUnknownError = (error, fallback = "Error inesperado.") => {
+    if (!error) return fallback;
+    if (typeof error === "string" && error.trim()) return error.trim();
+    if (error instanceof Error) {
+      const fromError = readApiError({ detail: error.message }, "");
+      if (fromError) return fromError;
+    }
+    if (typeof error === "object") {
+      const parsed = readApiError(error, "");
+      if (parsed) return parsed;
+      if (typeof error?.message === "string" && error.message.trim()) return error.message.trim();
+    }
+    return fallback;
+  };
+
+  const apiFetch = async (path, options = {}) => {
+    const token = getAccessToken();
+    if (!token) {
+      window.location.href = "/login.html";
+      throw new Error("No hay sesión activa.");
+    }
+
+    const response = await fetch(`${API}${path}`, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 401) {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("kiadez_access_token");
+      window.location.href = "/login.html";
+      throw new Error("Tu sesión expiró. Inicia sesión nuevamente.");
+    }
+
+    return response;
+  };
+
+  const setPostsStatus = (message, isError = false) => {
+    postsStatus = String(message || "").trim();
+    postsStatusIsError = Boolean(isError);
+  };
+
+  const relativeTime = (value) => {
+    const date = new Date(value || "");
+    if (Number.isNaN(date.getTime())) return "";
+
+    const diffMs = Date.now() - date.getTime();
+    const future = diffMs < 0;
+    const absMs = Math.abs(diffMs);
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+
+    const format = (num, unit) => {
+      const amount = Math.max(1, Math.floor(num));
+      const label = amount === 1 ? unit : `${unit}s`;
+      return future ? `en ${amount} ${label}` : `hace ${amount} ${label}`;
+    };
+
+    if (absMs < minute) return future ? "en instantes" : "hace instantes";
+    if (absMs < hour) return format(absMs / minute, "minuto");
+    if (absMs < day) return format(absMs / hour, "hora");
+    if (absMs < 7 * day) return format(absMs / day, "día");
+
+    return date.toLocaleString("es-CO", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const buildDisplayPosts = (posts) => {
+    const list = Array.isArray(posts) ? posts : [];
+    const grouped = new Map();
+    const display = [];
+
+    for (const post of list) {
+      const albumId = Number(post?.album_id || 0);
+      if (!albumId) {
+        display.push({ ...post, __kind: "single" });
+        continue;
+      }
+
+      const existing = grouped.get(albumId);
+      if (!existing) {
+        const group = {
+          __kind: "album",
+          album_id: albumId,
+          album_name: String(post?.album_name || "").trim() || `Álbum ${albumId}`,
+          album_items: [post],
+        };
+        grouped.set(albumId, group);
+        display.push(group);
+        continue;
+      }
+
+      existing.album_items.push(post);
+    }
+
+    return display.map((item) => {
+      if (item.__kind !== "album") return item;
+
+      const albumItems = Array.isArray(item.album_items) ? item.album_items : [];
+      const coverPost = albumItems[0] || null;
+      const previewItems = albumItems.slice(0, 4);
+      const extraItems = Math.max(0, albumItems.length - previewItems.length);
+
+      return {
+        ...coverPost,
+        __kind: "album",
+        album_id: item.album_id,
+        album_name: item.album_name,
+        album_items: albumItems,
+        album_preview_items: previewItems,
+        album_total_items: albumItems.length,
+        album_extra_items: extraItems,
+      };
+    });
+  };
+
+  const applyFeedPosts = (items) => {
+    feedPosts = Array.isArray(items) ? items : [];
+    displayPosts = buildDisplayPosts(feedPosts);
+  };
+
+  const isPostBusy = (postId) => Boolean(postActionBusyMap[Number(postId || 0)]);
+
+  const setPostBusy = (postId, isBusy) => {
+    const id = Number(postId || 0);
+    if (!id) return;
+    const next = { ...postActionBusyMap };
+    if (isBusy) {
+      next[id] = true;
+    } else {
+      delete next[id];
+    }
+    postActionBusyMap = next;
+  };
+
+  const patchFeedPost = (postId, updater) => {
+    const normalizedPostId = Number(postId || 0);
+    if (!normalizedPostId || typeof updater !== "function") return;
+
+    let changed = false;
+    const next = feedPosts.map((post) => {
+      if (Number(post?.id || 0) !== normalizedPostId) return post;
+      changed = true;
+      return updater(post);
+    });
+    if (!changed) return;
+
+    applyFeedPosts(next);
+  };
+
+  const loadFeed = async () => {
+    feedLoading = true;
+    feedError = "";
+    setPostsStatus("");
+
+    try {
+      const response = await apiFetch(`/posts/feed?limit=${FEED_LIMIT}&offset=0`);
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo cargar el feed."));
+      }
+
+      applyFeedPosts(data);
+    } catch (error) {
+      feedError = readUnknownError(error, "No se pudo cargar el feed.");
+      applyFeedPosts([]);
+    } finally {
+      feedLoading = false;
+    }
+  };
+
+  const donateStar = async (post) => {
+    const postId = Number(post?.id || 0);
+    if (!postId || isPostBusy(postId)) return;
+
+    if (post?.is_mine) {
+      setPostsStatus("No puedes donarte estrellas a ti mismo.", true);
+      return;
+    }
+    if (post?.starred_by_me) {
+      setPostsStatus("Ya donaste una estrella a esta publicación.", true);
+      return;
+    }
+
+    setPostBusy(postId, true);
+    setPostsStatus("");
+    try {
+      const response = await apiFetch(`/posts/${postId}/stars`, { method: "POST" });
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo donar la estrella."));
+      }
+
+      patchFeedPost(postId, (current) => ({
+        ...current,
+        starred_by_me: true,
+        star_count: Number(data?.star_count ?? current?.star_count ?? 0),
+      }));
+      setPostsStatus("Estrella donada. Esta acción es irreversible.");
+    } catch (error) {
+      setPostsStatus(readUnknownError(error, "No se pudo donar la estrella."), true);
+    } finally {
+      setPostBusy(postId, false);
+    }
+  };
+
+  const commentOnPost = async (post) => {
+    const postId = Number(post?.id || 0);
+    if (!postId || isPostBusy(postId)) return;
+
+    const text = window.prompt("Escribe tu comentario:");
+    if (text === null) return;
+
+    const normalizedText = String(text || "").trim();
+    if (!normalizedText) {
+      setPostsStatus("El comentario no puede estar vacío.", true);
+      return;
+    }
+
+    setPostBusy(postId, true);
+    setPostsStatus("");
+    try {
+      const response = await apiFetch(`/posts/${postId}/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text: normalizedText }),
+      });
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo comentar la publicación."));
+      }
+
+      patchFeedPost(postId, (current) => ({
+        ...current,
+        comment_count: Math.max(0, Number(current?.comment_count || 0) + 1),
+      }));
+      setPostsStatus("Comentario publicado.");
+    } catch (error) {
+      setPostsStatus(readUnknownError(error, "No se pudo comentar la publicación."), true);
+    } finally {
+      setPostBusy(postId, false);
+    }
+  };
+
+  const sharePost = async (post) => {
+    const postId = Number(post?.id || 0);
+    if (!postId || isPostBusy(postId)) return;
+
+    setPostBusy(postId, true);
+    setPostsStatus("");
+    try {
+      const response = await apiFetch(`/posts/${postId}/share`, { method: "POST" });
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo compartir la publicación."));
+      }
+
+      patchFeedPost(postId, (current) => ({
+        ...current,
+        share_count: Number(data?.share_count ?? current?.share_count ?? 0),
+      }));
+
+      const shareUrlObject = new URL("/home_user.html", window.location.origin);
+      shareUrlObject.searchParams.set("post", String(postId));
+      const shareUrl = shareUrlObject.toString();
+
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            title: "Kiadez",
+            text: "Mira esta publicación",
+            url: shareUrl,
+          });
+        } else if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(shareUrl);
+        }
+      } catch (shareError) {
+        if (shareError?.name !== "AbortError") {
+          throw shareError;
+        }
+      }
+
+      setPostsStatus("Publicación compartida.");
+    } catch (error) {
+      setPostsStatus(readUnknownError(error, "No se pudo compartir la publicación."), true);
+    } finally {
+      setPostBusy(postId, false);
+    }
+  };
+
+  const openAlbumGallery = (albumId) => {
+    const normalizedAlbumId = Number(albumId || 0);
+    if (!normalizedAlbumId) return;
+    window.location.href = `/gallery.html?album=${encodeURIComponent(String(normalizedAlbumId))}`;
+  };
 
   onMount(() => {
+    void syncTopbarAvatar();
+
+    const cleanupFns = [];
+    let previewObjectUrl = "";
+
+    const bind = (element, eventName, handler) => {
+      if (!element) return;
+      element.addEventListener(eventName, handler);
+      cleanupFns.push(() => element.removeEventListener(eventName, handler));
+    };
+
     const promptOptions = [
       "Publica algo que motive a tus seguidores",
       "¿Cómo estás trabajando hoy por tus sueños?",
-      "¿Qué ha pasado de fantástico hoy?"
+      "¿Qué ha pasado de fantástico hoy?",
     ];
 
     const composerInput = document.getElementById("openPostModal");
@@ -17,80 +380,94 @@
       const prompt = promptOptions[Math.floor(Math.random() * promptOptions.length)];
       composerInput.textContent = prompt;
     };
-
     setRandomPrompt();
 
-    if (feedHomeBtn) {
-      feedHomeBtn.addEventListener("click", () => {
-        setRandomPrompt();
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      });
-    }
+    bind(feedHomeBtn, "click", () => {
+      setRandomPrompt();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
 
     const menuPublishBtn = document.getElementById("menuPublishBtn");
     const menuDropdown = document.getElementById("menuDropdown");
-
     const postModalOverlay = document.getElementById("postModalOverlay");
     const closePostModal = document.getElementById("closePostModal");
     const cancelPost = document.getElementById("cancelPost");
     const postFile = document.getElementById("postFile");
     const uploadHint = document.getElementById("uploadHint");
     const postPreview = document.getElementById("postPreview");
+    const postTextInput = document.getElementById("postText");
+    const postVisibility = document.getElementById("postVisibility");
+    const publishPostBtn = document.getElementById("publishPost");
+
+    const resetPreview = () => {
+      if (previewObjectUrl) {
+        URL.revokeObjectURL(previewObjectUrl);
+        previewObjectUrl = "";
+      }
+      if (postPreview) {
+        postPreview.innerHTML = "";
+        postPreview.classList.add("hidden");
+      }
+      if (uploadHint) uploadHint.textContent = "Sin archivo adjunto";
+      if (postFile) postFile.value = "";
+    };
 
     const openPost = () => {
+      if (!postModalOverlay) return;
       postModalOverlay.classList.remove("hidden");
       postModalOverlay.setAttribute("aria-hidden", "false");
     };
 
     const closePost = () => {
+      if (!postModalOverlay) return;
       postModalOverlay.classList.add("hidden");
       postModalOverlay.setAttribute("aria-hidden", "true");
-      uploadHint.textContent = "Sin archivo adjunto";
-      postPreview.innerHTML = "";
-      postPreview.classList.add("hidden");
-      postFile.value = "";
-      document.getElementById("postText").value = "";
-      document.getElementById("postVisibility").value = "public";
+      resetPreview();
+      if (postTextInput) postTextInput.value = "";
+      if (postVisibility) postVisibility.value = "public";
     };
 
-    if (composerInput) composerInput.addEventListener("click", openPost);
-    if (menuPublishBtn) {
-      menuPublishBtn.addEventListener("click", () => {
-        openPost();
-        menuDropdown?.removeAttribute("open");
-      });
-    }
+    bind(composerInput, "click", openPost);
+    bind(menuPublishBtn, "click", () => {
+      openPost();
+      menuDropdown?.removeAttribute("open");
+    });
 
     document.querySelectorAll(".mini-action").forEach((btn) => {
-      btn.addEventListener("click", openPost);
+      bind(btn, "click", openPost);
     });
 
-    if (closePostModal) closePostModal.addEventListener("click", closePost);
-    if (cancelPost) cancelPost.addEventListener("click", closePost);
-
-    postModalOverlay.addEventListener("click", (e) => {
-      if (e.target === postModalOverlay) closePost();
+    bind(closePostModal, "click", closePost);
+    bind(cancelPost, "click", closePost);
+    bind(postModalOverlay, "click", (event) => {
+      if (event.target === postModalOverlay) closePost();
     });
 
-    postFile.addEventListener("change", (e) => {
-      const file = e.target.files?.[0];
+    bind(postFile, "change", (event) => {
+      const file = event?.target?.files?.[0];
       if (!file) return;
 
-      uploadHint.textContent = file.name;
-      const url = URL.createObjectURL(file);
+      resetPreview();
+      if (uploadHint) uploadHint.textContent = file.name || "archivo";
+
+      previewObjectUrl = URL.createObjectURL(file);
+      if (!postPreview) return;
       postPreview.classList.remove("hidden");
 
-      if (file.type.startsWith("image/")) {
-        postPreview.innerHTML = `<img src="${url}" alt="Previsualización" />`;
-      } else if (file.type.startsWith("video/")) {
-        postPreview.innerHTML = `<video src="${url}" controls></video>`;
-      } else {
-        postPreview.innerHTML = "";
-        postPreview.classList.add("hidden");
+      if (String(file.type || "").startsWith("image/")) {
+        postPreview.innerHTML = `<img src="${previewObjectUrl}" alt="Previsualización" />`;
+        return;
       }
+      if (String(file.type || "").startsWith("video/")) {
+        postPreview.innerHTML = `<video src="${previewObjectUrl}" controls><track kind="captions" /></video>`;
+        return;
+      }
+
+      postPreview.innerHTML = "";
+      postPreview.classList.add("hidden");
     });
 
-    document.getElementById("publishPost").addEventListener("click", () => {
+    bind(publishPostBtn, "click", () => {
       alert("Publicación creada (mock). En backend luego la guardamos en DB.");
       closePost();
     });
@@ -102,12 +479,13 @@
     const hasOracleResponse = oracleBlock?.dataset.hasResponse !== "false";
 
     if (!hasOracleResponse) {
-      oracleResponseText.classList.add("hidden");
-      oracleEmptyPrompt.classList.remove("hidden");
-      oracleToggle.checked = false;
+      oracleResponseText?.classList.add("hidden");
+      oracleEmptyPrompt?.classList.remove("hidden");
+      if (oracleToggle) oracleToggle.checked = false;
     }
 
     const syncOracleVisibility = () => {
+      if (!oracleToggle || !oracleResponseText) return;
       if (!oracleToggle.checked || !hasOracleResponse) {
         oracleResponseText.classList.add("hidden");
       } else {
@@ -115,10 +493,15 @@
       }
     };
 
-    if (oracleToggle) {
-      oracleToggle.addEventListener("change", syncOracleVisibility);
-      syncOracleVisibility();
-    }
+    bind(oracleToggle, "change", syncOracleVisibility);
+    syncOracleVisibility();
+
+    void loadFeed();
+
+    return () => {
+      for (const cleanup of cleanupFns) cleanup();
+      if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+    };
   });
 </script>
 
@@ -145,7 +528,7 @@
 
     <div class="feed-topbar-zone feed-topbar-center">
       <button class="topbar-btn is-active" id="feedHomeBtn" type="button">🏠 Home</button>
-      <button class="topbar-btn" type="button">🖼️ Galería</button>
+      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
@@ -174,10 +557,10 @@
             Publicar
           </button>
           <a href="/home_user.html" role="menuitem">Mi Home</a>
-          <a href="#" role="menuitem">Logros recientes</a>
-          <a href="#" role="menuitem">Galería</a>
+          <a href="/achievements.html" role="menuitem">Logros recientes</a>
+          <a href="/gallery.html" role="menuitem">Galería</a>
           <a href="/calendar.html" role="menuitem">Calendario</a>
-          <a href="#" role="menuitem">Mi Biografía</a>
+          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
         </div>
       </details>
     </div>
@@ -241,90 +624,124 @@
             </div>
           </article>
 
-          <article class="panel post">
-            <div class="post-head">
-              <div>
-                <strong>Carlos Jiménez Duarte</strong>
-                <span class="post-meta">· hace 20 min · Público</span>
-              </div>
-            </div>
-
-            <p class="post-text">
-              Hoy avancé en mi plan de estudios y terminé un módulo completo. #constancia #propósito
+          {#if postsStatus}
+            <p class={`posts-status ${postsStatusIsError ? "posts-status-error" : ""}`} aria-live="polite">
+              {postsStatus}
             </p>
+          {/if}
 
-            <div class="post-actions">
-              <button class="post-btn" type="button">⭐ Estrella</button>
-              <button class="post-btn" type="button">💬 Comentar</button>
-              <button class="post-btn" type="button">🔁 Compartir</button>
-            </div>
-          </article>
+          {#if feedLoading}
+            <article class="panel post post-empty">
+              <p class="post-text">Cargando publicaciones del feed...</p>
+            </article>
+          {:else if feedError}
+            <article class="panel post post-empty">
+              <p class="posts-status posts-status-error">{feedError}</p>
+              <button class="btn btn-outline" type="button" on:click={() => void loadFeed()}>
+                Reintentar
+              </button>
+            </article>
+          {:else if displayPosts.length === 0}
+            <article class="panel post post-empty">
+              <p class="post-text">Aún no hay publicaciones en tu feed.</p>
+            </article>
+          {:else}
+            {#each displayPosts as post (post.id)}
+              {@const isAlbumGroup = post.__kind === "album" && Number(post.album_total_items || 0) > 1}
+              <article class="panel post">
+                <div class="post-head">
+                  <div>
+                    <strong>{post.author?.name || "Usuario"}</strong>
+                    <span class="post-meta">
+                      · {relativeTime(post.created_at)} · {post.visibility === "private" ? "Privado" : "Público"}
+                    </span>
+                  </div>
+                </div>
 
-          <article class="panel post">
-            <div class="post-head">
-              <div>
-                <strong>María Fernanda López</strong>
-                <span class="post-meta">· hace 1 hora · Público</span>
-              </div>
-            </div>
+                {#if isAlbumGroup}
+                  <p class="post-album-meta">
+                    {post.album_name || "Álbum"} · {Number(post.album_total_items || 0)} archivo(s)
+                  </p>
+                {/if}
 
-            <p class="post-text">
-              Una caminata con mi equipo de Guardianes y una conversación que me recordó por qué empecé.
-            </p>
+                {#if post.text}
+                  <p class="post-text">{post.text}</p>
+                {/if}
 
-            <div class="post-media">
-              <img src="/assets/post-1.jpg" alt="Post con imagen" />
-            </div>
+                {#if isAlbumGroup}
+                  <div class="post-album-grid" aria-label="Publicación agrupada de álbum">
+                    {#each post.album_preview_items || [] as albumPost, index (`${post.id}-${albumPost.id}-${index}`)}
+                      <div class="post-album-cell">
+                        {#if albumPost.media_kind === "video"}
+                          <video src={albumPost.media_url} muted playsinline preload="metadata">
+                            <track kind="captions" />
+                          </video>
+                        {:else}
+                          <img src={albumPost.media_url} alt="Archivo del álbum" loading="lazy" />
+                        {/if}
+                        {#if index === 3 && Number(post.album_extra_items || 0) > 0}
+                          <span class="post-album-more">+{Number(post.album_extra_items || 0)}</span>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                {:else if post.media_url}
+                  <div class="post-media">
+                    {#if post.media_kind === "video"}
+                      <video src={post.media_url} controls preload="metadata">
+                        <track kind="captions" />
+                      </video>
+                    {:else}
+                      <img src={post.media_url} alt="Media de la publicación" loading="lazy" />
+                    {/if}
+                  </div>
+                {/if}
 
-            <div class="post-actions">
-              <button class="post-btn" type="button">⭐ Estrella</button>
-              <button class="post-btn" type="button">💬 Comentar</button>
-              <button class="post-btn" type="button">🔁 Compartir</button>
-            </div>
-          </article>
+                <p class="post-warning">La donación de estrella es irreversible.</p>
 
-          <article class="panel post">
-            <div class="post-head">
-              <div>
-                <strong>Raúl Mendoza</strong>
-                <span class="post-meta">· ayer · Público</span>
-              </div>
-            </div>
+                <div class="post-actions">
+                  <button
+                    class="post-btn"
+                    type="button"
+                    on:click={() => void donateStar(post)}
+                    disabled={isPostBusy(post.id) || Boolean(post.starred_by_me) || Boolean(post.is_mine)}
+                  >
+                    {post.starred_by_me
+                      ? `⭐ Estrella donada (${Number(post.star_count || 0)})`
+                      : `⭐ Donar estrella (${Number(post.star_count || 0)})`}
+                  </button>
 
-            <p class="post-text">
-              “Si avanzas un 1% cada día, al final del año no serás el mismo”. ¿Qué es lo que más te motiva
-              hoy? #hábitos
-            </p>
+                  <button
+                    class="post-btn"
+                    type="button"
+                    on:click={() => void commentOnPost(post)}
+                    disabled={isPostBusy(post.id)}
+                  >
+                    💬 Comentar ({Number(post.comment_count || 0)})
+                  </button>
 
-            <div class="post-actions">
-              <button class="post-btn" type="button">⭐ Estrella</button>
-              <button class="post-btn" type="button">💬 Comentar</button>
-              <button class="post-btn" type="button">🔁 Compartir</button>
-            </div>
-          </article>
+                  <button
+                    class="post-btn"
+                    type="button"
+                    on:click={() => void sharePost(post)}
+                    disabled={isPostBusy(post.id)}
+                  >
+                    🔁 Compartir ({Number(post.share_count || 0)})
+                  </button>
 
-          <article class="panel post">
-            <div class="post-head">
-              <div>
-                <strong>Lucía Gómez</strong>
-                <span class="post-meta">· hace 3 días · Público</span>
-              </div>
-            </div>
-
-            <p class="post-text">
-              Hoy grabé el video para mi primer taller. ¡Gracias por el apoyo! #crecimiento
-            </p>
-
-            <div class="post-media">
-              <img src="/assets/post-2.jpg" alt="Post con imagen" />
-            </div>
-
-            <div class="post-actions">
-              <button class="post-btn" type="button">⭐ Estrella</button>
-              <button class="post-btn" type="button">💬 Comentar</button>
-              <button class="post-btn" type="button">🔁 Compartir</button>
-            </div>
-          </article>
+                  {#if isAlbumGroup}
+                    <button
+                      class="post-btn"
+                      type="button"
+                      on:click={() => openAlbumGallery(post.album_id)}
+                    >
+                      🖼️ Hojear álbum ({Number(post.album_total_items || 0)})
+                    </button>
+                  {/if}
+                </div>
+              </article>
+            {/each}
+          {/if}
         </section>
 
         <!-- =========================
@@ -333,13 +750,13 @@
         <aside class="feed-side feed-side-right" aria-label="Perfil y accesos rápidos">
           <article class="panel profile-card feed-profile-card">
             <div class="profile-row">
-              <a class="feed-profile-link" href="#">
+              <a class="feed-profile-link" href="/home_user.html">
                 <img class="avatar" src="/assets/avatar-default.jpg" alt="Foto de perfil" />
               </a>
               <div class="profile-meta">
-                <a class="profile-name feed-profile-link" href="#">Carlos Jiménez Duarte</a>
+                <a class="profile-name feed-profile-link" href="/home_user.html">Carlos Jiménez Duarte</a>
                 <p class="profile-rank">@carlosjduarte</p>
-                <a class="btn btn-outline btn-compact" href="#">Ver perfil</a>
+                <a class="btn btn-outline btn-compact" href="/home_user.html">Ver perfil</a>
               </div>
             </div>
           </article>
@@ -347,13 +764,13 @@
           <article class="panel">
             <h3 class="panel-title">Mi comunidad</h3>
             <ul class="feed-link-list">
-              <li><a href="#">Seguidores</a></li>
-              <li><a href="#">Logros recientes</a></li>
-              <li><a href="#">Galería</a></li>
+              <li><a href="/followers.html">Seguidores</a></li>
+              <li><a href="/achievements.html">Logros recientes</a></li>
+              <li><a href="/gallery.html">Galería</a></li>
               <li><a href="/calendar.html">Calendario</a></li>
-              <li><a href="#">Mi Biografía</a></li>
-              <li><a href="#">Mensajería de Guardianes</a></li>
-              <li><a href="#">Notificaciones</a></li>
+              <li><a href="/my-biography.html">Mi Biografía</a></li>
+              <li><a href="/messages.html">Mensajería de Guardianes</a></li>
+              <li><a href="/privacy-and-settings.html">Notificaciones</a></li>
             </ul>
           </article>
 
@@ -364,10 +781,10 @@
           </article>
 
           <div class="feed-mini-footer">
-            <a href="#">Términos y condiciones</a>
-            <a href="#">Privacidad</a>
-            <a href="#">Cookies</a>
-            <a href="#">Idiomas</a>
+            <a href="/terms.html">Términos y condiciones</a>
+            <a href="/privacy.html">Privacidad</a>
+            <a href="/privacy-and-settings.html">Cookies</a>
+            <a href="/privacy-and-settings.html">Idiomas</a>
           </div>
         </aside>
       </section>

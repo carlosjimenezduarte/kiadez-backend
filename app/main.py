@@ -15,6 +15,10 @@ from app.oracle.routes import router as oracle_router
 from app.follows.routes import router as follows_router
 from app.privacy.routes import router as privacy_router
 from app.guardian_center.routes import router as guardian_center_router
+from app.messages.routes import router as messages_router
+from app.achievements.routes import router as achievements_router
+from app.gallery.routes import router as gallery_router
+from app.calendar.routes import router as calendar_router
 
 
 app = FastAPI(
@@ -46,6 +50,10 @@ app.include_router(oracle_router)
 app.include_router(follows_router)
 app.include_router(privacy_router)
 app.include_router(guardian_center_router)
+app.include_router(messages_router)
+app.include_router(achievements_router)
+app.include_router(gallery_router)
+app.include_router(calendar_router)
 
 
 @app.get("/health")

@@ -15,6 +15,8 @@ from app.core.storage import S3NotConfiguredError, generate_presigned_get_url
 from app.db.database import get_db
 from app.db.models.guardian_wish_message import GuardianWishMessage, GuardianWishMessageKind
 from app.db.models.guardian_wish_request import GuardianWishRequest, GuardianWishRequestStatus
+from app.db.models.message_entry import MessageEntry
+from app.db.models.message_thread import MessageThread
 from app.db.models.media import Media
 from app.db.models.public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus
 from app.db.models.user import User
@@ -210,6 +212,33 @@ def _message_out(*, msg: GuardianWishMessage, recipient: User) -> GuardianWishMe
         body=msg.body,
         created_at=msg.created_at,
     )
+
+
+def _mirror_guardian_message_in_inbox(*, db: Session, msg: GuardianWishMessage) -> None:
+    sender_guardian_id = int(msg.sender_guardian_id) if msg.sender_guardian_id else None
+    if sender_guardian_id is None:
+        return
+
+    created_at = msg.created_at or datetime.now(timezone.utc)
+    thread = MessageThread(
+        guardian_user_id=sender_guardian_id,
+        recipient_user_id=int(msg.recipient_user_id),
+        subject=msg.subject,
+        source_guardian_wish_message_id=int(msg.id),
+        is_guardian_center_origin=True,
+        created_at=created_at,
+        updated_at=created_at,
+    )
+    db.add(thread)
+    db.flush()
+
+    entry = MessageEntry(
+        thread_id=int(thread.id),
+        sender_user_id=sender_guardian_id,
+        body=msg.body,
+        created_at=created_at,
+    )
+    db.add(entry)
 
 
 @router.post("/wish-requests", response_model=GuardianWishRequestOut)
@@ -410,6 +439,8 @@ def deny_wish_request(
         body=payload.body,
     )
     db.add(msg)
+    db.flush()
+    _mirror_guardian_message_in_inbox(db=db, msg=msg)
 
     req.status = GuardianWishRequestStatus.closed
     req.denied_at = datetime.now(timezone.utc)
@@ -452,6 +483,8 @@ def message_wish_owner(
         body=payload.body,
     )
     db.add(msg)
+    db.flush()
+    _mirror_guardian_message_in_inbox(db=db, msg=msg)
     db.commit()
     db.refresh(msg)
 

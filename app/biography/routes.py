@@ -14,6 +14,9 @@ from app.biography.schemas import (
     BiographyCuriositiesUpdateRequest,
     BiographyDreamOut,
     BiographyDreamUpdateRequest,
+    BiographyDistinctionSlot,
+    BiographyDistinctionsOut,
+    BiographyDistinctionsUpdateRequest,
     BiographyFavoriteQuotesOut,
     BiographyFavoriteQuotesUpdateRequest,
     BiographyLifeAchievementsOut,
@@ -35,6 +38,7 @@ from app.db.models.biography_personal_info import BiographyPersonalInfo
 from app.db.models.biography_education import BiographyEducation
 from app.db.models.biography_about import BiographyAbout
 from app.db.models.biography_dream import BiographyDream
+from app.db.models.biography_distinctions import BiographyDistinctions
 from app.db.models.biography_favorite_quotes import BiographyFavoriteQuotes
 from app.db.models.biography_life_achievements import BiographyLifeAchievements
 from app.db.models.biography_professional_achievements import BiographyProfessionalAchievements
@@ -49,6 +53,8 @@ MAX_DREAM_WORDS = 1200
 MAX_PRO_ACHIEVEMENTS_WORDS = 500
 MAX_LIFE_ACHIEVEMENTS_WORDS = 500
 MAX_FAVORITE_QUOTES_WORDS = 500
+DISTINCTIONS_MAX_SLOTS = 10
+GUARDIANS_MIN_RANK = 3
 DEFAULT_DREAM_TITLE = "Sobre su mayor sueño"
 DEFAULT_PRO_ACHIEVEMENTS_TITLE = "Logros profesionales"
 DEFAULT_LIFE_ACHIEVEMENTS_TITLE = "Logros alcanzados"
@@ -251,6 +257,56 @@ def _serialize_favorite_quotes(
         section_text=section_text,
         word_count=_count_words(section_text),
     )
+
+
+def _is_guardian(current: UserPublic) -> bool:
+    return int(current.guardian_rank or 0) >= GUARDIANS_MIN_RANK
+
+
+def _require_guardian(current: UserPublic) -> None:
+    if _is_guardian(current):
+        return
+    raise HTTPException(
+        status_code=403,
+        detail="Esta sección solo puede ser actualizada por los Guardianes de Kiadez.com.",
+    )
+
+
+def _serialize_distinctions(
+    *,
+    distinctions: BiographyDistinctions | None,
+) -> BiographyDistinctionsOut:
+    slots: list[BiographyDistinctionSlot] = []
+    for slot_number in range(1, DISTINCTIONS_MAX_SLOTS + 1):
+        slot_type = getattr(distinctions, f"slot{slot_number}_type", None) if distinctions else None
+        slot_description = getattr(distinctions, f"slot{slot_number}_description", None) if distinctions else None
+        slots.append(
+            BiographyDistinctionSlot(
+                distinction_type=slot_type,
+                description=slot_description,
+            )
+        )
+    return BiographyDistinctionsOut(slots=slots)
+
+
+def _apply_distinctions_payload(
+    *,
+    distinctions: BiographyDistinctions,
+    payload: BiographyDistinctionsUpdateRequest,
+) -> None:
+    slots = payload.slots[:DISTINCTIONS_MAX_SLOTS]
+    for slot_number in range(1, DISTINCTIONS_MAX_SLOTS + 1):
+        slot = slots[slot_number - 1] if slot_number - 1 < len(slots) else None
+        setattr(
+            distinctions,
+            f"slot{slot_number}_type",
+            slot.distinction_type if slot else None,
+        )
+        setattr(
+            distinctions,
+            f"slot{slot_number}_description",
+            slot.description if slot else None,
+        )
 
 
 @router.get("/activity-stats", response_model=BiographyActivityStatsOut)
@@ -489,6 +545,98 @@ def upsert_professional_info(
     return _serialize_professional_info(professional_info=professional_info)
 
 
+@router.get("/distinctions", response_model=BiographyDistinctionsOut)
+def get_distinctions(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    distinctions = db.execute(
+        select(BiographyDistinctions).where(BiographyDistinctions.user_id == current.user_number)
+    ).scalar_one_or_none()
+    return _serialize_distinctions(distinctions=distinctions)
+
+
+@router.get("/distinctions/{user_id}", response_model=BiographyDistinctionsOut)
+def get_distinctions_for_user(
+    user_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.execute(
+        select(User).where(
+            User.id == user_id,
+            User.is_active.is_(True),
+        )
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    distinctions = db.execute(
+        select(BiographyDistinctions).where(BiographyDistinctions.user_id == user_id)
+    ).scalar_one_or_none()
+    return _serialize_distinctions(distinctions=distinctions)
+
+
+@router.put("/distinctions", response_model=BiographyDistinctionsOut)
+def upsert_distinctions(
+    payload: BiographyDistinctionsUpdateRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_guardian(current)
+
+    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    distinctions = db.execute(
+        select(BiographyDistinctions).where(BiographyDistinctions.user_id == current.user_number)
+    ).scalar_one_or_none()
+    if distinctions is None:
+        distinctions = BiographyDistinctions(user_id=current.user_number)
+        db.add(distinctions)
+
+    _apply_distinctions_payload(distinctions=distinctions, payload=payload)
+    db.commit()
+    db.refresh(distinctions)
+    return _serialize_distinctions(distinctions=distinctions)
+
+
+@router.put("/distinctions/{user_id}", response_model=BiographyDistinctionsOut)
+def upsert_distinctions_for_user(
+    user_id: int,
+    payload: BiographyDistinctionsUpdateRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_guardian(current)
+
+    user = db.execute(
+        select(User).where(
+            User.id == user_id,
+            User.is_active.is_(True),
+        )
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    distinctions = db.execute(
+        select(BiographyDistinctions).where(BiographyDistinctions.user_id == user_id)
+    ).scalar_one_or_none()
+    if distinctions is None:
+        distinctions = BiographyDistinctions(user_id=user_id)
+        db.add(distinctions)
+
+    _apply_distinctions_payload(distinctions=distinctions, payload=payload)
+    db.commit()
+    db.refresh(distinctions)
+    return _serialize_distinctions(distinctions=distinctions)
+
+
 @router.get("/about", response_model=BiographyAboutOut)
 def get_about(
     current: UserPublic = Depends(get_current_user),
@@ -517,6 +665,10 @@ def get_about_for_user(
     ).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = int(current.user_number) == int(user_id)
+    if not is_owner and not bool(user.public_profile_show_about):
+        raise HTTPException(status_code=403, detail='La sección "Acerca de mí" está oculta por privacidad.')
 
     about = db.execute(select(BiographyAbout).where(BiographyAbout.user_id == user_id)).scalar_one_or_none()
     return _serialize_about(user=user, about=about)

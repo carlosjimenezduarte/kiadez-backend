@@ -33,6 +33,7 @@
   import MyPrivateWhishes from './pages/MyPrivateWhishes.svelte';
   import PrivacyAndSettings from './pages/PrivacyAndSettings.svelte';
   import GuardianCenter from './pages/GuardianCenter.svelte';
+  import Messages from './pages/Messages.svelte';
 
   const path = typeof window !== 'undefined' ? window.location.pathname : '/';
   const route = path.replace(/\/+$/, '') || '/';
@@ -103,6 +104,8 @@
     '/privacy-and-settings.html': PrivacyAndSettings,
     '/guardiancenter': GuardianCenter,
     '/guardiancenter.html': GuardianCenter,
+    '/messages': Messages,
+    '/messages.html': Messages,
   };
 
   const Component = routes[route] || Landing;

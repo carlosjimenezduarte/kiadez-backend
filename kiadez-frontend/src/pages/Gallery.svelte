@@ -3,10 +3,950 @@
   import { logout } from "../lib/logout";
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
+  import { syncTopbarAvatar } from "../lib/topbarAvatar";
+
+  const API = "http://127.0.0.1:8000";
+  const RECENT_LIMIT = 20;
+  const POSTS_FETCH_LIMIT = 100;
+
+  let isLoading = true;
+  let loadError = "";
+
+  let statusMessage = "";
+  let statusIsError = false;
+
+  let recentImagePosts = [];
+  let folders = [];
+
+  let activeFolderId = "";
+  let activeFolderDetail = null;
+  let folderDetailLoading = false;
+
+  let renameFolderName = "";
+  let renameLoading = false;
+
+  let deletingFolder = false;
+
+  let showCreateAlbumModal = false;
+  let albumName = "";
+  let albumVisibility = "public";
+  let albumFiles = [];
+  let albumPublishing = false;
+  let albumModalStatus = "";
+  let albumModalStatusIsError = false;
+
+  let showPostViewer = false;
+  let viewerPostIndex = -1;
+  let currentViewerPost = null;
+  let viewerCanPrev = false;
+  let viewerCanNext = false;
+
+  let viewerComments = [];
+  let viewerCommentsLoading = false;
+  let viewerCommentText = "";
+  let viewerCommentSubmitting = false;
+  let viewerActionLoading = false;
+  let viewerStatusMessage = "";
+  let viewerStatusIsError = false;
+  let viewerLoadedPostId = 0;
+
+  const getAccessToken = () =>
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("kiadez_access_token") ||
+    "";
+
+  const parseResponseJson = async (response) => {
+    try {
+      return await response.json();
+    } catch {
+      return {};
+    }
+  };
+
+  const readApiError = (payload, fallback = "Error inesperado.") => {
+    const detail = payload?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail.trim();
+    }
+
+    if (Array.isArray(detail) && detail.length) {
+      const first = detail[0];
+      if (typeof first === "string" && first.trim()) {
+        return first.trim();
+      }
+      if (first && typeof first === "object") {
+        if (typeof first.msg === "string" && first.msg.trim()) {
+          return first.msg.trim();
+        }
+        if (typeof first.message === "string" && first.message.trim()) {
+          return first.message.trim();
+        }
+      }
+    }
+
+    if (detail && typeof detail === "object") {
+      if (typeof detail.msg === "string" && detail.msg.trim()) {
+        return detail.msg.trim();
+      }
+      if (typeof detail.message === "string" && detail.message.trim()) {
+        return detail.message.trim();
+      }
+    }
+
+    const message = payload?.message;
+    if (typeof message === "string" && message.trim()) {
+      return message.trim();
+    }
+
+    return fallback;
+  };
+
+  const readUnknownError = (error, fallback = "Error inesperado.") => {
+    if (!error) return fallback;
+
+    if (typeof error === "string" && error.trim()) {
+      return error.trim();
+    }
+
+    if (error instanceof Error) {
+      const fromMessage = readApiError({ detail: error.message }, "");
+      if (fromMessage) return fromMessage;
+    }
+
+    if (typeof error === "object") {
+      const parsed = readApiError(error, "");
+      if (parsed) return parsed;
+
+      const maybeMessage = error?.message;
+      if (typeof maybeMessage === "string" && maybeMessage.trim()) {
+        return maybeMessage.trim();
+      }
+    }
+
+    return fallback;
+  };
+
+  const escapeHtml = (value) =>
+    String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+
+  const apiFetch = async (path, options = {}) => {
+    const token = getAccessToken();
+    if (!token) {
+      window.location.href = "/login.html";
+      throw new Error("No hay sesión activa.");
+    }
+
+    const response = await fetch(`${API}${path}`, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 401) {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("kiadez_access_token");
+      window.location.href = "/login.html";
+      throw new Error("Tu sesión expiró. Inicia sesión nuevamente.");
+    }
+
+    return response;
+  };
+
+  const setStatus = (message, isError = false) => {
+    statusMessage = String(message || "").trim();
+    statusIsError = Boolean(isError);
+  };
+
+  const setViewerStatus = (message, isError = false) => {
+    viewerStatusMessage = String(message || "").trim();
+    viewerStatusIsError = Boolean(isError);
+  };
+
+  const clearViewerStatus = () => {
+    viewerStatusMessage = "";
+    viewerStatusIsError = false;
+  };
+
+  const relativeTime = (value) => {
+    const date = new Date(value || "");
+    if (Number.isNaN(date.getTime())) return "";
+
+    const diffMs = Date.now() - date.getTime();
+    const future = diffMs < 0;
+    const absMs = Math.abs(diffMs);
+
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+
+    const format = (num, unit) => {
+      const amount = Math.max(1, Math.floor(num));
+      const label = amount === 1 ? unit : `${unit}s`;
+      if (future) return `en ${amount} ${label}`;
+      return `hace ${amount} ${label}`;
+    };
+
+    if (absMs < minute) return future ? "en instantes" : "hace instantes";
+    if (absMs < hour) return format(absMs / minute, "minuto");
+    if (absMs < day) return format(absMs / hour, "hora");
+    if (absMs < 7 * day) return format(absMs / day, "día");
+
+    return date.toLocaleString("es-CO", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const normalizePostsForGallery = (items) => {
+    const list = Array.isArray(items) ? [...items] : [];
+    return list
+      .filter((post) => {
+        const mediaKind = String(post?.media_kind || "").toLowerCase();
+        const mediaId = Number(post?.media_id || 0);
+        const mediaUrl = String(post?.media_url || "").trim();
+        return mediaKind === "image" && mediaId > 0 && !!mediaUrl;
+      })
+      .sort((a, b) => {
+        const aTs = Date.parse(a?.created_at || "");
+        const bTs = Date.parse(b?.created_at || "");
+        const aSafe = Number.isNaN(aTs) ? 0 : aTs;
+        const bSafe = Number.isNaN(bTs) ? 0 : bTs;
+        return bSafe - aSafe;
+      })
+      .slice(0, RECENT_LIMIT);
+  };
+
+  const closePostViewer = () => {
+    showPostViewer = false;
+    viewerPostIndex = -1;
+    viewerComments = [];
+    viewerCommentsLoading = false;
+    viewerCommentText = "";
+    viewerCommentSubmitting = false;
+    viewerActionLoading = false;
+    viewerLoadedPostId = 0;
+    clearViewerStatus();
+  };
+
+  const syncViewerAfterPostRefresh = ({ preferredPostId = 0 } = {}) => {
+    if (!showPostViewer) return;
+
+    if (!recentImagePosts.length) {
+      closePostViewer();
+      return;
+    }
+
+    const preferred = Number(preferredPostId || 0);
+    if (preferred > 0) {
+      const preferredIndex = recentImagePosts.findIndex(
+        (post) => Number(post?.id || 0) === preferred
+      );
+      if (preferredIndex >= 0) {
+        viewerPostIndex = preferredIndex;
+        return;
+      }
+    }
+
+    if (viewerPostIndex < 0) {
+      viewerPostIndex = 0;
+      return;
+    }
+
+    if (viewerPostIndex >= recentImagePosts.length) {
+      viewerPostIndex = recentImagePosts.length - 1;
+    }
+  };
+
+  const applyRecentPosts = ({ items, preferredViewerPostId = 0 } = {}) => {
+    recentImagePosts = normalizePostsForGallery(items);
+    syncViewerAfterPostRefresh({ preferredPostId: preferredViewerPostId });
+
+    const activeViewerPostId = Number(
+      showPostViewer &&
+        viewerPostIndex >= 0 &&
+        viewerPostIndex < recentImagePosts.length
+        ? recentImagePosts[viewerPostIndex]?.id || 0
+        : 0
+    );
+
+    if (
+      showPostViewer &&
+      activeViewerPostId > 0 &&
+      activeViewerPostId !== Number(viewerLoadedPostId || 0)
+    ) {
+      void loadViewerCommentsForPost(activeViewerPostId);
+    }
+  };
+
+  const loadViewerCommentsForPost = async (postId) => {
+    const normalizedPostId = Number(postId || 0);
+    if (!normalizedPostId) {
+      viewerComments = [];
+      viewerLoadedPostId = 0;
+      return;
+    }
+
+    viewerCommentsLoading = true;
+    try {
+      const response = await apiFetch(`/posts/${normalizedPostId}/comments?limit=200`);
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudieron cargar los comentarios."));
+      }
+
+      viewerComments = Array.isArray(data) ? data : [];
+      viewerLoadedPostId = normalizedPostId;
+    } catch (error) {
+      viewerComments = [];
+      viewerLoadedPostId = 0;
+      setViewerStatus(readUnknownError(error, "No se pudieron cargar los comentarios."), true);
+    } finally {
+      viewerCommentsLoading = false;
+    }
+  };
+
+  const loadRecentPostsOnly = async ({ preferredViewerPostId = 0 } = {}) => {
+    const response = await apiFetch(`/posts/mine?limit=${POSTS_FETCH_LIMIT}`);
+    const data = await parseResponseJson(response);
+    if (!response.ok) {
+      throw new Error(
+        readApiError(data, "No se pudieron cargar las publicaciones de imagen.")
+      );
+    }
+
+    applyRecentPosts({ items: data, preferredViewerPostId });
+  };
+
+  const setAlbumModalStatus = (message, isError = false) => {
+    albumModalStatus = String(message || "").trim();
+    albumModalStatusIsError = Boolean(isError);
+  };
+
+  const clearAlbumFiles = () => {
+    for (const item of albumFiles) {
+      if (item?.preview_url && String(item.preview_url).startsWith("blob:")) {
+        URL.revokeObjectURL(item.preview_url);
+      }
+    }
+    albumFiles = [];
+  };
+
+  const closeCreateAlbumModal = () => {
+    showCreateAlbumModal = false;
+    albumName = "";
+    albumVisibility = "public";
+    albumPublishing = false;
+    setAlbumModalStatus("");
+    clearAlbumFiles();
+    const input = document.getElementById("galleryAlbumFilesInput");
+    if (input) input.value = "";
+  };
+
+  const openCreateAlbumModal = () => {
+    showCreateAlbumModal = true;
+    albumName = "";
+    albumVisibility = "public";
+    albumPublishing = false;
+    setAlbumModalStatus("");
+    clearAlbumFiles();
+  };
+
+  const normalizeAlbumFileKind = (file) => {
+    const mime = String(file?.type || "").toLowerCase();
+    if (mime.startsWith("video/")) return "video";
+    if (mime.startsWith("image/")) return "image";
+    return "";
+  };
+
+  const handleAlbumFilesChange = (event) => {
+    const files = Array.from(event?.target?.files || []);
+    clearAlbumFiles();
+
+    const next = [];
+    let ignored = 0;
+    for (const file of files) {
+      const mediaKind = normalizeAlbumFileKind(file);
+      if (!mediaKind) {
+        ignored += 1;
+        continue;
+      }
+
+      next.push({
+        file,
+        media_kind: mediaKind,
+        preview_url: URL.createObjectURL(file),
+        name: file.name || "archivo",
+      });
+    }
+    albumFiles = next;
+
+    if (ignored > 0) {
+      setAlbumModalStatus(
+        `${ignored} archivo(s) ignorado(s). Solo se permiten imágenes y videos.`,
+        true
+      );
+      return;
+    }
+
+    setAlbumModalStatus("");
+  };
+
+  const loadFolderDetail = async (folderId) => {
+    const normalizedFolderId = Number(folderId || 0);
+    if (!normalizedFolderId) {
+      activeFolderDetail = null;
+      return;
+    }
+
+    folderDetailLoading = true;
+    try {
+      const response = await apiFetch(`/gallery/mine/folders/${normalizedFolderId}`);
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo cargar el álbum."));
+      }
+
+      activeFolderDetail = data;
+      renameFolderName = String(data?.name || "");
+    } catch (error) {
+      activeFolderDetail = null;
+      setStatus(readUnknownError(error, "No se pudo cargar el álbum."), true);
+    } finally {
+      folderDetailLoading = false;
+    }
+  };
+
+  const loadGallery = async ({
+    preserveFolder = true,
+    preferredViewerPostId = 0,
+    preferredAlbumId = 0,
+  } = {}) => {
+    isLoading = true;
+    loadError = "";
+
+    try {
+      const postsResponse = await apiFetch(`/posts/mine?limit=${POSTS_FETCH_LIMIT}`);
+      const postsData = await parseResponseJson(postsResponse);
+      if (!postsResponse.ok) {
+        throw new Error(
+          readApiError(postsData, "No se pudieron cargar tus publicaciones.")
+        );
+      }
+      applyRecentPosts({ items: postsData, preferredViewerPostId });
+
+      const galleryResponse = await apiFetch(`/gallery/mine?recent_limit=${RECENT_LIMIT}`);
+      const galleryData = await parseResponseJson(galleryResponse);
+      if (!galleryResponse.ok) {
+        folders = [];
+        activeFolderId = "";
+        activeFolderDetail = null;
+        renameFolderName = "";
+        setStatus(
+          readApiError(
+            galleryData,
+            "No se pudieron cargar los álbumes. Tus publicaciones siguen disponibles."
+          ),
+          true
+        );
+        return;
+      }
+
+      folders = Array.isArray(galleryData?.folders) ? galleryData.folders : [];
+      if (!folders.length) {
+        activeFolderId = "";
+        activeFolderDetail = null;
+        renameFolderName = "";
+        return;
+      }
+
+      const preferredFromQuery = String(preferredAlbumId || "").trim();
+      const hasPreferredFromQuery = preferredFromQuery
+        ? folders.some((folder) => String(folder.id) === preferredFromQuery)
+        : false;
+
+      if (hasPreferredFromQuery) {
+        activeFolderId = preferredFromQuery;
+      } else {
+        const preferredId = preserveFolder ? String(activeFolderId || "") : "";
+        const hasPreferred = preferredId
+          ? folders.some((folder) => String(folder.id) === preferredId)
+          : false;
+        activeFolderId = hasPreferred ? preferredId : String(folders[0].id);
+      }
+      await loadFolderDetail(activeFolderId);
+    } catch (error) {
+      loadError = readUnknownError(error, "No se pudo cargar la galería.");
+      activeFolderId = "";
+      activeFolderDetail = null;
+    } finally {
+      isLoading = false;
+    }
+  };
+
+  const selectFolder = async (folderId) => {
+    activeFolderId = String(folderId || "");
+    await loadFolderDetail(activeFolderId);
+  };
+
+  const uploadAlbumMediaFile = async (file, visibilityValue) => {
+    const mediaKind = normalizeAlbumFileKind(file);
+    if (!mediaKind) {
+      throw new Error("Solo se permiten imágenes y videos.");
+    }
+
+    if (mediaKind === "image") {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("visibility", String(visibilityValue || "public").toLowerCase());
+
+      const uploadRes = await apiFetch("/media/upload/direct", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await parseResponseJson(uploadRes);
+      if (!uploadRes.ok) {
+        throw new Error(readApiError(uploadData, "No se pudo subir una imagen."));
+      }
+
+      const mediaId = Number(uploadData?.media_id || 0);
+      if (!mediaId) {
+        throw new Error("No se recibió el identificador de la media subida.");
+      }
+      return mediaId;
+    }
+
+    const presignRes = await apiFetch("/media/presign/upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        filename: file.name || "video.mp4",
+        content_type: file.type || "video/mp4",
+        size_bytes: Number(file.size || 0),
+        visibility: String(visibilityValue || "public").toLowerCase(),
+      }),
+    });
+    const presignData = await parseResponseJson(presignRes);
+    if (!presignRes.ok) {
+      throw new Error(readApiError(presignData, "No se pudo preparar la carga del video."));
+    }
+
+    const mediaId = Number(presignData?.media_id || 0);
+    if (!mediaId) {
+      throw new Error("No se recibió un media_id válido para el video.");
+    }
+
+    const proxyForm = new FormData();
+    proxyForm.append("media_id", String(mediaId));
+    proxyForm.append("file", file);
+    const proxyRes = await apiFetch("/media/upload/proxy", {
+      method: "POST",
+      body: proxyForm,
+    });
+    const proxyData = await parseResponseJson(proxyRes);
+    if (!proxyRes.ok) {
+      throw new Error(readApiError(proxyData, "No se pudo subir el video."));
+    }
+
+    return mediaId;
+  };
+
+  const publishAlbum = async () => {
+    if (albumPublishing) return;
+
+    const normalizedName = String(albumName || "").trim();
+    if (!normalizedName) {
+      setAlbumModalStatus("Debes escribir el nombre del álbum.", true);
+      return;
+    }
+    if (!albumFiles.length) {
+      setAlbumModalStatus("Adjunta al menos una imagen o video.", true);
+      return;
+    }
+
+    albumPublishing = true;
+    setAlbumModalStatus("Subiendo contenido del álbum...");
+
+    try {
+      const uploadedMediaIds = [];
+      for (const albumFile of albumFiles) {
+        const mediaId = await uploadAlbumMediaFile(albumFile.file, albumVisibility);
+        uploadedMediaIds.push(mediaId);
+      }
+
+      setAlbumModalStatus("Publicando álbum...");
+      const response = await apiFetch("/gallery/mine/albums/publish", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: normalizedName,
+          visibility: albumVisibility,
+          media_ids: uploadedMediaIds,
+        }),
+      });
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo publicar el álbum."));
+      }
+
+      const albumId = Number(data?.album?.id || 0);
+      closeCreateAlbumModal();
+      setStatus("Álbum publicado correctamente.");
+      await loadGallery({
+        preserveFolder: true,
+        preferredViewerPostId: 0,
+      });
+      if (albumId > 0) {
+        activeFolderId = String(albumId);
+        await loadFolderDetail(activeFolderId);
+      }
+    } catch (error) {
+      setAlbumModalStatus(readUnknownError(error, "No se pudo publicar el álbum."), true);
+    } finally {
+      albumPublishing = false;
+    }
+  };
+
+  const renameFolder = async () => {
+    if (renameLoading) return;
+
+    const normalizedFolderId = Number(activeFolderId || 0);
+    if (!normalizedFolderId) {
+      setStatus("Selecciona un álbum para renombrar.", true);
+      return;
+    }
+
+    const nextName = String(renameFolderName || "").trim();
+    if (!nextName) {
+      setStatus("Debes escribir un nuevo nombre.", true);
+      return;
+    }
+
+    renameLoading = true;
+    try {
+      const response = await apiFetch(`/gallery/mine/folders/${normalizedFolderId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: nextName }),
+      });
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo renombrar el álbum."));
+      }
+
+      setStatus("Álbum renombrado correctamente.");
+      await loadGallery({ preserveFolder: true });
+    } catch (error) {
+      setStatus(readUnknownError(error, "No se pudo renombrar el álbum."), true);
+    } finally {
+      renameLoading = false;
+    }
+  };
+
+  const deleteFolder = async () => {
+    if (deletingFolder) return;
+
+    const normalizedFolderId = Number(activeFolderId || 0);
+    if (!normalizedFolderId) {
+      setStatus("Selecciona un álbum para eliminar.", true);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "¿Deseas eliminar este álbum? Sus asociaciones de media se perderán."
+    );
+    if (!confirmed) return;
+
+    deletingFolder = true;
+    try {
+      const response = await apiFetch(`/gallery/mine/folders/${normalizedFolderId}`, {
+        method: "DELETE",
+      });
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo eliminar el álbum."));
+      }
+
+      activeFolderId = "";
+      activeFolderDetail = null;
+      renameFolderName = "";
+      setStatus("Álbum eliminado.");
+      await loadGallery({ preserveFolder: false });
+    } catch (error) {
+      setStatus(readUnknownError(error, "No se pudo eliminar el álbum."), true);
+    } finally {
+      deletingFolder = false;
+    }
+  };
+
+  const removeImageFromFolder = async (mediaId) => {
+    const normalizedFolderId = Number(activeFolderId || 0);
+    const normalizedMediaId = Number(mediaId || 0);
+    if (!normalizedFolderId || !normalizedMediaId) return;
+
+    try {
+      const response = await apiFetch(
+        `/gallery/mine/folders/${normalizedFolderId}/items/${normalizedMediaId}`,
+        {
+          method: "DELETE",
+        }
+      );
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(
+          readApiError(data, "No se pudo quitar la media del álbum.")
+        );
+      }
+
+      setStatus("Media retirada del álbum.");
+      await loadGallery({ preserveFolder: true });
+    } catch (error) {
+      setStatus(
+        readUnknownError(error, "No se pudo quitar la media del álbum."),
+        true
+      );
+    }
+  };
+
+  const handleRenameFolderSubmit = async () => {
+    await renameFolder();
+  };
+
+  const openPostViewerAt = async (index) => {
+    const normalizedIndex = Number(index);
+    if (
+      !Number.isFinite(normalizedIndex) ||
+      normalizedIndex < 0 ||
+      normalizedIndex >= recentImagePosts.length
+    ) {
+      return;
+    }
+
+    showPostViewer = true;
+    viewerPostIndex = normalizedIndex;
+    viewerComments = [];
+    viewerCommentText = "";
+    viewerLoadedPostId = 0;
+    clearViewerStatus();
+
+    const postId = Number(recentImagePosts[normalizedIndex]?.id || 0);
+    await loadViewerCommentsForPost(postId);
+  };
+
+  const goViewerPrev = async () => {
+    if (!viewerCanPrev) return;
+    const nextIndex = viewerPostIndex - 1;
+    viewerPostIndex = nextIndex;
+    viewerCommentText = "";
+    clearViewerStatus();
+
+    const postId = Number(recentImagePosts[nextIndex]?.id || 0);
+    await loadViewerCommentsForPost(postId);
+  };
+
+  const goViewerNext = async () => {
+    if (!viewerCanNext) return;
+    const nextIndex = viewerPostIndex + 1;
+    viewerPostIndex = nextIndex;
+    viewerCommentText = "";
+    clearViewerStatus();
+
+    const postId = Number(recentImagePosts[nextIndex]?.id || 0);
+    await loadViewerCommentsForPost(postId);
+  };
+
+  const focusViewerCommentInput = () => {
+    const input = document.getElementById("galleryViewerCommentInput");
+    input?.focus();
+  };
+
+  const donateViewerPostStar = async () => {
+    const postId = Number(currentViewerPost?.id || 0);
+    if (!postId || viewerActionLoading) return;
+
+    if (currentViewerPost?.is_mine) {
+      setViewerStatus("No puedes donarte estrellas a ti mismo.", true);
+      return;
+    }
+
+    if (currentViewerPost?.starred_by_me) {
+      setViewerStatus("Ya donaste una estrella a esta publicación.", true);
+      return;
+    }
+
+    viewerActionLoading = true;
+    clearViewerStatus();
+    try {
+      const response = await apiFetch(`/posts/${postId}/stars`, {
+        method: "POST",
+      });
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo donar la estrella."));
+      }
+
+      await loadRecentPostsOnly({ preferredViewerPostId: postId });
+      setViewerStatus("Estrella donada. Esta acción es irreversible.");
+    } catch (error) {
+      setViewerStatus(readUnknownError(error, "No se pudo donar la estrella."), true);
+    } finally {
+      viewerActionLoading = false;
+    }
+  };
+
+  const shareViewerPost = async () => {
+    const postId = Number(currentViewerPost?.id || 0);
+    if (!postId || viewerActionLoading) return;
+
+    viewerActionLoading = true;
+    clearViewerStatus();
+
+    try {
+      const response = await apiFetch(`/posts/${postId}/share`, {
+        method: "POST",
+      });
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo compartir la publicación."));
+      }
+
+      const shareUrlObject = new URL("/home_user.html", window.location.origin);
+      shareUrlObject.searchParams.set("post", String(postId));
+      const shareUrl = shareUrlObject.toString();
+
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            title: "Kiadez",
+            text: "Mira esta publicación",
+            url: shareUrl,
+          });
+        } else if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(shareUrl);
+        }
+      } catch (shareError) {
+        if (shareError?.name !== "AbortError") {
+          throw shareError;
+        }
+      }
+
+      await loadRecentPostsOnly({ preferredViewerPostId: postId });
+      setViewerStatus("Publicación compartida.");
+    } catch (error) {
+      setViewerStatus(
+        readUnknownError(error, "No se pudo compartir la publicación."),
+        true
+      );
+    } finally {
+      viewerActionLoading = false;
+    }
+  };
+
+  const submitViewerComment = async () => {
+    const postId = Number(currentViewerPost?.id || 0);
+    if (!postId || viewerCommentSubmitting) return;
+
+    const text = String(viewerCommentText || "").trim();
+    if (!text) {
+      setViewerStatus("Escribe un comentario antes de enviar.", true);
+      return;
+    }
+
+    viewerCommentSubmitting = true;
+    clearViewerStatus();
+
+    try {
+      const response = await apiFetch(`/posts/${postId}/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo guardar el comentario."));
+      }
+
+      viewerCommentText = "";
+      await Promise.all([
+        loadViewerCommentsForPost(postId),
+        loadRecentPostsOnly({ preferredViewerPostId: postId }),
+      ]);
+      setViewerStatus("Comentario publicado.");
+    } catch (error) {
+      setViewerStatus(
+        readUnknownError(error, "No se pudo guardar el comentario."),
+        true
+      );
+    } finally {
+      viewerCommentSubmitting = false;
+    }
+  };
+
+  const handleGlobalKeydown = (event) => {
+    if (!showPostViewer) return;
+
+    if (event.key === "Escape") {
+      closePostViewer();
+      return;
+    }
+
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      void goViewerPrev();
+      return;
+    }
+
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      void goViewerNext();
+    }
+  };
+
+  $: currentViewerPost =
+    showPostViewer &&
+    viewerPostIndex >= 0 &&
+    viewerPostIndex < recentImagePosts.length
+      ? recentImagePosts[viewerPostIndex]
+      : null;
+
+  $: viewerCanPrev = showPostViewer && viewerPostIndex > 0;
+  $: viewerCanNext =
+    showPostViewer && viewerPostIndex >= 0 && viewerPostIndex < recentImagePosts.length - 1;
 
   onMount(() => {
     initPurposeCoverModule();
     void syncProfileStarsTotal("galleryStarsTotal");
+    void syncTopbarAvatar();
+    const query = new URLSearchParams(window.location.search);
+    const preferredAlbumId = Number(query.get("album") || 0);
+    void loadGallery({
+      preferredAlbumId: Number.isFinite(preferredAlbumId) ? preferredAlbumId : 0,
+    });
+
+    window.addEventListener("keydown", handleGlobalKeydown);
+
+    return () => {
+      window.removeEventListener("keydown", handleGlobalKeydown);
+      clearAlbumFiles();
+    };
   });
 </script>
 
@@ -17,7 +957,7 @@
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
-<div class="page-background page-background-user home-background">
+<div class="page-background page-background-user home-background gallery-page">
   <header class="feed-topbar">
     <div class="feed-topbar-zone feed-topbar-left">
       <a class="topbar-logo" href="/feed.html" aria-label="Kiadez">
@@ -39,7 +979,7 @@
     <div class="feed-topbar-zone feed-topbar-right">
       <details class="topbar-dropdown">
         <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+          <img src="/assets/avatar-default.jpg" alt="Perfil de usuario" />
         </summary>
         <div class="dropdown-menu" role="menu">
           <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
@@ -63,12 +1003,14 @@
           <a href="/gallery.html" role="menuitem">Galería</a>
           <a href="/calendar.html" role="menuitem">Calendario</a>
           <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+          <a href="/messages.html" role="menuitem">Mensajes</a>
         </div>
       </details>
     </div>
   </header>
+
   <main class="user-home">
-  <section class="cover" id="cover">
+    <section class="cover" id="cover">
       <div class="cover-media" id="coverMedia">
         <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
 
@@ -103,7 +1045,7 @@
       </div>
     </section>
 
-    <div class="home-body">
+    <div class="home-body gallery-body">
       <nav class="profile-nav" aria-label="Navegación de perfil">
         <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
         <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
@@ -113,65 +1055,406 @@
 
         <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
         <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
+        <a class="nav-pill is-active" href="/gallery.html" title="Galería">Galería</a>
         <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
         <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
+        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
       </nav>
 
-      <section class="panel">
-        <div class="panel-head">
-          <h2 class="panel-title">Galería</h2>
-          <span class="panel-badge">Últimas publicaciones</span>
-        </div>
-        <p class="panel-muted">Un vistazo a tus recuerdos más luminosos.</p>
-      </section>
+      {#if isLoading}
+        <section class="panel">
+          <p class="panel-muted">Cargando tu galería...</p>
+        </section>
+      {:else if loadError}
+        <section class="panel">
+          <p class="posts-status posts-status-error">{loadError}</p>
+          <button class="btn btn-outline" type="button" on:click={() => loadGallery({ preserveFolder: true })}>
+            Reintentar
+          </button>
+        </section>
+      {:else}
+        <section class="panel">
+          <div class="panel-head gallery-head">
+            <div>
+              <h2 class="panel-title">Últimas imágenes</h2>
+            </div>
+          </div>
 
-      <section class="panel">
-        <div class="badge-grid">
-          <div class="badge-item is-unlocked">
-            <button class="badge-figure" type="button">
-              <img src="/css/star.webp" alt="Momento estelar" />
-              <span class="badge-label">Momento estelar</span>
-            </button>
-            <div class="badge-body">
-              <div class="badge-name">Noche de revelación</div>
-              <div class="badge-desc">Imagen · 2 días</div>
+          {#if statusMessage}
+            <p class={`posts-status ${statusIsError ? "posts-status-error" : ""}`} aria-live="polite">
+              {statusMessage}
+            </p>
+          {/if}
+
+          {#if recentImagePosts.length === 0}
+            <p class="panel-muted">
+              Aún no tienes publicaciones con imagen.
+            </p>
+          {:else}
+            <div class="gallery-recent-grid" aria-label="Publicaciones con imagen">
+              {#each recentImagePosts as post, index (post.id)}
+                <article class="gallery-recent-item">
+                  <button
+                    class="gallery-recent-open"
+                    type="button"
+                    title="Abrir publicación"
+                    on:click={() => openPostViewerAt(index)}
+                  >
+                    <img src={post.media_url} alt={`Publicación con imagen ${index + 1}`} loading="lazy" />
+                  </button>
+                </article>
+              {/each}
+            </div>
+          {/if}
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h3 class="panel-title">Álbumes</h3>
+            <span class="panel-badge">{folders.length} álbumes</span>
+          </div>
+
+          <div class="gallery-folders-layout">
+            <aside class="gallery-folders-sidebar">
+              <button class="gallery-album-create-card" type="button" on:click={openCreateAlbumModal}>
+                <span class="gallery-album-create-plus">+</span>
+                <span>Crear álbum</span>
+              </button>
+
+              {#if folders.length === 0}
+                <p class="panel-muted">Aún no tienes álbumes. Crea el primero para publicar contenido agrupado.</p>
+              {:else}
+                <div class="gallery-folder-list" aria-label="Lista de álbumes">
+                  {#each folders as folder (folder.id)}
+                    <button
+                      class={`gallery-folder-item ${String(folder.id) === String(activeFolderId) ? "is-active" : ""}`}
+                      type="button"
+                      on:click={() => selectFolder(folder.id)}
+                    >
+                      <strong>{folder.name}</strong>
+                      <span>
+                        {folder.images_count} archivo(s) · {folder.visibility === "private" ? "Privado" : "Público"}
+                      </span>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </aside>
+
+            <div class="gallery-folder-detail">
+              {#if !activeFolderId}
+                <div class="gallery-folder-placeholder">
+                  <p class="panel-muted">Selecciona o crea un álbum para ver su contenido.</p>
+                </div>
+              {:else if folderDetailLoading}
+                <div class="gallery-folder-placeholder">
+                  <p class="panel-muted">Cargando álbum...</p>
+                </div>
+              {:else if activeFolderDetail}
+                <div class="gallery-folder-head">
+                  <div>
+                    <h4>{activeFolderDetail.name}</h4>
+                    <p>
+                      {activeFolderDetail.images_count} archivo(s) en este álbum ·
+                      {activeFolderDetail.visibility === "private" ? "Privado" : "Público"}
+                    </p>
+                  </div>
+                </div>
+
+                <form class="gallery-rename-form" on:submit|preventDefault={handleRenameFolderSubmit}>
+                  <input
+                    class="modal-input"
+                    type="text"
+                    maxlength="120"
+                    placeholder="Nombre del álbum"
+                    bind:value={renameFolderName}
+                  />
+                  <button class="btn btn-outline" type="submit" disabled={renameLoading}>
+                    {renameLoading ? "Guardando..." : "Renombrar"}
+                  </button>
+                  <button
+                    class="btn btn-outline gallery-delete-folder-btn"
+                    type="button"
+                    on:click={deleteFolder}
+                    disabled={deletingFolder}
+                  >
+                    {deletingFolder ? "Eliminando..." : "Eliminar álbum"}
+                  </button>
+                </form>
+
+                {#if !activeFolderDetail.images || activeFolderDetail.images.length === 0}
+                  <p class="panel-muted">
+                    Este álbum está vacío.
+                  </p>
+                {:else}
+                  <div class="gallery-folder-grid" aria-label="Archivos del álbum">
+                    {#each activeFolderDetail.images as image (image.media_id)}
+                      <article class="gallery-folder-card">
+                        {#if image.media_kind === "video"}
+                          <video src={image.url} controls preload="metadata">
+                            <track kind="captions" />
+                          </video>
+                        {:else}
+                          <img src={image.url} alt={`Media ${image.media_id}`} loading="lazy" />
+                        {/if}
+                        <button
+                          class="gallery-folder-remove"
+                          type="button"
+                          title="Quitar del álbum"
+                          on:click={() => removeImageFromFolder(image.media_id)}
+                        >
+                          ✕
+                        </button>
+                      </article>
+                    {/each}
+                  </div>
+                {/if}
+              {:else}
+                <div class="gallery-folder-placeholder">
+                  <p class="panel-muted">No se pudo cargar el contenido del álbum seleccionado.</p>
+                </div>
+              {/if}
             </div>
           </div>
-          <div class="badge-item is-unlocked">
-            <button class="badge-figure" type="button">
-              <img src="/css/astral.webp" alt="Viaje astral" />
-              <span class="badge-label">Viaje astral</span>
-            </button>
-            <div class="badge-body">
-              <div class="badge-name">Testimonio del camino</div>
-              <div class="badge-desc">Video · 5 días</div>
-            </div>
-          </div>
-          <div class="badge-item is-unlocked">
-            <button class="badge-figure" type="button">
-              <img src="/css/fundstar.webp" alt="Fondo común" />
-              <span class="badge-label">Fondo común</span>
-            </button>
-            <div class="badge-body">
-              <div class="badge-name">Donación significativa</div>
-              <div class="badge-desc">Imagen · 1 semana</div>
-            </div>
-          </div>
-          <div class="badge-item is-unlocked">
-            <button class="badge-figure" type="button">
-              <img src="/css/star2.webp" alt="Ritual" />
-              <span class="badge-label">Ritual</span>
-            </button>
-            <div class="badge-body">
-              <div class="badge-name">Ritual de propósito</div>
-              <div class="badge-desc">Imagen · 2 semanas</div>
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
+      {/if}
     </div>
   </main>
+
+  {#if showCreateAlbumModal}
+    <div class="modal-overlay gallery-album-modal-overlay" aria-hidden="false">
+      <button
+        class="gallery-album-modal-backdrop"
+        type="button"
+        aria-label="Cerrar creación de álbum"
+        on:click={closeCreateAlbumModal}
+      ></button>
+      <div class="modal gallery-album-modal" role="dialog" aria-modal="true" aria-label="Crear álbum">
+        <div class="modal-head">
+          <h3>Crear álbum</h3>
+          <button class="modal-close" type="button" on:click={closeCreateAlbumModal}>✕</button>
+        </div>
+
+        <div class="modal-body gallery-album-modal-body">
+          <label class="modal-label" for="galleryAlbumNameInput">Nombre del álbum</label>
+          <input
+            id="galleryAlbumNameInput"
+            class="modal-input"
+            type="text"
+            maxlength="120"
+            placeholder="Ejemplo: Viaje de verano"
+            bind:value={albumName}
+          />
+
+          <label class="modal-label" for="galleryAlbumVisibilitySelect">Visibilidad</label>
+          <select
+            id="galleryAlbumVisibilitySelect"
+            class="modal-select"
+            bind:value={albumVisibility}
+          >
+            <option value="public">Público</option>
+            <option value="private">Privado</option>
+          </select>
+
+          <label class="modal-label" for="galleryAlbumFilesInput">
+            Subir contenido: fotos/videos 🖼️
+          </label>
+          <input
+            id="galleryAlbumFilesInput"
+            class="modal-input"
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            on:change={handleAlbumFilesChange}
+            disabled={albumPublishing}
+          />
+
+          <div class="gallery-album-preview-head">
+            <strong>Previsualización</strong>
+            <span>{albumFiles.length} archivo(s)</span>
+          </div>
+
+          {#if albumFiles.length === 0}
+            <p class="panel-muted">Aún no has seleccionado archivos para este álbum.</p>
+          {:else}
+            <div class="gallery-album-preview-grid" aria-label="Previsualización del álbum">
+              {#each albumFiles as item, index (`${item.name}-${index}`)}
+                <article class="gallery-album-preview-card">
+                  {#if item.media_kind === "video"}
+                    <video src={item.preview_url} controls preload="metadata">
+                      <track kind="captions" />
+                    </video>
+                  {:else}
+                    <img src={item.preview_url} alt={`Archivo ${index + 1}`} loading="lazy" />
+                  {/if}
+                  <p>{item.name}</p>
+                </article>
+              {/each}
+            </div>
+          {/if}
+
+          {#if albumModalStatus}
+            <p class={`posts-status ${albumModalStatusIsError ? "posts-status-error" : ""}`} aria-live="polite">
+              {albumModalStatus}
+            </p>
+          {/if}
+        </div>
+
+        <div class="modal-actions">
+          <button
+            class="btn btn-outline btn-compact"
+            type="button"
+            on:click={closeCreateAlbumModal}
+            disabled={albumPublishing}
+          >
+            Cancelar
+          </button>
+          <button
+            class="btn btn-primary btn-compact"
+            type="button"
+            on:click={publishAlbum}
+            disabled={albumPublishing}
+          >
+            {albumPublishing ? "Publicando..." : "Publicar álbum"}
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if showPostViewer && currentViewerPost}
+    <div class="modal-overlay gallery-post-viewer-overlay" aria-hidden="false">
+      <button class="gallery-post-viewer-backdrop" type="button" aria-label="Cerrar publicación" on:click={closePostViewer}></button>
+      <div class="modal gallery-post-viewer" role="dialog" aria-modal="true" aria-label="Publicación con imagen">
+        <div class="modal-head">
+          <h3>Publicación con imagen</h3>
+          <button class="modal-close" type="button" on:click={closePostViewer}>✕</button>
+        </div>
+
+        <div class="gallery-post-viewer-layout">
+          <section class="gallery-post-viewer-media">
+            <button
+              class="gallery-post-viewer-nav gallery-post-viewer-nav-prev"
+              type="button"
+              on:click={() => void goViewerPrev()}
+              disabled={!viewerCanPrev}
+              aria-label="Imagen anterior"
+            >
+              ‹
+            </button>
+
+            <img src={currentViewerPost.media_url} alt="Publicación en vista completa" loading="eager" />
+
+            <button
+              class="gallery-post-viewer-nav gallery-post-viewer-nav-next"
+              type="button"
+              on:click={() => void goViewerNext()}
+              disabled={!viewerCanNext}
+              aria-label="Siguiente imagen"
+            >
+              ›
+            </button>
+
+            <p class="gallery-post-viewer-counter">{viewerPostIndex + 1} de {recentImagePosts.length}</p>
+          </section>
+
+          <aside class="gallery-post-viewer-side">
+            <header class="gallery-post-viewer-author">
+              <strong>{currentViewerPost.author?.name || "Usuario"}</strong>
+              <span>{relativeTime(currentViewerPost.created_at)}</span>
+            </header>
+
+            {#if currentViewerPost.text}
+              <p class="gallery-post-viewer-text">{currentViewerPost.text}</p>
+            {/if}
+
+            <p class="post-warning">La donación de estrella es irreversible.</p>
+
+            <div class="post-actions gallery-post-viewer-actions">
+              <button
+                class="post-btn"
+                type="button"
+                on:click={donateViewerPostStar}
+                disabled={
+                  viewerActionLoading ||
+                  Boolean(currentViewerPost?.is_mine) ||
+                  Boolean(currentViewerPost?.starred_by_me)
+                }
+              >
+                {#if currentViewerPost?.starred_by_me}
+                  ⭐ Estrella donada ({currentViewerPost.star_count})
+                {:else}
+                  ⭐ Donar estrella ({currentViewerPost.star_count})
+                {/if}
+              </button>
+
+              <button class="post-btn" type="button" on:click={focusViewerCommentInput}>
+                💬 Comentar ({currentViewerPost.comment_count})
+              </button>
+
+              <button
+                class="post-btn"
+                type="button"
+                on:click={shareViewerPost}
+                disabled={viewerActionLoading}
+              >
+                🔁 Compartir ({currentViewerPost.share_count})
+              </button>
+            </div>
+
+            {#if viewerStatusMessage}
+              <p class={`posts-status ${viewerStatusIsError ? "posts-status-error" : ""}`} aria-live="polite">
+                {viewerStatusMessage}
+              </p>
+            {/if}
+
+            <section class="gallery-post-viewer-comments">
+              <h4>Comentarios</h4>
+
+              {#if viewerCommentsLoading}
+                <p class="panel-muted">Cargando comentarios...</p>
+              {:else if viewerComments.length === 0}
+                <p class="post-comments-empty">Aún no hay comentarios.</p>
+              {:else}
+                <div class="post-comments-list gallery-viewer-comments-list">
+                  {#each viewerComments as comment (comment.id)}
+                    <article class="post-comment-item">
+                      <div class="post-comment-head">
+                        <strong>{comment.author?.name || "Usuario"}</strong>
+                        <span>{relativeTime(comment.created_at)}</span>
+                      </div>
+                      <p>{@html escapeHtml(comment.text)}</p>
+                    </article>
+                  {/each}
+                </div>
+              {/if}
+            </section>
+
+            <form class="gallery-post-viewer-comment-form" on:submit|preventDefault={submitViewerComment}>
+              <textarea
+                id="galleryViewerCommentInput"
+                class="modal-textarea gallery-post-viewer-comment-input"
+                rows="3"
+                maxlength="1200"
+                placeholder="Escribe un comentario..."
+                bind:value={viewerCommentText}
+              ></textarea>
+              <div class="gallery-post-viewer-comment-actions">
+                <button
+                  class="btn btn-primary btn-compact"
+                  type="submit"
+                  disabled={viewerCommentSubmitting}
+                >
+                  {viewerCommentSubmitting ? "Enviando..." : "Comentar"}
+                </button>
+              </div>
+            </form>
+          </aside>
+        </div>
+      </div>
+    </div>
+  {/if}
+
   <footer class="kiadez-footer">
     <div class="footer-main">
       <div class="footer-column footer-origin">
@@ -225,5 +1508,4 @@
       © 2026 Kiadez — Una red social para cumplir deseos.
     </div>
   </footer>
-
 </div>

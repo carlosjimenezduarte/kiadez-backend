@@ -4,7 +4,18 @@
   import { initPurposeCoverModule } from "../lib/purposeCover";
 
   const API = "http://127.0.0.1:8000";
-  let starsSyncError = "";
+  let achievementsSyncError = "";
+  let weeklySyncError = "";
+  let weeklyLoading = true;
+  let weeklyAchievements = [];
+  const WEEKLY_CATEGORY_LINES = {
+    publication_stars: "Del nacimiento de la luz a la soberanía estelar.",
+    fulfilled_wishes: "El camino de orden, la palabra y la acción.",
+    granted_wishes: "Cuando el servicio se convierte en vocación.",
+    calendar_streak: "La Senda de la Constancia.",
+    donation_stars: "El viaje hacia la unión con el Universo.",
+    guardian_rank: "Hacía la conquista del corazón propio.",
+  };
 
   const getAccessToken = () => localStorage.getItem("access_token") || "";
 
@@ -17,18 +28,20 @@
     }
   };
 
-  const applyBadgeUnlockState = (containerId, achievements) => {
-    const container = document.getElementById(containerId);
-    if (!container || !Array.isArray(achievements)) return;
+  const applyAllBadgeUnlockState = (achievementGroups = []) => {
+    const unlockByImagePath = new Map();
+    achievementGroups
+      .filter((group) => Array.isArray(group))
+      .forEach((group) => {
+        group.forEach((achievement) => {
+          unlockByImagePath.set(
+            normalizeImagePath(achievement?.image_url || ""),
+            Boolean(achievement?.unlocked),
+          );
+        });
+      });
 
-    const unlockByImagePath = new Map(
-      achievements.map((achievement) => [
-        normalizeImagePath(achievement.image_url),
-        Boolean(achievement.unlocked),
-      ]),
-    );
-
-    const badgeItems = container.querySelectorAll(".badge-item");
+    const badgeItems = document.querySelectorAll(".badge-item");
     badgeItems.forEach((badgeItem) => {
       const badgeImage = badgeItem.querySelector("img");
       const imagePath = normalizeImagePath(badgeImage?.getAttribute("src") || "");
@@ -40,8 +53,31 @@
     });
   };
 
-  const loadStarAchievementsState = async () => {
-    starsSyncError = "";
+  const clearAuthAndRedirectToLogin = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    window.location.href = "/login.html";
+  };
+
+  const weekdayLabel = (isoValue) => {
+    const date = new Date(isoValue);
+    if (Number.isNaN(date.getTime())) return "Sin fecha";
+    const text = date.toLocaleDateString("es-CO", { weekday: "long" });
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  };
+
+  const unlockHourLabel = (isoValue) => {
+    const date = new Date(isoValue);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const weeklyCategoryLine = (category) => {
+    return WEEKLY_CATEGORY_LINES[category] || "Logro desbloqueado en esta semana.";
+  };
+
+  const loadAchievementsState = async () => {
+    achievementsSyncError = "";
 
     const token = getAccessToken();
     if (!token) {
@@ -50,7 +86,7 @@
     }
 
     try {
-      const response = await fetch(`${API}/posts/star-pool`, {
+      const response = await fetch(`${API}/achievements/mine/state`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -58,14 +94,12 @@
       const data = await response.json();
 
       if (response.status === 401) {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        window.location.href = "/login.html";
+        clearAuthAndRedirectToLogin();
         return;
       }
 
       if (!response.ok) {
-        throw new Error(data.detail || "No se pudieron sincronizar los logros de estrellas.");
+        throw new Error(data.detail || "No se pudo sincronizar el estado de logros.");
       }
 
       const totalStarsLabel = document.getElementById("achievementsStarsTotal");
@@ -73,16 +107,59 @@
         totalStarsLabel.textContent = Number(data.my_received_stars_total || 0).toLocaleString("es-CO");
       }
 
-      applyBadgeUnlockState("publicationStarsBadges", data.publication_achievements || []);
-      applyBadgeUnlockState("donationStarsBadges", data.donation_achievements || []);
+      applyAllBadgeUnlockState([
+        data.publication_achievements || [],
+        data.fulfilled_wishes_achievements || [],
+        data.granted_wishes_achievements || [],
+        data.calendar_achievements || [],
+        data.donation_achievements || [],
+        data.guardian_rank_achievements || [],
+      ]);
     } catch (error) {
-      starsSyncError = error.message || "No se pudieron sincronizar los logros de estrellas.";
+      achievementsSyncError = error.message || "No se pudo sincronizar el estado de logros.";
+    }
+  };
+
+  const loadWeeklyAchievements = async () => {
+    weeklySyncError = "";
+    weeklyLoading = true;
+    weeklyAchievements = [];
+
+    const token = getAccessToken();
+    if (!token) {
+      weeklyLoading = false;
+      window.location.href = "/login.html";
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API}/achievements/mine/weekly`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        clearAuthAndRedirectToLogin();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(data.detail || "No se pudieron cargar los logros de esta semana.");
+      }
+
+      weeklyAchievements = Array.isArray(data.items) ? data.items : [];
+    } catch (error) {
+      weeklySyncError = error.message || "No se pudieron cargar los logros de esta semana.";
+    } finally {
+      weeklyLoading = false;
     }
   };
 
   onMount(() => {
     initPurposeCoverModule();
-    void loadStarAchievementsState();
+    void Promise.all([loadAchievementsState(), loadWeeklyAchievements()]);
   });
 </script>
 
@@ -139,6 +216,7 @@
             <a href="/gallery.html" role="menuitem">Galería</a>
             <a href="/calendar.html" role="menuitem">Calendario</a>
             <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+          <a href="/messages.html" role="menuitem">Mensajes</a>
           </div>
         </details>
       </div>
@@ -200,6 +278,7 @@
         <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
         <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
         <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
+        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
       </nav>
 
       <!-- =========================
@@ -217,8 +296,8 @@
           </div>
         </header>
 
-        {#if starsSyncError}
-          <p class="achievements-sync-error">{starsSyncError}</p>
+        {#if achievementsSyncError}
+          <p class="achievements-sync-error">{achievementsSyncError}</p>
         {/if}
 
         <article class="panel weekly-achievements">
@@ -230,32 +309,32 @@
             Esta sección se vacía el lunes siguiente y vuelve a revelar los logros de la nueva semana.
           </p>
 
-          <div class="weekly-list">
-            <article class="week-day">
-              <div class="week-day-title">Martes</div>
-              <div class="week-day-line">Del nacimiento de la luz a la soberanía estelar: I. Primer contacto con la Luz
-              </div>
-              <div class="week-achievement">
-                <img class="week-badge" src="/css/AKI/Astral/Star1/1a.webp" alt="Insignia Alumbramiento" />
-                <div class="week-info">
-                  <strong>Alumbramiento</strong>
-                  <span>Has alcanzado 1 estrella por tus publicaciones</span>
-                </div>
-              </div>
-            </article>
-
-            <article class="week-day">
-              <div class="week-day-title">Lunes</div>
-              <div class="week-day-line">El camino de orden, la palabra y la acción: I. Despertar de la acción</div>
-              <div class="week-achievement">
-                <img class="week-badge" src="/css/AKI/Fulfilled/Wish1/1a.webp" alt="Insignia Realizador" />
-                <div class="week-info">
-                  <strong>Realizador</strong>
-                  <span>Has cumplido 1 deseo</span>
-                </div>
-              </div>
-            </article>
-          </div>
+          {#if weeklyLoading}
+            <p class="panel-muted week-empty">Cargando logros semanales...</p>
+          {:else if weeklySyncError}
+            <p class="achievements-sync-error">{weeklySyncError}</p>
+          {:else if weeklyAchievements.length === 0}
+            <p class="panel-muted week-empty">
+              Aún no desbloqueaste logros esta semana. Cuando ocurra, aparecerán aquí.
+            </p>
+          {:else}
+            <div class="weekly-list">
+              {#each weeklyAchievements as achievement (achievement.achievement_key)}
+                <article class="week-day">
+                  <div class="week-day-title">{weekdayLabel(achievement.unlocked_at)}</div>
+                  <div class="week-day-line">{weeklyCategoryLine(achievement.category)}</div>
+                  <div class="week-achievement">
+                    <img class="week-badge" src={achievement.image_url} alt={`Insignia ${achievement.title}`} />
+                    <div class="week-info">
+                      <strong>{achievement.title}</strong>
+                      <span>{achievement.description}</span>
+                      <span class="week-time">{unlockHourLabel(achievement.unlocked_at)}</span>
+                    </div>
+                  </div>
+                </article>
+              {/each}
+            </div>
+          {/if}
         </article>
 
         <section class="badge-collection" aria-label="Insignias">
@@ -637,7 +716,7 @@
           <!-- =========================
            *  DESEOS CUMPLIDOS
            *  ========================= -->
-          <article class="panel badge-group" id="donationStarsBadges">
+          <article class="panel badge-group">
             <div>
               <h3 class="panel-title">El camino de orden, la palabra y la acción</h3>
               <p class="panel-muted">Logros de deseos cumplidos.</p>
@@ -1327,7 +1406,7 @@
           <!-- =========================
            *  DONACIÓN DE ESTRELLAS
            *  ========================= -->
-          <article class="panel badge-group">
+          <article class="panel badge-group" id="donationStarsBadges">
             <div>
               <h3 class="panel-title">El viaje hacia la unión con el Universo</h3>
               <p class="panel-muted">Logros de donación de estrellas.</p>

@@ -93,6 +93,11 @@
     const homeAboutInput = document.getElementById('homeAboutInput');
     const homeAboutWordCounter = document.getElementById('homeAboutWordCounter');
     const homeAboutModalStatus = document.getElementById('homeAboutModalStatus');
+    const homeAboutPanel = document.getElementById('homeAboutPanel');
+    const homeFulfilledPanel = document.getElementById('homeFulfilledPanel');
+    const homePublicPanel = document.getElementById('homePublicPanel');
+    const homeCalendarPanel = document.getElementById('homeCalendarPanel');
+    const homeOraclePanel = document.getElementById('homeOraclePanel');
     const profilePhotoPostOverlay = document.getElementById('profilePhotoPostModalOverlay');
     const closeProfilePhotoPostModal = document.getElementById('closeProfilePhotoPostModal');
     const cancelProfilePhotoPostModal = document.getElementById('cancelProfilePhotoPostModal');
@@ -140,6 +145,15 @@
     const PROFILE_PHOTO_POST_STORAGE_KEY = 'home_profile_photo_post_id';
     const PROFILE_PHOTO_POST_TEXT = 'Actualice mi foto de perfil.';
     const DEFAULT_AVATAR_SRC = '/assets/avatar-default.jpg';
+    const DEFAULT_PROFILE_PRIVACY_VISIBILITY = {
+      public_profile_show_about: true,
+      public_profile_show_fulfilled_wishes: true,
+      public_profile_show_public_wishes: true,
+      public_profile_show_calendar: true,
+      public_profile_show_oracle: true,
+      public_profile_show_personal_posts: true,
+    };
+    let activeProfilePrivacyVisibility = { ...DEFAULT_PROFILE_PRIVACY_VISIBILITY };
 
     const getAccessToken = () => localStorage.getItem('access_token') || '';
 
@@ -254,7 +268,8 @@
 	      public_wishes: '/my-public-whishes.html',
 	      fulfilled_wishes: '/my-fulfilled-whises.html',
 	      calendar: '/calendar.html',
-	      oracle: '/oracle.html'
+	      oracle: '/oracle.html',
+	      biography: '/my-biography.html'
 	    };
 
 	    const syncProfileModuleLinks = () => {
@@ -310,6 +325,64 @@
         localStorage.setItem(PROFILE_PHOTO_POST_STORAGE_KEY, String(profilePhotoPostId));
       } else {
         localStorage.removeItem(PROFILE_PHOTO_POST_STORAGE_KEY);
+      }
+    };
+
+    const normalizeProfilePrivacyVisibility = (value) => ({
+      public_profile_show_about: Boolean(value?.public_profile_show_about ?? true),
+      public_profile_show_fulfilled_wishes: Boolean(value?.public_profile_show_fulfilled_wishes ?? true),
+      public_profile_show_public_wishes: Boolean(value?.public_profile_show_public_wishes ?? true),
+      public_profile_show_calendar: Boolean(value?.public_profile_show_calendar ?? true),
+      public_profile_show_oracle: Boolean(value?.public_profile_show_oracle ?? true),
+      public_profile_show_personal_posts: Boolean(value?.public_profile_show_personal_posts ?? true),
+    });
+
+    const setProfileModuleVisibility = (moduleKey, visible) => {
+      document.querySelectorAll(`[data-profile-module="${moduleKey}"]`).forEach((node) => {
+        node.classList.toggle('hidden', !visible);
+      });
+    };
+
+    const applyProfilePrivacyVisibility = (value, { isOwner = false } = {}) => {
+      if (isOwner) {
+        activeProfilePrivacyVisibility = { ...DEFAULT_PROFILE_PRIVACY_VISIBILITY };
+      } else {
+        activeProfilePrivacyVisibility = normalizeProfilePrivacyVisibility(value);
+      }
+
+      const visibility = activeProfilePrivacyVisibility;
+      homeAboutPanel?.classList.toggle('hidden', !visibility.public_profile_show_about);
+      homeFulfilledPanel?.classList.toggle('hidden', !visibility.public_profile_show_fulfilled_wishes);
+      homePublicPanel?.classList.toggle('hidden', !visibility.public_profile_show_public_wishes);
+      homeCalendarPanel?.classList.toggle('hidden', !visibility.public_profile_show_calendar);
+      homeOraclePanel?.classList.toggle('hidden', !visibility.public_profile_show_oracle);
+
+      setProfileModuleVisibility('fulfilled_wishes', visibility.public_profile_show_fulfilled_wishes);
+      setProfileModuleVisibility('public_wishes', visibility.public_profile_show_public_wishes);
+      setProfileModuleVisibility('calendar', visibility.public_profile_show_calendar);
+      setProfileModuleVisibility('oracle', visibility.public_profile_show_oracle);
+    };
+
+    const loadForeignProfilePrivacyVisibility = async () => {
+      if (isViewingOwnProfile) {
+        applyProfilePrivacyVisibility(DEFAULT_PROFILE_PRIVACY_VISIBILITY, { isOwner: true });
+        return;
+      }
+
+      const profileId = Number(activeProfileUserId);
+      if (!Number.isFinite(profileId) || profileId <= 0) {
+        applyProfilePrivacyVisibility(DEFAULT_PROFILE_PRIVACY_VISIBILITY);
+        return;
+      }
+
+      try {
+        const res = await apiFetch(`/privacy/user/${encodeURIComponent(String(profileId))}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar la privacidad del perfil.');
+        applyProfilePrivacyVisibility(data);
+      } catch (error) {
+        console.error(error);
+        applyProfilePrivacyVisibility(DEFAULT_PROFILE_PRIVACY_VISIBILITY);
       }
     };
 
@@ -483,11 +556,17 @@
         homeAboutTextValue.classList.toggle('hidden', !aboutText);
       }
       if (homeAboutEmptyState) {
+        homeAboutEmptyState.textContent = isViewingOwnProfile
+          ? 'Cuéntale a la comunidad quién eres en pocas palabras.'
+          : 'Este usuario aún no ha compartido su sección "Acerca de mí".';
         homeAboutEmptyState.classList.toggle('hidden', Boolean(aboutText));
       }
     };
 
     const loadHomeAbout = async (userId = null) => {
+      if (!isViewingOwnProfile && !activeProfilePrivacyVisibility.public_profile_show_about) {
+        return;
+      }
       try {
         const endpoint =
           Number.isFinite(Number(userId)) && Number(userId) > 0
@@ -499,6 +578,21 @@
         applyHomeAbout(data);
       } catch (error) {
         console.error(error);
+        if (homeAboutTextValue) {
+          homeAboutTextValue.textContent = '';
+          homeAboutTextValue.classList.add('hidden');
+        }
+        if (homeAboutEmptyState) {
+          const reason = String(error?.message || '').trim();
+          if (!isViewingOwnProfile && reason.toLowerCase().includes('oculta por privacidad')) {
+            homeAboutEmptyState.textContent = 'Este usuario decidió ocultar su sección "Acerca de mí".';
+          } else {
+            homeAboutEmptyState.textContent = isViewingOwnProfile
+              ? 'No se pudo cargar tu sección "Acerca de mí".'
+              : 'No se pudo cargar la sección "Acerca de mí" de este perfil.';
+          }
+          homeAboutEmptyState.classList.remove('hidden');
+        }
       }
     };
 
@@ -922,6 +1016,10 @@
     };
 
 	    const loadHomePublicWishes = async () => {
+	      if (!isViewingOwnProfile && !activeProfilePrivacyVisibility.public_profile_show_public_wishes) {
+	        setHomePublicWishStatus('');
+	        return;
+	      }
 	      try {
 	        const profileId = Number(activeProfileUserId);
 	        const endpoint =
@@ -988,6 +1086,10 @@
     };
 
 	    const loadHomeFulfilledWishes = async () => {
+	      if (!isViewingOwnProfile && !activeProfilePrivacyVisibility.public_profile_show_fulfilled_wishes) {
+	        setHomeFulfilledWishStatus('');
+	        return;
+	      }
 	      try {
 	        const profileId = Number(activeProfileUserId);
 	        const endpoint =
@@ -1031,9 +1133,60 @@
       }
     };
 
+    const buildDisplayPosts = (posts) => {
+      const list = Array.isArray(posts) ? posts : [];
+      const grouped = new Map();
+      const display = [];
+
+      for (const post of list) {
+        const albumId = Number(post?.album_id || 0);
+        if (!albumId) {
+          display.push({ ...post, __kind: 'single' });
+          continue;
+        }
+
+        const existing = grouped.get(albumId);
+        if (!existing) {
+          const albumGroup = {
+            __kind: 'album',
+            album_id: albumId,
+            album_name: String(post?.album_name || '').trim() || `Álbum ${albumId}`,
+            album_items: [post]
+          };
+          grouped.set(albumId, albumGroup);
+          display.push(albumGroup);
+          continue;
+        }
+
+        existing.album_items.push(post);
+      }
+
+      return display.map((item) => {
+        if (item.__kind !== 'album') return item;
+
+        const albumItems = Array.isArray(item.album_items) ? item.album_items : [];
+        const coverPost = albumItems[0] || null;
+        const previewItems = albumItems.slice(0, 4);
+        const extraItems = Math.max(0, albumItems.length - previewItems.length);
+
+        return {
+          ...coverPost,
+          __kind: 'album',
+          album_id: item.album_id,
+          album_name: item.album_name,
+          album_items: albumItems,
+          album_preview_items: previewItems,
+          album_total_items: albumItems.length,
+          album_extra_items: extraItems
+        };
+      });
+    };
+
     const renderPosts = (posts) => {
       if (!postsList) return;
-      if (!Array.isArray(posts) || posts.length === 0) {
+      const displayPosts = buildDisplayPosts(posts);
+
+      if (!Array.isArray(displayPosts) || displayPosts.length === 0) {
         postsList.innerHTML = `
           <article class="panel post post-empty">
             <p class="post-text">Aun no hay publicaciones. Crea la primera desde el boton "Que estas pensando?".</p>
@@ -1042,13 +1195,44 @@
         return;
       }
 
-      postsList.innerHTML = posts
+      postsList.innerHTML = displayPosts
         .map((post) => {
-          const mediaHtml = post.media_url
-            ? post.media_kind === 'video'
-              ? `<div class="post-media"><video src="${post.media_url}" controls></video></div>`
-              : `<div class="post-media"><img src="${post.media_url}" alt="Media de la publicacion" /></div>`
-            : '';
+          const isAlbumGroup = post.__kind === 'album' && Number(post.album_total_items || 0) > 1;
+
+          let mediaHtml = '';
+          if (isAlbumGroup) {
+            const previewItems = Array.isArray(post.album_preview_items) ? post.album_preview_items : [];
+            const extraItems = Math.max(0, Number(post.album_extra_items || 0));
+            const previewHtml = previewItems
+              .map((albumPost, index) => {
+                const mediaNode = albumPost.media_kind === 'video'
+                  ? `<video src="${escapeHtml(albumPost.media_url || '')}" muted playsinline preload="metadata"></video>`
+                  : `<img src="${escapeHtml(albumPost.media_url || '')}" alt="Archivo del álbum" loading="lazy" />`;
+                const showExtra = index === 3 && extraItems > 0
+                  ? `<span class="post-album-more">+${extraItems}</span>`
+                  : '';
+                return `
+                  <div class="post-album-cell">
+                    ${mediaNode}
+                    ${showExtra}
+                  </div>
+                `;
+              })
+              .join('');
+
+            mediaHtml = `
+              <div class="post-album-grid" aria-label="Publicación agrupada de álbum">
+                ${previewHtml}
+              </div>
+            `;
+          } else {
+            mediaHtml = post.media_url
+              ? post.media_kind === 'video'
+                ? `<div class="post-media"><video src="${post.media_url}" controls></video></div>`
+                : `<div class="post-media"><img src="${post.media_url}" alt="Media de la publicacion" /></div>`
+              : '';
+          }
+
           const starDisabled = post.starred_by_me || post.is_mine ? 'disabled' : '';
           const starLabel = post.starred_by_me
             ? `⭐ Estrella donada (${post.star_count})`
@@ -1058,6 +1242,12 @@
             : `<button class="post-head-btn" type="button" data-action="report-post" data-post-id="${post.id}" title="Reportar publicacion">🚩</button>`;
           const deleteBtn = post.is_mine
             ? `<button class="post-head-btn" type="button" data-action="delete-post" data-post-id="${post.id}" title="Eliminar publicacion">🗑</button>`
+            : '';
+          const albumMeta = isAlbumGroup
+            ? `<p class="post-album-meta">${escapeHtml(post.album_name || "Álbum")} · ${Number(post.album_total_items || 0)} archivo(s)</p>`
+            : '';
+          const openAlbumBtn = isAlbumGroup
+            ? `<button class="post-btn" type="button" data-action="open-album-gallery" data-album-id="${Number(post.album_id || 0)}">🖼️ Hojear álbum (${Number(post.album_total_items || 0)})</button>`
             : '';
 
           return `
@@ -1072,6 +1262,7 @@
                   ${deleteBtn}
                 </div>
               </div>
+              ${albumMeta}
               ${post.text ? `<p class="post-text">${escapeHtml(post.text)}</p>` : ''}
               ${mediaHtml}
               <p class="post-warning">La donacion de estrella es irreversible.</p>
@@ -1079,6 +1270,7 @@
                 <button class="post-btn" type="button" data-action="star-post" data-post-id="${post.id}" ${starDisabled}>${starLabel}</button>
                 <button class="post-btn" type="button" data-action="comment-post" data-post-id="${post.id}">💬 Comentar (${post.comment_count})</button>
                 <button class="post-btn" type="button" data-action="share-post" data-post-id="${post.id}">🔁 Compartir (${post.share_count})</button>
+                ${openAlbumBtn}
               </div>
             </article>
           `;
@@ -1749,10 +1941,18 @@
     };
 
     const handlePostsClick = async (event) => {
-      const button = event.target.closest('[data-action][data-post-id]');
+      const button = event.target.closest('[data-action]');
       if (!button) return;
       const action = button.dataset.action;
+      const albumId = Number(button.dataset.albumId);
       const postId = Number(button.dataset.postId);
+
+      if (action === 'open-album-gallery') {
+        if (!Number.isFinite(albumId) || albumId <= 0) return;
+        window.location.href = `/gallery.html?album=${encodeURIComponent(String(albumId))}`;
+        return;
+      }
+
       if (!postId) return;
 
       if (action === 'star-post') {
@@ -1923,6 +2123,7 @@
     });
 
     void (async () => {
+      applyProfilePrivacyVisibility(DEFAULT_PROFILE_PRIVACY_VISIBILITY, { isOwner: true });
       try {
         await resolveProfileContext();
       } catch (error) {
@@ -1945,9 +2146,10 @@
         return;
       }
 
-	      await Promise.all([
-	        loadHomeAbout(activeProfileUserId),
-	        loadHomePublicWishes(),
+		      await loadForeignProfilePrivacyVisibility();
+		      await Promise.all([
+		        loadHomeAbout(activeProfileUserId),
+		        loadHomePublicWishes(),
 	        loadHomeFulfilledWishes(),
 	        loadMyStats(),
 	      ]);
@@ -2072,7 +2274,8 @@
           <a href="/achievements.html" role="menuitem">Logros recientes</a>
           <a href="/gallery.html" role="menuitem">Galería</a>
 	          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
-          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+          <a href="/my-biography.html" role="menuitem" data-profile-module="biography">Mi Biografía</a>
+          <a href="/messages.html" role="menuitem">Mensajes</a>
         </div>
       </details>
     </div>
@@ -2126,7 +2329,8 @@
         <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
         <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
 	        <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
-        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
+        <a class="nav-pill" href="/my-biography.html" title="Mi biografía" data-profile-module="biography">Mi biografía</a>
+        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
       </nav>
 
       <section class="profile-grid">
@@ -2166,24 +2370,20 @@
             </div>
           </article>
 
-          <article class="panel">
+          <article class="panel" id="homeAboutPanel">
             <div class="panel-head home-about-head">
               <h3 class="panel-title">Acerca de mí</h3>
               <button class="infobox-edit-btn home-about-edit-btn" id="homeAboutEditBtn" type="button" title="Modificar acerca de mí">
                 <img src="/css/icons/iconedit.webp" alt="Editar" />
               </button>
             </div>
-            <p class="panel-muted hidden" id="homeAboutEmptyState">
-              Cuéntale a la comunidad quién eres en pocas palabras.
+            <p class="panel-muted" id="homeAboutEmptyState">
+              Cargando sección "Acerca de mí"...
             </p>
-            <p class="panel-text home-about-text" id="homeAboutTextValue">
-              Aficionado a los videojuegos, los libros, los perros y la buena comida.
-              Mi filosofía es que: la sabiduría suprema consiste en tener sueños lo suficientemente grandes
-              para no perderlos de vista mientras se persiguen.
-            </p>
+            <p class="panel-text home-about-text hidden" id="homeAboutTextValue"></p>
           </article>
 
-          <article class="panel">
+          <article class="panel" id="homeFulfilledPanel">
             <div class="panel-head">
               <h3 class="panel-title">Mis deseos cumplidos</h3>
               <span class="panel-badge" id="homeFulfilledWishCount">0 recientes</span>
@@ -2200,7 +2400,7 @@
 	            <a href="/my-fulfilled-whises.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="fulfilled_wishes">Ver más</a>
           </article>
 
-          <article class="panel">
+          <article class="panel" id="homePublicPanel">
             <div class="panel-head">
               <h3 class="panel-title">Mis deseos públicos</h3>
               <span class="panel-badge" id="homePublicWishCount">0 / 50</span>
@@ -2232,7 +2432,7 @@
             <a href="/my-private-whishes.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn">Ir a Deseos privados</a>
           </article>
 
-          <article class="panel">
+          <article class="panel" id="homeCalendarPanel">
             <div class="panel-head">
               <h3 class="panel-title">Calendario</h3>
               <span class="panel-badge">Actividad</span>
@@ -2280,7 +2480,7 @@
 	            <a href="/calendar.html" class="btn btn-outline btn-compact btn-inline" data-profile-module="calendar">Ver calendario</a>
           </article>
 
-          <article class="panel">
+          <article class="panel" id="homeOraclePanel">
             <div class="panel-head">
               <h3 class="panel-title">Oráculo</h3>
               <span class="panel-badge">Última carta</span>

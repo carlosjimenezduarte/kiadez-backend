@@ -13,6 +13,8 @@ from app.core.storage import S3NotConfiguredError, generate_presigned_get_url
 from app.db.database import get_db
 from app.db.models.guardian_wish_request import GuardianWishRequest, GuardianWishRequestStatus
 from app.db.models.media import Media
+from app.db.models.public_cooperative_wish import PublicCooperativeWish
+from app.db.models.public_cooperative_wish_participation import PublicCooperativeWishParticipation
 from app.db.models.public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus
 from app.db.models.public_wish_fulfillment import (
     PublicWishFulfillment,
@@ -25,6 +27,10 @@ from app.db.models.public_wish_freeze_audit import (
 )
 from app.db.models.user import User
 from app.public_wishes.schemas import (
+    PublicCooperativeWishListOut,
+    PublicCooperativeWishOut,
+    PublicCooperativeWishParticipationUpsertRequest,
+    PublicCooperativeWishUpsertRequest,
     PublicPersonalWishDeleteResponse,
     PublicPersonalWishFulfilledListOut,
     PublicPersonalWishFulfillRequest,
@@ -38,6 +44,7 @@ from app.public_wishes.schemas import (
 router = APIRouter(prefix="/public-wishes", tags=["public-wishes"])
 
 PERSONAL_ACTIVE_LIMIT = 50
+COOPERATIVE_ACTIVE_LIMIT = 20
 GUARDIAN_REQUIRED_RANK = 3
 FULFILLMENT_SECRET_MESSAGE = "Quien cumplió el deseo decidió obrar desde lo secreto."
 
@@ -211,6 +218,75 @@ def _resolve_owned_media(*, db: Session, media_id: int | None, user_id: int) -> 
     return media
 
 
+def _load_cooperative_participants_count_map(
+    *,
+    db: Session,
+    wish_ids: list[int],
+) -> dict[int, int]:
+    if not wish_ids:
+        return {}
+
+    rows = db.execute(
+        select(
+            PublicCooperativeWishParticipation.wish_id,
+            func.count(PublicCooperativeWishParticipation.id),
+        )
+        .where(PublicCooperativeWishParticipation.wish_id.in_(wish_ids))
+        .group_by(PublicCooperativeWishParticipation.wish_id)
+    ).all()
+    return {int(row[0]): int(row[1]) for row in rows}
+
+
+def _load_viewer_cooperative_participation_map(
+    *,
+    db: Session,
+    wish_ids: list[int],
+    viewer_user_id: int,
+) -> dict[int, PublicCooperativeWishParticipation]:
+    if not wish_ids:
+        return {}
+
+    rows = db.execute(
+        select(PublicCooperativeWishParticipation)
+        .where(PublicCooperativeWishParticipation.wish_id.in_(wish_ids))
+        .where(PublicCooperativeWishParticipation.participant_user_id == viewer_user_id)
+    ).scalars().all()
+    return {int(row.wish_id): row for row in rows}
+
+
+def _cooperative_wish_out(
+    *,
+    wish: PublicCooperativeWish,
+    media_map: dict[int, Media],
+    current_user_id: int,
+    participants_count_map: dict[int, int] | None = None,
+    viewer_participation_map: dict[int, PublicCooperativeWishParticipation] | None = None,
+) -> PublicCooperativeWishOut:
+    media = media_map.get(wish.media_id) if wish.media_id else None
+    participants_current = int((participants_count_map or {}).get(int(wish.id), 0))
+    is_owner = int(current_user_id) == int(wish.user_id)
+    viewer_participation = (
+        (viewer_participation_map or {}).get(int(wish.id))
+        if viewer_participation_map is not None
+        else None
+    )
+    return PublicCooperativeWishOut(
+        id=int(wish.id),
+        user_id=int(wish.user_id),
+        wish_text=wish.wish_text,
+        wish_type=wish.wish_type,
+        participants_goal=int(wish.participants_goal or 0),
+        participants_current=participants_current,
+        template_text=wish.template_text,
+        security_code=wish.security_code if is_owner else None,
+        media_id=wish.media_id,
+        media_url=_build_media_url(media),
+        viewer_participation_text=viewer_participation.participation_text if viewer_participation else None,
+        created_at=wish.created_at,
+        updated_at=wish.updated_at,
+    )
+
+
 def _resolve_guardian_user(*, db: Session, user_id: int) -> User:
     user = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
     if user is None:
@@ -321,6 +397,287 @@ def list_user_personal_wishes(
         active_limit=PERSONAL_ACTIVE_LIMIT,
         fulfilled_total=fulfilled_total or 0,
     )
+
+
+@router.get("/cooperative", response_model=PublicCooperativeWishListOut)
+def list_cooperative_wishes(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    wishes = db.execute(
+        select(PublicCooperativeWish)
+        .where(PublicCooperativeWish.user_id == current.user_number)
+        .order_by(PublicCooperativeWish.created_at.desc(), PublicCooperativeWish.id.desc())
+    ).scalars().all()
+
+    wish_ids = [int(wish.id) for wish in wishes]
+    media_ids = {int(wish.media_id) for wish in wishes if wish.media_id is not None}
+    media_map: dict[int, Media] = {}
+    if media_ids:
+        medias = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
+        media_map = {int(media.id): media for media in medias}
+
+    participants_count_map = _load_cooperative_participants_count_map(db=db, wish_ids=wish_ids)
+    viewer_participation_map = _load_viewer_cooperative_participation_map(
+        db=db,
+        wish_ids=wish_ids,
+        viewer_user_id=current.user_number,
+    )
+
+    return PublicCooperativeWishListOut(
+        items=[
+            _cooperative_wish_out(
+                wish=wish,
+                media_map=media_map,
+                current_user_id=current.user_number,
+                participants_count_map=participants_count_map,
+                viewer_participation_map=viewer_participation_map,
+            )
+            for wish in wishes
+        ],
+        active_count=len(wishes),
+        active_limit=COOPERATIVE_ACTIVE_LIMIT,
+    )
+
+
+@router.get("/user/{user_id}/cooperative", response_model=PublicCooperativeWishListOut)
+def list_user_cooperative_wishes(
+    user_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    target = db.execute(
+        select(User).where(User.id == user_id, User.is_active.is_(True))
+    ).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = int(current.user_number) == int(user_id)
+    if not is_owner and not bool(target.public_profile_show_public_wishes):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+
+    wishes = db.execute(
+        select(PublicCooperativeWish)
+        .where(PublicCooperativeWish.user_id == user_id)
+        .order_by(PublicCooperativeWish.created_at.desc(), PublicCooperativeWish.id.desc())
+    ).scalars().all()
+
+    wish_ids = [int(wish.id) for wish in wishes]
+    media_ids = {int(wish.media_id) for wish in wishes if wish.media_id is not None}
+    media_map: dict[int, Media] = {}
+    if media_ids:
+        medias = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
+        media_map = {int(media.id): media for media in medias}
+
+    participants_count_map = _load_cooperative_participants_count_map(db=db, wish_ids=wish_ids)
+    viewer_participation_map = _load_viewer_cooperative_participation_map(
+        db=db,
+        wish_ids=wish_ids,
+        viewer_user_id=current.user_number,
+    )
+
+    return PublicCooperativeWishListOut(
+        items=[
+            _cooperative_wish_out(
+                wish=wish,
+                media_map=media_map,
+                current_user_id=current.user_number,
+                participants_count_map=participants_count_map,
+                viewer_participation_map=viewer_participation_map,
+            )
+            for wish in wishes
+        ],
+        active_count=len(wishes),
+        active_limit=COOPERATIVE_ACTIVE_LIMIT,
+    )
+
+
+@router.post("/cooperative", response_model=PublicCooperativeWishOut)
+def create_cooperative_wish(
+    payload: PublicCooperativeWishUpsertRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    active_count = db.execute(
+        select(func.count(PublicCooperativeWish.id)).where(PublicCooperativeWish.user_id == current.user_number)
+    ).scalar_one()
+    if int(active_count or 0) >= COOPERATIVE_ACTIVE_LIMIT:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ya alcanzaste el máximo de {COOPERATIVE_ACTIVE_LIMIT} deseos cooperativos activos.",
+        )
+
+    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number)
+    wish = PublicCooperativeWish(
+        user_id=current.user_number,
+        wish_text=payload.wish_text,
+        wish_type=payload.wish_type,
+        participants_goal=payload.participants_goal,
+        template_text=payload.template_text,
+        security_code=payload.security_code,
+        media_id=media.id if media else None,
+    )
+    db.add(wish)
+    db.commit()
+    db.refresh(wish)
+
+    media_map = {int(media.id): media} if media else {}
+    return _cooperative_wish_out(
+        wish=wish,
+        media_map=media_map,
+        current_user_id=current.user_number,
+        participants_count_map={int(wish.id): 0},
+        viewer_participation_map={},
+    )
+
+
+@router.put("/cooperative/{wish_id}", response_model=PublicCooperativeWishOut)
+def update_cooperative_wish(
+    wish_id: int,
+    payload: PublicCooperativeWishUpsertRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    wish = db.execute(
+        select(PublicCooperativeWish)
+        .where(PublicCooperativeWish.id == wish_id)
+        .where(PublicCooperativeWish.user_id == current.user_number)
+    ).scalar_one_or_none()
+    if wish is None:
+        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+
+    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number)
+    wish.wish_text = payload.wish_text
+    wish.wish_type = payload.wish_type
+    wish.participants_goal = payload.participants_goal
+    wish.template_text = payload.template_text
+    wish.security_code = payload.security_code
+    wish.media_id = media.id if media else None
+
+    db.commit()
+    db.refresh(wish)
+
+    media_ids = {int(wish.media_id)} if wish.media_id is not None else set()
+    media_map: dict[int, Media] = {}
+    if media_ids:
+        medias = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
+        media_map = {int(media.id): media for media in medias}
+
+    participants_count_map = _load_cooperative_participants_count_map(db=db, wish_ids=[int(wish.id)])
+    viewer_participation_map = _load_viewer_cooperative_participation_map(
+        db=db,
+        wish_ids=[int(wish.id)],
+        viewer_user_id=current.user_number,
+    )
+    return _cooperative_wish_out(
+        wish=wish,
+        media_map=media_map,
+        current_user_id=current.user_number,
+        participants_count_map=participants_count_map,
+        viewer_participation_map=viewer_participation_map,
+    )
+
+
+@router.post("/cooperative/{wish_id}/participate", response_model=PublicCooperativeWishOut)
+def participate_in_cooperative_wish(
+    wish_id: int,
+    payload: PublicCooperativeWishParticipationUpsertRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    wish = db.execute(select(PublicCooperativeWish).where(PublicCooperativeWish.id == wish_id)).scalar_one_or_none()
+    if wish is None:
+        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+
+    owner = db.execute(
+        select(User).where(User.id == int(wish.user_id), User.is_active.is_(True))
+    ).scalar_one_or_none()
+    if owner is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    if int(current.user_number) == int(wish.user_id):
+        raise HTTPException(status_code=409, detail="No puedes registrar participación en tu propio deseo cooperativo.")
+
+    if not bool(owner.public_profile_show_public_wishes):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+
+    expected_code = (wish.security_code or "").strip()
+    provided_code = (payload.security_code or "").strip()
+    if not expected_code or expected_code != provided_code:
+        raise HTTPException(status_code=403, detail="Código de seguridad inválido.")
+
+    participation = db.execute(
+        select(PublicCooperativeWishParticipation)
+        .where(PublicCooperativeWishParticipation.wish_id == int(wish.id))
+        .where(PublicCooperativeWishParticipation.participant_user_id == int(current.user_number))
+    ).scalar_one_or_none()
+    if participation is None:
+        participation = PublicCooperativeWishParticipation(
+            wish_id=int(wish.id),
+            participant_user_id=int(current.user_number),
+            participation_text=payload.participation_text,
+        )
+        db.add(participation)
+    else:
+        participation.participation_text = payload.participation_text
+
+    db.commit()
+    db.refresh(wish)
+
+    media_ids = {int(wish.media_id)} if wish.media_id is not None else set()
+    media_map: dict[int, Media] = {}
+    if media_ids:
+        medias = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
+        media_map = {int(media.id): media for media in medias}
+
+    participants_count_map = _load_cooperative_participants_count_map(db=db, wish_ids=[int(wish.id)])
+    viewer_participation_map = _load_viewer_cooperative_participation_map(
+        db=db,
+        wish_ids=[int(wish.id)],
+        viewer_user_id=current.user_number,
+    )
+    return _cooperative_wish_out(
+        wish=wish,
+        media_map=media_map,
+        current_user_id=current.user_number,
+        participants_count_map=participants_count_map,
+        viewer_participation_map=viewer_participation_map,
+    )
+
+
+@router.delete("/cooperative/{wish_id}", response_model=PublicPersonalWishDeleteResponse)
+def delete_cooperative_wish(
+    wish_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    wish = db.execute(
+        select(PublicCooperativeWish)
+        .where(PublicCooperativeWish.id == wish_id)
+        .where(PublicCooperativeWish.user_id == current.user_number)
+    ).scalar_one_or_none()
+    if wish is None:
+        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+
+    db.delete(wish)
+    db.commit()
+    return PublicPersonalWishDeleteResponse(deleted=True)
 
 
 @router.get("/personal/fulfilled", response_model=PublicPersonalWishFulfilledListOut)

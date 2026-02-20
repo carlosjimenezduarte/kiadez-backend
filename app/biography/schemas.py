@@ -263,5 +263,36 @@ class BiographyFavoriteQuotesOut(BaseModel):
     word_count: int = 0
 
 
+class BiographyDistinctionSlot(BaseModel):
+    distinction_type: str | None = Field(default=None, max_length=120)
+    description: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def normalize_text_fields(self):
+        if self.distinction_type is not None:
+            clean_type = self.distinction_type.strip()
+            self.distinction_type = clean_type if clean_type else None
+
+        if self.description is not None:
+            clean_description = self.description.strip()
+            self.description = clean_description if clean_description else None
+
+        return self
+
+
+class BiographyDistinctionsUpdateRequest(BaseModel):
+    slots: list[BiographyDistinctionSlot] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_slots(self):
+        if len(self.slots) > 10:
+            raise ValueError("Distinciones permite máximo 10 registros.")
+        return self
+
+
+class BiographyDistinctionsOut(BaseModel):
+    slots: list[BiographyDistinctionSlot] = Field(default_factory=list)
+
+
 class BiographyActivityStatsOut(BaseModel):
     wishes_granted: int = 0

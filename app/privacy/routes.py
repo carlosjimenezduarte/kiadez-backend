@@ -17,9 +17,11 @@ router = APIRouter(prefix="/privacy", tags=["privacy"])
 def _serialize(user: User) -> PublicProfilePrivacyOut:
     return PublicProfilePrivacyOut(
         public_profile_show_public_wishes=bool(user.public_profile_show_public_wishes),
+        public_profile_show_about=bool(user.public_profile_show_about),
         public_profile_show_fulfilled_wishes=bool(user.public_profile_show_fulfilled_wishes),
         public_profile_show_calendar=bool(user.public_profile_show_calendar),
         public_profile_show_oracle=bool(user.public_profile_show_oracle),
+        public_profile_show_personal_posts=bool(user.public_profile_show_personal_posts),
     )
 
 
@@ -66,4 +68,3 @@ def get_user_privacy_settings(
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
     return _serialize(user)
-
