@@ -274,7 +274,7 @@
         </a>
 
         <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-        <a class="nav-pill" href="/achievements.html" title="Logros">Logros</a>
+        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
         <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
         <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
         <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>

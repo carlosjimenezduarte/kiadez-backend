@@ -219,6 +219,177 @@ def send_password_reset_email(to_email: str, token: str) -> None:
         server.send_message(msg)
 
 
+def send_email_change_confirmation_email(*, to_email: str, previous_email: str) -> None:
+    subject = "Tu correo fue actualizado en Kiadez"
+
+    html_body = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+    <meta charset="UTF-8">
+    <title>Cambio de correo · Kiadez</title>
+    </head>
+    <body style="
+    margin:0;
+    padding:0;
+    background-color:#0e1a14;
+    font-family: Arial, Helvetica, sans-serif;
+    color:#1e1e1e;
+    ">
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0e1a14; padding:40px 0;">
+        <tr>
+        <td align="center">
+
+            <table width="600" cellpadding="0" cellspacing="0" style="
+            background:#ffffff;
+            border-radius:12px;
+            overflow:hidden;
+            ">
+
+            <tr>
+                <td align="center" style="
+                background:#00674F;
+                padding:30px;
+                ">
+                <img src="https://kiadez.com/assets/logo-email.png" alt="Kiadez" width="120" style="display:block;" />
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding:35px;">
+                <h2 style="text-align:center; margin-top:0; color:#1e1e1e;">
+                    Correo actualizado
+                </h2>
+
+                <p style="text-align:center; font-size:15px; line-height:1.6;">
+                    Confirmamos que tu correo de inicio de sesion en <strong>Kiadez</strong> fue actualizado correctamente.
+                </p>
+
+                <p style="text-align:center; font-size:14px; color:#555; margin:20px 0 0;">
+                    Correo anterior: <strong>{previous_email}</strong><br />
+                    Correo actual: <strong>{to_email}</strong>
+                </p>
+
+                <p style="text-align:center; font-size:14px; color:#555;">
+                    Si no autorizaste este cambio, por favor contacta soporte de inmediato.
+                </p>
+
+                <hr style="border:none; border-top:1px solid #e0e0e0; margin:30px 0;">
+
+                <p style="font-size:12px; color:#777; text-align:center;">
+                    Kiadez · Ingenieria de la Conciencia<br>
+                    Una red social para cumplir deseos
+                </p>
+                </td>
+            </tr>
+
+            </table>
+
+        </td>
+        </tr>
+    </table>
+
+    </body>
+    </html>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["From"] = settings.SMTP_FROM
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(html_body, "html"))
+
+    with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as server:
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        server.send_message(msg)
+
+
+def send_email_change_security_alert_email(*, to_email: str, new_email: str) -> None:
+    subject = "Alerta de seguridad: cambio de correo en Kiadez"
+
+    html_body = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+    <meta charset="UTF-8">
+    <title>Alerta de seguridad · Kiadez</title>
+    </head>
+    <body style="
+    margin:0;
+    padding:0;
+    background-color:#0e1a14;
+    font-family: Arial, Helvetica, sans-serif;
+    color:#1e1e1e;
+    ">
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0e1a14; padding:40px 0;">
+        <tr>
+        <td align="center">
+
+            <table width="600" cellpadding="0" cellspacing="0" style="
+            background:#ffffff;
+            border-radius:12px;
+            overflow:hidden;
+            ">
+
+            <tr>
+                <td align="center" style="
+                background:#00674F;
+                padding:30px;
+                ">
+                <img src="https://kiadez.com/assets/logo-email.png" alt="Kiadez" width="120" style="display:block;" />
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding:35px;">
+                <h2 style="text-align:center; margin-top:0; color:#1e1e1e;">
+                    Alerta de seguridad
+                </h2>
+
+                <p style="text-align:center; font-size:15px; line-height:1.6;">
+                    Tu correo de inicio de sesion en <strong>Kiadez</strong> fue cambiado recientemente.
+                </p>
+
+                <p style="text-align:center; font-size:14px; color:#555; margin:20px 0 0;">
+                    Nuevo correo configurado: <strong>{new_email}</strong>
+                </p>
+
+                <p style="text-align:center; font-size:14px; color:#555;">
+                    Si no autorizaste este cambio, contacta soporte de inmediato.
+                </p>
+
+                <hr style="border:none; border-top:1px solid #e0e0e0; margin:30px 0;">
+
+                <p style="font-size:12px; color:#777; text-align:center;">
+                    Kiadez · Ingenieria de la Conciencia<br>
+                    Una red social para cumplir deseos
+                </p>
+                </td>
+            </tr>
+
+            </table>
+
+        </td>
+        </tr>
+    </table>
+
+    </body>
+    </html>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["From"] = settings.SMTP_FROM
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(html_body, "html"))
+
+    with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as server:
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        server.send_message(msg)
+
+
 def send_contact_email(*, name: str, email: str, message: str) -> None:
     subject = f"Nuevo mensaje de contacto: {name}"
 

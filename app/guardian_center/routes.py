@@ -5,7 +5,7 @@ from math import ceil
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import desc, func, select
+from sqlalchemy import case, desc, func, select, update
 from sqlalchemy.orm import Session
 
 from app.auth.models import UserPublic
@@ -18,9 +18,13 @@ from app.db.models.guardian_wish_request import GuardianWishRequest, GuardianWis
 from app.db.models.message_entry import MessageEntry
 from app.db.models.message_thread import MessageThread
 from app.db.models.media import Media
+from app.db.models.post import Post, PostReport, PostReportCase, PostReportCaseStatus
 from app.db.models.public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus
 from app.db.models.user import User
 from app.guardian_center.schemas import (
+    GuardianReportedPostListOut,
+    GuardianReportedPostOut,
+    GuardianReportedPostReportOut,
     GuardianWishMessageOut,
     GuardianWishRequestCreate,
     GuardianWishRequestDenyInput,
@@ -35,6 +39,8 @@ router = APIRouter(prefix="/guardian-center", tags=["guardian-center"])
 GUARDIANS_MIN_RANK = 3
 PAGE_SIZE_DEFAULT = 10
 PAGE_SIZE_MAX = 25
+REPORTED_POSTS_PAGE_SIZE_DEFAULT = 10
+REPORTED_POSTS_PAGE_SIZE_MAX = 25
 
 
 def _require_guardian(current: UserPublic) -> None:
@@ -214,6 +220,103 @@ def _message_out(*, msg: GuardianWishMessage, recipient: User) -> GuardianWishMe
     )
 
 
+def _load_reporter_handles(
+    *,
+    db: Session,
+    case_ids: list[int],
+) -> dict[int, list[GuardianReportedPostReportOut]]:
+    if not case_ids:
+        return {}
+
+    rows = db.execute(
+        select(PostReport, User)
+        .join(User, User.id == PostReport.reporter_id)
+        .where(PostReport.case_id.in_(case_ids))
+        .order_by(desc(PostReport.created_at), desc(PostReport.id))
+    ).all()
+
+    out: dict[int, list[GuardianReportedPostReportOut]] = {}
+    for report, reporter in rows:
+        case_id = int(report.case_id)
+        bucket = out.setdefault(case_id, [])
+        if len(bucket) >= 5:
+            continue
+        bucket.append(
+            GuardianReportedPostReportOut(
+                id=int(report.id),
+                reporter_user_id=int(reporter.id),
+                reporter_handle=_build_handle(username=reporter.username, user_id=int(reporter.id)),
+                reason=report.reason,
+                other_reason=(report.other_reason or None),
+                created_at=report.created_at,
+            )
+        )
+    return out
+
+
+def _reported_post_out(
+    *,
+    item: PostReportCase,
+    users: dict[int, User],
+    medias: dict[int, Media],
+    reports_map: dict[int, list[GuardianReportedPostReportOut]],
+) -> GuardianReportedPostOut:
+    author = users.get(int(item.post_author_id)) if item.post_author_id else None
+    if author is None:
+        raise HTTPException(status_code=500, detail="No se pudo construir el reporte (autor faltante).")
+
+    resolver = users.get(int(item.resolved_by_guardian_id)) if item.resolved_by_guardian_id else None
+    media = medias.get(int(item.post_media_id_snapshot)) if item.post_media_id_snapshot else None
+
+    return GuardianReportedPostOut(
+        id=int(item.id),
+        status=item.status,
+        report_count=max(0, int(item.report_count or 0)),
+        post_id=int(item.post_id) if item.post_id else None,
+        post_text=item.post_text_snapshot,
+        post_media_kind=item.post_media_kind_snapshot,
+        post_media_url=_build_media_url(media),
+        post_author=_user_out(author),
+        resolved_by_guardian=_user_out(resolver) if resolver else None,
+        first_reported_at=item.first_reported_at,
+        last_reported_at=item.last_reported_at,
+        resolved_at=item.resolved_at,
+        reports=reports_map.get(int(item.id), []),
+    )
+
+
+def _load_related_maps_for_report_cases(
+    *,
+    db: Session,
+    items: list[PostReportCase],
+) -> tuple[dict[int, User], dict[int, Media], dict[int, list[GuardianReportedPostReportOut]]]:
+    user_ids: set[int] = set()
+    media_ids: set[int] = set()
+    case_ids: list[int] = []
+
+    for item in items:
+        case_ids.append(int(item.id))
+        if item.post_author_id:
+            user_ids.add(int(item.post_author_id))
+        if item.resolved_by_guardian_id:
+            user_ids.add(int(item.resolved_by_guardian_id))
+        if item.post_media_id_snapshot:
+            media_ids.add(int(item.post_media_id_snapshot))
+
+    users_map: dict[int, User] = {}
+    if user_ids:
+        users = db.execute(select(User).where(User.id.in_(sorted(user_ids)))).scalars().all()
+        users_map = {int(user.id): user for user in users}
+
+    medias_map: dict[int, Media] = {}
+    if media_ids:
+        medias = db.execute(select(Media).where(Media.id.in_(sorted(media_ids)))).scalars().all()
+        medias_map = {int(media.id): media for media in medias}
+
+    reports_map = _load_reporter_handles(db=db, case_ids=case_ids)
+    return users_map, medias_map, reports_map
+
+
 def _mirror_guardian_message_in_inbox(*, db: Session, msg: GuardianWishMessage) -> None:
     sender_guardian_id = int(msg.sender_guardian_id) if msg.sender_guardian_id else None
     if sender_guardian_id is None:
@@ -378,6 +481,144 @@ def list_wish_requests(
         range_start=range_start,
         range_end=range_end,
     )
+
+
+@router.get("/reported-posts", response_model=GuardianReportedPostListOut)
+def list_reported_posts(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=REPORTED_POSTS_PAGE_SIZE_DEFAULT, ge=1, le=REPORTED_POSTS_PAGE_SIZE_MAX),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_guardian(current)
+
+    total = int(db.execute(select(func.count(PostReportCase.id))).scalar_one() or 0)
+    normalized_size = max(1, min(int(page_size), REPORTED_POSTS_PAGE_SIZE_MAX))
+    total_pages = max(1, ceil(total / normalized_size)) if total else 1
+    normalized_page = max(1, min(int(page), total_pages))
+    offset = (normalized_page - 1) * normalized_size
+
+    status_priority = case(
+        (PostReportCase.status == PostReportCaseStatus.open, 0),
+        else_=1,
+    )
+
+    rows = db.execute(
+        select(PostReportCase)
+        .order_by(status_priority.asc(), desc(PostReportCase.last_reported_at), desc(PostReportCase.id))
+        .offset(offset)
+        .limit(normalized_size)
+    ).scalars().all()
+
+    users_map, medias_map, reports_map = _load_related_maps_for_report_cases(db=db, items=rows)
+    items = [
+        _reported_post_out(item=item, users=users_map, medias=medias_map, reports_map=reports_map)
+        for item in rows
+    ]
+
+    range_start = offset + 1 if total > 0 and items else 0
+    range_end = offset + len(items) if total > 0 and items else 0
+
+    return GuardianReportedPostListOut(
+        items=items,
+        page=normalized_page,
+        page_size=normalized_size,
+        total=total,
+        total_pages=total_pages,
+        range_start=range_start,
+        range_end=range_end,
+    )
+
+
+@router.post("/reported-posts/{case_id}/delete-post", response_model=GuardianReportedPostOut)
+def delete_reported_post(
+    case_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_guardian(current)
+
+    item = db.execute(
+        select(PostReportCase).where(PostReportCase.id == case_id)
+    ).scalar_one_or_none()
+    if item is None:
+        raise HTTPException(status_code=404, detail="Reporte no encontrado.")
+
+    now = datetime.now(timezone.utc)
+    post = None
+    if item.post_id:
+        post = db.execute(select(Post).where(Post.id == item.post_id)).scalar_one_or_none()
+
+    if post is not None:
+        removed_stars = max(0, int(post.star_count or 0))
+        author = db.execute(select(User).where(User.id == post.author_id)).scalar_one_or_none()
+        if author is not None:
+            author.received_stars_total = max(0, int(author.received_stars_total or 0) - removed_stars)
+            if int(author.donated_stars_total or 0) > int(author.received_stars_total or 0):
+                author.donated_stars_total = int(author.received_stars_total or 0)
+
+        item.post_text_snapshot = item.post_text_snapshot or post.text
+        item.post_media_id_snapshot = item.post_media_id_snapshot or post.media_id
+        item.post_media_kind_snapshot = item.post_media_kind_snapshot or post.media_kind
+
+        db.execute(
+            update(PostReport)
+            .where(PostReport.case_id == item.id)
+            .values(post_id=None)
+        )
+        db.delete(post)
+    else:
+        db.execute(
+            update(PostReport)
+            .where(PostReport.case_id == item.id, PostReport.post_id.is_not(None))
+            .values(post_id=None)
+        )
+
+    item.post_id = None
+    item.status = PostReportCaseStatus.deleted
+    item.resolved_at = now
+    item.resolved_by_guardian_id = int(current.user_number)
+    item.updated_at = now
+
+    db.commit()
+    db.refresh(item)
+
+    users_map, medias_map, reports_map = _load_related_maps_for_report_cases(db=db, items=[item])
+    return _reported_post_out(item=item, users=users_map, medias=medias_map, reports_map=reports_map)
+
+
+@router.post("/reported-posts/{case_id}/keep-post", response_model=GuardianReportedPostOut)
+def keep_reported_post(
+    case_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_guardian(current)
+
+    item = db.execute(
+        select(PostReportCase).where(PostReportCase.id == case_id)
+    ).scalar_one_or_none()
+    if item is None:
+        raise HTTPException(status_code=404, detail="Reporte no encontrado.")
+
+    if item.post_id:
+        post = db.execute(select(Post).where(Post.id == item.post_id)).scalar_one_or_none()
+        if post is not None:
+            item.post_text_snapshot = post.text
+            item.post_media_id_snapshot = post.media_id
+            item.post_media_kind_snapshot = post.media_kind
+
+    now = datetime.now(timezone.utc)
+    item.status = PostReportCaseStatus.kept
+    item.resolved_at = now
+    item.resolved_by_guardian_id = int(current.user_number)
+    item.updated_at = now
+
+    db.commit()
+    db.refresh(item)
+
+    users_map, medias_map, reports_map = _load_related_maps_for_report_cases(db=db, items=[item])
+    return _reported_post_out(item=item, users=users_map, medias=medias_map, reports_map=reports_map)
 
 
 @router.post("/wish-requests/{request_id}/seal-commitment", response_model=GuardianWishRequestOut)

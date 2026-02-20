@@ -75,6 +75,9 @@
     const homePublicWishList = document.getElementById('homePublicWishList');
     const homePublicWishCount = document.getElementById('homePublicWishCount');
     const homePublicWishStatus = document.getElementById('homePublicWishStatus');
+    const homeCooperativeWishList = document.getElementById('homeCooperativeWishList');
+    const homeCooperativeWishCount = document.getElementById('homeCooperativeWishCount');
+    const homeCooperativeWishStatus = document.getElementById('homeCooperativeWishStatus');
     const homeFulfilledWishList = document.getElementById('homeFulfilledWishList');
     const homeFulfilledWishCount = document.getElementById('homeFulfilledWishCount');
     const homeFulfilledWishStatus = document.getElementById('homeFulfilledWishStatus');
@@ -96,6 +99,7 @@
     const homeAboutPanel = document.getElementById('homeAboutPanel');
     const homeFulfilledPanel = document.getElementById('homeFulfilledPanel');
     const homePublicPanel = document.getElementById('homePublicPanel');
+    const homeCooperativePanel = document.getElementById('homeCooperativePanel');
     const homeCalendarPanel = document.getElementById('homeCalendarPanel');
     const homeOraclePanel = document.getElementById('homeOraclePanel');
     const profilePhotoPostOverlay = document.getElementById('profilePhotoPostModalOverlay');
@@ -137,6 +141,7 @@
     let activeProfileUsername = '';
     let activeProfileUrl = '/home_user.html';
     let isViewingOwnProfile = true;
+    let hasActiveCooperativeWishes = false;
 
     const HOME_ABOUT_MAX_WORDS = 50;
     const USERNAME_MIN_LENGTH = 4;
@@ -195,6 +200,12 @@
       homePublicWishStatus.classList.toggle('is-error', Boolean(isError));
     };
 
+    const setHomeCooperativeWishStatus = (message, isError = false) => {
+      if (!homeCooperativeWishStatus) return;
+      homeCooperativeWishStatus.textContent = message || '';
+      homeCooperativeWishStatus.classList.toggle('is-error', Boolean(isError));
+    };
+
     const setHomeFulfilledWishStatus = (message, isError = false) => {
       if (!homeFulfilledWishStatus) return;
       homeFulfilledWishStatus.textContent = message || '';
@@ -205,6 +216,12 @@
       if (!homePrivateWishStatus) return;
       homePrivateWishStatus.textContent = message || '';
       homePrivateWishStatus.classList.toggle('is-error', Boolean(isError));
+    };
+
+    const updateHomeCooperativePanelVisibility = () => {
+      const canShowPublicWishes = Boolean(activeProfilePrivacyVisibility.public_profile_show_public_wishes);
+      const isVisible = canShowPublicWishes && hasActiveCooperativeWishes;
+      homeCooperativePanel?.classList.toggle('hidden', !isVisible);
     };
 
     const countWords = (value) => {
@@ -248,28 +265,29 @@
 	      return null;
 	    };
 
-	    const buildProfileModuleUrl = (path) => {
-	      const raw = String(path || '').trim();
-	      if (!raw) return '';
-	      try {
-	        const url = new URL(raw, window.location.origin);
-	        const qp = buildProfileQueryParams();
-	        url.searchParams.delete('u');
-	        url.searchParams.delete('id');
-	        if (qp) url.searchParams.set(qp.key, qp.value);
-	        return `${url.pathname}${url.search}`;
-	      } catch {
-	        return raw;
-	      }
-	    };
+    const buildProfileModuleUrl = (path) => {
+      const raw = String(path || '').trim();
+      if (!raw) return '';
+      try {
+        const url = new URL(raw, window.location.origin);
+        const qp = buildProfileQueryParams();
+        url.searchParams.delete('u');
+        url.searchParams.delete('id');
+        if (qp) url.searchParams.set(qp.key, qp.value);
+        return `${url.pathname}${url.search}${url.hash}`;
+      } catch {
+        return raw;
+      }
+    };
 
-	    const PROFILE_MODULE_ROUTES = {
-	      home: '/home_user.html',
-	      public_wishes: '/my-public-whishes.html',
-	      fulfilled_wishes: '/my-fulfilled-whises.html',
-	      calendar: '/calendar.html',
-	      oracle: '/oracle.html',
-	      biography: '/my-biography.html'
+    const PROFILE_MODULE_ROUTES = {
+      home: '/home_user.html',
+      public_wishes: '/my-public-whishes.html',
+      public_wishes_cooperative: '/my-public-whishes.html#cooperative-wishes',
+      fulfilled_wishes: '/my-fulfilled-whises.html',
+      calendar: '/calendar.html',
+      oracle: '/oracle.html',
+      biography: '/my-biography.html'
 	    };
 
 	    const syncProfileModuleLinks = () => {
@@ -354,6 +372,7 @@
       homeAboutPanel?.classList.toggle('hidden', !visibility.public_profile_show_about);
       homeFulfilledPanel?.classList.toggle('hidden', !visibility.public_profile_show_fulfilled_wishes);
       homePublicPanel?.classList.toggle('hidden', !visibility.public_profile_show_public_wishes);
+      updateHomeCooperativePanelVisibility();
       homeCalendarPanel?.classList.toggle('hidden', !visibility.public_profile_show_calendar);
       homeOraclePanel?.classList.toggle('hidden', !visibility.public_profile_show_oracle);
 
@@ -1015,6 +1034,51 @@
         .join('');
     };
 
+    const renderHomeCooperativeWishes = (items, activeCount = 0, activeLimit = 20) => {
+      if (!homeCooperativeWishList) return;
+      const wishes = Array.isArray(items) ? [...items] : [];
+      wishes.sort((a, b) => {
+        const aTs = Date.parse(a?.created_at || '');
+        const bTs = Date.parse(b?.created_at || '');
+        const aSafe = Number.isNaN(aTs) ? 0 : aTs;
+        const bSafe = Number.isNaN(bTs) ? 0 : bTs;
+        return bSafe - aSafe;
+      });
+
+      const topSeven = wishes.slice(0, 7);
+      const safeActiveCount = Math.max(0, Number(activeCount || 0));
+      const safeActiveLimit = Math.max(1, Number(activeLimit || 20));
+
+      hasActiveCooperativeWishes = safeActiveCount > 0 && topSeven.length > 0;
+      updateHomeCooperativePanelVisibility();
+
+      if (homeCooperativeWishCount) {
+        homeCooperativeWishCount.textContent = `${safeActiveCount} / ${safeActiveLimit}`;
+      }
+
+      if (topSeven.length === 0) {
+        homeCooperativeWishList.innerHTML = '';
+        return;
+      }
+
+      homeCooperativeWishList.innerHTML = topSeven
+        .map((wish) => {
+          const wishText = escapeHtml(wish?.wish_text || 'Deseo cooperativo sin descripción');
+          const mediaUrl = (wish?.media_url || '').trim();
+          const mediaHtml = mediaUrl
+            ? `<img class="wish-item-thumb" src="${escapeHtml(mediaUrl)}" alt="Imagen del deseo cooperativo" loading="lazy" />`
+            : '<span class="wish-dot"></span>';
+
+          return `
+            <li class="wish-item wish-item-home-public">
+              ${mediaHtml}
+              <span class="wish-item-label">${wishText}</span>
+            </li>
+          `;
+        })
+        .join('');
+    };
+
 	    const loadHomePublicWishes = async () => {
 	      if (!isViewingOwnProfile && !activeProfilePrivacyVisibility.public_profile_show_public_wishes) {
 	        setHomePublicWishStatus('');
@@ -1034,6 +1098,32 @@
       } catch (error) {
         renderHomePublicWishes([], 0, 50);
         setHomePublicWishStatus(error.message || 'No se pudieron cargar tus deseos públicos.', true);
+      }
+    };
+
+    const loadHomeCooperativeWishes = async () => {
+      if (!isViewingOwnProfile && !activeProfilePrivacyVisibility.public_profile_show_public_wishes) {
+        hasActiveCooperativeWishes = false;
+        updateHomeCooperativePanelVisibility();
+        setHomeCooperativeWishStatus('');
+        return;
+      }
+      try {
+        const profileId = Number(activeProfileUserId);
+        const endpoint =
+          !isViewingOwnProfile && Number.isFinite(profileId) && profileId > 0
+            ? `/public-wishes/user/${encodeURIComponent(String(profileId))}/cooperative`
+            : '/public-wishes/cooperative';
+        const res = await apiFetch(endpoint);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudieron cargar tus deseos cooperativos.');
+        renderHomeCooperativeWishes(data?.items || [], data?.active_count || 0, data?.active_limit || 20);
+        setHomeCooperativeWishStatus('');
+      } catch (error) {
+        hasActiveCooperativeWishes = false;
+        updateHomeCooperativePanelVisibility();
+        renderHomeCooperativeWishes([], 0, 20);
+        setHomeCooperativeWishStatus(error.message || 'No se pudieron cargar tus deseos cooperativos.', true);
       }
     };
 
@@ -2137,6 +2227,7 @@
           loadProfilePhoto(),
           loadUsernameState(),
           loadHomePublicWishes(),
+          loadHomeCooperativeWishes(),
           loadHomeFulfilledWishes(),
           loadHomePrivateWishes(),
           loadMyStats()
@@ -2150,6 +2241,7 @@
 		      await Promise.all([
 		        loadHomeAbout(activeProfileUserId),
 		        loadHomePublicWishes(),
+	        loadHomeCooperativeWishes(),
 	        loadHomeFulfilledWishes(),
 	        loadMyStats(),
 	      ]);
@@ -2415,6 +2507,24 @@
             <p class="home-public-wish-status" id="homePublicWishStatus" aria-live="polite"></p>
 
 	            <a href="/my-public-whishes.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="public_wishes">Ver más</a>
+          </article>
+
+          <article class="panel hidden" id="homeCooperativePanel">
+            <div class="panel-head">
+              <h3 class="panel-title">Deseos cooperativos</h3>
+              <span class="panel-badge" id="homeCooperativeWishCount">0 / 20</span>
+            </div>
+
+            <ul class="wish-list" id="homeCooperativeWishList"></ul>
+            <p class="home-public-wish-status" id="homeCooperativeWishStatus" aria-live="polite"></p>
+
+	            <a
+                href="/my-public-whishes.html#cooperative-wishes"
+                class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn"
+                data-profile-module="public_wishes_cooperative"
+              >
+                Ver más
+              </a>
           </article>
 
           <article class="panel">

@@ -8,7 +8,17 @@ from .user_vault import UserVault  # noqa
 from .life_purpose import LifePurpose  # noqa
 from .media import Media  # noqa
 from .password_reset_token import PasswordResetToken  # noqa
-from .post import Post, PostComment, PostMediaKind, PostReport, PostReportReason, PostStar, PostVisibility  # noqa
+from .post import (
+    Post,
+    PostComment,
+    PostMediaKind,
+    PostReport,
+    PostReportCase,
+    PostReportCaseStatus,
+    PostReportReason,
+    PostStar,
+    PostVisibility,
+)  # noqa
 from .biography_personal_info import BiographyPersonalInfo  # noqa
 from .biography_physical_traits import BiographyPhysicalTraits  # noqa
 from .biography_education import BiographyEducation  # noqa
@@ -23,6 +33,7 @@ from .biography_distinctions import BiographyDistinctions  # noqa
 from .public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus  # noqa
 from .public_cooperative_wish import PublicCooperativeWish  # noqa
 from .public_cooperative_wish_participation import PublicCooperativeWishParticipation  # noqa
+from .public_cooperative_wish_fulfillment import PublicCooperativeWishFulfillment  # noqa
 from .private_personal_wish import PrivatePersonalWish, PrivatePersonalWishStatus  # noqa
 from .public_wish_freeze_audit import (
     PublicWishFreezeAudit,
@@ -42,3 +53,8 @@ from .message_entry import MessageEntry  # noqa
 from .gallery_folder import GalleryFolder  # noqa
 from .gallery_folder_item import GalleryFolderItem  # noqa
 from .achievement_unlock_event import AchievementUnlockEvent  # noqa
+from .account_closure_audit import (
+    AccountClosureAudit,
+    AccountClosureReason,
+    AccountClosureRestoreMethod,
+)  # noqa

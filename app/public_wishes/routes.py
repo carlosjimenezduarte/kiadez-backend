@@ -14,6 +14,7 @@ from app.db.database import get_db
 from app.db.models.guardian_wish_request import GuardianWishRequest, GuardianWishRequestStatus
 from app.db.models.media import Media
 from app.db.models.public_cooperative_wish import PublicCooperativeWish
+from app.db.models.public_cooperative_wish_fulfillment import PublicCooperativeWishFulfillment
 from app.db.models.public_cooperative_wish_participation import PublicCooperativeWishParticipation
 from app.db.models.public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus
 from app.db.models.public_wish_fulfillment import (
@@ -27,8 +28,13 @@ from app.db.models.public_wish_freeze_audit import (
 )
 from app.db.models.user import User
 from app.public_wishes.schemas import (
+    PublicCooperativeWishFulfilledListOut,
+    PublicCooperativeWishFulfilledOut,
     PublicCooperativeWishListOut,
     PublicCooperativeWishOut,
+    PublicCooperativeWishFulfillRequest,
+    PublicCooperativeWishParticipantReviewOut,
+    PublicCooperativeWishParticipationCompleteRequest,
     PublicCooperativeWishParticipationUpsertRequest,
     PublicCooperativeWishUpsertRequest,
     PublicPersonalWishDeleteResponse,
@@ -218,40 +224,122 @@ def _resolve_owned_media(*, db: Session, media_id: int | None, user_id: int) -> 
     return media
 
 
-def _load_cooperative_participants_count_map(
+def _load_cooperative_fulfillment_for_wish(
+    *,
+    db: Session,
+    wish_id: int,
+) -> PublicCooperativeWishFulfillment | None:
+    return db.execute(
+        select(PublicCooperativeWishFulfillment).where(PublicCooperativeWishFulfillment.wish_id == wish_id)
+    ).scalar_one_or_none()
+
+
+def _load_cooperative_participations_map(
     *,
     db: Session,
     wish_ids: list[int],
-) -> dict[int, int]:
-    if not wish_ids:
-        return {}
-
-    rows = db.execute(
-        select(
-            PublicCooperativeWishParticipation.wish_id,
-            func.count(PublicCooperativeWishParticipation.id),
-        )
-        .where(PublicCooperativeWishParticipation.wish_id.in_(wish_ids))
-        .group_by(PublicCooperativeWishParticipation.wish_id)
-    ).all()
-    return {int(row[0]): int(row[1]) for row in rows}
-
-
-def _load_viewer_cooperative_participation_map(
-    *,
-    db: Session,
-    wish_ids: list[int],
-    viewer_user_id: int,
-) -> dict[int, PublicCooperativeWishParticipation]:
+) -> dict[int, list[PublicCooperativeWishParticipation]]:
     if not wish_ids:
         return {}
 
     rows = db.execute(
         select(PublicCooperativeWishParticipation)
         .where(PublicCooperativeWishParticipation.wish_id.in_(wish_ids))
-        .where(PublicCooperativeWishParticipation.participant_user_id == viewer_user_id)
+        .order_by(
+            PublicCooperativeWishParticipation.created_at.asc(),
+            PublicCooperativeWishParticipation.id.asc(),
+        )
     ).scalars().all()
-    return {int(row.wish_id): row for row in rows}
+    out: dict[int, list[PublicCooperativeWishParticipation]] = {}
+    for row in rows:
+        out.setdefault(int(row.wish_id), []).append(row)
+    return out
+
+
+def _build_participants_count_map(
+    *,
+    participations_map: dict[int, list[PublicCooperativeWishParticipation]],
+) -> dict[int, int]:
+    return {
+        int(wish_id): int(len(items or []))
+        for wish_id, items in participations_map.items()
+    }
+
+
+def _load_users_map(
+    *,
+    db: Session,
+    user_ids: set[int],
+) -> dict[int, User]:
+    if not user_ids:
+        return {}
+    rows = db.execute(select(User).where(User.id.in_(sorted(user_ids)))).scalars().all()
+    return {int(user.id): user for user in rows}
+
+
+def _build_cooperative_render_context(
+    *,
+    db: Session,
+    wishes: list[PublicCooperativeWish],
+    current_user_id: int,
+    fulfillment_map: dict[int, PublicCooperativeWishFulfillment] | None = None,
+) -> dict[str, object]:
+    wish_ids = [int(wish.id) for wish in wishes if wish.id is not None]
+    participations_map = _load_cooperative_participations_map(db=db, wish_ids=wish_ids)
+    participants_count_map = _build_participants_count_map(participations_map=participations_map)
+
+    viewer_participation_map: dict[int, PublicCooperativeWishParticipation] = {}
+    participant_user_ids: set[int] = set()
+    for wish_id, rows in participations_map.items():
+        for row in rows:
+            participant_user_ids.add(int(row.participant_user_id))
+            if int(row.participant_user_id) == int(current_user_id):
+                viewer_participation_map[int(wish_id)] = row
+
+    participant_user_map = _load_users_map(db=db, user_ids=participant_user_ids)
+
+    media_ids: set[int] = set()
+    for wish in wishes:
+        if wish.media_id is not None:
+            media_ids.add(int(wish.media_id))
+
+    for rows in participations_map.values():
+        for row in rows:
+            if row.evidence_media_id is not None:
+                media_ids.add(int(row.evidence_media_id))
+
+    for user in participant_user_map.values():
+        if user.profile_photo_media_id is not None:
+            media_ids.add(int(user.profile_photo_media_id))
+
+    for fulfillment in (fulfillment_map or {}).values():
+        if fulfillment.final_evidence_media_id is not None:
+            media_ids.add(int(fulfillment.final_evidence_media_id))
+
+    media_map: dict[int, Media] = {}
+    if media_ids:
+        medias = db.execute(select(Media).where(Media.id.in_(sorted(media_ids)))).scalars().all()
+        media_map = {int(media.id): media for media in medias}
+
+    return {
+        "media_map": media_map,
+        "participants_count_map": participants_count_map,
+        "viewer_participation_map": viewer_participation_map,
+        "participations_map": participations_map,
+        "participant_user_map": participant_user_map,
+    }
+
+
+def _cooperative_participation_status(
+    participation: PublicCooperativeWishParticipation | None,
+) -> str | None:
+    if participation is None:
+        return None
+    if participation.owner_validated_at is not None:
+        return "validated"
+    if participation.evidence_submitted_at is not None and participation.evidence_media_id is not None:
+        return "completed"
+    return "pending"
 
 
 def _cooperative_wish_out(
@@ -261,17 +349,65 @@ def _cooperative_wish_out(
     current_user_id: int,
     participants_count_map: dict[int, int] | None = None,
     viewer_participation_map: dict[int, PublicCooperativeWishParticipation] | None = None,
+    participations_map: dict[int, list[PublicCooperativeWishParticipation]] | None = None,
+    participant_user_map: dict[int, User] | None = None,
+    fulfillment_map: dict[int, PublicCooperativeWishFulfillment] | None = None,
 ) -> PublicCooperativeWishOut:
+    wish_id = int(wish.id)
     media = media_map.get(wish.media_id) if wish.media_id else None
-    participants_current = int((participants_count_map or {}).get(int(wish.id), 0))
+    participants_current = int((participants_count_map or {}).get(wish_id, 0))
     is_owner = int(current_user_id) == int(wish.user_id)
     viewer_participation = (
-        (viewer_participation_map or {}).get(int(wish.id))
+        (viewer_participation_map or {}).get(wish_id)
         if viewer_participation_map is not None
         else None
     )
+    fulfillment = (fulfillment_map or {}).get(wish_id)
+    is_fulfilled = fulfillment is not None
+
+    owner_review_items: list[PublicCooperativeWishParticipantReviewOut] = []
+    owner_pending_validation_count = 0
+    if is_owner:
+        for row in (participations_map or {}).get(wish_id, []):
+            if row.evidence_submitted_at is None or row.evidence_media_id is None:
+                continue
+
+            participant = (participant_user_map or {}).get(int(row.participant_user_id))
+            participant_username = participant.username if participant is not None else None
+            participant_user_id = int(row.participant_user_id)
+
+            profile_photo_media = None
+            if participant is not None and participant.profile_photo_media_id is not None:
+                profile_photo_media = media_map.get(int(participant.profile_photo_media_id))
+
+            evidence_media = media_map.get(int(row.evidence_media_id))
+            item = PublicCooperativeWishParticipantReviewOut(
+                participation_id=int(row.id),
+                participant_user_id=participant_user_id,
+                participant_handle=_build_handle(
+                    username=participant_username,
+                    user_id=participant_user_id,
+                ),
+                participant_profile_url=_build_profile_url(
+                    participant_username,
+                    user_id=participant_user_id,
+                ),
+                participant_profile_photo_url=_build_media_url(profile_photo_media),
+                participation_text=row.participation_text,
+                evidence_media_id=int(row.evidence_media_id),
+                evidence_media_url=_build_media_url(evidence_media),
+                completed_at=row.evidence_submitted_at,
+                validated_at=row.owner_validated_at,
+                is_validated=row.owner_validated_at is not None,
+            )
+            owner_review_items.append(item)
+            if row.owner_validated_at is None:
+                owner_pending_validation_count += 1
+
+    owner_can_mark_fulfilled = bool(owner_review_items) and owner_pending_validation_count == 0 and not is_fulfilled
+
     return PublicCooperativeWishOut(
-        id=int(wish.id),
+        id=wish_id,
         user_id=int(wish.user_id),
         wish_text=wish.wish_text,
         wish_type=wish.wish_type,
@@ -281,7 +417,62 @@ def _cooperative_wish_out(
         security_code=wish.security_code if is_owner else None,
         media_id=wish.media_id,
         media_url=_build_media_url(media),
+        viewer_participation_id=int(viewer_participation.id) if viewer_participation is not None else None,
         viewer_participation_text=viewer_participation.participation_text if viewer_participation else None,
+        viewer_participation_status=_cooperative_participation_status(viewer_participation),
+        viewer_participation_has_evidence=bool(
+            viewer_participation
+            and viewer_participation.evidence_media_id is not None
+            and viewer_participation.evidence_submitted_at is not None
+        ),
+        viewer_participation_completed_at=(
+            viewer_participation.evidence_submitted_at if viewer_participation is not None else None
+        ),
+        viewer_participation_validated_at=(
+            viewer_participation.owner_validated_at if viewer_participation is not None else None
+        ),
+        owner_review_items=owner_review_items if is_owner else [],
+        owner_pending_validation_count=owner_pending_validation_count if is_owner else 0,
+        owner_can_mark_fulfilled=owner_can_mark_fulfilled if is_owner else False,
+        is_fulfilled=is_fulfilled,
+        fulfilled_at=fulfillment.fulfilled_at if fulfillment is not None else None,
+        created_at=wish.created_at,
+        updated_at=wish.updated_at,
+    )
+
+
+def _cooperative_fulfilled_wish_out(
+    *,
+    wish: PublicCooperativeWish,
+    fulfillment: PublicCooperativeWishFulfillment,
+    media_map: dict[int, Media],
+    participants_count_map: dict[int, int] | None = None,
+) -> PublicCooperativeWishFulfilledOut:
+    wish_id = int(wish.id)
+    wish_media = media_map.get(int(wish.media_id)) if wish.media_id is not None else None
+    evidence_media = (
+        media_map.get(int(fulfillment.final_evidence_media_id))
+        if fulfillment.final_evidence_media_id is not None
+        else None
+    )
+    participants_current = int((participants_count_map or {}).get(wish_id, 0))
+
+    return PublicCooperativeWishFulfilledOut(
+        id=wish_id,
+        user_id=int(wish.user_id),
+        wish_text=wish.wish_text,
+        wish_type=wish.wish_type,
+        participants_goal=int(wish.participants_goal or 0),
+        participants_current=participants_current,
+        media_id=int(wish.media_id) if wish.media_id is not None else None,
+        media_url=_build_media_url(wish_media),
+        fulfilled_evidence_media_id=(
+            int(fulfillment.final_evidence_media_id)
+            if fulfillment.final_evidence_media_id is not None
+            else None
+        ),
+        fulfilled_evidence_media_url=_build_media_url(evidence_media),
+        fulfilled_at=fulfillment.fulfilled_at,
         created_at=wish.created_at,
         updated_at=wish.updated_at,
     )
@@ -410,23 +601,26 @@ def list_cooperative_wishes(
 
     wishes = db.execute(
         select(PublicCooperativeWish)
+        .outerjoin(
+            PublicCooperativeWishFulfillment,
+            PublicCooperativeWishFulfillment.wish_id == PublicCooperativeWish.id,
+        )
         .where(PublicCooperativeWish.user_id == current.user_number)
+        .where(PublicCooperativeWishFulfillment.id.is_(None))
         .order_by(PublicCooperativeWish.created_at.desc(), PublicCooperativeWish.id.desc())
     ).scalars().all()
 
-    wish_ids = [int(wish.id) for wish in wishes]
-    media_ids = {int(wish.media_id) for wish in wishes if wish.media_id is not None}
-    media_map: dict[int, Media] = {}
-    if media_ids:
-        medias = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
-        media_map = {int(media.id): media for media in medias}
-
-    participants_count_map = _load_cooperative_participants_count_map(db=db, wish_ids=wish_ids)
-    viewer_participation_map = _load_viewer_cooperative_participation_map(
+    render_context = _build_cooperative_render_context(
         db=db,
-        wish_ids=wish_ids,
-        viewer_user_id=current.user_number,
+        wishes=wishes,
+        current_user_id=current.user_number,
+        fulfillment_map={},
     )
+    media_map = render_context["media_map"]
+    participants_count_map = render_context["participants_count_map"]
+    viewer_participation_map = render_context["viewer_participation_map"]
+    participations_map = render_context["participations_map"]
+    participant_user_map = render_context["participant_user_map"]
 
     return PublicCooperativeWishListOut(
         items=[
@@ -436,6 +630,9 @@ def list_cooperative_wishes(
                 current_user_id=current.user_number,
                 participants_count_map=participants_count_map,
                 viewer_participation_map=viewer_participation_map,
+                participations_map=participations_map,
+                participant_user_map=participant_user_map,
+                fulfillment_map={},
             )
             for wish in wishes
         ],
@@ -462,23 +659,26 @@ def list_user_cooperative_wishes(
 
     wishes = db.execute(
         select(PublicCooperativeWish)
+        .outerjoin(
+            PublicCooperativeWishFulfillment,
+            PublicCooperativeWishFulfillment.wish_id == PublicCooperativeWish.id,
+        )
         .where(PublicCooperativeWish.user_id == user_id)
+        .where(PublicCooperativeWishFulfillment.id.is_(None))
         .order_by(PublicCooperativeWish.created_at.desc(), PublicCooperativeWish.id.desc())
     ).scalars().all()
 
-    wish_ids = [int(wish.id) for wish in wishes]
-    media_ids = {int(wish.media_id) for wish in wishes if wish.media_id is not None}
-    media_map: dict[int, Media] = {}
-    if media_ids:
-        medias = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
-        media_map = {int(media.id): media for media in medias}
-
-    participants_count_map = _load_cooperative_participants_count_map(db=db, wish_ids=wish_ids)
-    viewer_participation_map = _load_viewer_cooperative_participation_map(
+    render_context = _build_cooperative_render_context(
         db=db,
-        wish_ids=wish_ids,
-        viewer_user_id=current.user_number,
+        wishes=wishes,
+        current_user_id=current.user_number,
+        fulfillment_map={},
     )
+    media_map = render_context["media_map"]
+    participants_count_map = render_context["participants_count_map"]
+    viewer_participation_map = render_context["viewer_participation_map"]
+    participations_map = render_context["participations_map"]
+    participant_user_map = render_context["participant_user_map"]
 
     return PublicCooperativeWishListOut(
         items=[
@@ -488,6 +688,9 @@ def list_user_cooperative_wishes(
                 current_user_id=current.user_number,
                 participants_count_map=participants_count_map,
                 viewer_participation_map=viewer_participation_map,
+                participations_map=participations_map,
+                participant_user_map=participant_user_map,
+                fulfillment_map={},
             )
             for wish in wishes
         ],
@@ -507,7 +710,14 @@ def create_cooperative_wish(
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
     active_count = db.execute(
-        select(func.count(PublicCooperativeWish.id)).where(PublicCooperativeWish.user_id == current.user_number)
+        select(func.count(PublicCooperativeWish.id))
+        .select_from(PublicCooperativeWish)
+        .outerjoin(
+            PublicCooperativeWishFulfillment,
+            PublicCooperativeWishFulfillment.wish_id == PublicCooperativeWish.id,
+        )
+        .where(PublicCooperativeWish.user_id == current.user_number)
+        .where(PublicCooperativeWishFulfillment.id.is_(None))
     ).scalar_one()
     if int(active_count or 0) >= COOPERATIVE_ACTIVE_LIMIT:
         raise HTTPException(
@@ -529,13 +739,27 @@ def create_cooperative_wish(
     db.commit()
     db.refresh(wish)
 
-    media_map = {int(media.id): media} if media else {}
+    render_context = _build_cooperative_render_context(
+        db=db,
+        wishes=[wish],
+        current_user_id=current.user_number,
+        fulfillment_map={},
+    )
+    media_map = render_context["media_map"]
+    participants_count_map = render_context["participants_count_map"]
+    viewer_participation_map = render_context["viewer_participation_map"]
+    participations_map = render_context["participations_map"]
+    participant_user_map = render_context["participant_user_map"]
+
     return _cooperative_wish_out(
         wish=wish,
         media_map=media_map,
         current_user_id=current.user_number,
-        participants_count_map={int(wish.id): 0},
-        viewer_participation_map={},
+        participants_count_map=participants_count_map,
+        viewer_participation_map=viewer_participation_map,
+        participations_map=participations_map,
+        participant_user_map=participant_user_map,
+        fulfillment_map={},
     )
 
 
@@ -557,6 +781,8 @@ def update_cooperative_wish(
     ).scalar_one_or_none()
     if wish is None:
         raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+    if _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id)) is not None:
+        raise HTTPException(status_code=409, detail="Este deseo cooperativo ya fue marcado como cumplido.")
 
     media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number)
     wish.wish_text = payload.wish_text
@@ -569,24 +795,27 @@ def update_cooperative_wish(
     db.commit()
     db.refresh(wish)
 
-    media_ids = {int(wish.media_id)} if wish.media_id is not None else set()
-    media_map: dict[int, Media] = {}
-    if media_ids:
-        medias = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
-        media_map = {int(media.id): media for media in medias}
-
-    participants_count_map = _load_cooperative_participants_count_map(db=db, wish_ids=[int(wish.id)])
-    viewer_participation_map = _load_viewer_cooperative_participation_map(
+    render_context = _build_cooperative_render_context(
         db=db,
-        wish_ids=[int(wish.id)],
-        viewer_user_id=current.user_number,
+        wishes=[wish],
+        current_user_id=current.user_number,
+        fulfillment_map={},
     )
+    media_map = render_context["media_map"]
+    participants_count_map = render_context["participants_count_map"]
+    viewer_participation_map = render_context["viewer_participation_map"]
+    participations_map = render_context["participations_map"]
+    participant_user_map = render_context["participant_user_map"]
+
     return _cooperative_wish_out(
         wish=wish,
         media_map=media_map,
         current_user_id=current.user_number,
         participants_count_map=participants_count_map,
         viewer_participation_map=viewer_participation_map,
+        participations_map=participations_map,
+        participant_user_map=participant_user_map,
+        fulfillment_map={},
     )
 
 
@@ -600,6 +829,8 @@ def participate_in_cooperative_wish(
     wish = db.execute(select(PublicCooperativeWish).where(PublicCooperativeWish.id == wish_id)).scalar_one_or_none()
     if wish is None:
         raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+    if _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id)) is not None:
+        raise HTTPException(status_code=409, detail="Este deseo cooperativo ya fue marcado como cumplido.")
 
     owner = db.execute(
         select(User).where(User.id == int(wish.user_id), User.is_active.is_(True))
@@ -613,17 +844,27 @@ def participate_in_cooperative_wish(
     if not bool(owner.public_profile_show_public_wishes):
         raise HTTPException(status_code=403, detail="Este módulo es privado.")
 
-    expected_code = (wish.security_code or "").strip()
-    provided_code = (payload.security_code or "").strip()
-    if not expected_code or expected_code != provided_code:
-        raise HTTPException(status_code=403, detail="Código de seguridad inválido.")
-
     participation = db.execute(
         select(PublicCooperativeWishParticipation)
         .where(PublicCooperativeWishParticipation.wish_id == int(wish.id))
         .where(PublicCooperativeWishParticipation.participant_user_id == int(current.user_number))
     ).scalar_one_or_none()
     if participation is None:
+        expected_code = (wish.security_code or "").strip()
+        provided_code = (payload.security_code or "").strip()
+        if not expected_code or expected_code != provided_code:
+            raise HTTPException(status_code=403, detail="Código de seguridad inválido.")
+
+        participants_current = db.execute(
+            select(func.count(PublicCooperativeWishParticipation.id))
+            .where(PublicCooperativeWishParticipation.wish_id == int(wish.id))
+        ).scalar_one()
+        if int(participants_current or 0) >= int(wish.participants_goal or 0):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Este deseo ya alcanzó el máximo de {int(wish.participants_goal or 0)} participantes.",
+            )
+
         participation = PublicCooperativeWishParticipation(
             wish_id=int(wish.id),
             participant_user_id=int(current.user_number),
@@ -631,29 +872,316 @@ def participate_in_cooperative_wish(
         )
         db.add(participation)
     else:
+        if participation.owner_validated_at is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Tu participación ya fue validada por el creador y no puede editarse.",
+            )
         participation.participation_text = payload.participation_text
 
     db.commit()
     db.refresh(wish)
 
-    media_ids = {int(wish.media_id)} if wish.media_id is not None else set()
-    media_map: dict[int, Media] = {}
-    if media_ids:
-        medias = db.execute(select(Media).where(Media.id.in_(media_ids))).scalars().all()
-        media_map = {int(media.id): media for media in medias}
-
-    participants_count_map = _load_cooperative_participants_count_map(db=db, wish_ids=[int(wish.id)])
-    viewer_participation_map = _load_viewer_cooperative_participation_map(
+    render_context = _build_cooperative_render_context(
         db=db,
-        wish_ids=[int(wish.id)],
-        viewer_user_id=current.user_number,
+        wishes=[wish],
+        current_user_id=current.user_number,
+        fulfillment_map={},
     )
+    media_map = render_context["media_map"]
+    participants_count_map = render_context["participants_count_map"]
+    viewer_participation_map = render_context["viewer_participation_map"]
+    participations_map = render_context["participations_map"]
+    participant_user_map = render_context["participant_user_map"]
+
     return _cooperative_wish_out(
         wish=wish,
         media_map=media_map,
         current_user_id=current.user_number,
         participants_count_map=participants_count_map,
         viewer_participation_map=viewer_participation_map,
+        participations_map=participations_map,
+        participant_user_map=participant_user_map,
+        fulfillment_map={},
+    )
+
+
+@router.delete("/cooperative/{wish_id}/participation/mine", response_model=PublicCooperativeWishOut)
+def cancel_my_cooperative_participation(
+    wish_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    wish = db.execute(select(PublicCooperativeWish).where(PublicCooperativeWish.id == wish_id)).scalar_one_or_none()
+    if wish is None:
+        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+    if _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id)) is not None:
+        raise HTTPException(status_code=409, detail="Este deseo cooperativo ya fue marcado como cumplido.")
+
+    if int(current.user_number) == int(wish.user_id):
+        raise HTTPException(status_code=409, detail="No puedes cancelar participación en tu propio deseo cooperativo.")
+
+    participation = db.execute(
+        select(PublicCooperativeWishParticipation)
+        .where(PublicCooperativeWishParticipation.wish_id == int(wish.id))
+        .where(PublicCooperativeWishParticipation.participant_user_id == int(current.user_number))
+    ).scalar_one_or_none()
+    if participation is None:
+        raise HTTPException(status_code=404, detail="No tienes participación registrada en este deseo.")
+    if participation.owner_validated_at is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Tu participación ya fue validada por el creador y no puede cancelarse.",
+        )
+
+    db.delete(participation)
+    db.commit()
+    db.refresh(wish)
+
+    render_context = _build_cooperative_render_context(
+        db=db,
+        wishes=[wish],
+        current_user_id=current.user_number,
+        fulfillment_map={},
+    )
+    media_map = render_context["media_map"]
+    participants_count_map = render_context["participants_count_map"]
+    viewer_participation_map = render_context["viewer_participation_map"]
+    participations_map = render_context["participations_map"]
+    participant_user_map = render_context["participant_user_map"]
+
+    return _cooperative_wish_out(
+        wish=wish,
+        media_map=media_map,
+        current_user_id=current.user_number,
+        participants_count_map=participants_count_map,
+        viewer_participation_map=viewer_participation_map,
+        participations_map=participations_map,
+        participant_user_map=participant_user_map,
+        fulfillment_map={},
+    )
+
+
+@router.post("/cooperative/{wish_id}/participation/complete", response_model=PublicCooperativeWishOut)
+def complete_my_cooperative_participation(
+    wish_id: int,
+    payload: PublicCooperativeWishParticipationCompleteRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    wish = db.execute(select(PublicCooperativeWish).where(PublicCooperativeWish.id == wish_id)).scalar_one_or_none()
+    if wish is None:
+        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+    if _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id)) is not None:
+        raise HTTPException(status_code=409, detail="Este deseo cooperativo ya fue marcado como cumplido.")
+
+    if int(current.user_number) == int(wish.user_id):
+        raise HTTPException(status_code=409, detail="No puedes registrar participación en tu propio deseo cooperativo.")
+
+    participation = db.execute(
+        select(PublicCooperativeWishParticipation)
+        .where(PublicCooperativeWishParticipation.wish_id == int(wish.id))
+        .where(PublicCooperativeWishParticipation.participant_user_id == int(current.user_number))
+    ).scalar_one_or_none()
+    if participation is None:
+        raise HTTPException(status_code=404, detail="Primero debes registrar tu participación.")
+    if participation.owner_validated_at is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Tu participación ya fue validada por el creador y no puede modificarse.",
+        )
+
+    evidence_media = _resolve_owned_media(
+        db=db,
+        media_id=int(payload.evidence_media_id),
+        user_id=int(current.user_number),
+    )
+    participation.evidence_media_id = int(evidence_media.id)
+    participation.evidence_submitted_at = datetime.now(timezone.utc)
+    participation.oath_accepted = bool(payload.oath_accepted)
+
+    db.commit()
+    db.refresh(wish)
+
+    render_context = _build_cooperative_render_context(
+        db=db,
+        wishes=[wish],
+        current_user_id=current.user_number,
+        fulfillment_map={},
+    )
+    media_map = render_context["media_map"]
+    participants_count_map = render_context["participants_count_map"]
+    viewer_participation_map = render_context["viewer_participation_map"]
+    participations_map = render_context["participations_map"]
+    participant_user_map = render_context["participant_user_map"]
+
+    return _cooperative_wish_out(
+        wish=wish,
+        media_map=media_map,
+        current_user_id=current.user_number,
+        participants_count_map=participants_count_map,
+        viewer_participation_map=viewer_participation_map,
+        participations_map=participations_map,
+        participant_user_map=participant_user_map,
+        fulfillment_map={},
+    )
+
+
+@router.post("/cooperative/{wish_id}/participation/{participation_id}/validate", response_model=PublicCooperativeWishOut)
+def validate_cooperative_participation(
+    wish_id: int,
+    participation_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    wish = db.execute(
+        select(PublicCooperativeWish)
+        .where(PublicCooperativeWish.id == wish_id)
+        .where(PublicCooperativeWish.user_id == current.user_number)
+    ).scalar_one_or_none()
+    if wish is None:
+        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+    if _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id)) is not None:
+        raise HTTPException(status_code=409, detail="Este deseo cooperativo ya fue marcado como cumplido.")
+
+    participation = db.execute(
+        select(PublicCooperativeWishParticipation)
+        .where(PublicCooperativeWishParticipation.id == participation_id)
+        .where(PublicCooperativeWishParticipation.wish_id == int(wish.id))
+    ).scalar_one_or_none()
+    if participation is None:
+        raise HTTPException(status_code=404, detail="Participación no encontrada.")
+    if participation.evidence_submitted_at is None or participation.evidence_media_id is None:
+        raise HTTPException(status_code=409, detail="Esta participación aún no tiene evidencia para validar.")
+    if participation.oath_accepted is not True:
+        raise HTTPException(
+            status_code=409,
+            detail="La participación no aceptó el juramento obligatorio para su evidencia.",
+        )
+
+    if participation.owner_validated_at is None:
+        participation.owner_validated_at = datetime.now(timezone.utc)
+        participation.owner_validated_by_user_id = int(current.user_number)
+        db.commit()
+        db.refresh(wish)
+    else:
+        db.refresh(wish)
+
+    render_context = _build_cooperative_render_context(
+        db=db,
+        wishes=[wish],
+        current_user_id=current.user_number,
+        fulfillment_map={},
+    )
+    media_map = render_context["media_map"]
+    participants_count_map = render_context["participants_count_map"]
+    viewer_participation_map = render_context["viewer_participation_map"]
+    participations_map = render_context["participations_map"]
+    participant_user_map = render_context["participant_user_map"]
+
+    return _cooperative_wish_out(
+        wish=wish,
+        media_map=media_map,
+        current_user_id=current.user_number,
+        participants_count_map=participants_count_map,
+        viewer_participation_map=viewer_participation_map,
+        participations_map=participations_map,
+        participant_user_map=participant_user_map,
+        fulfillment_map={},
+    )
+
+
+@router.post("/cooperative/{wish_id}/fulfill", response_model=PublicCooperativeWishOut)
+def fulfill_cooperative_wish(
+    wish_id: int,
+    payload: PublicCooperativeWishFulfillRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    wish = db.execute(
+        select(PublicCooperativeWish)
+        .where(PublicCooperativeWish.id == wish_id)
+        .where(PublicCooperativeWish.user_id == current.user_number)
+    ).scalar_one_or_none()
+    if wish is None:
+        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+    existing_fulfillment = _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id))
+    if existing_fulfillment is not None:
+        raise HTTPException(status_code=409, detail="Este deseo cooperativo ya fue marcado como cumplido.")
+
+    invalid_oath_count = db.execute(
+        select(func.count(PublicCooperativeWishParticipation.id))
+        .where(PublicCooperativeWishParticipation.wish_id == int(wish.id))
+        .where(PublicCooperativeWishParticipation.evidence_submitted_at.is_not(None))
+        .where(PublicCooperativeWishParticipation.evidence_media_id.is_not(None))
+        .where(PublicCooperativeWishParticipation.oath_accepted.is_(False))
+    ).scalar_one()
+    if int(invalid_oath_count or 0) > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Hay evidencias de participación sin juramento válido. Deben volver a enviarse.",
+        )
+
+    participation_rows = db.execute(
+        select(PublicCooperativeWishParticipation)
+        .where(PublicCooperativeWishParticipation.wish_id == int(wish.id))
+        .where(PublicCooperativeWishParticipation.evidence_submitted_at.is_not(None))
+        .where(PublicCooperativeWishParticipation.evidence_media_id.is_not(None))
+        .where(PublicCooperativeWishParticipation.oath_accepted.is_(True))
+    ).scalars().all()
+    if not participation_rows:
+        raise HTTPException(
+            status_code=409,
+            detail="Aún no hay evidencias de participación para cerrar este deseo cooperativo.",
+        )
+
+    pending_validation_exists = any(row.owner_validated_at is None for row in participation_rows)
+    if pending_validation_exists:
+        raise HTTPException(
+            status_code=409,
+            detail="Debes validar todas las participaciones con evidencia antes de marcar este deseo como cumplido.",
+        )
+
+    evidence_media = _resolve_owned_media(
+        db=db,
+        media_id=int(payload.evidence_media_id),
+        user_id=int(current.user_number),
+    )
+
+    fulfillment = PublicCooperativeWishFulfillment(
+        wish_id=int(wish.id),
+        wish_owner_user_id=int(current.user_number),
+        final_evidence_media_id=int(evidence_media.id),
+        oath_accepted=bool(payload.oath_accepted),
+        fulfilled_at=datetime.now(timezone.utc),
+    )
+    db.add(fulfillment)
+    db.commit()
+    db.refresh(wish)
+    db.refresh(fulfillment)
+
+    fulfillment_map = {int(wish.id): fulfillment}
+    render_context = _build_cooperative_render_context(
+        db=db,
+        wishes=[wish],
+        current_user_id=current.user_number,
+        fulfillment_map=fulfillment_map,
+    )
+    media_map = render_context["media_map"]
+    participants_count_map = render_context["participants_count_map"]
+    viewer_participation_map = render_context["viewer_participation_map"]
+    participations_map = render_context["participations_map"]
+    participant_user_map = render_context["participant_user_map"]
+
+    return _cooperative_wish_out(
+        wish=wish,
+        media_map=media_map,
+        current_user_id=current.user_number,
+        participants_count_map=participants_count_map,
+        viewer_participation_map=viewer_participation_map,
+        participations_map=participations_map,
+        participant_user_map=participant_user_map,
+        fulfillment_map=fulfillment_map,
     )
 
 
@@ -674,10 +1202,165 @@ def delete_cooperative_wish(
     ).scalar_one_or_none()
     if wish is None:
         raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+    if _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id)) is not None:
+        raise HTTPException(status_code=409, detail="No puedes borrar un deseo cooperativo ya cumplido.")
 
     db.delete(wish)
     db.commit()
     return PublicPersonalWishDeleteResponse(deleted=True)
+
+
+@router.get("/cooperative/fulfilled/list", response_model=PublicCooperativeWishFulfilledListOut)
+def list_fulfilled_cooperative_wishes(
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    total = db.execute(
+        select(func.count(PublicCooperativeWishFulfillment.id))
+        .select_from(PublicCooperativeWishFulfillment)
+        .join(
+            PublicCooperativeWish,
+            PublicCooperativeWish.id == PublicCooperativeWishFulfillment.wish_id,
+        )
+        .where(PublicCooperativeWish.user_id == current.user_number)
+    ).scalar_one()
+
+    rows = db.execute(
+        select(PublicCooperativeWish, PublicCooperativeWishFulfillment)
+        .join(
+            PublicCooperativeWishFulfillment,
+            PublicCooperativeWishFulfillment.wish_id == PublicCooperativeWish.id,
+        )
+        .where(PublicCooperativeWish.user_id == current.user_number)
+        .order_by(
+            PublicCooperativeWishFulfillment.fulfilled_at.desc().nullslast(),
+            PublicCooperativeWishFulfillment.id.desc(),
+        )
+        .offset(offset)
+        .limit(limit)
+    ).all()
+
+    wishes = [row[0] for row in rows]
+    fulfillments_map = {int(row[0].id): row[1] for row in rows}
+    wish_ids = [int(wish.id) for wish in wishes if wish.id is not None]
+
+    participations_map = _load_cooperative_participations_map(db=db, wish_ids=wish_ids)
+    participants_count_map = _build_participants_count_map(participations_map=participations_map)
+
+    media_ids: set[int] = set()
+    for wish in wishes:
+        if wish.media_id is not None:
+            media_ids.add(int(wish.media_id))
+
+    for fulfillment in fulfillments_map.values():
+        if fulfillment.final_evidence_media_id is not None:
+            media_ids.add(int(fulfillment.final_evidence_media_id))
+
+    media_map: dict[int, Media] = {}
+    if media_ids:
+        medias = db.execute(select(Media).where(Media.id.in_(sorted(media_ids)))).scalars().all()
+        media_map = {int(media.id): media for media in medias}
+
+    return PublicCooperativeWishFulfilledListOut(
+        items=[
+            _cooperative_fulfilled_wish_out(
+                wish=wish,
+                fulfillment=fulfillments_map[int(wish.id)],
+                media_map=media_map,
+                participants_count_map=participants_count_map,
+            )
+            for wish in wishes
+        ],
+        total=int(total or 0),
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/user/{user_id}/cooperative/fulfilled", response_model=PublicCooperativeWishFulfilledListOut)
+def list_user_fulfilled_cooperative_wishes(
+    user_id: int,
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    target = db.execute(
+        select(User).where(User.id == user_id, User.is_active.is_(True))
+    ).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = int(current.user_number) == int(user_id)
+    if not is_owner and not bool(target.public_profile_show_fulfilled_wishes):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+
+    total = db.execute(
+        select(func.count(PublicCooperativeWishFulfillment.id))
+        .select_from(PublicCooperativeWishFulfillment)
+        .join(
+            PublicCooperativeWish,
+            PublicCooperativeWish.id == PublicCooperativeWishFulfillment.wish_id,
+        )
+        .where(PublicCooperativeWish.user_id == user_id)
+    ).scalar_one()
+
+    rows = db.execute(
+        select(PublicCooperativeWish, PublicCooperativeWishFulfillment)
+        .join(
+            PublicCooperativeWishFulfillment,
+            PublicCooperativeWishFulfillment.wish_id == PublicCooperativeWish.id,
+        )
+        .where(PublicCooperativeWish.user_id == user_id)
+        .order_by(
+            PublicCooperativeWishFulfillment.fulfilled_at.desc().nullslast(),
+            PublicCooperativeWishFulfillment.id.desc(),
+        )
+        .offset(offset)
+        .limit(limit)
+    ).all()
+
+    wishes = [row[0] for row in rows]
+    fulfillments_map = {int(row[0].id): row[1] for row in rows}
+    wish_ids = [int(wish.id) for wish in wishes if wish.id is not None]
+
+    participations_map = _load_cooperative_participations_map(db=db, wish_ids=wish_ids)
+    participants_count_map = _build_participants_count_map(participations_map=participations_map)
+
+    media_ids: set[int] = set()
+    for wish in wishes:
+        if wish.media_id is not None:
+            media_ids.add(int(wish.media_id))
+
+    for fulfillment in fulfillments_map.values():
+        if fulfillment.final_evidence_media_id is not None:
+            media_ids.add(int(fulfillment.final_evidence_media_id))
+
+    media_map: dict[int, Media] = {}
+    if media_ids:
+        medias = db.execute(select(Media).where(Media.id.in_(sorted(media_ids)))).scalars().all()
+        media_map = {int(media.id): media for media in medias}
+
+    return PublicCooperativeWishFulfilledListOut(
+        items=[
+            _cooperative_fulfilled_wish_out(
+                wish=wish,
+                fulfillment=fulfillments_map[int(wish.id)],
+                media_map=media_map,
+                participants_count_map=participants_count_map,
+            )
+            for wish in wishes
+        ],
+        total=int(total or 0),
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/personal/fulfilled", response_model=PublicPersonalWishFulfilledListOut)

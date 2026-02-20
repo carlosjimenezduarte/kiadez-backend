@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -44,6 +44,9 @@ from app.db.models.biography_life_achievements import BiographyLifeAchievements
 from app.db.models.biography_professional_achievements import BiographyProfessionalAchievements
 from app.db.models.biography_professional_info import BiographyProfessionalInfo
 from app.db.models.biography_physical_traits import BiographyPhysicalTraits
+from app.db.models.private_personal_wish import PrivatePersonalWish, PrivatePersonalWishStatus
+from app.db.models.public_cooperative_wish_fulfillment import PublicCooperativeWishFulfillment
+from app.db.models.public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus
 from app.db.models.public_wish_fulfillment import PublicWishFulfillment
 from app.db.models.user import User
 
@@ -311,20 +314,71 @@ def _apply_distinctions_payload(
 
 @router.get("/activity-stats", response_model=BiographyActivityStatsOut)
 def get_activity_stats(
+    user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    target_user_id = int(current.user_number)
+    requested_user_id = int(user_id) if user_id is not None else None
 
-    wishes_granted = db.execute(
-        select(func.count(PublicWishFulfillment.id)).where(
-            PublicWishFulfillment.fulfiller_user_id == current.user_number
-        )
-    ).scalar_one()
+    if requested_user_id is not None and requested_user_id != int(current.user_number):
+        target_user = db.execute(
+            select(User).where(
+                User.id == requested_user_id,
+                User.is_active.is_(True),
+            )
+        ).scalar_one_or_none()
+        if target_user is None:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        target_user_id = int(target_user.id)
+    else:
+        current_user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
+        if current_user is None:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
-    return BiographyActivityStatsOut(wishes_granted=int(wishes_granted or 0))
+    public_wishes_fulfilled = int(
+        db.execute(
+            select(func.count(PublicPersonalWish.id))
+            .where(PublicPersonalWish.user_id == target_user_id)
+            .where(PublicPersonalWish.status == PublicPersonalWishStatus.fulfilled)
+        ).scalar_one()
+        or 0
+    )
+
+    private_wishes_fulfilled = int(
+        db.execute(
+            select(func.count(PrivatePersonalWish.id))
+            .where(PrivatePersonalWish.user_id == target_user_id)
+            .where(PrivatePersonalWish.status == PrivatePersonalWishStatus.fulfilled)
+        ).scalar_one()
+        or 0
+    )
+
+    cooperative_wishes_fulfilled = int(
+        db.execute(
+            select(func.count(PublicCooperativeWishFulfillment.id)).where(
+                PublicCooperativeWishFulfillment.wish_owner_user_id == target_user_id
+            )
+        ).scalar_one()
+        or 0
+    )
+
+    wishes_fulfilled_total = max(0, public_wishes_fulfilled + private_wishes_fulfilled)
+
+    wishes_granted = int(
+        db.execute(
+            select(func.count(PublicWishFulfillment.id)).where(
+                PublicWishFulfillment.fulfiller_user_id == target_user_id
+            )
+        ).scalar_one()
+        or 0
+    )
+
+    return BiographyActivityStatsOut(
+        wishes_fulfilled=wishes_fulfilled_total,
+        cooperative_wishes_fulfilled=max(0, cooperative_wishes_fulfilled),
+        wishes_granted=max(0, wishes_granted),
+    )
 
 
 @router.get("/personal-info", response_model=BiographyPersonalInfoOut)

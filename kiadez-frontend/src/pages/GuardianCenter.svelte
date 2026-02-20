@@ -51,6 +51,18 @@
   let actionError = "";
   let actionLoading = false;
 
+  let reportedPostsLoading = false;
+  let reportedPostsError = "";
+  let reportedPostsPage = 1;
+  let reportedPostsTotalPages = 1;
+  let reportedPostsItems = [];
+  const REPORTED_POSTS_PAGE_SIZE = 10;
+  let activeReportedPost = null;
+  let reportedPostsActionError = "";
+  let reportedPostsActionLoading = false;
+  let showDeleteReportedPostModal = false;
+  let showKeepReportedPostModal = false;
+
   let showSealCommitmentModal = false;
   let showDenyModal = false;
   let showOwnerMessageModal = false;
@@ -100,16 +112,22 @@
     activeModuleKey = String(key || modules[0].key);
     if (activeModuleKey === "wish_management" && isGuardian) {
       void loadWishRequests(1);
+      return;
+    }
+    if (activeModuleKey === "reported_posts" && isGuardian) {
+      void loadReportedPosts(1);
     }
   };
 
   const getActiveModule = () => modules.find((item) => item.key === activeModuleKey) || modules[0];
 
-  const formatStatusLabel = (status) => {
-    const value = String(status || "").toLowerCase();
+  const formatStatusLabel = (request) => {
+    const value = String(request?.status || "").toLowerCase();
     if (value === "open") return "Abierta";
     if (value === "in_progress") return "Compromiso sellado";
-    if (value === "closed") return "Denegada";
+    if (value === "closed") {
+      return request?.denied_at ? "Denegada" : "Deseo completado";
+    }
     return value || "Desconocida";
   };
 
@@ -123,6 +141,26 @@
     }
   };
 
+  const formatReportStatusLabel = (item) => {
+    const value = String(item?.status || "").toLowerCase();
+    if (value === "open") return "Pendiente";
+    if (value === "kept") return "Conservada";
+    if (value === "deleted") return "Eliminada";
+    return value || "Desconocida";
+  };
+
+  const formatReportReasonLabel = (reason, otherReason = "") => {
+    const value = String(reason || "").toLowerCase();
+    if (value === "violent") return "Contenido violento o perturbador";
+    if (value === "divisive") return "Promueve confrontación o división excesiva";
+    if (value === "sexual") return "Contenido sexual explícito o inapropiado";
+    if (value === "other") {
+      const note = String(otherReason || "").trim();
+      return note ? `Otra razón: ${note}` : "Otra razón";
+    }
+    return value || "Razón no especificada";
+  };
+
   const toCensoredHandle = (userId) => {
     const id = Number(userId || 0);
     if (!Number.isFinite(id) || id <= 0) return "@id";
@@ -134,6 +172,14 @@
     const targetId = Number(updatedRequest.id);
     wishRequestsItems = wishRequestsItems.map((item) =>
       Number(item?.id) === targetId ? { ...item, ...updatedRequest } : item
+    );
+  };
+
+  const updateReportedPostItem = (updatedItem) => {
+    if (!updatedItem || !updatedItem.id) return;
+    const targetId = Number(updatedItem.id);
+    reportedPostsItems = reportedPostsItems.map((item) =>
+      Number(item?.id) === targetId ? { ...item, ...updatedItem } : item
     );
   };
 
@@ -165,6 +211,18 @@
     ownerMessageBodyError = false;
   };
 
+  const closeDeleteReportedPostModal = () => {
+    showDeleteReportedPostModal = false;
+    activeReportedPost = null;
+    reportedPostsActionError = "";
+  };
+
+  const closeKeepReportedPostModal = () => {
+    showKeepReportedPostModal = false;
+    activeReportedPost = null;
+    reportedPostsActionError = "";
+  };
+
   const openSealCommitmentModal = (req) => {
     activeWishRequest = req || null;
     actionError = "";
@@ -194,6 +252,18 @@
     showOwnerMessageModal = true;
   };
 
+  const openDeleteReportedPostModal = (item) => {
+    activeReportedPost = item || null;
+    reportedPostsActionError = "";
+    showDeleteReportedPostModal = true;
+  };
+
+  const openKeepReportedPostModal = (item) => {
+    activeReportedPost = item || null;
+    reportedPostsActionError = "";
+    showKeepReportedPostModal = true;
+  };
+
   const loadWishRequests = async (page = 1) => {
     wishRequestsLoading = true;
     wishRequestsError = "";
@@ -217,6 +287,32 @@
       wishRequestsTotalPages = 1;
     } finally {
       wishRequestsLoading = false;
+    }
+  };
+
+  const loadReportedPosts = async (page = 1) => {
+    reportedPostsLoading = true;
+    reportedPostsError = "";
+    const requestedPage = Math.max(1, Number(page || 1));
+
+    try {
+      const res = await apiFetch(
+        `/guardian-center/reported-posts?page=${encodeURIComponent(String(requestedPage))}&page_size=${encodeURIComponent(String(REPORTED_POSTS_PAGE_SIZE))}`
+      );
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudieron cargar las publicaciones denunciadas.");
+      }
+      reportedPostsItems = Array.isArray(data?.items) ? data.items : [];
+      reportedPostsTotalPages = Math.max(1, Number(data?.total_pages || 1));
+      reportedPostsPage = Math.max(1, Math.min(Number(data?.page || requestedPage), reportedPostsTotalPages));
+    } catch (err) {
+      reportedPostsError = err?.message || "No se pudieron cargar las publicaciones denunciadas.";
+      reportedPostsItems = [];
+      reportedPostsPage = 1;
+      reportedPostsTotalPages = 1;
+    } finally {
+      reportedPostsLoading = false;
     }
   };
 
@@ -312,8 +408,59 @@
     }
   };
 
+  const deleteReportedPost = async () => {
+    if (!activeReportedPost?.id || reportedPostsActionLoading) return;
+    reportedPostsActionLoading = true;
+    reportedPostsActionError = "";
+    try {
+      const res = await apiFetch(
+        `/guardian-center/reported-posts/${encodeURIComponent(String(activeReportedPost.id))}/delete-post`,
+        { method: "POST" }
+      );
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo eliminar la publicación denunciada.");
+      }
+      updateReportedPostItem(data);
+      closeDeleteReportedPostModal();
+    } catch (err) {
+      reportedPostsActionError = err?.message || "No se pudo eliminar la publicación denunciada.";
+    } finally {
+      reportedPostsActionLoading = false;
+    }
+  };
+
+  const keepReportedPost = async () => {
+    if (!activeReportedPost?.id || reportedPostsActionLoading) return;
+    reportedPostsActionLoading = true;
+    reportedPostsActionError = "";
+    try {
+      const res = await apiFetch(
+        `/guardian-center/reported-posts/${encodeURIComponent(String(activeReportedPost.id))}/keep-post`,
+        { method: "POST" }
+      );
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo conservar la publicación reportada.");
+      }
+      updateReportedPostItem(data);
+      closeKeepReportedPostModal();
+    } catch (err) {
+      reportedPostsActionError = err?.message || "No se pudo conservar la publicación reportada.";
+    } finally {
+      reportedPostsActionLoading = false;
+    }
+  };
+
   onMount(() => {
     document.body.dataset.visitor = "false";
+    const pollingMs = 15000;
+    const poller = window.setInterval(() => {
+      if (!isGuardian || isLoading) return;
+      if (activeModuleKey !== "reported_posts") return;
+      if (reportedPostsLoading || reportedPostsActionLoading) return;
+      void loadReportedPosts(reportedPostsPage);
+    }, pollingMs);
 
     (async () => {
       isLoading = true;
@@ -328,12 +475,23 @@
         }
         guardianRank = Number(data?.guardian_rank || 0) || 0;
         isGuardian = guardianRank >= GUARDIAN_REQUIRED_RANK;
+        if (isGuardian) {
+          if (activeModuleKey === "reported_posts") {
+            await loadReportedPosts(1);
+          } else if (activeModuleKey === "wish_management") {
+            await loadWishRequests(1);
+          }
+        }
       } catch (err) {
         loadError = err?.message || "No se pudo cargar el Centro del Guardián.";
       } finally {
         isLoading = false;
       }
     })();
+
+    return () => {
+      window.clearInterval(poller);
+    };
   });
 </script>
 
@@ -456,7 +614,7 @@
           <section class="guardian-center-module" aria-label={activeModule.title}>
             <div class="guardian-center-module-head">
               <h3 class="guardian-center-module-title">{activeModule.title}</h3>
-              {#if activeModuleKey === "wish_management"}
+              {#if activeModuleKey === "wish_management" || activeModuleKey === "reported_posts"}
                 <span class="guardian-center-module-pill">En vivo</span>
               {:else}
                 <span class="guardian-center-module-pill">Próximamente</span>
@@ -466,6 +624,10 @@
             {#if activeModuleKey === "wish_management"}
               <p class="panel-muted guardian-center-module-note">
                 Solicitudes generadas desde “Yo puedo cumplir ese deseo”. Usa el botón “Ver deseo” para ir al deseo exacto.
+              </p>
+            {:else if activeModuleKey === "reported_posts"}
+              <p class="panel-muted guardian-center-module-note">
+                Denuncias de publicaciones recibidas en tiempo real. Revisa el reporte y decide si se conserva o se elimina la publicación.
               </p>
             {:else}
               <p class="panel-muted guardian-center-module-note">
@@ -486,7 +648,7 @@
                     <article class="guardian-wish-card">
                       <header class="guardian-wish-card-head">
                         <div class="guardian-wish-card-title">{req.wish_text}</div>
-                        <div class="guardian-wish-card-status">{formatStatusLabel(req.status)}</div>
+                        <div class="guardian-wish-card-status">{formatStatusLabel(req)}</div>
                       </header>
 
                       <div class="guardian-wish-card-meta">
@@ -645,7 +807,136 @@
                 </div>
               {/if}
             {:else if activeModuleKey === "reported_posts"}
-              <div class="guardian-center-empty">No hay publicaciones denunciadas por ahora.</div>
+              {#if reportedPostsError}
+                <div class="guardian-center-empty is-error">{reportedPostsError}</div>
+              {:else if reportedPostsLoading}
+                <div class="guardian-center-empty">Cargando publicaciones denunciadas...</div>
+              {:else if !reportedPostsItems.length}
+                <div class="guardian-center-empty">No hay publicaciones denunciadas por ahora.</div>
+              {:else}
+                <div class="guardian-reported-posts" aria-label="Publicaciones denunciadas">
+                  {#each reportedPostsItems as item (item.id)}
+                    {@const statusLabel = formatReportStatusLabel(item)}
+                    <article class="guardian-reported-card">
+                      <header class="guardian-reported-head">
+                        <div class="guardian-reported-title-wrap">
+                          <div class="guardian-reported-title">Caso #{item.id}</div>
+                          <div class="guardian-reported-meta">
+                            <span>Reportes: {item.report_count}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>Primero: {formatDateTime(item.first_reported_at)}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>Último: {formatDateTime(item.last_reported_at)}</span>
+                          </div>
+                        </div>
+                        <span class={`guardian-reported-status is-${String(item.status || "").toLowerCase()}`}>{statusLabel}</span>
+                      </header>
+
+                      <div class="guardian-reported-body">
+                        <div class="guardian-reported-field">
+                          <div class="guardian-wish-label">Autor de la publicación</div>
+                          <div class="guardian-wish-value">
+                            {item.post_author.full_name}
+                            <span class="guardian-wish-handle">{item.post_author.handle}</span>
+                          </div>
+                        </div>
+
+                        <div class="guardian-reported-field">
+                          <div class="guardian-wish-label">Publicación reportada</div>
+                          <div class="guardian-reported-text">
+                            {#if item.post_text}
+                              {item.post_text}
+                            {:else}
+                              <span class="panel-muted">Sin texto.</span>
+                            {/if}
+                          </div>
+                          {#if item.post_media_url}
+                            <div class="guardian-reported-media-wrap">
+                              {#if item.post_media_kind && item.post_media_kind.startsWith("video")}
+                                <video class="guardian-reported-media" src={item.post_media_url} controls preload="metadata"></video>
+                              {:else}
+                                <a href={item.post_media_url} target="_blank" rel="noopener noreferrer" class="guardian-reported-media-link">
+                                  <img class="guardian-reported-media" src={item.post_media_url} alt="Media de la publicación denunciada" />
+                                </a>
+                              {/if}
+                            </div>
+                          {/if}
+                        </div>
+
+                        {#if item.reports?.length}
+                          <div class="guardian-reported-field">
+                            <div class="guardian-wish-label">Últimos reportes</div>
+                            <div class="guardian-reported-reasons">
+                              {#each item.reports as rep (rep.id)}
+                                <div class="guardian-reported-reason-item">
+                                  <span class="guardian-wish-handle">{rep.reporter_handle}</span>
+                                  <span>{formatReportReasonLabel(rep.reason, rep.other_reason)}</span>
+                                  <span class="panel-muted">{formatDateTime(rep.created_at)}</span>
+                                </div>
+                              {/each}
+                            </div>
+                          </div>
+                        {/if}
+
+                        {#if item.resolved_by_guardian}
+                          <div class="guardian-reported-field">
+                            <div class="guardian-wish-label">Última decisión</div>
+                            <div class="guardian-wish-value">
+                              {item.resolved_by_guardian.full_name}
+                              <span class="guardian-wish-handle">{item.resolved_by_guardian.handle}</span>
+                              {#if item.resolved_at}
+                                <span class="guardian-wish-commitment-date">· {formatDateTime(item.resolved_at)}</span>
+                              {/if}
+                            </div>
+                          </div>
+                        {/if}
+                      </div>
+
+                      <div class="guardian-reported-actions">
+                        <a class="btn btn-outline btn-compact" href={item.post_author.profile_url} target="_blank" rel="noopener noreferrer">
+                          Ver perfil
+                        </a>
+                        <button
+                          class="btn btn-primary btn-compact"
+                          type="button"
+                          disabled={reportedPostsActionLoading || item.status === "deleted" || !item.post_id}
+                          on:click={() => openDeleteReportedPostModal(item)}
+                        >
+                          Eliminar publicación
+                        </button>
+                        <button
+                          class="btn btn-outline btn-compact"
+                          type="button"
+                          disabled={reportedPostsActionLoading || item.status === "kept"}
+                          on:click={() => openKeepReportedPostModal(item)}
+                        >
+                          Conservar publicación
+                        </button>
+                      </div>
+                    </article>
+                  {/each}
+                </div>
+
+                <div class="guardian-wish-pagination" aria-label="Paginación de publicaciones denunciadas">
+                  <button
+                    class="btn btn-outline btn-compact"
+                    type="button"
+                    disabled={reportedPostsLoading || reportedPostsPage <= 1}
+                    on:click={() => loadReportedPosts(reportedPostsPage - 1)}
+                  >
+                    Anterior
+                  </button>
+                  <span class="guardian-wish-page">{reportedPostsPage} / {reportedPostsTotalPages}</span>
+                  <button
+                    class="btn btn-outline btn-compact"
+                    type="button"
+                    disabled={reportedPostsLoading || reportedPostsPage >= reportedPostsTotalPages}
+                    on:click={() => loadReportedPosts(reportedPostsPage + 1)}
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              {/if}
             {:else if activeModuleKey === "reported_profiles"}
               <div class="guardian-center-empty">No hay perfiles denunciados por ahora.</div>
             {:else if activeModuleKey === "messaging"}
@@ -807,6 +1098,80 @@
           {actionLoading ? "Enviando..." : "Enviar mensaje"}
         </button>
         <button class="btn btn-outline btn-compact" type="button" disabled={actionLoading} on:click={closeOwnerMessageModal}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal-overlay guardian-center-modal-overlay"
+    class:hidden={!showDeleteReportedPostModal}
+    aria-hidden={!showDeleteReportedPostModal}
+    on:click={(event) => {
+      if (event.target === event.currentTarget && !reportedPostsActionLoading) closeDeleteReportedPostModal();
+    }}
+  >
+    <div class="modal wish-modal guardian-center-modal" role="dialog" aria-modal="true" aria-label="Eliminar publicación denunciada">
+      <div class="modal-head guardian-center-modal-head">
+        <h3>Eliminar publicación denunciada</h3>
+      </div>
+      <div class="modal-body">
+        <p class="panel-muted">
+          Esta acción eliminará la publicación reportada y dejará registro en el historial del usuario.
+        </p>
+        {#if activeReportedPost?.post_author}
+          <p>
+            Autor: <strong>{activeReportedPost.post_author.full_name}</strong>
+            <span class="guardian-wish-handle">{activeReportedPost.post_author.handle}</span>
+          </p>
+        {/if}
+        {#if reportedPostsActionError}
+          <div class="wish-error is-visible">{reportedPostsActionError}</div>
+        {/if}
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-compact" type="button" disabled={reportedPostsActionLoading} on:click={deleteReportedPost}>
+          {reportedPostsActionLoading ? "Procesando..." : "Eliminar"}
+        </button>
+        <button class="btn btn-outline btn-compact" type="button" disabled={reportedPostsActionLoading} on:click={closeDeleteReportedPostModal}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal-overlay guardian-center-modal-overlay"
+    class:hidden={!showKeepReportedPostModal}
+    aria-hidden={!showKeepReportedPostModal}
+    on:click={(event) => {
+      if (event.target === event.currentTarget && !reportedPostsActionLoading) closeKeepReportedPostModal();
+    }}
+  >
+    <div class="modal wish-modal guardian-center-modal" role="dialog" aria-modal="true" aria-label="Conservar publicación reportada">
+      <div class="modal-head guardian-center-modal-head">
+        <h3>Conservar publicación reportada</h3>
+      </div>
+      <div class="modal-body">
+        <p class="panel-muted">
+          Marcarás este caso como revisado y la publicación permanecerá visible.
+        </p>
+        {#if activeReportedPost?.post_author}
+          <p>
+            Autor: <strong>{activeReportedPost.post_author.full_name}</strong>
+            <span class="guardian-wish-handle">{activeReportedPost.post_author.handle}</span>
+          </p>
+        {/if}
+        {#if reportedPostsActionError}
+          <div class="wish-error is-visible">{reportedPostsActionError}</div>
+        {/if}
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-compact" type="button" disabled={reportedPostsActionLoading} on:click={keepReportedPost}>
+          {reportedPostsActionLoading ? "Procesando..." : "Conservar"}
+        </button>
+        <button class="btn btn-outline btn-compact" type="button" disabled={reportedPostsActionLoading} on:click={closeKeepReportedPostModal}>
           Cancelar
         </button>
       </div>

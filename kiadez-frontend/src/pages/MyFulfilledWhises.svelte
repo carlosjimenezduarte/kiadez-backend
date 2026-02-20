@@ -38,6 +38,12 @@
   let personalFulfilledError = "";
   let personalFulfilledLoading = false;
 
+  let cooperativeFulfilledItems = [];
+  let cooperativeCompletedView = cooperativeCompletedSlots.map((slot) => ({ slot, wish: null }));
+  let cooperativeFulfilledTotal = 0;
+  let cooperativeFulfilledError = "";
+  let cooperativeFulfilledLoading = false;
+
   const getAccessToken = () => localStorage.getItem("access_token") || "";
 
   const parseResponseJson = async (res) => {
@@ -230,6 +236,20 @@
     return data;
   };
 
+  const fetchFulfilledCooperativeWishes = async (limit = FULFILLED_VISIBLE_SLOTS, offset = 0) => {
+    const profileId = Number(activeProfileUserId);
+    const endpoint =
+      !isViewingOwnProfile && Number.isFinite(profileId) && profileId > 0
+        ? `/public-wishes/user/${encodeURIComponent(String(profileId))}/cooperative/fulfilled?limit=${limit}&offset=${offset}`
+        : `/public-wishes/cooperative/fulfilled/list?limit=${limit}&offset=${offset}`;
+    const res = await apiFetch(endpoint);
+    const data = await parseResponseJson(res);
+    if (!res.ok) {
+      throw new Error(data.detail || "No se pudieron cargar los deseos cooperativos cumplidos.");
+    }
+    return data;
+  };
+
   const formatFulfilledDate = (value) => {
     if (!value) return "";
     const date = new Date(value);
@@ -291,9 +311,33 @@
     }
   };
 
+  const loadFulfilledCooperativeWishes = async () => {
+    cooperativeFulfilledLoading = true;
+    cooperativeFulfilledError = "";
+
+    try {
+      const data = await fetchFulfilledCooperativeWishes();
+      cooperativeFulfilledItems = Array.isArray(data?.items) ? data.items : [];
+      cooperativeFulfilledTotal = Number(data?.total) || cooperativeFulfilledItems.length;
+    } catch (error) {
+      cooperativeFulfilledItems = [];
+      cooperativeFulfilledTotal = 0;
+      cooperativeFulfilledError = error instanceof Error
+        ? error.message
+        : "No se pudieron cargar tus deseos cooperativos cumplidos.";
+    } finally {
+      cooperativeFulfilledLoading = false;
+    }
+  };
+
   $: personalCompletedView = personalCompletedSlots.map((slot, index) => ({
     slot,
     wish: personalFulfilledItems[index] || null
+  }));
+
+  $: cooperativeCompletedView = cooperativeCompletedSlots.map((slot, index) => ({
+    slot,
+    wish: cooperativeFulfilledItems[index] || null
   }));
 
   onMount(() => {
@@ -301,8 +345,20 @@
     void syncProfileStarsTotal("fulfilledWishesStarsTotal");
     const onFulfilledChanged = (event) => {
       const scope = event?.detail?.scope;
-      if (scope !== "public") return;
-      void loadFulfilledPersonalWishes();
+      if (scope === "public") {
+        void loadFulfilledPersonalWishes();
+        return;
+      }
+      if (scope === "public-cooperative") {
+        void loadFulfilledCooperativeWishes();
+        return;
+      }
+      if (!scope) {
+        void Promise.all([
+          loadFulfilledPersonalWishes(),
+          loadFulfilledCooperativeWishes(),
+        ]);
+      }
     };
     window.addEventListener("kiadez:fulfilled-wishes-changed", onFulfilledChanged);
     (async () => {
@@ -311,7 +367,10 @@
       } catch (error) {
         console.error(error);
       } finally {
-        void loadFulfilledPersonalWishes();
+        void Promise.all([
+          loadFulfilledPersonalWishes(),
+          loadFulfilledCooperativeWishes(),
+        ]);
       }
     })();
     return () => {
@@ -580,19 +639,78 @@
           <article class="panel wish-list-panel">
             <div class="panel-head">
               <h3 class="panel-title">Deseos cooperativos cumplidos</h3>
-              <span class="panel-badge">0 / 10</span>
+              <span class="panel-badge">
+                {Math.min(cooperativeFulfilledTotal, FULFILLED_VISIBLE_SLOTS)} / {FULFILLED_VISIBLE_SLOTS}
+              </span>
             </div>
             <ol class="wish-slot-list wish-slot-list-fulfilled" aria-label="Deseos cooperativos cumplidos">
-              {#each cooperativeCompletedSlots as slot}
-                <li class="wish-slot is-filled wish-slot-fulfilled" data-slot={slot}>
-                  <div class="wish-slot-row wish-slot-row-fulfilled">
-                    <p class="wish-slot-fulfilled-message">
-                      {PLACEHOLDER_FULFILLED_MESSAGE}
-                    </p>
-                  </div>
+              {#each cooperativeCompletedView as item}
+                <li class="wish-slot is-filled" data-slot={item.slot}>
+                  {#if item.wish}
+                    {@const fulfilledImageUrl = item.wish.fulfilled_evidence_media_url || item.wish.media_url || null}
+                    <div class="wish-slot-row">
+                      <div class={`wish-slot-body${fulfilledImageUrl ? "" : " single"}`}>
+                        <div class="wish-slot-left">
+                          <div class="wish-slot-header">
+                            <button
+                              class="wish-category-hint"
+                              type="button"
+                              data-hint={getWishTypeHint(item.wish.wish_type)}
+                              aria-label={getWishTypeHint(item.wish.wish_type)}
+                            >
+                              <img
+                                class="wish-slot-category-icon"
+                                src={getTypeIconSrc(item.wish.wish_type)}
+                                alt={getWishTypeHint(item.wish.wish_type)}
+                                loading="lazy"
+                              />
+                            </button>
+                            <br />
+                            <div class="wish-slot-title">{item.wish.wish_text}</div>
+                            <div class="wish-slot-meta wish-slot-meta-fulfilled">
+                              {#if item.wish.fulfilled_at}
+                                <span class="wish-type-pill wish-fulfilled-date-pill">
+                                  Cumplido el {formatFulfilledDate(item.wish.fulfilled_at)}
+                                </span>
+                              {/if}
+                              <span class="wish-type-pill">
+                                Equipo validado: {Number(item.wish.participants_current || 0)} / {Number(item.wish.participants_goal || 0)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {#if fulfilledImageUrl}
+                          <div class="wish-slot-image-wrap">
+                            <img
+                              class="wish-slot-image wish-slot-image-fulfilled"
+                              src={fulfilledImageUrl}
+                              alt="Evidencia del deseo cooperativo cumplido"
+                              loading="lazy"
+                            />
+                          </div>
+                        {/if}
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="wish-slot-row wish-slot-row-fulfilled">
+                      <p class="wish-slot-fulfilled-message">
+                        {PLACEHOLDER_FULFILLED_MESSAGE}
+                      </p>
+                    </div>
+                  {/if}
                 </li>
               {/each}
             </ol>
+            {#if cooperativeFulfilledLoading}
+              <p class="wish-fulfilled-status">Cargando deseos cumplidos...</p>
+            {:else if cooperativeFulfilledError}
+              <p class="wish-fulfilled-status is-error">{cooperativeFulfilledError}</p>
+            {:else if cooperativeFulfilledTotal > FULFILLED_VISIBLE_SLOTS}
+              <p class="wish-fulfilled-status">
+                Mostrando los últimos {FULFILLED_VISIBLE_SLOTS} de {cooperativeFulfilledTotal} deseos cumplidos.
+              </p>
+            {/if}
           </article>
         </section>
       </section>

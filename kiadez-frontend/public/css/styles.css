@@ -1922,6 +1922,130 @@ body {
     background: rgba(153, 31, 31, 0.10);
 }
 
+.guardian-reported-posts {
+    display: grid;
+    gap: 12px;
+}
+
+.guardian-reported-card {
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    background: rgba(255, 255, 255, 0.74);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.10);
+}
+
+.guardian-reported-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.guardian-reported-title-wrap {
+    min-width: 0;
+}
+
+.guardian-reported-title {
+    font-size: 1.04rem;
+    font-weight: 800;
+    color: rgba(0, 0, 0, 0.84);
+}
+
+.guardian-reported-meta {
+    margin-top: 6px;
+    color: rgba(0, 0, 0, 0.55);
+    font-size: 0.9rem;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.guardian-reported-status {
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    font-weight: 800;
+    font-size: 0.84rem;
+    white-space: nowrap;
+}
+
+.guardian-reported-status.is-open {
+    background: rgba(176, 124, 0, 0.10);
+    border-color: rgba(176, 124, 0, 0.24);
+    color: rgba(117, 80, 0, 0.96);
+}
+
+.guardian-reported-status.is-kept {
+    background: rgba(11, 95, 42, 0.08);
+    border-color: rgba(11, 95, 42, 0.18);
+    color: rgba(11, 95, 42, 0.92);
+}
+
+.guardian-reported-status.is-deleted {
+    background: rgba(170, 35, 35, 0.08);
+    border-color: rgba(170, 35, 35, 0.18);
+    color: rgba(136, 26, 26, 0.92);
+}
+
+.guardian-reported-body {
+    margin-top: 10px;
+    display: grid;
+    gap: 10px;
+}
+
+.guardian-reported-field {
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.62);
+}
+
+.guardian-reported-text {
+    color: rgba(0, 0, 0, 0.78);
+    font-size: 0.95rem;
+    white-space: pre-wrap;
+}
+
+.guardian-reported-media-wrap {
+    margin-top: 10px;
+}
+
+.guardian-reported-media-link {
+    display: inline-flex;
+    text-decoration: none;
+}
+
+.guardian-reported-media {
+    width: min(520px, 100%);
+    max-height: 220px;
+    border-radius: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    object-fit: cover;
+    display: block;
+}
+
+.guardian-reported-reasons {
+    display: grid;
+    gap: 8px;
+}
+
+.guardian-reported-reason-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    color: rgba(0, 0, 0, 0.76);
+    font-size: 0.92rem;
+}
+
+.guardian-reported-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 .guardian-center-modal-overlay {
     z-index: 12000;
 }
@@ -2041,6 +2165,106 @@ body {
     margin-top: 12px;
     color: rgba(11, 95, 42, 0.92);
     font-size: 0.95rem;
+}
+
+.settings-change-intro {
+    margin: 0 0 8px;
+}
+
+.settings-change-section {
+    margin-top: 10px;
+}
+
+.settings-change-section-title {
+    margin: 0 0 6px;
+    font-size: 1rem;
+    color: rgba(0, 0, 0, 0.82);
+}
+
+.settings-change-section-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.settings-change-divider {
+    height: 1px;
+    margin: 18px 0 14px;
+    background: rgba(0, 0, 0, 0.10);
+}
+
+.settings-change-current-email {
+    margin-top: 0;
+}
+
+.modal.settings-close-account-modal {
+    width: min(820px, 92vw);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal.settings-close-account-modal .modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+}
+
+.settings-close-account-intro,
+.settings-close-account-summary {
+    margin: 0 0 10px;
+}
+
+.settings-close-account-reasons {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    background: rgba(255, 255, 255, 0.68);
+    display: grid;
+    gap: 8px;
+}
+
+.settings-close-account-legend {
+    padding: 0 6px;
+    color: rgba(0, 0, 0, 0.78);
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.settings-close-account-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: rgba(0, 0, 0, 0.78);
+    font-size: 0.95rem;
+}
+
+.settings-close-account-option input[type="radio"] {
+    margin-top: 2px;
+}
+
+.settings-close-account-warning {
+    margin: 12px 0 8px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(153, 31, 31, 0.24);
+    background: rgba(153, 31, 31, 0.08);
+    color: rgba(94, 23, 23, 0.94);
+    font-size: 0.93rem;
+    line-height: 1.4;
+}
+
+.settings-close-account-window {
+    margin-top: 10px;
+}
+
+.settings-close-account-confirm {
+    background: linear-gradient(to bottom, #8e2222, #7a1b1b);
+}
+
+.settings-close-account-confirm:hover {
+    background: linear-gradient(to bottom, #9c2a2a, #842020);
 }
 
 .settings-reset-text {
@@ -8010,6 +8234,130 @@ body[data-visitor="true"] .visitor-only {
 
 .fulfill-wish-modal .wish-preview-image {
     max-height: min(44vh, 420px);
+}
+
+.cooperative-owner-review-modal {
+    width: min(980px, 96vw);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.cooperative-owner-review-modal .modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.cooperative-owner-review-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.cooperative-review-item {
+    border-radius: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cooperative-review-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.cooperative-review-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    object-fit: cover;
+    border: 1px solid rgba(11, 95, 42, 0.2);
+    background: rgba(11, 95, 42, 0.08);
+    flex: 0 0 auto;
+}
+
+.cooperative-review-meta {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cooperative-review-handle {
+    color: #0b5f2a;
+    font-weight: 700;
+    text-decoration: none;
+    word-break: break-word;
+}
+
+.cooperative-review-handle:hover {
+    text-decoration: underline;
+}
+
+.cooperative-review-text {
+    margin: 0;
+    color: rgba(0, 0, 0, 0.72);
+    line-height: 1.45;
+    font-size: 0.94rem;
+    white-space: pre-wrap;
+}
+
+.cooperative-review-evidence-wrap {
+    width: 100%;
+    min-height: 170px;
+    border-radius: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.cooperative-review-evidence {
+    width: 100%;
+    height: 100%;
+    min-height: 170px;
+    object-fit: cover;
+    display: block;
+}
+
+.cooperative-review-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.cooperative-review-validate-btn {
+    border: 1px solid rgba(11, 95, 42, 0.24);
+    background: rgba(11, 95, 42, 0.08);
+    color: #0b5f2a;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-weight: 700;
+    font-family: 'Liberation Serif', serif;
+    cursor: pointer;
+}
+
+.cooperative-review-validate-btn:hover {
+    background: rgba(11, 95, 42, 0.16);
+}
+
+.cooperative-review-validate-btn.is-validated,
+.cooperative-review-validate-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    background: rgba(11, 95, 42, 0.18);
+}
+
+@media (max-width: 960px) {
+    .cooperative-owner-review-list {
+        grid-template-columns: 1fr;
+    }
 }
 
 .guardian-fulfill-modal .modal-body {

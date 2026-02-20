@@ -185,6 +185,8 @@
     const professionalActiveYearsInput = document.getElementById("professionalActiveYearsInput");
     const professionalOccupationValue = document.getElementById("professionalOccupationValue");
     const professionalActiveYearsValue = document.getElementById("professionalActiveYearsValue");
+    const wishesFulfilledValue = document.getElementById("wishesFulfilledValue");
+    const cooperativeWishesFulfilledValue = document.getElementById("cooperativeWishesFulfilledValue");
     const wishesGrantedValue = document.getElementById("wishesGrantedValue");
 
     const defaultProfilePhotoSrc = profilePhoto?.getAttribute("src") || "/css/logo-kiadez.webp";
@@ -553,10 +555,22 @@
       return { slots };
     };
 
+    const normalizeActivityCount = (value) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return "0";
+      return String(Math.max(0, Math.trunc(numeric)));
+    };
+
     const applyActivityStatsToView = (stats) => {
-      if (!wishesGrantedValue) return;
-      const totalGranted = Number(stats?.wishes_granted);
-      wishesGrantedValue.textContent = Number.isFinite(totalGranted) ? String(Math.max(0, Math.trunc(totalGranted))) : "0";
+      if (wishesFulfilledValue) {
+        wishesFulfilledValue.textContent = normalizeActivityCount(stats?.wishes_fulfilled);
+      }
+      if (cooperativeWishesFulfilledValue) {
+        cooperativeWishesFulfilledValue.textContent = normalizeActivityCount(stats?.cooperative_wishes_fulfilled);
+      }
+      if (wishesGrantedValue) {
+        wishesGrantedValue.textContent = normalizeActivityCount(stats?.wishes_granted);
+      }
     };
 
     const applyAboutToView = (about) => {
@@ -1052,8 +1066,10 @@
       return data;
     };
 
-    const loadActivityStats = async () => {
-      const res = await apiFetch("/biography/activity-stats");
+    const loadActivityStats = async ({ userId = null } = {}) => {
+      const requestedUserId = parsePositiveId(userId);
+      const query = requestedUserId ? `?user_id=${encodeURIComponent(String(requestedUserId))}` : "";
+      const res = await apiFetch(`/biography/activity-stats${query}`);
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "No se pudo cargar la actividad de Kiadez.");
@@ -2065,13 +2081,13 @@
     void loadProAchievements().catch(() => {});
     void loadLifeAchievements().catch(() => {});
     void loadFavoriteQuotes().catch(() => {});
-    void loadActivityStats().catch(() => {});
     void (async () => {
       try {
         await resolveBiographyProfileContext();
       } catch (error) {
         setDistinctionsModalStatus(error?.message || "No se pudo cargar el contexto del perfil.", true);
       }
+      void loadActivityStats({ userId: activeProfileUserId }).catch(() => {});
       void loadDistinctions().catch((error) => {
         applyDistinctionsToView({ slots: [] });
         setDistinctionsModalStatus(error?.message || "No se pudieron cargar las distinciones.", true);
@@ -2591,7 +2607,13 @@
                 <tbody>
                 <tr data-field="wishes_done">
                   <th>Deseos cumplidos</th>
-                  <td><span data-value>20</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
+                  <td><span id="wishesFulfilledValue" data-value>0</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
+                      decirlo</span>
+                  </td>
+                </tr>
+                <tr data-field="cooperative_wishes_done">
+                  <th>Deseos cooperativos cumplidos</th>
+                  <td><span id="cooperativeWishesFulfilledValue" data-value>0</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
                       decirlo</span>
                   </td>
                 </tr>

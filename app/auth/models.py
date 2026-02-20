@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 from typing import Optional, Literal
+from enum import Enum
 
 Role = Literal["user", "guardian", "admin"]
 
@@ -51,6 +52,32 @@ class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8)
     new_password_confirm: str = Field(min_length=8)
+
+
+class EmailChangeRequest(BaseModel):
+    current_password: str
+    new_email: EmailStr
+
+
+class AccountClosureReason(str, Enum):
+    no_support = "no_support"
+    prefer_private_space = "prefer_private_space"
+    personal_pause = "personal_pause"
+    misaligned_platform = "misaligned_platform"
+    goals_reached = "goals_reached"
+    other = "other"
+
+
+class AccountClosureRequest(BaseModel):
+    reason: AccountClosureReason
+    current_password: str
+    other_reason: Optional[str] = None
+
+
+class AccountClosureResponse(BaseModel):
+    closed: bool
+    restore_deadline_at: datetime
+    message: str
 
 
 class UsernameState(BaseModel):

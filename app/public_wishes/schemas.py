@@ -129,7 +129,7 @@ class PublicPersonalWishDeleteResponse(BaseModel):
 class PublicCooperativeWishUpsertRequest(BaseModel):
     wish_text: str = Field(..., min_length=1, max_length=120)
     wish_type: PublicCooperativeWishType
-    participants_goal: int = Field(..., ge=1, le=500)
+    participants_goal: int = Field(..., ge=1, le=10)
     template_text: str | None = Field(default=None, max_length=500)
     security_code: str = Field(..., min_length=6, max_length=6)
     media_id: int | None = Field(default=None, gt=0)
@@ -151,21 +151,63 @@ class PublicCooperativeWishUpsertRequest(BaseModel):
 
 
 class PublicCooperativeWishParticipationUpsertRequest(BaseModel):
-    security_code: str = Field(..., min_length=6, max_length=6)
+    security_code: str | None = Field(default=None, min_length=6, max_length=6)
     participation_text: str = Field(..., min_length=1, max_length=255)
 
     @model_validator(mode="after")
     def normalize_fields(self):
-        normalized_code = "".join(ch for ch in (self.security_code or "") if ch.isdigit())
-        if len(normalized_code) != 6:
-            raise ValueError("El código de seguridad debe tener exactamente 6 dígitos.")
-        self.security_code = normalized_code
+        if self.security_code is not None:
+            normalized_code = "".join(ch for ch in (self.security_code or "") if ch.isdigit())
+            if len(normalized_code) != 6:
+                raise ValueError("El código de seguridad debe tener exactamente 6 dígitos.")
+            self.security_code = normalized_code
+        else:
+            self.security_code = None
 
         normalized_text = (self.participation_text or "").strip()
         if not normalized_text:
             raise ValueError("Debes describir tu participación.")
         self.participation_text = normalized_text
         return self
+
+
+class PublicCooperativeWishParticipationCompleteRequest(BaseModel):
+    evidence_media_id: int = Field(..., gt=0)
+    oath_accepted: bool = False
+
+    @model_validator(mode="after")
+    def validate_oath(self):
+        if self.oath_accepted is not True:
+            raise ValueError("Debes aceptar el juramento para registrar la evidencia.")
+        return self
+
+
+class PublicCooperativeWishFulfillRequest(BaseModel):
+    evidence_media_id: int = Field(..., gt=0)
+    oath_accepted: bool = False
+
+    @model_validator(mode="after")
+    def validate_oath(self):
+        if self.oath_accepted is not True:
+            raise ValueError("Debes aceptar el juramento para marcar este deseo como cumplido.")
+        return self
+
+
+PublicCooperativeParticipationStatusLiteral = Literal["pending", "completed", "validated"]
+
+
+class PublicCooperativeWishParticipantReviewOut(BaseModel):
+    participation_id: int
+    participant_user_id: int
+    participant_handle: str
+    participant_profile_url: str
+    participant_profile_photo_url: str | None = None
+    participation_text: str
+    evidence_media_id: int
+    evidence_media_url: str | None = None
+    completed_at: datetime
+    validated_at: datetime | None = None
+    is_validated: bool = False
 
 
 class PublicCooperativeWishOut(BaseModel):
@@ -179,7 +221,17 @@ class PublicCooperativeWishOut(BaseModel):
     security_code: str | None = None
     media_id: int | None = None
     media_url: str | None = None
+    viewer_participation_id: int | None = None
     viewer_participation_text: str | None = None
+    viewer_participation_status: PublicCooperativeParticipationStatusLiteral | None = None
+    viewer_participation_has_evidence: bool = False
+    viewer_participation_completed_at: datetime | None = None
+    viewer_participation_validated_at: datetime | None = None
+    owner_review_items: list[PublicCooperativeWishParticipantReviewOut] = Field(default_factory=list)
+    owner_pending_validation_count: int = 0
+    owner_can_mark_fulfilled: bool = False
+    is_fulfilled: bool = False
+    fulfilled_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -188,3 +240,26 @@ class PublicCooperativeWishListOut(BaseModel):
     items: list[PublicCooperativeWishOut]
     active_count: int
     active_limit: int
+
+
+class PublicCooperativeWishFulfilledOut(BaseModel):
+    id: int
+    user_id: int
+    wish_text: str
+    wish_type: PublicCooperativeWishType
+    participants_goal: int
+    participants_current: int
+    media_id: int | None = None
+    media_url: str | None = None
+    fulfilled_evidence_media_id: int | None = None
+    fulfilled_evidence_media_url: str | None = None
+    fulfilled_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+class PublicCooperativeWishFulfilledListOut(BaseModel):
+    items: list[PublicCooperativeWishFulfilledOut]
+    total: int
+    limit: int
+    offset: int

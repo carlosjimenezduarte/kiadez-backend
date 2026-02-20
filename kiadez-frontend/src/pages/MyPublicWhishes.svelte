@@ -246,6 +246,9 @@
     const cooperativeParticipateModal = document.getElementById("cooperativeParticipateModal");
     const cooperativeParticipateDescription = document.getElementById("cooperativeParticipateDescription");
     const cooperativeParticipateQuote = document.getElementById("cooperativeParticipateQuote");
+    const cooperativeParticipateTitle = document.getElementById("cooperativeParticipateTitle");
+    const cooperativeParticipatePrompt = document.getElementById("cooperativeParticipatePrompt");
+    const cooperativeParticipateCta = document.getElementById("confirmCooperativeParticipate");
     const cancelCooperativeParticipate = document.getElementById("cancelCooperativeParticipate");
     const confirmCooperativeParticipate = document.getElementById("confirmCooperativeParticipate");
     const cooperativeSecurityModal = document.getElementById("cooperativeSecurityModal");
@@ -254,6 +257,19 @@
     const confirmCooperativeSecurity = document.getElementById("confirmCooperativeSecurity");
     const cancelCooperativeSecurity = document.getElementById("cancelCooperativeSecurity");
     const cooperativeCharacter = document.getElementById("cooperativeCharacter");
+    const cooperativeCancelParticipationModal = document.getElementById("cooperativeCancelParticipationModal");
+    const cooperativeCancelParticipationYes = document.getElementById("cooperativeCancelParticipationYes");
+    const cooperativeCancelParticipationNo = document.getElementById("cooperativeCancelParticipationNo");
+    const cooperativeOwnerReviewModal = document.getElementById("cooperativeOwnerReviewModal");
+    const cooperativeOwnerReviewClose = document.getElementById("cooperativeOwnerReviewClose");
+    const cooperativeOwnerReviewCancel = document.getElementById("cooperativeOwnerReviewCancel");
+    const cooperativeOwnerReviewProceed = document.getElementById("cooperativeOwnerReviewProceed");
+    const cooperativeOwnerReviewList = document.getElementById("cooperativeOwnerReviewList");
+    const cooperativeOwnerReviewStatus = document.getElementById("cooperativeOwnerReviewStatus");
+    const cooperativeFeedbackModal = document.getElementById("cooperativeFeedbackModal");
+    const cooperativeFeedbackTitle = document.getElementById("cooperativeFeedbackTitle");
+    const cooperativeFeedbackMessage = document.getElementById("cooperativeFeedbackMessage");
+    const cooperativeFeedbackClose = document.getElementById("cooperativeFeedbackClose");
     const personalWishText = document.getElementById("personalWishText");
     const personalWishError = document.getElementById("personalWishError");
     const confirmPersonalWish = document.getElementById("confirmPersonalWish");
@@ -274,8 +290,11 @@
     let activePersonalSlot = null;
     let activeDeleteSlot = null;
     let activeFulfillSlot = null;
+    let activeFulfillContext = "personal";
     let activeIcanSlot = null;
     let activeCooperativeSlot = null;
+    let activeCooperativeCancelSlot = null;
+    let activeCooperativeOwnerReviewSlot = null;
     let cooperativePreviewUrl = null;
     let cooperativePreviewImage = null;
     let activeParticipateSource = null;
@@ -283,6 +302,7 @@
     let activeParticipateSlot = null;
     let activeSecuritySlot = null;
     let activeSecurityCode = "";
+    let cooperativeOwnerReviewSubmitting = false;
     let coverMoveEnabled = false;
     let coverDragActive = false;
     let coverStartX = 0;
@@ -307,8 +327,9 @@
 	    let highlightWishId = null;
 	    let fulfillEvidenceUrl = null;
 	    let fulfillEvidenceImage = null;
-	    const GUARDIANS_PAGE_SIZE = 4;
-	    const GUARDIAN_REQUIRED_RANK = 3;
+    const GUARDIANS_PAGE_SIZE = 4;
+    const COOPERATIVE_PARTICIPANTS_LIMIT = 10;
+    const GUARDIAN_REQUIRED_RANK = 3;
 	    const GUARDIAN_AVATAR_PLACEHOLDERS = [
 	      "/css/icons/Guardian1.png",
 	      "/css/icons/Guardian2.png",
@@ -1079,6 +1100,58 @@
 	      return data;
 	    };
 
+	    const cancelCooperativeParticipationRecord = async (wishId) => {
+	      const res = await apiFetch(`/public-wishes/cooperative/${wishId}/participation/mine`, {
+	        method: "DELETE",
+	      });
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo cancelar tu participación.");
+	      }
+	      return data;
+	    };
+
+	    const completeCooperativeParticipationRecord = async (wishId, payload) => {
+	      const res = await apiFetch(`/public-wishes/cooperative/${wishId}/participation/complete`, {
+	        method: "POST",
+	        headers: { "Content-Type": "application/json" },
+	        body: JSON.stringify(payload),
+	      });
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo registrar la evidencia de tu participación.");
+	      }
+	      return data;
+	    };
+
+	    const validateCooperativeParticipationRecord = async (wishId, participationId) => {
+	      const res = await apiFetch(
+	        `/public-wishes/cooperative/${wishId}/participation/${participationId}/validate`,
+	        { method: "POST" }
+	      );
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo validar la participación.");
+	      }
+	      return data;
+	    };
+
+	    const fulfillCooperativeWishRecord = async (wishId, payload) => {
+	      if (!isViewingOwnProfile) {
+	        throw new Error("No autorizado.");
+	      }
+	      const res = await apiFetch(`/public-wishes/cooperative/${wishId}/fulfill`, {
+	        method: "POST",
+	        headers: { "Content-Type": "application/json" },
+	        body: JSON.stringify(payload),
+	      });
+	      const data = await parseResponseJson(res);
+	      if (!res.ok) {
+	        throw new Error(data.detail || "No se pudo marcar el deseo cooperativo como cumplido.");
+	      }
+	      return data;
+	    };
+
     const fetchPurposeSlotsFromApi = async () => {
       const token = getAccessToken();
       if (!token) return null;
@@ -1469,9 +1542,10 @@
       activeDeleteSlot = null;
     };
 
-    const openFulfillWishModal = (slot) => {
+    const openFulfillWishModal = (slot, context = "personal") => {
       if (!fulfillWishModal) return;
       activeFulfillSlot = slot;
+      activeFulfillContext = context || "personal";
       fulfillWishModal.classList.remove("hidden");
       fulfillWishModal.setAttribute("aria-hidden", "false");
       updateModalScrollLock();
@@ -1487,6 +1561,7 @@
       if (fulfillEvidence) fulfillEvidence.value = "";
       updateFulfillEvidencePreview(null);
       activeFulfillSlot = null;
+      activeFulfillContext = "personal";
     };
 
     const openIcanConfirmModal = (slot) => {
@@ -2138,7 +2213,7 @@
 
     const openCooperativeParticipateModal = (slot, mode = "create") => {
       if (!cooperativeParticipateModal) return;
-      activeParticipateMode = mode;
+      activeParticipateMode = mode === "edit" ? "edit" : "create";
       activeParticipateSource = slot;
       const description = slot?.dataset?.rootDescription || slot?.dataset?.description || "";
       const template = slot?.dataset?.template || "";
@@ -2146,6 +2221,22 @@
         slot?.dataset?.viewerParticipationText ||
         slot?.dataset?.participationText ||
         "";
+      const isEditMode = activeParticipateMode === "edit";
+      if (cooperativeParticipateTitle) {
+        cooperativeParticipateTitle.textContent = isEditMode
+          ? "Editar mi participación en el deseo cooperativo"
+          : "Gestión de participación en el deseo cooperativo";
+      }
+      if (cooperativeParticipatePrompt) {
+        cooperativeParticipatePrompt.textContent = isEditMode
+          ? "Ajusta tu texto de participación."
+          : "¿Seguro que quieres ayudar a cumplir este deseo?";
+      }
+      if (cooperativeParticipateCta) {
+        cooperativeParticipateCta.textContent = isEditMode
+          ? "Guardar cambios de mi participación"
+          : "Ayudar a cumplir este deseo";
+      }
       if (cooperativeParticipateDescription) {
         cooperativeParticipateDescription.textContent = description;
       }
@@ -2153,7 +2244,7 @@
         cooperativeParticipateQuote.textContent = template ? `“${template}”` : "";
       }
       if (cooperativeCharacter) {
-        cooperativeCharacter.value = mode === "edit" ? existingParticipation : "";
+        cooperativeCharacter.value = isEditMode ? existingParticipation : "";
       }
       cooperativeParticipateModal.classList.remove("hidden");
       cooperativeParticipateModal.setAttribute("aria-hidden", "false");
@@ -2194,6 +2285,186 @@
       if (clearCode) {
         activeSecurityCode = "";
       }
+      updateModalScrollLock();
+    };
+
+    const openCooperativeCancelParticipationModal = (slot) => {
+      if (!cooperativeCancelParticipationModal || !slot) return;
+      activeCooperativeCancelSlot = slot;
+      cooperativeCancelParticipationModal.classList.remove("hidden");
+      cooperativeCancelParticipationModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+    };
+
+    const closeCooperativeCancelParticipationModal = () => {
+      if (!cooperativeCancelParticipationModal) return;
+      cooperativeCancelParticipationModal.classList.add("hidden");
+      cooperativeCancelParticipationModal.setAttribute("aria-hidden", "true");
+      activeCooperativeCancelSlot = null;
+      updateModalScrollLock();
+    };
+
+    const getCooperativeOwnerReviewItemsFromSlot = (slot) => {
+      const raw = String(slot?.dataset?.ownerReviewItems || "").trim();
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const renderCooperativeOwnerReviewModal = () => {
+      if (!cooperativeOwnerReviewList || !cooperativeOwnerReviewStatus) return;
+      const slot = activeCooperativeOwnerReviewSlot;
+      const items = getCooperativeOwnerReviewItemsFromSlot(slot);
+      const ownerCanMarkFulfilled = slot?.dataset?.ownerCanMarkFulfilled === "true";
+      const pendingCount = Number(slot?.dataset?.ownerPendingValidationCount || 0);
+
+      cooperativeOwnerReviewList.innerHTML = "";
+      if (!items.length) {
+        cooperativeOwnerReviewStatus.textContent = "Aún no hay evidencias de participantes para revisar.";
+      } else if (pendingCount > 0) {
+        cooperativeOwnerReviewStatus.textContent = `Debes validar ${pendingCount} evidencia(s) antes de cerrar el deseo.`;
+      } else {
+        cooperativeOwnerReviewStatus.textContent = "Todas las evidencias fueron validadas. Ya puedes cerrar el deseo.";
+      }
+
+      items.forEach((item) => {
+        const card = document.createElement("article");
+        card.className = "cooperative-review-item";
+
+        const head = document.createElement("div");
+        head.className = "cooperative-review-head";
+
+        const avatar = document.createElement("img");
+        avatar.className = "cooperative-review-avatar";
+        avatar.src = item?.participant_profile_photo_url || "/assets/avatar-default.jpg";
+        avatar.alt = item?.participant_handle || "Participante";
+        head.appendChild(avatar);
+
+        const meta = document.createElement("div");
+        meta.className = "cooperative-review-meta";
+        const handle = document.createElement("a");
+        handle.className = "cooperative-review-handle";
+        handle.href = item?.participant_profile_url || "#";
+        handle.textContent = item?.participant_handle || "@usuario";
+        if (handle.href === "#") {
+          handle.removeAttribute("href");
+        }
+        const text = document.createElement("p");
+        text.className = "cooperative-review-text";
+        text.textContent = item?.participation_text || "";
+        meta.appendChild(handle);
+        meta.appendChild(text);
+        head.appendChild(meta);
+
+        card.appendChild(head);
+
+        const evidenceWrap = document.createElement("div");
+        evidenceWrap.className = "cooperative-review-evidence-wrap";
+        const evidence = document.createElement("img");
+        evidence.className = "cooperative-review-evidence";
+        evidence.src = item?.evidence_media_url || "/assets/avatar-default.jpg";
+        evidence.alt = "Evidencia de participación";
+        evidenceWrap.appendChild(evidence);
+        card.appendChild(evidenceWrap);
+
+        const actions = document.createElement("div");
+        actions.className = "cooperative-review-actions";
+        const validateBtn = document.createElement("button");
+        validateBtn.type = "button";
+        validateBtn.className = `cooperative-review-validate-btn${item?.is_validated ? " is-validated" : ""}`;
+        validateBtn.dataset.participationId = `${Number(item?.participation_id || 0)}`;
+        validateBtn.textContent = item?.is_validated ? "✅ Validado" : "✅ Validar";
+        validateBtn.disabled = cooperativeOwnerReviewSubmitting || Boolean(item?.is_validated);
+        actions.appendChild(validateBtn);
+        card.appendChild(actions);
+
+        cooperativeOwnerReviewList.appendChild(card);
+      });
+
+      if (cooperativeOwnerReviewProceed) {
+        cooperativeOwnerReviewProceed.disabled = !ownerCanMarkFulfilled || cooperativeOwnerReviewSubmitting;
+      }
+    };
+
+    const openCooperativeOwnerReviewModal = (slot) => {
+      if (!cooperativeOwnerReviewModal || !slot) return;
+      activeCooperativeOwnerReviewSlot = slot;
+      cooperativeOwnerReviewModal.classList.remove("hidden");
+      cooperativeOwnerReviewModal.setAttribute("aria-hidden", "false");
+      renderCooperativeOwnerReviewModal();
+      updateModalScrollLock();
+    };
+
+    const closeCooperativeOwnerReviewModal = () => {
+      if (!cooperativeOwnerReviewModal) return;
+      cooperativeOwnerReviewModal.classList.add("hidden");
+      cooperativeOwnerReviewModal.setAttribute("aria-hidden", "true");
+      activeCooperativeOwnerReviewSlot = null;
+      cooperativeOwnerReviewSubmitting = false;
+      updateModalScrollLock();
+    };
+
+    const validateParticipantEvidenceFromOwner = async (participationId) => {
+      if (cooperativeOwnerReviewSubmitting) return;
+      const slot = activeCooperativeOwnerReviewSlot;
+      const wishId = parsePositiveId(slot?.dataset?.wishId);
+      if (!slot || !wishId || !participationId) return;
+
+      cooperativeOwnerReviewSubmitting = true;
+      try {
+        const updatedWish = await validateCooperativeParticipationRecord(wishId, participationId);
+        applyCooperativeWishRecordToSlot(slot, updatedWish);
+        renderCooperativeOwnerReviewModal();
+      } catch (error) {
+        openCooperativeFeedbackModal({
+          title: "No se pudo validar",
+          message: error?.message || "No se pudo validar la participación.",
+        });
+      } finally {
+        cooperativeOwnerReviewSubmitting = false;
+        renderCooperativeOwnerReviewModal();
+      }
+    };
+
+    const continueOwnerCooperativeFulfillFlow = () => {
+      const slot = activeCooperativeOwnerReviewSlot;
+      if (!slot) return;
+      const ownerCanMarkFulfilled = slot.dataset.ownerCanMarkFulfilled === "true";
+      if (!ownerCanMarkFulfilled) {
+        openCooperativeFeedbackModal({
+          title: "Validación pendiente",
+          message: "Primero debes validar todas las evidencias de participación.",
+        });
+        return;
+      }
+      closeCooperativeOwnerReviewModal();
+      openFulfillWishModal(slot, "cooperative-final");
+    };
+
+    const openCooperativeFeedbackModal = ({
+      title = "Información",
+      message = "",
+    } = {}) => {
+      if (!cooperativeFeedbackModal) return;
+      if (cooperativeFeedbackTitle) {
+        cooperativeFeedbackTitle.textContent = String(title || "Información").trim() || "Información";
+      }
+      if (cooperativeFeedbackMessage) {
+        cooperativeFeedbackMessage.textContent = String(message || "").trim();
+      }
+      cooperativeFeedbackModal.classList.remove("hidden");
+      cooperativeFeedbackModal.setAttribute("aria-hidden", "false");
+      updateModalScrollLock();
+    };
+
+    const closeCooperativeFeedbackModal = () => {
+      if (!cooperativeFeedbackModal) return;
+      cooperativeFeedbackModal.classList.add("hidden");
+      cooperativeFeedbackModal.setAttribute("aria-hidden", "true");
       updateModalScrollLock();
     };
 
@@ -2478,13 +2749,11 @@
 
     if (confirmFulfillWish) {
       confirmFulfillWish.addEventListener("click", async () => {
-        if (!activeFulfillSlot) return;
-        if (activeFulfillSlot.classList.contains("is-cooperative")) {
-          closeFulfillWishModalFn();
-          return;
-        }
+        const slot = activeFulfillSlot;
+        if (!slot) return;
 
-        const wishId = parsePositiveId(activeFulfillSlot.dataset.wishId);
+        const context = activeFulfillContext || (slot.classList.contains("is-cooperative") ? "cooperative-participation" : "personal");
+        const wishId = parsePositiveId(slot.dataset.wishId);
         if (!wishId) {
           closeFulfillWishModalFn();
           return;
@@ -2492,14 +2761,64 @@
 
         try {
           const evidenceFile = fulfillEvidence?.files?.[0] || null;
-          const uploadedEvidence = evidenceFile ? await uploadWishImage(evidenceFile) : null;
-          await fulfillPersonalWishRecord(wishId, uploadedEvidence?.media_id || null);
-          resetSlotToEmpty(activeFulfillSlot);
-          closeFulfillWishModalFn();
-          window.dispatchEvent(new CustomEvent("kiadez:fulfilled-wishes-changed", { detail: { scope: "public" } }));
+          if (!evidenceFile && context !== "personal") {
+            openCooperativeFeedbackModal({
+              title: "Evidencia requerida",
+              message: "Debes subir una evidencia para continuar.",
+            });
+            return;
+          }
+
+          const evidenceUploader = context === "personal" ? uploadWishImage : uploadPublicImageMedia;
+          const uploadedEvidence = evidenceFile ? await evidenceUploader(evidenceFile) : null;
+          const evidenceMediaId = parsePositiveId(uploadedEvidence?.media_id);
+
+          if (context === "personal") {
+            await fulfillPersonalWishRecord(wishId, evidenceMediaId || null);
+            resetSlotToEmpty(slot);
+            closeFulfillWishModalFn();
+            window.dispatchEvent(new CustomEvent("kiadez:fulfilled-wishes-changed", { detail: { scope: "public" } }));
+            return;
+          }
+
+          if (!evidenceMediaId) {
+            throw new Error("No se pudo subir la evidencia.");
+          }
+
+          if (context === "cooperative-participation") {
+            const updatedWish = await completeCooperativeParticipationRecord(wishId, {
+              evidence_media_id: evidenceMediaId,
+              oath_accepted: true,
+            });
+            applyCooperativeWishRecordToSlot(slot, updatedWish);
+            closeFulfillWishModalFn();
+            openCooperativeFeedbackModal({
+              title: "Participación actualizada",
+              message: "Tu evidencia de participación fue enviada.",
+            });
+            return;
+          }
+
+          if (context === "cooperative-final") {
+            await fulfillCooperativeWishRecord(wishId, {
+              evidence_media_id: evidenceMediaId,
+              oath_accepted: true,
+            });
+            closeFulfillWishModalFn();
+            await loadCooperativeWishesFromApi();
+            openCooperativeFeedbackModal({
+              title: "Deseo cooperativo cumplido",
+              message: "El deseo cooperativo fue marcado como cumplido.",
+            });
+            window.dispatchEvent(new CustomEvent("kiadez:fulfilled-wishes-changed", { detail: { scope: "public-cooperative" } }));
+            return;
+          }
         } catch (error) {
           console.error(error);
-          window.alert(error?.message || "No se pudo marcar el deseo como cumplido.");
+          openCooperativeFeedbackModal({
+            title: "No se pudo completar la acción",
+            message: error?.message || "No se pudo marcar el deseo como cumplido.",
+          });
         }
       });
     }
@@ -2741,6 +3060,80 @@
     if (cooperativeSecurityModal) {
       cooperativeSecurityModal.addEventListener("click", (event) => {
         if (event.target === cooperativeSecurityModal) closeCooperativeSecurityModal();
+      });
+    }
+
+    if (cooperativeCancelParticipationNo) {
+      cooperativeCancelParticipationNo.addEventListener("click", closeCooperativeCancelParticipationModal);
+    }
+
+    if (cooperativeCancelParticipationYes) {
+      cooperativeCancelParticipationYes.addEventListener("click", async () => {
+        const slot = activeCooperativeCancelSlot;
+        const wishId = parsePositiveId(slot?.dataset?.wishId);
+        if (!slot || !wishId) {
+          closeCooperativeCancelParticipationModal();
+          return;
+        }
+
+        const oldLabel = cooperativeCancelParticipationYes.textContent || "Sí";
+        cooperativeCancelParticipationYes.disabled = true;
+        cooperativeCancelParticipationYes.textContent = "Procesando...";
+        try {
+          const updatedWish = await cancelCooperativeParticipationRecord(wishId);
+          applyCooperativeWishRecordToSlot(slot, updatedWish);
+          closeCooperativeCancelParticipationModal();
+          window.alert("Tu participación fue cancelada.");
+        } catch (error) {
+          window.alert(error?.message || "No se pudo cancelar tu participación.");
+        } finally {
+          cooperativeCancelParticipationYes.disabled = false;
+          cooperativeCancelParticipationYes.textContent = oldLabel;
+        }
+      });
+    }
+
+    if (cooperativeCancelParticipationModal) {
+      cooperativeCancelParticipationModal.addEventListener("click", (event) => {
+        if (event.target === cooperativeCancelParticipationModal) closeCooperativeCancelParticipationModal();
+      });
+    }
+
+    if (cooperativeOwnerReviewClose) {
+      cooperativeOwnerReviewClose.addEventListener("click", closeCooperativeOwnerReviewModal);
+    }
+
+    if (cooperativeOwnerReviewCancel) {
+      cooperativeOwnerReviewCancel.addEventListener("click", closeCooperativeOwnerReviewModal);
+    }
+
+    if (cooperativeOwnerReviewProceed) {
+      cooperativeOwnerReviewProceed.addEventListener("click", continueOwnerCooperativeFulfillFlow);
+    }
+
+    if (cooperativeOwnerReviewList) {
+      cooperativeOwnerReviewList.addEventListener("click", (event) => {
+        const validateBtn = event.target.closest(".cooperative-review-validate-btn");
+        if (!validateBtn) return;
+        const participationId = parsePositiveId(validateBtn.dataset.participationId);
+        if (!participationId) return;
+        void validateParticipantEvidenceFromOwner(participationId);
+      });
+    }
+
+    if (cooperativeOwnerReviewModal) {
+      cooperativeOwnerReviewModal.addEventListener("click", (event) => {
+        if (event.target === cooperativeOwnerReviewModal) closeCooperativeOwnerReviewModal();
+      });
+    }
+
+    if (cooperativeFeedbackClose) {
+      cooperativeFeedbackClose.addEventListener("click", closeCooperativeFeedbackModal);
+    }
+
+    if (cooperativeFeedbackModal) {
+      cooperativeFeedbackModal.addEventListener("click", (event) => {
+        if (event.target === cooperativeFeedbackModal) closeCooperativeFeedbackModal();
       });
     }
 
@@ -3082,6 +3475,13 @@
       delete slot.dataset.template;
       delete slot.dataset.securityCode;
       delete slot.dataset.viewerParticipationText;
+      delete slot.dataset.viewerParticipationStatus;
+      delete slot.dataset.viewerParticipationHasEvidence;
+      delete slot.dataset.viewerParticipationValidatedAt;
+      delete slot.dataset.ownerPendingValidationCount;
+      delete slot.dataset.ownerCanMarkFulfilled;
+      delete slot.dataset.ownerReviewItems;
+      delete slot.dataset.isFulfilled;
       delete slot.dataset.participationText;
       delete slot.dataset.rootDescription;
       delete slot.dataset.rootImageUrl;
@@ -3364,6 +3764,12 @@
       const mediaId = parsePositiveId(wish.media_id);
       const ownerSecurityCode = String(wish.security_code || "").trim();
       const viewerParticipationText = String(wish.viewer_participation_text || "").trim();
+      const viewerParticipationStatus = String(wish.viewer_participation_status || "").trim();
+      const viewerParticipationValidatedAt = String(wish.viewer_participation_validated_at || "").trim();
+      const ownerReviewItems = Array.isArray(wish.owner_review_items) ? wish.owner_review_items : [];
+      const ownerPendingValidationCount = Number(wish.owner_pending_validation_count || 0);
+      const ownerCanMarkFulfilled = Boolean(wish.owner_can_mark_fulfilled);
+      const isFulfilled = Boolean(wish.is_fulfilled);
 
       if (wishId) {
         slot.dataset.wishId = `${wishId}`;
@@ -3385,18 +3791,23 @@
       } else {
         delete slot.dataset.viewerParticipationText;
       }
+      if (viewerParticipationStatus) {
+        slot.dataset.viewerParticipationStatus = viewerParticipationStatus;
+      } else {
+        delete slot.dataset.viewerParticipationStatus;
+      }
+      slot.dataset.viewerParticipationHasEvidence = wish.viewer_participation_has_evidence ? "true" : "false";
+      if (viewerParticipationValidatedAt) {
+        slot.dataset.viewerParticipationValidatedAt = viewerParticipationValidatedAt;
+      } else {
+        delete slot.dataset.viewerParticipationValidatedAt;
+      }
+      slot.dataset.ownerPendingValidationCount = `${Number.isFinite(ownerPendingValidationCount) ? ownerPendingValidationCount : 0}`;
+      slot.dataset.ownerCanMarkFulfilled = ownerCanMarkFulfilled ? "true" : "false";
+      slot.dataset.ownerReviewItems = JSON.stringify(ownerReviewItems);
+      slot.dataset.isFulfilled = isFulfilled ? "true" : "false";
 
-      renderCooperativeWishSlot(
-        slot,
-        wish.wish_text || "",
-        wish.media_url || null,
-        wish.wish_type || "Espiritual",
-        Number(wish.participants_current || 0),
-        Number(wish.participants_goal || 0),
-        wish.template_text || "",
-        ownerSecurityCode,
-        viewerParticipationText
-      );
+      renderCooperativeWishSlot(slot, wish);
     };
 
     const clearCooperativeSlots = () => {
@@ -3433,18 +3844,32 @@
       }
     };
 
-    const renderCooperativeWishSlot = (
-      slot,
-      description,
-      imageUrl,
-      type,
-      current,
-      goal,
-      template,
-      securityCode,
-      viewerParticipationText = ""
-    ) => {
+    const renderCooperativeWishSlot = (slot, wish) => {
       if (!slot) return;
+      const description = String(wish?.wish_text || "").trim();
+      const imageUrl = String(wish?.media_url || "").trim() || null;
+      const type = String(wish?.wish_type || slot?.dataset?.type || "Espiritual");
+      const current = Number(wish?.participants_current || slot?.dataset?.current || 0);
+      const goal = Number(wish?.participants_goal || slot?.dataset?.goal || 0);
+      const template = String(wish?.template_text || slot?.dataset?.template || "");
+      const securityCode = String(wish?.security_code || slot?.dataset?.securityCode || "").trim();
+      const viewerParticipationText = String(
+        wish?.viewer_participation_text || slot?.dataset?.viewerParticipationText || ""
+      ).trim();
+      const viewerParticipationStatus = String(
+        wish?.viewer_participation_status || slot?.dataset?.viewerParticipationStatus || ""
+      ).trim();
+      const viewerParticipationHasEvidence = Boolean(
+        wish?.viewer_participation_has_evidence || slot?.dataset?.viewerParticipationHasEvidence === "true"
+      );
+      const viewerParticipationValidated = Boolean(
+        wish?.viewer_participation_validated_at || slot?.dataset?.viewerParticipationValidatedAt
+      );
+      const ownerReviewItems = Array.isArray(wish?.owner_review_items)
+        ? wish.owner_review_items
+        : getCooperativeOwnerReviewItemsFromSlot(slot);
+      const hasOwnerEvidenceItems = ownerReviewItems.length > 0;
+
       if (slot.dataset.imageUrl && slot.dataset.imageUrl !== imageUrl) {
         URL.revokeObjectURL(slot.dataset.imageUrl);
         delete slot.dataset.imageUrl;
@@ -3510,6 +3935,18 @@
         participationLine.className = "wish-root-description";
         participationLine.textContent = `Tu participación: ${viewerParticipationText}`;
         descWrap.appendChild(participationLine);
+
+        if (viewerParticipationValidated) {
+          const statusLine = document.createElement("div");
+          statusLine.className = "wish-root-description";
+          statusLine.textContent = "✅ Tu participación fue validada por el creador del deseo.";
+          descWrap.appendChild(statusLine);
+        } else if (viewerParticipationHasEvidence || viewerParticipationStatus === "completed") {
+          const statusLine = document.createElement("div");
+          statusLine.className = "wish-root-description";
+          statusLine.textContent = "⏳ Evidencia enviada. Esperando validación del creador.";
+          descWrap.appendChild(statusLine);
+        }
       }
       if (isViewingOwnProfile) {
         const securityField = document.createElement("div");
@@ -3544,11 +3981,45 @@
       const actions = document.createElement("div");
       actions.className = "wish-slot-actions wish-slot-actions-inline";
       if (!isViewingOwnProfile) {
-        actions.appendChild(createVisitorCooperativeIcon(hasViewerParticipation));
+        if (!hasViewerParticipation) {
+          actions.appendChild(createVisitorCooperativeIcon(false));
+        } else {
+          const disableManageActions = viewerParticipationValidated;
+
+          const editParticipationBtn = createWishActionBtn(
+            "/css/icons/iconedit.webp",
+            "Editar mi participación",
+            "help-edit"
+          );
+          if (disableManageActions) editParticipationBtn.classList.add("wish-icon-disabled");
+          actions.appendChild(editParticipationBtn);
+
+          const cancelParticipationBtn = createWishActionBtn(
+            "/css/icons/icondelete.webp",
+            "Cancelar mi participación",
+            "help-cancel"
+          );
+          if (disableManageActions) cancelParticipationBtn.classList.add("wish-icon-disabled");
+          actions.appendChild(cancelParticipationBtn);
+
+          const completeParticipationTitle = viewerParticipationHasEvidence
+            ? "Actualizar evidencia de mi participación"
+            : "Marcar mi participación como cumplida";
+          const completeParticipationBtn = createWishActionBtn(
+            "/css/icons/iconfulfill.webp",
+            completeParticipationTitle,
+            "help-complete"
+          );
+          if (disableManageActions) completeParticipationBtn.classList.add("wish-icon-disabled");
+          actions.appendChild(completeParticipationBtn);
+        }
       } else {
         actions.appendChild(createWishActionBtn("/css/icons/iconedit.webp", "Editar deseo", "edit"));
         const fulfillBtn = createWishActionBtn("/css/icons/iconfulfill.webp", "Marcar como cumplido", "fulfill");
-        fulfillBtn.classList.add("wish-icon-disabled");
+        if (!hasOwnerEvidenceItems) {
+          fulfillBtn.classList.add("wish-icon-disabled");
+          fulfillBtn.title = "Aún no hay evidencias de participantes para validar.";
+        }
         actions.appendChild(fulfillBtn);
         actions.appendChild(createWishActionBtn("/css/icons/icondelete.webp", "Borrar deseo", "delete"));
       }
@@ -3698,7 +4169,7 @@
         cooperativeWishText.dispatchEvent(new Event("input", { bubbles: true }));
       }
       if (cooperativeWishCount) {
-        cooperativeWishCount.value = "50";
+        cooperativeWishCount.value = `${COOPERATIVE_PARTICIPANTS_LIMIT}`;
       }
       if (cooperativeWishTemplate) {
         const suffix = cooperativeWishTemplate.dataset.suffix || "";
@@ -3868,7 +4339,9 @@
 
       const selectedType = Array.from(cooperativeWishTypeInputs).find((input) => input.checked)?.value || "Espiritual";
       const goalRaw = cooperativeWishCount ? Number(cooperativeWishCount.value) : 0;
-      const goal = Number.isFinite(goalRaw) ? Math.max(1, Math.min(500, Math.floor(goalRaw))) : 1;
+      const goal = Number.isFinite(goalRaw)
+        ? Math.max(1, Math.min(COOPERATIVE_PARTICIPANTS_LIMIT, Math.floor(goalRaw)))
+        : 1;
       if (cooperativeWishCount) {
         cooperativeWishCount.value = `${goal}`;
       }
@@ -3916,8 +4389,9 @@
         const sourceSlot = activeParticipateSource;
         const wishId = parsePositiveId(sourceSlot?.dataset?.wishId);
         if (!sourceSlot || !wishId) return;
+        const isEditMode = activeParticipateMode === "edit";
         const enteredCode = String(activeSecurityCode || "").replace(/\D/g, "").slice(0, 6);
-        if (enteredCode.length !== 6) {
+        if (!isEditMode && enteredCode.length !== 6) {
           closeCooperativeParticipateModalFn();
           openCooperativeSecurityModal(sourceSlot);
           if (cooperativeSecurityError) {
@@ -3938,7 +4412,7 @@
         }
         try {
           const updatedWish = await participateInCooperativeWishRecord(wishId, {
-            security_code: enteredCode,
+            security_code: isEditMode ? null : enteredCode,
             participation_text: participationText,
           });
           applyCooperativeWishRecordToSlot(sourceSlot, updatedWish);
@@ -4284,7 +4758,16 @@
         if (actionBtn) {
           if (
             !isViewingOwnProfile &&
-            !["ican", "help-coop", "guardian-freeze", "guardian-unfreeze", "guardian-fulfill"].includes(
+            ![
+              "ican",
+              "help-coop",
+              "help-edit",
+              "help-cancel",
+              "help-complete",
+              "guardian-freeze",
+              "guardian-unfreeze",
+              "guardian-fulfill",
+            ].includes(
               actionBtn.dataset.action
             )
           ) return;
@@ -4382,6 +4865,12 @@
             } else {
               openCooperativeParticipateModal(slot);
             }
+          } else if (actionBtn.dataset.action === "help-edit") {
+            openCooperativeParticipateModal(slot, "edit");
+          } else if (actionBtn.dataset.action === "help-cancel") {
+            openCooperativeCancelParticipationModal(slot);
+          } else if (actionBtn.dataset.action === "help-complete") {
+            openFulfillWishModal(slot, "cooperative-participation");
           }
           return;
         }
@@ -4403,7 +4892,7 @@
           return;
         }
         if (!actionBtn) return;
-        if (!isViewingOwnProfile && !["help-coop"].includes(actionBtn.dataset.action)) return;
+        if (!isViewingOwnProfile && !["help-coop", "help-edit", "help-cancel", "help-complete"].includes(actionBtn.dataset.action)) return;
         const slot = actionBtn.closest(".wish-slot");
         if (!slot) return;
 
@@ -4439,9 +4928,16 @@
           }
           setCooperativePreviewFromUrl(slot.dataset.imageUrl || null, "Imagen actual");
           openCooperativeWishModal();
+        } else if (actionBtn.dataset.action === "fulfill") {
+          if (!isViewingOwnProfile) return;
+          openCooperativeOwnerReviewModal(slot);
         } else if (actionBtn.dataset.action === "help-edit") {
           activeParticipateSlot = slot;
           openCooperativeParticipateModal(slot, "edit");
+        } else if (actionBtn.dataset.action === "help-cancel") {
+          openCooperativeCancelParticipationModal(slot);
+        } else if (actionBtn.dataset.action === "help-complete") {
+          openFulfillWishModal(slot, "cooperative-participation");
         } else if (actionBtn.dataset.action === "help-coop") {
           if (!isViewingOwnProfile) {
             openCooperativeSecurityModal(slot);
@@ -4451,6 +4947,15 @@
         }
       });
     }
+
+    const scrollToCooperativeSectionIfRequested = () => {
+      if (window.location.hash !== "#cooperative-wishes") return;
+      const cooperativeSection = document.getElementById("cooperative-wishes");
+      if (!cooperativeSection) return;
+      requestAnimationFrame(() => {
+        cooperativeSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    };
 
 	    void (async () => {
 	      try {
@@ -4462,6 +4967,7 @@
 	        loadPersonalWishesFromApi(),
 	        loadCooperativeWishesFromApi(),
 	      ]);
+        scrollToCooperativeSectionIfRequested();
 	    })();
 	  });
 </script>
@@ -4887,14 +5393,11 @@
             </div>
           </article>
 
-          <article class="panel wish-list-panel">
+          <article class="panel wish-list-panel" id="cooperative-wishes">
             <div class="panel-head">
               <h3 class="panel-title">Deseos cooperativos</h3>
               <span class="panel-badge"><span id="cooperativeWishCountLabel">0</span> / 20</span>
             </div>
-            <p class="panel-muted">
-              Zona vacía hasta que el usuario configura un deseo cooperativo.
-            </p>
             <ol class="wish-slot-list" id="cooperativeWishList" data-total="0" aria-label="Deseos cooperativos">
             </ol>
             <div class="wish-add-row">
@@ -5128,8 +5631,8 @@
                   <h2 class="modal-label modal-label-center">Configuración cooperativa</h2>
 
                   <h3 class="modal-label modal-label-center">Número máximo de personas
-                    participantes</h3>
-                  <input class="modal-input" id="cooperativeWishCount" type="number" min="1" value="50" />
+                    participantes (máximo 10)</h3>
+                  <input class="modal-input" id="cooperativeWishCount" type="number" min="1" max="10" value="10" />
 
                   <h3 class="modal-label modal-label-center">Dale al usuario una idea de cómo apropiarse de este
                     deseo</h3>
@@ -5429,11 +5932,11 @@
           <div class="modal wish-modal cooperative-participate-modal" role="dialog" aria-modal="true"
             aria-label="Gestión de participación en el deseo cooperativo">
             <div class="modal-head">
-              <h3>Gestión de participación en el deseo cooperativo</h3>
+              <h3 id="cooperativeParticipateTitle">Gestión de participación en el deseo cooperativo</h3>
             </div>
             <div class="modal-body">
               <p class="panel-muted" id="cooperativeParticipateDescription"></p>
-              <p class="panel-muted">¿Seguro que quieres ayudar a cumplir este deseo?</p>
+              <p class="panel-muted" id="cooperativeParticipatePrompt">¿Seguro que quieres ayudar a cumplir este deseo?</p>
               <div class="wish-quote" id="cooperativeParticipateQuote"></div>
               <label class="modal-label" for="cooperativeCharacter">Termina de redactar la naturaleza de este deseo,
                 para que sea tuyo</label>
@@ -5445,6 +5948,58 @@
               </button>
               <button class="btn btn-outline btn-compact" type="button"
                 id="cancelCooperativeParticipate">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-overlay hidden" id="cooperativeCancelParticipationModal" aria-hidden="true">
+          <div class="modal wish-modal delete-wish-modal" role="dialog" aria-modal="true"
+            aria-label="Cancelar participación">
+            <div class="modal-head">
+              <h3>¿Estás seguro de que ya no quieres participar en este deseo?</h3>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-primary btn-compact" type="button" id="cooperativeCancelParticipationYes">Sí</button>
+              <button class="btn btn-outline btn-compact" type="button" id="cooperativeCancelParticipationNo">No</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-overlay hidden" id="cooperativeOwnerReviewModal" aria-hidden="true">
+          <div class="modal wish-modal cooperative-owner-review-modal" role="dialog" aria-modal="true"
+            aria-label="Validar participaciones del deseo cooperativo">
+            <div class="modal-head">
+              <h3>Validar participaciones con evidencia</h3>
+              <button class="modal-close" type="button" id="cooperativeOwnerReviewClose">✕</button>
+            </div>
+            <div class="modal-body">
+              <p class="panel-muted" id="cooperativeOwnerReviewStatus">
+                Revisa y valida cada evidencia antes de cerrar este deseo cooperativo.
+              </p>
+              <div class="cooperative-owner-review-list" id="cooperativeOwnerReviewList"></div>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-primary btn-compact" type="button" id="cooperativeOwnerReviewProceed">
+                Continuar para marcar deseo como cumplido
+              </button>
+              <button class="btn btn-outline btn-compact" type="button" id="cooperativeOwnerReviewCancel">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-overlay hidden" id="cooperativeFeedbackModal" aria-hidden="true">
+          <div class="modal wish-modal delete-wish-modal" role="dialog" aria-modal="true"
+            aria-label="Mensaje informativo">
+            <div class="modal-head">
+              <h3 id="cooperativeFeedbackTitle">Información</h3>
+            </div>
+            <div class="modal-body">
+              <p class="panel-muted" id="cooperativeFeedbackMessage"></p>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-primary btn-compact" type="button" id="cooperativeFeedbackClose">Aceptar</button>
             </div>
           </div>
         </div>

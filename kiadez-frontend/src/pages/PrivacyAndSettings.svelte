@@ -12,9 +12,12 @@
   let changePasswordMode = "change"; // change | reset
   let changePasswordStatus = "";
   let changePasswordError = "";
+  let emailChangeStatus = "";
+  let emailChangeError = "";
   let resetStatus = "";
   let resetError = "";
   let isChangingPassword = false;
+  let isChangingEmail = false;
   let isSendingReset = false;
 
   let meEmail = "";
@@ -22,6 +25,7 @@
   let currentPassword = "";
   let newPassword = "";
   let newPasswordConfirm = "";
+  let newEmail = "";
 
   let showCurrentPassword = false;
   let showNewPassword = false;
@@ -97,12 +101,33 @@
     public_profile_show_personal_posts: true,
   };
 
+  const ACCOUNT_CLOSE_REASON_OTHER = "other";
+  const ACCOUNT_CLOSE_OPTIONS = [
+    { value: "no_support", label: "No encontré el acompañamiento que esperaba en este momento" },
+    { value: "prefer_private_space", label: "Prefiero mantener mis deseos en un espacio más privado" },
+    { value: "personal_pause", label: "Deseo tomar una pausa personal" },
+    { value: "misaligned_platform", label: "No me siento alineado actualmente con la dinámica de la plataforma" },
+    { value: "goals_reached", label: "He alcanzado mis objetivos por ahora" },
+    { value: ACCOUNT_CLOSE_REASON_OTHER, label: "Otro (especificar)" },
+  ];
+
   let privacyModalOpen = false;
   let privacyLoading = false;
   let privacySaving = false;
   let privacyError = "";
   let privacyStatus = "";
   let privacySettings = { ...DEFAULT_PRIVACY_SETTINGS };
+
+  let closeAccountModalOpen = false;
+  let closeAccountReason = ACCOUNT_CLOSE_OPTIONS[0].value;
+  let closeAccountOtherReason = "";
+  let closeAccountPassword = "";
+  let closeAccountLoading = false;
+  let closeAccountError = "";
+  let closeAccountStatus = "";
+  let closeAccountDone = false;
+  let closeAccountDeadlineLabel = "";
+  let showCloseAccountPassword = false;
 
   const getAccessToken = () => localStorage.getItem("access_token") || "";
 
@@ -149,14 +174,18 @@
   const resetChangePasswordState = () => {
     changePasswordStatus = "";
     changePasswordError = "";
+    emailChangeStatus = "";
+    emailChangeError = "";
     resetStatus = "";
     resetError = "";
     isChangingPassword = false;
+    isChangingEmail = false;
     isSendingReset = false;
 
     currentPassword = "";
     newPassword = "";
     newPasswordConfirm = "";
+    newEmail = "";
 
     showCurrentPassword = false;
     showNewPassword = false;
@@ -277,6 +306,61 @@
       resetError = err?.message || "No se pudo enviar el enlace de recuperación.";
     } finally {
       isSendingReset = false;
+    }
+  };
+
+  const handleChangeEmail = async () => {
+    emailChangeError = "";
+    emailChangeStatus = "";
+
+    const current = String(currentPassword || "").trim();
+    const nextEmail = String(newEmail || "").trim().toLowerCase();
+    const currentEmail = String(meEmail || "").trim().toLowerCase();
+
+    if (!current) {
+      emailChangeError = "Debes digitar tu contraseña actual.";
+      return;
+    }
+
+    if (!nextEmail) {
+      emailChangeError = "Debes digitar el nuevo correo.";
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
+      emailChangeError = "Digita un correo electrónico válido.";
+      return;
+    }
+
+    if (currentEmail && nextEmail === currentEmail) {
+      emailChangeError = "El nuevo correo debe ser distinto al actual.";
+      return;
+    }
+
+    isChangingEmail = true;
+    try {
+      const res = await apiFetch("/auth/email/change", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          current_password: current,
+          new_email: nextEmail,
+        }),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo actualizar el correo.");
+      }
+
+      meEmail = String(data?.email || nextEmail);
+      newEmail = "";
+      currentPassword = "";
+      showCurrentPassword = false;
+      emailChangeStatus = data?.message || "Correo actualizado correctamente.";
+    } catch (err) {
+      emailChangeError = err?.message || "No se pudo actualizar el correo.";
+    } finally {
+      isChangingEmail = false;
     }
   };
 
@@ -511,6 +595,81 @@
     }
   };
 
+  const resetCloseAccountState = () => {
+    closeAccountReason = ACCOUNT_CLOSE_OPTIONS[0].value;
+    closeAccountOtherReason = "";
+    closeAccountPassword = "";
+    closeAccountLoading = false;
+    closeAccountError = "";
+    closeAccountStatus = "";
+    closeAccountDone = false;
+    closeAccountDeadlineLabel = "";
+    showCloseAccountPassword = false;
+  };
+
+  const openCloseAccountModal = () => {
+    resetCloseAccountState();
+    closeAccountModalOpen = true;
+  };
+
+  const closeCloseAccountModal = () => {
+    if (closeAccountLoading) return;
+    closeAccountModalOpen = false;
+    resetCloseAccountState();
+  };
+
+  const handleConfirmCloseAccount = async () => {
+    if (closeAccountLoading || closeAccountDone) return;
+    closeAccountError = "";
+    closeAccountStatus = "";
+
+    const reason = String(closeAccountReason || "").trim();
+    const currentPassword = String(closeAccountPassword || "");
+    const otherReason = String(closeAccountOtherReason || "").trim();
+
+    if (!reason) {
+      closeAccountError = "Selecciona un motivo para cerrar la cuenta.";
+      return;
+    }
+    if (reason === ACCOUNT_CLOSE_REASON_OTHER && !otherReason) {
+      closeAccountError = "Describe el motivo en la opción “Otro”.";
+      return;
+    }
+    if (!currentPassword.trim()) {
+      closeAccountError = "Digita tu contraseña para confirmar el cierre de cuenta.";
+      return;
+    }
+
+    closeAccountLoading = true;
+    try {
+      const res = await apiFetch("/auth/account/close", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reason,
+          current_password: currentPassword,
+          other_reason: reason === ACCOUNT_CLOSE_REASON_OTHER ? otherReason : null,
+        }),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo cerrar la cuenta.");
+      }
+
+      const deadlineDate = new Date(data?.restore_deadline_at || "");
+      closeAccountDeadlineLabel = Number.isNaN(deadlineDate.getTime()) ? "" : deadlineDate.toLocaleString();
+      closeAccountStatus = data?.message || "";
+      closeAccountDone = true;
+      closeAccountPassword = "";
+      closeAccountOtherReason = "";
+      showCloseAccountPassword = false;
+    } catch (err) {
+      closeAccountError = err?.message || "No se pudo cerrar la cuenta.";
+    } finally {
+      closeAccountLoading = false;
+    }
+  };
+
   onMount(() => {
     document.body.dataset.visitor = "false";
   });
@@ -586,7 +745,7 @@
         <div class="settings-actions">
           <button class="settings-action" type="button" on:click={openChangePasswordModal}>
             <span class="settings-action-icon" aria-hidden="true">🔑</span>
-            <span class="settings-action-label">Cambiar contraseña</span>
+            <span class="settings-action-label">Cambiar contraseña / Correo electrónico</span>
           </button>
 
           <button class="settings-action" type="button" on:click={openTwoFAModal}>
@@ -599,7 +758,7 @@
             <span class="settings-action-label">Privacidad</span>
           </button>
 
-          <button class="settings-action is-danger" type="button">
+          <button class="settings-action is-danger" type="button" on:click={openCloseAccountModal}>
             <span class="settings-action-icon" aria-hidden="true">🗑️</span>
             <span class="settings-action-label">Cerrar cuenta</span>
           </button>
@@ -660,6 +819,122 @@
       © 2026 Kiadez — Una red social para cumplir deseos.
     </div>
   </footer>
+
+  <div
+    class="modal-overlay"
+    class:hidden={!closeAccountModalOpen}
+    aria-hidden={!closeAccountModalOpen}
+    on:click={(event) => {
+      if (event.target?.classList?.contains("modal-overlay") && !closeAccountDone) closeCloseAccountModal();
+    }}
+  >
+    <div class="modal settings-close-account-modal" role="dialog" aria-modal="true" aria-label="Cerrar cuenta">
+      <div class="modal-head">
+        <h3>Cerrar cuenta</h3>
+        {#if !closeAccountDone}
+          <button class="modal-close" type="button" on:click={closeCloseAccountModal}>✕</button>
+        {/if}
+      </div>
+
+      <div class="modal-body">
+        {#if closeAccountDone}
+          <p class="panel-text settings-close-account-summary">
+            {closeAccountStatus || "Tu cuenta fue cerrada correctamente."}
+          </p>
+          {#if closeAccountDeadlineLabel}
+            <p class="panel-muted">
+              Puedes restaurarla hasta el <strong>{closeAccountDeadlineLabel}</strong> iniciando sesión con tu clave o recuperándola.
+            </p>
+          {/if}
+        {:else}
+          <p class="panel-text settings-close-account-intro">
+            Selecciona el motivo principal por el cual deseas cerrar tu cuenta.
+          </p>
+
+          <fieldset class="settings-close-account-reasons">
+            <legend class="settings-close-account-legend">Motivo del cierre</legend>
+            {#each ACCOUNT_CLOSE_OPTIONS as option}
+              <label class="settings-close-account-option">
+                <input
+                  type="radio"
+                  name="close-account-reason"
+                  value={option.value}
+                  checked={closeAccountReason === option.value}
+                  disabled={closeAccountLoading}
+                  on:change={() => {
+                    closeAccountReason = option.value;
+                    closeAccountError = "";
+                  }}
+                />
+                <span>{option.label}</span>
+              </label>
+            {/each}
+          </fieldset>
+
+          {#if closeAccountReason === ACCOUNT_CLOSE_REASON_OTHER}
+            <label class="modal-label" for="close-account-other-reason">Especifica el motivo</label>
+            <textarea
+              id="close-account-other-reason"
+              class="modal-textarea"
+              rows="3"
+              maxlength="1600"
+              bind:value={closeAccountOtherReason}
+              disabled={closeAccountLoading}
+            ></textarea>
+          {/if}
+
+          <div class="settings-close-account-warning">
+            Al cerrar la cuenta, tu información quedará inhabilitada para el sistema público. Además, eliminaremos tus deseos públicos y privados,
+            publicaciones, reacciones y comentarios.
+          </div>
+
+          <label class="modal-label" for="close-account-password">Digita tu contraseña para confirmar</label>
+          <div class="settings-password-row">
+            <input
+              id="close-account-password"
+              class="modal-input"
+              type={showCloseAccountPassword ? "text" : "password"}
+              bind:value={closeAccountPassword}
+              autocomplete="current-password"
+              disabled={closeAccountLoading}
+            />
+            <button
+              class="settings-password-toggle"
+              type="button"
+              aria-label={showCloseAccountPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              on:click={() => (showCloseAccountPassword = !showCloseAccountPassword)}
+            >
+              👁️
+            </button>
+          </div>
+
+          <p class="panel-muted settings-close-account-window">
+            Después de confirmar, tendrás 30 días para volver con esa misma contraseña o recuperándola si la olvidas. Si no regresas en ese plazo,
+            la cuenta se eliminará permanentemente.
+          </p>
+
+          {#if closeAccountError}
+            <p class="settings-form-error" role="alert">{closeAccountError}</p>
+          {/if}
+        {/if}
+      </div>
+
+      <div class="modal-actions">
+        {#if closeAccountDone}
+          <button class="btn btn-primary btn-compact" type="button" on:click={() => logout()}>
+            Ir al inicio de sesión
+          </button>
+        {:else}
+          <button class="btn btn-primary btn-compact settings-close-account-confirm" type="button" on:click={handleConfirmCloseAccount} disabled={closeAccountLoading}>
+            {closeAccountLoading ? "Cerrando..." : "Confirmar cierre de cuenta"}
+          </button>
+          <button class="btn btn-outline btn-compact" type="button" on:click={closeCloseAccountModal} disabled={closeAccountLoading}>
+            Cancelar
+          </button>
+        {/if}
+      </div>
+    </div>
+  </div>
 
   <div
     class="modal-overlay"
@@ -735,15 +1010,19 @@
       class="modal settings-change-password-modal"
       role="dialog"
       aria-modal="true"
-      aria-label="Cambiar contraseña"
+      aria-label="Cambiar contraseña y correo electrónico"
     >
       <div class="modal-head">
-        <h3>{changePasswordMode === "change" ? "Cambiar contraseña" : "Recuperar contraseña"}</h3>
+        <h3>{changePasswordMode === "change" ? "Cambiar contraseña / Correo electrónico" : "Recuperar contraseña"}</h3>
         <button class="modal-close" type="button" on:click={closeChangePasswordModal}>✕</button>
       </div>
 
       <div class="modal-body">
         {#if changePasswordMode === "change"}
+          <p class="panel-text settings-change-intro">
+            Para actualizar contraseña o correo, primero confirma tu contraseña de inicio de sesión.
+          </p>
+
           <label class="modal-label" for="settings-current-password">
             Digita tu contraseña actual
           </label>
@@ -766,81 +1045,128 @@
             </button>
           </div>
 
-          <label class="modal-label" for="settings-new-password">
-            Digita tu nueva contraseña
-          </label>
-          <div class="settings-password-row">
+          <div class="settings-change-section">
+            <h4 class="settings-change-section-title">Cambiar contraseña</h4>
+
+            <label class="modal-label" for="settings-new-password">
+              Digita tu nueva contraseña
+            </label>
+            <div class="settings-password-row">
+              <input
+                class="modal-input"
+                id="settings-new-password"
+                type={showNewPassword ? "text" : "password"}
+                bind:value={newPassword}
+                autocomplete="new-password"
+              />
+              <button
+                class="settings-password-toggle"
+                type="button"
+                aria-label={showNewPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                on:click={() => (showNewPassword = !showNewPassword)}
+              >
+                👁️
+              </button>
+            </div>
+
+            <div class="settings-password-rules" aria-label="Normativa de contraseña">
+              <div class:ok={newPasswordRules.length} class="settings-password-rule">
+                {newPasswordRules.length ? "✔" : "•"} Mínimo {PASSWORD_MIN_LENGTH} caracteres
+              </div>
+              <div class:ok={newPasswordRules.upper} class="settings-password-rule">
+                {newPasswordRules.upper ? "✔" : "•"} Al menos 1 mayúscula
+              </div>
+              <div class:ok={newPasswordRules.digit} class="settings-password-rule">
+                {newPasswordRules.digit ? "✔" : "•"} Al menos 1 número
+              </div>
+              <div class:ok={newPasswordRules.special} class="settings-password-rule">
+                {newPasswordRules.special ? "✔" : "•"} Al menos 1 caracter especial
+              </div>
+            </div>
+
+            <label class="modal-label" for="settings-new-password-confirm">
+              Confirma tu nueva contraseña
+            </label>
+            <div class="settings-password-row">
+              <input
+                class="modal-input"
+                id="settings-new-password-confirm"
+                type={showNewPasswordConfirm ? "text" : "password"}
+                bind:value={newPasswordConfirm}
+                autocomplete="new-password"
+              />
+              <button
+                class="settings-password-toggle"
+                type="button"
+                aria-label={showNewPasswordConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
+                on:click={() => (showNewPasswordConfirm = !showNewPasswordConfirm)}
+              >
+                👁️
+              </button>
+            </div>
+
+            <div class="settings-change-section-actions">
+              <button class="btn btn-primary btn-compact" type="button" on:click={handleChangePassword} disabled={isChangingPassword}>
+                {isChangingPassword ? "Confirmando..." : "Actualizar contraseña"}
+              </button>
+            </div>
+
+            <button
+              class="settings-inline-link"
+              type="button"
+              on:click={() => {
+                changePasswordMode = "reset";
+                changePasswordError = "";
+                changePasswordStatus = "";
+              }}
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+
+            {#if changePasswordError}
+              <p class="settings-form-error" role="alert">{changePasswordError}</p>
+            {/if}
+            {#if changePasswordStatus}
+              <p class="settings-form-success" role="status">{changePasswordStatus}</p>
+            {/if}
+          </div>
+
+          <div class="settings-change-divider" aria-hidden="true"></div>
+
+          <div class="settings-change-section">
+            <h4 class="settings-change-section-title">Cambiar correo electrónico</h4>
+
+            {#if meEmail}
+              <p class="panel-muted settings-change-current-email">
+                Correo actual: <strong>{meEmail}</strong>
+              </p>
+            {/if}
+
+            <label class="modal-label" for="settings-new-email">
+              Digita tu nuevo correo electrónico
+            </label>
             <input
               class="modal-input"
-              id="settings-new-password"
-              type={showNewPassword ? "text" : "password"}
-              bind:value={newPassword}
-              autocomplete="new-password"
+              id="settings-new-email"
+              type="email"
+              bind:value={newEmail}
+              autocomplete="email"
+              placeholder="nuevo-correo@ejemplo.com"
             />
-            <button
-              class="settings-password-toggle"
-              type="button"
-              aria-label={showNewPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-              on:click={() => (showNewPassword = !showNewPassword)}
-            >
-              👁️
-            </button>
+
+            <div class="settings-change-section-actions">
+              <button class="btn btn-primary btn-compact" type="button" on:click={handleChangeEmail} disabled={isChangingEmail}>
+                {isChangingEmail ? "Actualizando..." : "Actualizar correo"}
+              </button>
+            </div>
+
+            {#if emailChangeError}
+              <p class="settings-form-error" role="alert">{emailChangeError}</p>
+            {/if}
+            {#if emailChangeStatus}
+              <p class="settings-form-success" role="status">{emailChangeStatus}</p>
+            {/if}
           </div>
-
-          <div class="settings-password-rules" aria-label="Normativa de contraseña">
-            <div class:ok={newPasswordRules.length} class="settings-password-rule">
-              {newPasswordRules.length ? "✔" : "•"} Mínimo {PASSWORD_MIN_LENGTH} caracteres
-            </div>
-            <div class:ok={newPasswordRules.upper} class="settings-password-rule">
-              {newPasswordRules.upper ? "✔" : "•"} Al menos 1 mayúscula
-            </div>
-            <div class:ok={newPasswordRules.digit} class="settings-password-rule">
-              {newPasswordRules.digit ? "✔" : "•"} Al menos 1 número
-            </div>
-            <div class:ok={newPasswordRules.special} class="settings-password-rule">
-              {newPasswordRules.special ? "✔" : "•"} Al menos 1 caracter especial
-            </div>
-          </div>
-
-          <label class="modal-label" for="settings-new-password-confirm">
-            Confirma tu nueva contraseña
-          </label>
-          <div class="settings-password-row">
-            <input
-              class="modal-input"
-              id="settings-new-password-confirm"
-              type={showNewPasswordConfirm ? "text" : "password"}
-              bind:value={newPasswordConfirm}
-              autocomplete="new-password"
-            />
-            <button
-              class="settings-password-toggle"
-              type="button"
-              aria-label={showNewPasswordConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
-              on:click={() => (showNewPasswordConfirm = !showNewPasswordConfirm)}
-            >
-              👁️
-            </button>
-          </div>
-
-          <button
-            class="settings-inline-link"
-            type="button"
-            on:click={() => {
-              changePasswordMode = "reset";
-              changePasswordError = "";
-              changePasswordStatus = "";
-            }}
-          >
-            ¿Olvidaste tu contraseña?
-          </button>
-
-          {#if changePasswordError}
-            <p class="settings-form-error" role="alert">{changePasswordError}</p>
-          {/if}
-          {#if changePasswordStatus}
-            <p class="settings-form-success" role="status">{changePasswordStatus}</p>
-          {/if}
         {:else}
           <p class="panel-text settings-reset-text">
             Si ya no recuerdas tu contraseña, te enviaremos un enlace seguro para restablecerla.
@@ -863,11 +1189,8 @@
 
       <div class="modal-actions">
         {#if changePasswordMode === "change"}
-          <button class="btn btn-primary btn-compact" type="button" on:click={handleChangePassword} disabled={isChangingPassword}>
-            {isChangingPassword ? "Confirmando..." : "Confirmar"}
-          </button>
           <button class="btn btn-outline btn-compact" type="button" on:click={closeChangePasswordModal}>
-            Cancelar
+            Cerrar
           </button>
         {:else}
           <button class="btn btn-primary btn-compact" type="button" on:click={handleSendPasswordReset} disabled={isSendingReset}>

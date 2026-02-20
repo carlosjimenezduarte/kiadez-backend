@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.db.models.guardian_wish_request import GuardianWishRequestStatus
 from app.db.models.guardian_wish_message import GuardianWishMessageKind
+from app.db.models.post import PostMediaKind, PostReportCaseStatus, PostReportReason
 
 
 class GuardianWishRequestCreate(BaseModel):
@@ -95,6 +96,41 @@ class GuardianWishMessageOut(BaseModel):
 
 class GuardianWishRequestListOut(BaseModel):
     items: list[GuardianWishRequestOut] = Field(default_factory=list)
+    page: int = 1
+    page_size: int = 10
+    total: int = 0
+    total_pages: int = 1
+    range_start: int = 0
+    range_end: int = 0
+
+
+class GuardianReportedPostReportOut(BaseModel):
+    id: int
+    reporter_user_id: int
+    reporter_handle: str
+    reason: PostReportReason
+    other_reason: str | None = None
+    created_at: datetime
+
+
+class GuardianReportedPostOut(BaseModel):
+    id: int
+    status: PostReportCaseStatus
+    report_count: int
+    post_id: int | None = None
+    post_text: str | None = None
+    post_media_kind: PostMediaKind | None = None
+    post_media_url: str | None = None
+    post_author: GuardianWishRequestUserOut
+    resolved_by_guardian: GuardianWishRequestUserOut | None = None
+    first_reported_at: datetime
+    last_reported_at: datetime
+    resolved_at: datetime | None = None
+    reports: list[GuardianReportedPostReportOut] = Field(default_factory=list)
+
+
+class GuardianReportedPostListOut(BaseModel):
+    items: list[GuardianReportedPostOut] = Field(default_factory=list)
     page: int = 1
     page_size: int = 10
     total: int = 0

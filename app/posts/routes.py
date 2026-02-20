@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, or_, select
+from datetime import datetime, timezone
+
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,8 @@ from app.db.models.post import (
     PostComment,
     PostMediaKind,
     PostReport,
+    PostReportCase,
+    PostReportCaseStatus,
     PostReportReason,
     PostStar,
     PostVisibility,
@@ -548,6 +552,23 @@ def delete_post(
     if post.author_id != current.user_number:
         raise HTTPException(status_code=403, detail="No autorizado para eliminar esta publicación.")
 
+    report_case = db.execute(
+        select(PostReportCase).where(PostReportCase.post_id == post.id)
+    ).scalar_one_or_none()
+
+    if report_case is not None:
+        now = datetime.now(timezone.utc)
+        report_case.post_id = None
+        report_case.status = PostReportCaseStatus.deleted
+        report_case.resolved_at = now
+        report_case.resolved_by_guardian_id = None
+        report_case.updated_at = now
+        db.execute(
+            update(PostReport)
+            .where(PostReport.case_id == report_case.id)
+            .values(post_id=None)
+        )
+
     removed_stars = post.star_count or 0
     db.delete(post)
 
@@ -730,13 +751,49 @@ def report_post(
     if post.author_id == current.user_number:
         raise HTTPException(status_code=400, detail="No puedes reportar tu propia publicación.")
 
+    now = datetime.now(timezone.utc)
+    report_case = db.execute(
+        select(PostReportCase).where(PostReportCase.post_id == post.id)
+    ).scalar_one_or_none()
+    if report_case is None:
+        report_case = PostReportCase(
+            post_id=post.id,
+            post_author_id=post.author_id,
+            post_text_snapshot=post.text,
+            post_media_id_snapshot=post.media_id,
+            post_media_kind_snapshot=post.media_kind,
+            status=PostReportCaseStatus.open,
+            report_count=0,
+            first_reported_at=now,
+            last_reported_at=now,
+        )
+        db.add(report_case)
+        db.flush()
+    else:
+        report_case.post_author_id = post.author_id
+        report_case.post_text_snapshot = post.text
+        report_case.post_media_id_snapshot = post.media_id
+        report_case.post_media_kind_snapshot = post.media_kind
+        if report_case.status != PostReportCaseStatus.open:
+            report_case.status = PostReportCaseStatus.open
+            report_case.resolved_at = None
+            report_case.resolved_by_guardian_id = None
+        report_case.updated_at = now
+
     report = PostReport(
+        case_id=report_case.id,
         post_id=post.id,
         reporter_id=current.user_number,
         reason=payload.reason,
         other_reason=(payload.other_reason or "").strip() or None,
     )
     db.add(report)
+
+    report_case.report_count = max(0, int(report_case.report_count or 0)) + 1
+    if report_case.first_reported_at is None:
+        report_case.first_reported_at = now
+    report_case.last_reported_at = now
+
     try:
         db.commit()
     except IntegrityError:

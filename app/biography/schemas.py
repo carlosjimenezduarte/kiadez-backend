@@ -295,4 +295,6 @@ class BiographyDistinctionsOut(BaseModel):
 
 
 class BiographyActivityStatsOut(BaseModel):
+    wishes_fulfilled: int = 0
+    cooperative_wishes_fulfilled: int = 0
     wishes_granted: int = 0

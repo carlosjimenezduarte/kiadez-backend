@@ -26,6 +26,12 @@ class PostReportReason(str, Enum):
     other = "other"
 
 
+class PostReportCaseStatus(str, Enum):
+    open = "open"
+    kept = "kept"
+    deleted = "deleted"
+
+
 class Post(Base):
     __tablename__ = "posts"
 
@@ -127,13 +133,89 @@ class PostComment(Base):
     )
 
 
+class PostReportCase(Base):
+    __tablename__ = "post_report_cases"
+    __table_args__ = (UniqueConstraint("post_id", name="uq_post_report_cases_post"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    post_id: Mapped[int | None] = mapped_column(
+        ForeignKey("posts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    post_author_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    post_text_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    post_media_id_snapshot: Mapped[int | None] = mapped_column(
+        ForeignKey("media.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    post_media_kind_snapshot: Mapped[PostMediaKind | None] = mapped_column(
+        SAEnum(PostMediaKind, name="post_media_kind"),
+        nullable=True,
+    )
+    status: Mapped[PostReportCaseStatus] = mapped_column(
+        SAEnum(PostReportCaseStatus, name="post_report_case_status"),
+        nullable=False,
+        default=PostReportCaseStatus.open,
+        index=True,
+    )
+    report_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    first_reported_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
+    )
+    last_reported_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
+    resolved_by_guardian_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
 class PostReport(Base):
     __tablename__ = "post_reports"
     __table_args__ = (UniqueConstraint("post_id", "reporter_id", name="uq_post_reports_post_reporter"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    post_id: Mapped[int] = mapped_column(
+    post_id: Mapped[int | None] = mapped_column(
         ForeignKey("posts.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey("post_report_cases.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

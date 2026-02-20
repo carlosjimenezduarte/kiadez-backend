@@ -7,10 +7,44 @@ import re
 from sqlalchemy.exc import IntegrityError
 from datetime import date
 
-from sqlalchemy import delete
+from sqlalchemy import delete, or_, select, text
 
 
 from app.db.models.user_2fa import User2FA
+from app.db.models.account_closure_audit import (
+    AccountClosureAudit,
+    AccountClosureReason as AccountClosureReasonDB,
+    AccountClosureRestoreMethod,
+)
+from app.db.models.achievement_unlock_event import AchievementUnlockEvent
+from app.db.models.biography_about import BiographyAbout
+from app.db.models.biography_curiosities import BiographyCuriosities
+from app.db.models.biography_distinctions import BiographyDistinctions
+from app.db.models.biography_dream import BiographyDream
+from app.db.models.biography_education import BiographyEducation
+from app.db.models.biography_favorite_quotes import BiographyFavoriteQuotes
+from app.db.models.biography_life_achievements import BiographyLifeAchievements
+from app.db.models.biography_personal_info import BiographyPersonalInfo
+from app.db.models.biography_physical_traits import BiographyPhysicalTraits
+from app.db.models.biography_professional_achievements import BiographyProfessionalAchievements
+from app.db.models.biography_professional_info import BiographyProfessionalInfo
+from app.db.models.gallery_folder import GalleryFolder
+from app.db.models.guardian_wish_message import GuardianWishMessage
+from app.db.models.guardian_wish_request import GuardianWishRequest
+from app.db.models.life_purpose import LifePurpose
+from app.db.models.media import Media
+from app.db.models.message_entry import MessageEntry
+from app.db.models.message_thread import MessageThread
+from app.db.models.oracle import OracleResponse, OracleUserState
+from app.db.models.post import Post, PostComment, PostReport, PostReportCase, PostStar
+from app.db.models.private_desire import PrivateDesire
+from app.db.models.private_personal_wish import PrivatePersonalWish
+from app.db.models.public_cooperative_wish import PublicCooperativeWish
+from app.db.models.public_cooperative_wish_fulfillment import PublicCooperativeWishFulfillment
+from app.db.models.public_cooperative_wish_participation import PublicCooperativeWishParticipation
+from app.db.models.public_personal_wish import PublicPersonalWish
+from app.db.models.public_wish_fulfillment import PublicWishFulfillment
+from app.db.models.user_follow import UserFollow
 
 from app.core.two_fa_totp import generate_totp_secret, build_totp_uri
 from app.core.two_fa_crypto import encrypt_secret
@@ -35,7 +69,12 @@ from fastapi import Body
 from app.db.repositories.refresh_token_repository import RefreshTokenRepository
 from datetime import datetime, timedelta, timezone
 from app.core.config import settings
-from app.core.mailer import send_verification_email, send_password_reset_email
+from app.core.mailer import (
+    send_verification_email,
+    send_password_reset_email,
+    send_email_change_confirmation_email,
+    send_email_change_security_alert_email,
+)
 from app.core.password_reset import generate_password_reset_token, get_password_reset_expiry
 
 
@@ -50,6 +89,9 @@ from .models import (
     PasswordResetRequest,
     PasswordResetConfirm,
     PasswordChangeRequest,
+    EmailChangeRequest,
+    AccountClosureRequest,
+    AccountClosureResponse,
     UsernameState,
     UsernameAvailabilityOut,
     UsernameUpdateRequest,
@@ -78,6 +120,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")  # aunque login sea
 
 USERNAME_PATTERN = re.compile(r"^[a-z0-9._]{4,30}$")
 USERNAME_COOLDOWN_DAYS = 30
+ACCOUNT_CLOSURE_GRACE_DAYS = 30
 USERNAME_RESERVED = {
     "admin",
     "support",
@@ -144,6 +187,250 @@ def _build_username_state(user: User, now: datetime | None = None) -> UsernameSt
         cooldown_remaining_days=remaining_days,
         profile_url=_build_profile_url(user.username),
     )
+
+
+def _is_account_closure_pending(user: User, *, now: datetime) -> bool:
+    requested_at = user.account_closure_requested_at
+    deadline_at = user.account_closure_restore_deadline_at
+    if requested_at is None or deadline_at is None:
+        return False
+    return _to_utc(deadline_at) >= now
+
+
+def _mark_account_closure_restored(
+    *,
+    db: Session,
+    user: User,
+    now: datetime,
+    method: AccountClosureRestoreMethod,
+) -> None:
+    user.is_active = True
+    user.account_closure_requested_at = None
+    user.account_closure_restore_deadline_at = None
+
+    # Restore default visibility for users that return after closing their account.
+    user.public_profile_show_about = True
+    user.public_profile_show_fulfilled_wishes = True
+    user.public_profile_show_public_wishes = True
+    user.public_profile_show_calendar = True
+    user.public_profile_show_oracle = True
+    user.public_profile_show_personal_posts = True
+
+    audit = db.execute(
+        select(AccountClosureAudit)
+        .where(
+            AccountClosureAudit.user_id == user.id,
+            AccountClosureAudit.restored_at.is_(None),
+            AccountClosureAudit.purged_at.is_(None),
+        )
+        .order_by(AccountClosureAudit.requested_at.desc(), AccountClosureAudit.id.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if audit is not None:
+        audit.restored_at = now
+        audit.restore_method = method
+
+
+def _recompute_post_counters(db: Session) -> None:
+    db.execute(
+        text(
+            """
+            UPDATE posts p
+            SET star_count = COALESCE(s.star_count, 0)
+            FROM (
+                SELECT post_id, COUNT(*)::int AS star_count
+                FROM post_stars
+                GROUP BY post_id
+            ) s
+            WHERE p.id = s.post_id
+            """
+        )
+    )
+    db.execute(
+        text(
+            """
+            UPDATE posts
+            SET star_count = 0
+            WHERE id NOT IN (SELECT DISTINCT post_id FROM post_stars)
+            """
+        )
+    )
+
+    db.execute(
+        text(
+            """
+            UPDATE posts p
+            SET comment_count = COALESCE(c.comment_count, 0)
+            FROM (
+                SELECT post_id, COUNT(*)::int AS comment_count
+                FROM post_comments
+                GROUP BY post_id
+            ) c
+            WHERE p.id = c.post_id
+            """
+        )
+    )
+    db.execute(
+        text(
+            """
+            UPDATE posts
+            SET comment_count = 0
+            WHERE id NOT IN (SELECT DISTINCT post_id FROM post_comments)
+            """
+        )
+    )
+
+    db.execute(
+        text(
+            """
+            UPDATE users u
+            SET received_stars_total = COALESCE(t.total, 0)
+            FROM (
+                SELECT author_id, COALESCE(SUM(star_count), 0)::int AS total
+                FROM posts
+                GROUP BY author_id
+            ) t
+            WHERE u.id = t.author_id
+            """
+        )
+    )
+    db.execute(
+        text(
+            """
+            UPDATE users
+            SET received_stars_total = 0
+            WHERE id NOT IN (SELECT DISTINCT author_id FROM posts)
+            """
+        )
+    )
+    db.execute(
+        text(
+            """
+            UPDATE users
+            SET donated_stars_total = LEAST(COALESCE(donated_stars_total, 0), COALESCE(received_stars_total, 0))
+            """
+        )
+    )
+
+
+def _purge_user_content_for_account_closure(*, db: Session, user_id: int) -> None:
+    db.execute(delete(UserFollow).where(or_(UserFollow.follower_id == user_id, UserFollow.followed_id == user_id)))
+
+    db.execute(text("UPDATE guardian_wish_requests SET guardian_id = NULL WHERE guardian_id = :user_id"), {"user_id": user_id})
+    db.execute(
+        text("UPDATE public_wish_fulfillments SET guardian_user_id = NULL WHERE guardian_user_id = :user_id"),
+        {"user_id": user_id},
+    )
+    db.execute(
+        text("UPDATE message_threads SET guardian_user_id = NULL WHERE guardian_user_id = :user_id"),
+        {"user_id": user_id},
+    )
+    db.execute(
+        text("UPDATE post_report_cases SET resolved_by_guardian_id = NULL WHERE resolved_by_guardian_id = :user_id"),
+        {"user_id": user_id},
+    )
+
+    db.execute(delete(PostStar).where(PostStar.user_id == user_id))
+    db.execute(delete(PostComment).where(PostComment.user_id == user_id))
+    db.execute(delete(PostReport).where(PostReport.reporter_id == user_id))
+    db.execute(delete(Post).where(Post.author_id == user_id))
+    db.execute(delete(PostReportCase).where(PostReportCase.post_author_id == user_id))
+
+    db.execute(delete(PublicCooperativeWishParticipation).where(PublicCooperativeWishParticipation.participant_user_id == user_id))
+    db.execute(delete(PublicCooperativeWishFulfillment).where(PublicCooperativeWishFulfillment.wish_owner_user_id == user_id))
+    db.execute(delete(PublicCooperativeWish).where(PublicCooperativeWish.user_id == user_id))
+
+    db.execute(
+        delete(PublicWishFulfillment).where(
+            or_(
+                PublicWishFulfillment.wish_owner_id == user_id,
+                PublicWishFulfillment.fulfiller_user_id == user_id,
+            )
+        )
+    )
+
+    db.execute(
+        delete(GuardianWishMessage).where(
+            or_(
+                GuardianWishMessage.recipient_user_id == user_id,
+                GuardianWishMessage.sender_guardian_id == user_id,
+            )
+        )
+    )
+    db.execute(
+        delete(GuardianWishRequest).where(
+            or_(
+                GuardianWishRequest.requester_id == user_id,
+                GuardianWishRequest.wish_owner_id == user_id,
+            )
+        )
+    )
+
+    db.execute(delete(PublicPersonalWish).where(PublicPersonalWish.user_id == user_id))
+    db.execute(delete(PrivatePersonalWish).where(PrivatePersonalWish.user_id == user_id))
+
+    db.execute(delete(BiographyPersonalInfo).where(BiographyPersonalInfo.user_id == user_id))
+    db.execute(delete(BiographyPhysicalTraits).where(BiographyPhysicalTraits.user_id == user_id))
+    db.execute(delete(BiographyEducation).where(BiographyEducation.user_id == user_id))
+    db.execute(delete(BiographyCuriosities).where(BiographyCuriosities.user_id == user_id))
+    db.execute(delete(BiographyProfessionalInfo).where(BiographyProfessionalInfo.user_id == user_id))
+    db.execute(delete(BiographyAbout).where(BiographyAbout.user_id == user_id))
+    db.execute(delete(BiographyDream).where(BiographyDream.user_id == user_id))
+    db.execute(delete(BiographyProfessionalAchievements).where(BiographyProfessionalAchievements.user_id == user_id))
+    db.execute(delete(BiographyLifeAchievements).where(BiographyLifeAchievements.user_id == user_id))
+    db.execute(delete(BiographyFavoriteQuotes).where(BiographyFavoriteQuotes.user_id == user_id))
+    db.execute(delete(BiographyDistinctions).where(BiographyDistinctions.user_id == user_id))
+
+    db.execute(delete(PrivateDesire).where(PrivateDesire.user_id == user_id))
+    db.execute(delete(LifePurpose).where(LifePurpose.user_id == user_id))
+    db.execute(delete(AchievementUnlockEvent).where(AchievementUnlockEvent.user_id == user_id))
+    db.execute(delete(OracleResponse).where(OracleResponse.user_id == user_id))
+    db.execute(delete(OracleUserState).where(OracleUserState.user_id == user_id))
+
+    db.execute(delete(MessageEntry).where(MessageEntry.sender_user_id == user_id))
+    db.execute(delete(MessageThread).where(MessageThread.recipient_user_id == user_id))
+
+    db.execute(delete(GalleryFolder).where(GalleryFolder.owner_id == user_id))
+    db.execute(delete(Media).where(Media.owner_id == user_id))
+
+    _recompute_post_counters(db)
+
+
+def _purge_expired_closed_accounts(*, db: Session, now: datetime) -> None:
+    expired_users = db.execute(
+        select(User)
+        .where(
+            User.is_active.is_(False),
+            User.account_closure_requested_at.is_not(None),
+            User.account_closure_restore_deadline_at.is_not(None),
+            User.account_closure_restore_deadline_at < now,
+        )
+        .limit(50)
+    ).scalars().all()
+
+    if not expired_users:
+        return
+
+    for user in expired_users:
+        db.execute(
+            text(
+                """
+                UPDATE account_closure_audits
+                SET purged_at = :purged_at, updated_at = :updated_at
+                WHERE user_id = :user_id
+                  AND restored_at IS NULL
+                  AND purged_at IS NULL
+                """
+            ),
+            {
+                "purged_at": now,
+                "updated_at": now,
+                "user_id": user.id,
+            },
+        )
+        db.delete(user)
+
+    db.commit()
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),
@@ -268,14 +555,32 @@ def verification_status(
 
 @router.post("/login")
 def login(data: LoginRequest, db: Session = Depends(get_db)):
+    now_utc = datetime.now(timezone.utc)
+    _purge_expired_closed_accounts(db=db, now=now_utc)
+
     repo = UserRepository(db)
     user = repo.get_user_by_email(data.email)
 
-    if not user or not user.is_active:
+    if not user:
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-    if not verify_password(data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+    if not user.is_active:
+        if not _is_account_closure_pending(user, now=now_utc):
+            raise HTTPException(status_code=401, detail="Credenciales inválidas")
+        if not verify_password(data.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Credenciales inválidas")
+
+        _mark_account_closure_restored(
+            db=db,
+            user=user,
+            now=now_utc,
+            method=AccountClosureRestoreMethod.login,
+        )
+        db.commit()
+        db.refresh(user)
+    else:
+        if not verify_password(data.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
     # 🔐 Revisar si tiene 2FA activo
     two_fa_repo = User2FARepository(db)
@@ -485,6 +790,145 @@ def change_password(
 
     db.commit()
     return {"changed": True}
+
+
+@router.post("/email/change")
+def change_email(
+    payload: EmailChangeRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    repo = UserRepository(db)
+    user = repo.get_user_by_id(current.user_number)
+
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta.")
+
+    new_email = payload.new_email.strip().lower()
+    current_email = user.email.strip().lower()
+
+    if new_email == current_email:
+        raise HTTPException(status_code=400, detail="El nuevo correo debe ser distinto al actual.")
+
+    existing = repo.get_user_by_email(new_email)
+    if existing and existing.id != user.id:
+        raise HTTPException(status_code=409, detail="El correo electrónico ya está registrado.")
+
+    previous_email = user.email
+    user.email = new_email
+
+    # Seguridad: al cambiar correo, invalidamos refresh tokens existentes.
+    db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="El correo electrónico ya está registrado.")
+
+    delivery_issues: list[str] = []
+
+    try:
+        send_email_change_confirmation_email(
+            to_email=user.email,
+            previous_email=previous_email,
+        )
+    except Exception:
+        delivery_issues.append("new")
+
+    if previous_email.strip().lower() != user.email.strip().lower():
+        try:
+            send_email_change_security_alert_email(
+                to_email=previous_email,
+                new_email=user.email,
+            )
+        except Exception:
+            delivery_issues.append("previous")
+
+    if delivery_issues:
+        return {
+            "changed": True,
+            "email": user.email,
+            "message": "Correo actualizado, pero no se pudieron enviar todas las notificaciones de seguridad.",
+        }
+
+    return {
+        "changed": True,
+        "email": user.email,
+        "message": "Correo actualizado correctamente. Enviamos confirmación al nuevo correo y alerta al correo anterior.",
+    }
+
+
+@router.post("/account/close", response_model=AccountClosureResponse)
+def close_account(
+    payload: AccountClosureRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    now_utc = datetime.now(timezone.utc)
+    _purge_expired_closed_accounts(db=db, now=now_utc)
+
+    repo = UserRepository(db)
+    user = repo.get_user_by_id(current.user_number)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta.")
+
+    other_reason = (payload.other_reason or "").strip()
+    if payload.reason.value == "other" and not other_reason:
+        raise HTTPException(status_code=400, detail="Debes especificar el motivo en “Otro”.")
+    if payload.reason.value != "other":
+        other_reason = ""
+
+    try:
+        reason_db = AccountClosureReasonDB(payload.reason.value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Motivo de cierre inválido.") from exc
+
+    restore_deadline = now_utc + timedelta(days=ACCOUNT_CLOSURE_GRACE_DAYS)
+
+    audit = AccountClosureAudit(
+        user_id=user.id,
+        user_email_snapshot=user.email,
+        user_username_snapshot=user.username,
+        reason=reason_db,
+        other_reason=other_reason or None,
+        requested_at=now_utc,
+        restore_deadline_at=restore_deadline,
+        created_at=now_utc,
+        updated_at=now_utc,
+    )
+    db.add(audit)
+
+    _purge_user_content_for_account_closure(db=db, user_id=user.id)
+
+    user.public_profile_show_about = False
+    user.public_profile_show_fulfilled_wishes = False
+    user.public_profile_show_public_wishes = False
+    user.public_profile_show_calendar = False
+    user.public_profile_show_oracle = False
+    user.public_profile_show_personal_posts = False
+    user.account_closure_requested_at = now_utc
+    user.account_closure_restore_deadline_at = restore_deadline
+    user.is_active = False
+
+    db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
+
+    db.commit()
+    return AccountClosureResponse(
+        closed=True,
+        restore_deadline_at=restore_deadline,
+        message=(
+            "Tu cuenta fue cerrada y tu información pública quedó inhabilitada. "
+            "Tienes 30 días para volver a ingresar con tu clave o restaurarla. "
+            "Después de ese plazo, la cuenta se eliminará de forma permanente."
+        ),
+    )
+
 
 @router.post("/2fa/setup")
 def setup_2fa(
@@ -782,6 +1226,9 @@ def request_password_reset(
     payload: PasswordResetRequest,
     db: Session = Depends(get_db),
 ):
+    now_utc = datetime.now(timezone.utc)
+    _purge_expired_closed_accounts(db=db, now=now_utc)
+
     email = payload.email.strip().lower()
 
     # Respuesta genérica para evitar enumeración
@@ -789,7 +1236,9 @@ def request_password_reset(
 
     repo = UserRepository(db)
     user = repo.get_user_by_email(email)
-    if not user or not user.is_active:
+    if not user:
+        return generic
+    if not user.is_active and not _is_account_closure_pending(user, now=now_utc):
         return generic
 
     # limpiar tokens previos
@@ -819,6 +1268,9 @@ def confirm_password_reset(
     payload: PasswordResetConfirm,
     db: Session = Depends(get_db),
 ):
+    now_utc = datetime.now(timezone.utc)
+    _purge_expired_closed_accounts(db=db, now=now_utc)
+
     token = payload.token.strip()
     if not token:
         raise HTTPException(status_code=400, detail="Token inválido.")
@@ -832,16 +1284,29 @@ def confirm_password_reset(
     if not reset or reset.is_used:
         raise HTTPException(status_code=400, detail="Token inválido o usado.")
 
-    if reset.expires_at < datetime.now(timezone.utc):
+    if reset.expires_at < now_utc:
         raise HTTPException(status_code=400, detail="Token expirado.")
 
     repo = UserRepository(db)
     user = repo.get_user_by_id(reset.user_id)
-    if not user or not user.is_active:
+    if not user:
         raise HTTPException(status_code=400, detail="Usuario inválido.")
+
+    restore_after_reset = False
+    if not user.is_active:
+        if not _is_account_closure_pending(user, now=now_utc):
+            raise HTTPException(status_code=400, detail="Usuario inválido.")
+        restore_after_reset = True
 
     validate_password_policy(payload.new_password)
     user.password_hash = hash_password(payload.new_password)
+    if restore_after_reset:
+        _mark_account_closure_restored(
+            db=db,
+            user=user,
+            now=now_utc,
+            method=AccountClosureRestoreMethod.password_reset,
+        )
     reset.is_used = True
 
     db.commit()
