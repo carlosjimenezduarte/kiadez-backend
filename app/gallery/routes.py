@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.auth.minor_accreditation import is_minor_protected
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.core.config import settings
@@ -19,6 +20,7 @@ from app.db.models.gallery_folder import GalleryFolder
 from app.db.models.gallery_folder_item import GalleryFolderItem
 from app.db.models.media import Media
 from app.db.models.post import Post, PostMediaKind, PostVisibility
+from app.db.models.user import User
 from app.gallery.schemas import (
     GalleryAlbumPublishInput,
     GalleryAlbumPublishOut,
@@ -273,6 +275,12 @@ def create_folder(
     _ensure_media_storage_ready()
 
     owner_id = int(current.user_number)
+    owner = db.execute(
+        select(User).where(User.id == owner_id, User.is_active.is_(True))
+    ).scalar_one_or_none()
+    if owner is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
     if _find_duplicate_folder_name(
         db=db,
         owner_id=owner_id,
@@ -280,10 +288,12 @@ def create_folder(
     ):
         raise HTTPException(status_code=409, detail="Ya tienes una carpeta con ese nombre.")
 
+    effective_visibility = "private" if is_minor_protected(owner) else payload.visibility
+
     folder = GalleryFolder(
         owner_id=owner_id,
         name=payload.name,
-        visibility=payload.visibility,
+        visibility=effective_visibility,
     )
     db.add(folder)
     db.commit()
@@ -475,6 +485,12 @@ def publish_album(
     _ensure_media_storage_ready()
 
     owner_id = int(current.user_number)
+    owner = db.execute(
+        select(User).where(User.id == owner_id, User.is_active.is_(True))
+    ).scalar_one_or_none()
+    if owner is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
     if _find_duplicate_folder_name(
         db=db,
         owner_id=owner_id,
@@ -511,11 +527,13 @@ def publish_album(
             detail="Debes adjuntar al menos una imagen o video listo para publicar.",
         )
 
+    effective_visibility = "private" if is_minor_protected(owner) else payload.visibility
+
     published_at = datetime.now(timezone.utc)
     album = GalleryFolder(
         owner_id=owner_id,
         name=payload.name,
-        visibility=payload.visibility,
+        visibility=effective_visibility,
         published_at=published_at,
     )
     db.add(album)
@@ -526,7 +544,7 @@ def publish_album(
 
     post_visibility = (
         PostVisibility.private
-        if payload.visibility == "private"
+        if effective_visibility == "private"
         else PostVisibility.public
     )
     created_posts: list[tuple[Post, Media]] = []

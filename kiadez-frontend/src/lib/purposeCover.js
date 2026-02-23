@@ -750,6 +750,132 @@ const ensurePurposeModals = () => {
       </div>
     `);
   }
+
+  if (!document.getElementById("purposeVaultOverlay")) {
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="modal-overlay hidden" id="purposeVaultOverlay" aria-hidden="true">
+        <div class="modal wish-modal purpose-vault-modal" role="dialog" aria-modal="true" aria-label="Desbloquear clave privada">
+          <div class="modal-body">
+            <img class="private-security-hero" src="/css/cpp-key.webp" alt="Clave privada" />
+            <h2 class="private-security-title">Digita tu contraseña privada personal:</h2>
+
+            <div class="private-security-input-row">
+              <label class="modal-label hidden" for="purposeVaultPassword">Contraseña privada</label>
+              <input class="modal-input private-security-input" id="purposeVaultPassword" type="password" autocomplete="off" inputmode="text" placeholder="••••••••••••••" />
+              <button class="private-security-btn private-security-unlock" type="button" id="purposeVaultUnlock" aria-label="Ingresar" title="Ingresar">
+                <img src="/css/icons/icondoor.webp" alt="Ingresar" />
+              </button>
+            </div>
+
+            <p class="private-security-error" id="purposeVaultError" role="alert"></p>
+
+            <div class="private-security-actions">
+              <button class="private-security-btn" type="button" aria-label="Modificar contraseña privada personal"
+                id="purposeVaultChangePassword" title="Modificar contraseña privada personal">
+                <img src="/css/icons/iconedit.webp" alt="Cambiar contraseña" />
+              </button>
+              <button class="private-security-btn" type="button" aria-label="Reiniciar contraseña"
+                id="purposeVaultResetPassword" title="Reiniciar contraseña">
+                <img src="/css/icons/icondelete.webp" alt="Reiniciar contraseña" />
+              </button>
+            </div>
+
+            <p class="private-security-note">
+              Tu clave secreta personal protege toda la información privada que declares en esta red social: deseos,
+              propósitos y datos confidenciales. Sin esta clave, no se habilitan cambios en tu propósito de vida.
+            </p>
+          </div>
+
+          <div class="modal-actions purpose-vault-actions">
+            <button class="btn btn-outline btn-compact" type="button" id="purposeVaultCancel">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    `);
+  }
+
+  if (!document.getElementById("purposeVaultChangePasswordModal")) {
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="modal-overlay hidden" id="purposeVaultChangePasswordModal" aria-hidden="true">
+        <div class="modal wish-modal private-change-password-modal" role="dialog" aria-modal="true" aria-label="Modificar contraseña privada personal">
+          <div class="modal-head">
+            <h3>Modificar contraseña privada personal</h3>
+            <button class="modal-close" type="button" id="purposeVaultChangePasswordCancel">✕</button>
+          </div>
+          <div class="modal-body">
+            <label class="modal-label" for="purposeVaultCurrentPassword">Digita tu actual contraseña privada personal</label>
+            <input class="modal-input" id="purposeVaultCurrentPassword" type="password" autocomplete="off" />
+
+            <label class="modal-label" for="purposeVaultNewPassword">Digita tu nueva contraseña privada personal</label>
+            <input class="modal-input" id="purposeVaultNewPassword" type="password" autocomplete="off" />
+
+            <label class="modal-label" for="purposeVaultConfirmPassword">Confirma tu nueva contraseña privada actual</label>
+            <input class="modal-input" id="purposeVaultConfirmPassword" type="password" autocomplete="off" />
+
+            <p class="private-security-error" id="purposeVaultChangePasswordError" role="alert"></p>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-primary btn-compact" type="button" id="purposeVaultChangePasswordConfirm">Confirmar</button>
+            <button class="btn btn-outline btn-compact" type="button" id="purposeVaultChangePasswordCancelFooter">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    `);
+  }
+
+  if (!document.getElementById("purposeVaultResetPasswordModal")) {
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="modal-overlay hidden" id="purposeVaultResetPasswordModal" aria-hidden="true">
+        <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label="Restaurar contraseña privada personal">
+          <div class="modal-head">
+            <h3>Restaurar contraseña privada personal</h3>
+            <button class="modal-close" type="button" id="purposeVaultResetPasswordCancel">✕</button>
+          </div>
+          <div class="modal-body">
+            <p class="private-reset-text">
+              Estás a punto de reiniciar tu clave secreta personal porque la has olvidado.
+            </p>
+            <p class="private-reset-text">
+              Esta acción eliminará de forma permanente todos tus deseos privados y tu información cifrada.
+            </p>
+            <p class="private-reset-text private-reset-question">
+              ¿Estás seguro de que deseas continuar?
+            </p>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-primary btn-compact" type="button" id="purposeVaultResetPasswordConfirm">Sí, continuar</button>
+            <button class="btn btn-outline btn-compact" type="button" id="purposeVaultResetPasswordCancelFooter">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    `);
+  }
+
+  if (!document.getElementById("purposeVaultResetPasswordFinalModal")) {
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="modal-overlay hidden" id="purposeVaultResetPasswordFinalModal" aria-hidden="true">
+        <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label="Confirmación final de eliminación">
+          <div class="modal-head">
+            <h3>Confirmación final</h3>
+            <button class="modal-close" type="button" id="purposeVaultResetPasswordFinalCancel">✕</button>
+          </div>
+          <div class="modal-body">
+            <p class="private-reset-text">
+              Para confirmar la eliminación de tu clave secreta personal, escribe la siguiente palabra exactamente como se muestra:
+            </p>
+            <p class="private-reset-text private-reset-keyword" id="purposeVaultResetKeywordLabel">ELIMINAR</p>
+            <input class="modal-input" id="purposeVaultResetPasswordKeyword" type="text" autocomplete="off" />
+
+            <p class="private-security-error" id="purposeVaultResetPasswordError" role="alert"></p>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-primary btn-compact" type="button" id="purposeVaultResetPasswordFinalConfirm">Eliminar clave</button>
+            <button class="btn btn-outline btn-compact" type="button" id="purposeVaultResetPasswordFinalCancelFooter">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    `);
+  }
 };
 
 const enhancePrefixInputs = (scopeEl) => {
@@ -905,6 +1031,32 @@ export const initPurposeCoverModule = () => {
   const purposeFulfillPassword = document.getElementById("purposeFulfillPassword");
   const purposeFulfillError = document.getElementById("purposeFulfillError");
   const purposePublishChoice = purposeFulfillOverlay?.querySelector(".purpose-publish-choice");
+  const purposeVaultOverlay = document.getElementById("purposeVaultOverlay");
+  const purposeVaultPassword = document.getElementById("purposeVaultPassword");
+  const purposeVaultUnlock = document.getElementById("purposeVaultUnlock");
+  const purposeVaultCancel = document.getElementById("purposeVaultCancel");
+  const purposeVaultError = document.getElementById("purposeVaultError");
+  const purposeVaultChangePasswordBtn = document.getElementById("purposeVaultChangePassword");
+  const purposeVaultResetPasswordBtn = document.getElementById("purposeVaultResetPassword");
+  const purposeVaultChangePasswordModal = document.getElementById("purposeVaultChangePasswordModal");
+  const purposeVaultChangePasswordCancel = document.getElementById("purposeVaultChangePasswordCancel");
+  const purposeVaultChangePasswordCancelFooter = document.getElementById("purposeVaultChangePasswordCancelFooter");
+  const purposeVaultCurrentPassword = document.getElementById("purposeVaultCurrentPassword");
+  const purposeVaultNewPassword = document.getElementById("purposeVaultNewPassword");
+  const purposeVaultConfirmPassword = document.getElementById("purposeVaultConfirmPassword");
+  const purposeVaultChangePasswordConfirm = document.getElementById("purposeVaultChangePasswordConfirm");
+  const purposeVaultChangePasswordError = document.getElementById("purposeVaultChangePasswordError");
+  const purposeVaultResetPasswordModal = document.getElementById("purposeVaultResetPasswordModal");
+  const purposeVaultResetPasswordCancel = document.getElementById("purposeVaultResetPasswordCancel");
+  const purposeVaultResetPasswordCancelFooter = document.getElementById("purposeVaultResetPasswordCancelFooter");
+  const purposeVaultResetPasswordConfirm = document.getElementById("purposeVaultResetPasswordConfirm");
+  const purposeVaultResetPasswordFinalModal = document.getElementById("purposeVaultResetPasswordFinalModal");
+  const purposeVaultResetPasswordFinalCancel = document.getElementById("purposeVaultResetPasswordFinalCancel");
+  const purposeVaultResetPasswordFinalCancelFooter = document.getElementById("purposeVaultResetPasswordFinalCancelFooter");
+  const purposeVaultResetKeywordLabel = document.getElementById("purposeVaultResetKeywordLabel");
+  const purposeVaultResetPasswordKeyword = document.getElementById("purposeVaultResetPasswordKeyword");
+  const purposeVaultResetPasswordFinalConfirm = document.getElementById("purposeVaultResetPasswordFinalConfirm");
+  const purposeVaultResetPasswordError = document.getElementById("purposeVaultResetPasswordError");
 
   enhancePrefixInputs(lifeProposalOverlay);
 
@@ -916,6 +1068,7 @@ export const initPurposeCoverModule = () => {
   let purposeFulfillEvidenceImage = null;
   let purposeFulfillBusy = false;
   let pendingConfirmGroup = null;
+  let purposeVaultResetKeywords = null;
 
   const setPurposeStatus = (groupEl, text) => {
     const statusEl = groupEl.querySelector(".purpose-status");
@@ -1171,6 +1324,285 @@ export const initPurposeCoverModule = () => {
     updateModalScrollLock();
   };
 
+  const setPurposeVaultError = (message) => {
+    if (!purposeVaultError) return;
+    purposeVaultError.textContent = message || "";
+    purposeVaultError.classList.toggle("is-visible", Boolean(message));
+  };
+
+  const closePurposeVaultModal = () => {
+    if (!purposeVaultOverlay) return;
+    purposeVaultOverlay.classList.add("hidden");
+    purposeVaultOverlay.setAttribute("aria-hidden", "true");
+    if (purposeVaultPassword) purposeVaultPassword.value = "";
+    setPurposeVaultError("");
+    updateModalScrollLock();
+  };
+
+  const openPurposeVaultModal = (message = "") => {
+    if (!purposeVaultOverlay) return;
+    purposeVaultOverlay.classList.remove("hidden");
+    purposeVaultOverlay.setAttribute("aria-hidden", "false");
+    setPurposeVaultError(message);
+    if (purposeVaultPassword && !message) {
+      purposeVaultPassword.value = "";
+    }
+    setTimeout(() => purposeVaultPassword?.focus(), 0);
+    updateModalScrollLock();
+  };
+
+  const setPurposeVaultChangePasswordError = (message) => {
+    if (!purposeVaultChangePasswordError) return;
+    purposeVaultChangePasswordError.textContent = message || "";
+    purposeVaultChangePasswordError.classList.toggle("is-visible", Boolean(message));
+  };
+
+  const setPurposeVaultResetPasswordError = (message) => {
+    if (!purposeVaultResetPasswordError) return;
+    purposeVaultResetPasswordError.textContent = message || "";
+    purposeVaultResetPasswordError.classList.toggle("is-visible", Boolean(message));
+  };
+
+  const closePurposeVaultChangePasswordModal = () => {
+    if (!purposeVaultChangePasswordModal) return;
+    purposeVaultChangePasswordModal.classList.add("hidden");
+    purposeVaultChangePasswordModal.setAttribute("aria-hidden", "true");
+    if (purposeVaultCurrentPassword) purposeVaultCurrentPassword.value = "";
+    if (purposeVaultNewPassword) purposeVaultNewPassword.value = "";
+    if (purposeVaultConfirmPassword) purposeVaultConfirmPassword.value = "";
+    setPurposeVaultChangePasswordError("");
+    updateModalScrollLock();
+  };
+
+  const openPurposeVaultChangePasswordModal = () => {
+    if (!purposeVaultChangePasswordModal) return;
+    setPurposeVaultChangePasswordError("");
+    purposeVaultChangePasswordModal.classList.remove("hidden");
+    purposeVaultChangePasswordModal.setAttribute("aria-hidden", "false");
+    setTimeout(() => purposeVaultCurrentPassword?.focus(), 0);
+    updateModalScrollLock();
+  };
+
+  const closePurposeVaultResetPasswordModal = () => {
+    if (!purposeVaultResetPasswordModal) return;
+    purposeVaultResetPasswordModal.classList.add("hidden");
+    purposeVaultResetPasswordModal.setAttribute("aria-hidden", "true");
+    updateModalScrollLock();
+  };
+
+  const openPurposeVaultResetPasswordModal = () => {
+    if (!purposeVaultResetPasswordModal) return;
+    void loadPurposeVaultResetKeywords();
+    purposeVaultResetPasswordModal.classList.remove("hidden");
+    purposeVaultResetPasswordModal.setAttribute("aria-hidden", "false");
+    updateModalScrollLock();
+  };
+
+  const closePurposeVaultResetPasswordFinalModal = () => {
+    if (!purposeVaultResetPasswordFinalModal) return;
+    purposeVaultResetPasswordFinalModal.classList.add("hidden");
+    purposeVaultResetPasswordFinalModal.setAttribute("aria-hidden", "true");
+    if (purposeVaultResetPasswordKeyword) purposeVaultResetPasswordKeyword.value = "";
+    setPurposeVaultResetPasswordError("");
+    updateModalScrollLock();
+  };
+
+  const openPurposeVaultResetPasswordFinalModal = () => {
+    if (!purposeVaultResetPasswordFinalModal) return;
+    void loadPurposeVaultResetKeywords();
+    setPurposeVaultResetPasswordError("");
+    if (purposeVaultResetPasswordKeyword) purposeVaultResetPasswordKeyword.value = "";
+    purposeVaultResetPasswordFinalModal.classList.remove("hidden");
+    purposeVaultResetPasswordFinalModal.setAttribute("aria-hidden", "false");
+    setTimeout(() => purposeVaultResetPasswordKeyword?.focus(), 0);
+    updateModalScrollLock();
+  };
+
+  const loadPurposeVaultResetKeywords = async () => {
+    try {
+      const res = await apiFetch("/vault/reset-keywords");
+      const data = await parseResponseJson(res);
+      if (!res.ok) return;
+      purposeVaultResetKeywords = data?.keywords || null;
+      if (purposeVaultResetKeywordLabel && purposeVaultResetKeywords?.es) {
+        purposeVaultResetKeywordLabel.textContent = String(purposeVaultResetKeywords.es);
+      }
+    } catch {
+      // No bloquea el flujo; dejamos palabra por defecto.
+    }
+  };
+
+  const handlePurposeVaultChangePassword = async () => {
+    const current = purposeVaultCurrentPassword?.value || "";
+    const next = purposeVaultNewPassword?.value || "";
+    const next2 = purposeVaultConfirmPassword?.value || "";
+
+    setPurposeVaultChangePasswordError("");
+
+    if (!current.trim()) {
+      setPurposeVaultChangePasswordError("Debes digitar tu contraseña privada actual.");
+      return;
+    }
+    if (!next.trim() || next.length < 8) {
+      setPurposeVaultChangePasswordError("Tu nueva clave debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (next !== next2) {
+      setPurposeVaultChangePasswordError("La confirmación no coincide con tu nueva clave.");
+      return;
+    }
+
+    const token = getAccessToken();
+    if (!token) {
+      window.location.href = "/login.html";
+      return;
+    }
+
+    try {
+      const dekRaw = await decryptDekRawFromPassword(current, token);
+
+      const iters = 310000;
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const kek = await pbkdf2Key(next, salt.buffer, iters);
+      const nonce = crypto.getRandomValues(new Uint8Array(12));
+      const wrappedDek = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: nonce, additionalData: AAD_VAULT },
+        kek,
+        dekRaw
+      );
+
+      const rewrapRes = await apiFetch("/vault/rewrap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kdf_name: "pbkdf2_sha256",
+          kdf_iters: iters,
+          kdf_salt_hex: bufToHex(salt.buffer),
+          wrapped_dek_nonce_hex: bufToHex(nonce.buffer),
+          wrapped_dek_hex: bufToHex(wrappedDek),
+        }),
+      });
+      const rewrapData = await parseResponseJson(rewrapRes);
+      if (!rewrapRes.ok) {
+        throw new Error(rewrapData.detail || "No se pudo actualizar tu clave privada.");
+      }
+
+      closePurposeVaultChangePasswordModal();
+      closePurposeVaultModal();
+      openLifeProposalModal();
+    } catch (err) {
+      setPurposeVaultChangePasswordError(
+        err?.message || "No se pudo modificar la contraseña privada."
+      );
+    }
+  };
+
+  const handlePurposeVaultReset = async () => {
+    setPurposeVaultResetPasswordError("");
+    const typed = (purposeVaultResetPasswordKeyword?.value || "").trim();
+    if (!typed) {
+      setPurposeVaultResetPasswordError("Debes escribir la palabra de confirmación.");
+      return;
+    }
+
+    const allowed = purposeVaultResetKeywords
+      ? Object.values(purposeVaultResetKeywords).map((value) => String(value).toUpperCase())
+      : ["ELIMINAR", "DELETE", "SUPPRIMER"];
+
+    if (!allowed.includes(typed.toUpperCase())) {
+      setPurposeVaultResetPasswordError("La palabra de confirmación no coincide.");
+      return;
+    }
+
+    try {
+      const res = await apiFetch("/vault/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm_keyword: typed }),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo restaurar tu clave privada.");
+      }
+
+      sessionStorage.removeItem("dek_hex");
+      localStorage.removeItem(LS.purpose);
+
+      closePurposeVaultResetPasswordFinalModal();
+      closePurposeVaultResetPasswordModal();
+      closePurposeVaultModal();
+      window.location.href = "/create-private-key.html";
+    } catch (err) {
+      setPurposeVaultResetPasswordError(
+        err?.message || "No se pudo restaurar tu clave privada."
+      );
+    }
+  };
+
+  const ensureVaultReadyForPurposeEditor = async () => {
+    const token = getAccessToken();
+    if (!token) {
+      window.location.href = "/login.html";
+      return false;
+    }
+
+    const sessionDek = sessionStorage.getItem("dek_hex");
+    if (sessionDek && String(sessionDek).trim()) {
+      return true;
+    }
+
+    const statusRes = await fetch(`${API}/vault/status`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const statusData = await parseResponseJson(statusRes);
+    if (!statusRes.ok) {
+      throw new Error(statusData.detail || "No se pudo verificar el estado de tu clave privada.");
+    }
+    if (!statusData?.has_vault) {
+      window.location.href = "/create-private-key.html";
+      return false;
+    }
+
+    openPurposeVaultModal();
+    return false;
+  };
+
+  const unlockVaultForPurposeEditor = async () => {
+    const password = (purposeVaultPassword?.value || "").trim();
+    if (!password) {
+      setPurposeVaultError("Debes digitar tu clave privada personal.");
+      return;
+    }
+
+    const token = getAccessToken();
+    if (!token) {
+      window.location.href = "/login.html";
+      return;
+    }
+
+    setPurposeVaultError("");
+    try {
+      await decryptDekFromPassword(password, token);
+      closePurposeVaultModal();
+      openLifeProposalModal();
+    } catch (err) {
+      if (err?.name === "OperationError" || String(err?.message || "").includes("OperationError")) {
+        setPurposeVaultError("Contraseña incorrecta. Inténtalo de nuevo.");
+      } else {
+        setPurposeVaultError(err?.message || "No se pudo desbloquear tu clave privada personal.");
+      }
+    }
+  };
+
+  const handleEditPurposeClick = async () => {
+    try {
+      const ready = await ensureVaultReadyForPurposeEditor();
+      if (ready) openLifeProposalModal();
+    } catch (err) {
+      openPurposeVaultModal(err?.message || "No se pudo validar la clave privada personal.");
+    }
+  };
+
   const openPurposeUnlockModal = (slotNumber) => {
     const slotMap = getPurposeSlotMap(purposeSlots);
     const slotData = slotMap.get(slotNumber);
@@ -1289,7 +1721,7 @@ export const initPurposeCoverModule = () => {
     );
   };
 
-  const decryptDekFromPassword = async (privatePassword, token) => {
+  const decryptDekRawFromPassword = async (privatePassword, token) => {
     const vaultRes = await fetch(`${API}/vault/record`, {
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -1308,6 +1740,11 @@ export const initPurposeCoverModule = () => {
       wrappedDek
     );
     sessionStorage.setItem("dek_hex", bufToHex(dekRaw));
+    return dekRaw;
+  };
+
+  const decryptDekFromPassword = async (privatePassword, token) => {
+    const dekRaw = await decryptDekRawFromPassword(privatePassword, token);
     return crypto.subtle.importKey("raw", dekRaw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
   };
 
@@ -1895,11 +2332,65 @@ export const initPurposeCoverModule = () => {
     closeLifeProposalModal();
   });
 
-  btnEditPurposes?.addEventListener("click", openLifeProposalModal);
+  btnEditPurposes?.addEventListener("click", () => {
+    void handleEditPurposeClick();
+  });
   lifeProposalClose?.addEventListener("click", closeLifeProposalModal);
   lifeProposalCloseFooter?.addEventListener("click", closeLifeProposalModal);
   lifeProposalOverlay?.addEventListener("click", (event) => {
     if (event.target === lifeProposalOverlay) closeLifeProposalModal();
+  });
+
+  purposeVaultCancel?.addEventListener("click", closePurposeVaultModal);
+  purposeVaultOverlay?.addEventListener("click", (event) => {
+    if (event.target === purposeVaultOverlay) closePurposeVaultModal();
+  });
+  purposeVaultUnlock?.addEventListener("click", () => void unlockVaultForPurposeEditor());
+  purposeVaultPassword?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void unlockVaultForPurposeEditor();
+    }
+  });
+  purposeVaultChangePasswordBtn?.addEventListener("click", openPurposeVaultChangePasswordModal);
+  purposeVaultResetPasswordBtn?.addEventListener("click", openPurposeVaultResetPasswordModal);
+
+  purposeVaultChangePasswordCancel?.addEventListener("click", closePurposeVaultChangePasswordModal);
+  purposeVaultChangePasswordCancelFooter?.addEventListener("click", closePurposeVaultChangePasswordModal);
+  purposeVaultChangePasswordModal?.addEventListener("click", (event) => {
+    if (event.target === purposeVaultChangePasswordModal) closePurposeVaultChangePasswordModal();
+  });
+  purposeVaultChangePasswordConfirm?.addEventListener("click", () => void handlePurposeVaultChangePassword());
+  [purposeVaultCurrentPassword, purposeVaultNewPassword, purposeVaultConfirmPassword].forEach((input) => {
+    input?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void handlePurposeVaultChangePassword();
+      }
+    });
+  });
+
+  purposeVaultResetPasswordCancel?.addEventListener("click", closePurposeVaultResetPasswordModal);
+  purposeVaultResetPasswordCancelFooter?.addEventListener("click", closePurposeVaultResetPasswordModal);
+  purposeVaultResetPasswordModal?.addEventListener("click", (event) => {
+    if (event.target === purposeVaultResetPasswordModal) closePurposeVaultResetPasswordModal();
+  });
+  purposeVaultResetPasswordConfirm?.addEventListener("click", () => {
+    closePurposeVaultResetPasswordModal();
+    openPurposeVaultResetPasswordFinalModal();
+  });
+
+  purposeVaultResetPasswordFinalCancel?.addEventListener("click", closePurposeVaultResetPasswordFinalModal);
+  purposeVaultResetPasswordFinalCancelFooter?.addEventListener("click", closePurposeVaultResetPasswordFinalModal);
+  purposeVaultResetPasswordFinalModal?.addEventListener("click", (event) => {
+    if (event.target === purposeVaultResetPasswordFinalModal) closePurposeVaultResetPasswordFinalModal();
+  });
+  purposeVaultResetPasswordFinalConfirm?.addEventListener("click", () => void handlePurposeVaultReset());
+  purposeVaultResetPasswordKeyword?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void handlePurposeVaultReset();
+    }
   });
 
   [purposeUnlocks[1], purposeUnlocks[2], purposeUnlocks[3]].forEach((unlockBtn) => {

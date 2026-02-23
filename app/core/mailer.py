@@ -1,4 +1,5 @@
 import smtplib
+import html
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -365,6 +366,139 @@ def send_email_change_security_alert_email(*, to_email: str, new_email: str) -> 
                 <p style="font-size:12px; color:#777; text-align:center;">
                     Kiadez · Ingenieria de la Conciencia<br>
                     Una red social para cumplir deseos
+                </p>
+                </td>
+            </tr>
+
+            </table>
+
+        </td>
+        </tr>
+    </table>
+
+    </body>
+    </html>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["From"] = settings.SMTP_FROM
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(html_body, "html"))
+
+    with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as server:
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        server.send_message(msg)
+
+
+def send_minor_account_accreditation_email(
+    *,
+    to_email: str,
+    minor_username: str,
+    minor_email: str,
+    registration_date_label: str,
+    approval_url: str,
+) -> None:
+    subject = "Validación de cuenta de menor en Kiadez.com"
+
+    safe_minor_username = html.escape(minor_username or "Usuario")
+    safe_minor_email = html.escape(minor_email or "")
+    safe_registration_date = html.escape(registration_date_label or "")
+    safe_approval_url = html.escape(approval_url or "")
+
+    html_body = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+    <meta charset="UTF-8">
+    <title>Validación de cuenta de menor · Kiadez</title>
+    </head>
+    <body style="
+    margin:0;
+    padding:0;
+    background-color:#0e1a14;
+    font-family: Arial, Helvetica, sans-serif;
+    color:#1e1e1e;
+    ">
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0e1a14; padding:40px 0;">
+        <tr>
+        <td align="center">
+
+            <table width="600" cellpadding="0" cellspacing="0" style="
+            background:#ffffff;
+            border-radius:12px;
+            overflow:hidden;
+            ">
+
+            <tr>
+                <td align="center" style="
+                background:#00674F;
+                padding:30px;
+                ">
+                <img src="https://kiadez.com/assets/logo-email.png" alt="Kiadez" width="120" style="display:block;" />
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding:35px;">
+                <p style="font-size:15px; line-height:1.7; margin:0 0 14px;">
+                    Estimado/a,
+                </p>
+
+                <p style="font-size:15px; line-height:1.7; margin:0 0 14px;">
+                    Le informamos que el usuario <strong>{safe_minor_username}</strong>, asociado al correo
+                    <strong>{safe_minor_email}</strong>, se registró en Kiadez.com el día
+                    <strong>{safe_registration_date}</strong>.
+                </p>
+
+                <p style="font-size:15px; line-height:1.7; margin:0 0 14px;">
+                    De acuerdo con la información suministrada durante el registro, el usuario es menor de edad,
+                    por lo que su cuenta se encuentra actualmente en modo protegido.
+                </p>
+
+                <p style="font-size:15px; line-height:1.7; margin:0 0 14px;">
+                    Esto significa que puede utilizar la plataforma, pero su contenido permanecerá privado y no será
+                    visible públicamente hasta contar con la validación de un adulto responsable.
+                </p>
+
+                <p style="font-size:15px; line-height:1.7; margin:0 0 14px;">
+                    Si usted autoriza que el menor bajo su responsabilidad pueda habilitar funciones públicas dentro
+                    de la plataforma, puede aprobarlo haciendo clic en el siguiente enlace:
+                </p>
+
+                <div style="text-align:center; margin:26px 0;">
+                    <a href="{safe_approval_url}" style="
+                        display:inline-block;
+                        padding:14px 28px;
+                        background:#00674F;
+                        color:#ffffff;
+                        text-decoration:none;
+                        border-radius:8px;
+                        font-weight:bold;
+                        font-size:15px;
+                    ">
+                    Aprobar validación
+                    </a>
+                </div>
+
+                <p style="font-size:15px; line-height:1.7; margin:0 0 14px;">
+                    En caso de no aprobar la habilitación pública, la cuenta continuará operando en modo privado.
+                    También podrá gestionar ajustes adicionales de privacidad desde su panel correspondiente.
+                </p>
+
+                <p style="font-size:15px; line-height:1.7; margin:0 0 14px;">
+                    Kiadez promueve el uso responsable y acompañado de la tecnología en menores de edad.
+                </p>
+
+                <p style="font-size:15px; line-height:1.7; margin:0;">
+                    Atentamente,<br />
+                    Equipo Kiadez
+                </p>
+
+                <p style="font-size:12px; line-height:1.6; color:#6b6b6b; margin:18px 0 0; word-break:break-all;">
+                    Si el botón no funciona, copia y pega este enlace en tu navegador:<br />
+                    <a href="{safe_approval_url}" style="color:#00674F; text-decoration:none;">{safe_approval_url}</a>
                 </p>
                 </td>
             </tr>

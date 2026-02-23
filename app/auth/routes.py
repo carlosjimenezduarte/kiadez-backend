@@ -2,7 +2,9 @@ from app.core.security import decode_2fa_temp_token
 from fastapi import Query
 from app.core.security import create_2fa_temp_token
 from app.db.repositories.user_2fa_repository import User2FARepository
+import hashlib
 import re
+import secrets
 
 from sqlalchemy.exc import IntegrityError
 from datetime import date
@@ -37,7 +39,6 @@ from app.db.models.message_entry import MessageEntry
 from app.db.models.message_thread import MessageThread
 from app.db.models.oracle import OracleResponse, OracleUserState
 from app.db.models.post import Post, PostComment, PostReport, PostReportCase, PostStar
-from app.db.models.private_desire import PrivateDesire
 from app.db.models.private_personal_wish import PrivatePersonalWish
 from app.db.models.public_cooperative_wish import PublicCooperativeWish
 from app.db.models.public_cooperative_wish_fulfillment import PublicCooperativeWishFulfillment
@@ -61,7 +62,7 @@ from app.db.repositories.user_repository import UserRepository
 
 # FastAPI
 from fastapi import APIRouter, HTTPException, Depends, Header
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import Body
 
@@ -74,6 +75,7 @@ from app.core.mailer import (
     send_password_reset_email,
     send_email_change_confirmation_email,
     send_email_change_security_alert_email,
+    send_minor_account_accreditation_email,
 )
 from app.core.password_reset import generate_password_reset_token, get_password_reset_expiry
 
@@ -96,6 +98,22 @@ from .models import (
     UsernameAvailabilityOut,
     UsernameUpdateRequest,
     UsernameUpdateResponse,
+    MinorAccreditationRequest,
+    MinorAccreditationStatusOut,
+    MinorAccreditationRequestOut,
+)
+from .minor_accreditation import (
+    MINOR_STATUS_APPROVED,
+    MINOR_STATUS_NOT_REQUIRED,
+    MINOR_STATUS_PENDING,
+    MINOR_STATUS_REQUESTED,
+    MINOR_RELATIONSHIP_VALUES,
+    calculate_age,
+    force_minor_private_profile_flags,
+    is_minor_protected,
+    is_underage,
+    normalize_minor_relationship,
+    resolve_minor_status,
 )
 from app.core.security import (
     validate_password_policy,
@@ -121,6 +139,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")  # aunque login sea
 USERNAME_PATTERN = re.compile(r"^[a-z0-9._]{4,30}$")
 USERNAME_COOLDOWN_DAYS = 30
 ACCOUNT_CLOSURE_GRACE_DAYS = 30
+MINOR_ACCREDITATION_TOKEN_EXPIRE_DAYS = 7
 USERNAME_RESERVED = {
     "admin",
     "support",
@@ -172,6 +191,83 @@ def _build_profile_url(username: str | None) -> str:
     return "/home_user.html"
 
 
+def _hash_minor_approval_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _to_user_public(user: User) -> UserPublic:
+    minor_status = resolve_minor_status(user)
+    minor_required = minor_status != MINOR_STATUS_NOT_REQUIRED
+    protected = is_minor_protected(user)
+    return UserPublic(
+        user_number=user.id,
+        email=user.email,
+        role=user.role,
+        guardian_rank=user.guardian_rank,
+        username=user.username,
+        username_updated_at=user.username_updated_at,
+        is_active=user.is_active,
+        minor_accreditation_status=minor_status,
+        minor_accreditation_required=minor_required,
+        is_minor_protected=protected,
+        can_publish_public=not protected,
+    )
+
+
+def _minor_status_out(user: User) -> MinorAccreditationStatusOut:
+    status = resolve_minor_status(user)
+    required = status != MINOR_STATUS_NOT_REQUIRED
+    protected = status in {MINOR_STATUS_PENDING, MINOR_STATUS_REQUESTED}
+
+    relationship_raw = (user.minor_guardian_relationship or "").strip().lower()
+    relationship = relationship_raw if relationship_raw in MINOR_RELATIONSHIP_VALUES else None
+
+    return MinorAccreditationStatusOut(
+        required=required,
+        status=status,
+        is_minor_protected=protected,
+        can_publish_public=not protected,
+        guardian_phone=(user.minor_guardian_phone or None),
+        guardian_email=(user.minor_guardian_email or None),
+        relationship=relationship,
+        requested_at=user.minor_accreditation_requested_at,
+        approved_at=user.minor_accreditation_approved_at,
+    )
+
+
+def _sync_minor_protected_state(*, db: Session, user: User) -> User:
+    changed = False
+
+    resolved_status = resolve_minor_status(user)
+    if (user.minor_accreditation_status or "").strip().lower() != resolved_status:
+        user.minor_accreditation_status = resolved_status
+        changed = True
+
+    if resolved_status == MINOR_STATUS_NOT_REQUIRED:
+        if user.minor_accreditation_token_hash is not None:
+            user.minor_accreditation_token_hash = None
+            changed = True
+        if user.minor_accreditation_token_expires_at is not None:
+            user.minor_accreditation_token_expires_at = None
+            changed = True
+    elif resolved_status == MINOR_STATUS_APPROVED:
+        if user.minor_accreditation_token_hash is not None:
+            user.minor_accreditation_token_hash = None
+            changed = True
+        if user.minor_accreditation_token_expires_at is not None:
+            user.minor_accreditation_token_expires_at = None
+            changed = True
+
+    if force_minor_private_profile_flags(user):
+        changed = True
+
+    if changed:
+        db.commit()
+        db.refresh(user)
+
+    return user
+
+
 def _build_username_state(user: User, now: datetime | None = None) -> UsernameState:
     now_utc = now or datetime.now(timezone.utc)
     next_change_at = _next_username_change_at(user)
@@ -215,6 +311,13 @@ def _mark_account_closure_restored(
     user.public_profile_show_calendar = True
     user.public_profile_show_oracle = True
     user.public_profile_show_personal_posts = True
+    user.public_profile_show_cooperative_wishes = True
+    user.public_profile_show_followers = True
+    user.public_profile_show_gallery = True
+    user.public_profile_show_recent_achievements = True
+    user.public_profile_show_stars = True
+    user.public_profile_show_cover_purposes = True
+    user.public_profile_show_biography = True
 
     audit = db.execute(
         select(AccountClosureAudit)
@@ -381,7 +484,6 @@ def _purge_user_content_for_account_closure(*, db: Session, user_id: int) -> Non
     db.execute(delete(BiographyFavoriteQuotes).where(BiographyFavoriteQuotes.user_id == user_id))
     db.execute(delete(BiographyDistinctions).where(BiographyDistinctions.user_id == user_id))
 
-    db.execute(delete(PrivateDesire).where(PrivateDesire.user_id == user_id))
     db.execute(delete(LifePurpose).where(LifePurpose.user_id == user_id))
     db.execute(delete(AchievementUnlockEvent).where(AchievementUnlockEvent.user_id == user_id))
     db.execute(delete(OracleResponse).where(OracleResponse.user_id == user_id))
@@ -449,23 +551,10 @@ def get_current_user(
         if not user or not user.is_active:
             raise ValueError("Usuario no encontrado o inactivo.")
 
-        return UserPublic(
-            user_number=user.id,
-            email=user.email,
-            role=user.role,
-            guardian_rank=user.guardian_rank,
-            username=user.username,
-            username_updated_at=user.username_updated_at,
-            is_active=user.is_active,
-        )
+        user = _sync_minor_protected_state(db=db, user=user)
+        return _to_user_public(user)
     except Exception:
         raise HTTPException(status_code=401, detail="No autorizado")
-
-def calculate_age(birth_date: date) -> int:
-    today = date.today()
-    return today.year - birth_date.year - (
-        (today.month, today.day) < (birth_date.month, birth_date.day)
-    )
 
 
 @router.post("/register", response_model=UserPublic)
@@ -489,8 +578,7 @@ def register(
     # 3. Calcular edad
     age = calculate_age(birth_date)
 
-    # 4. Decidir estado inicial
-    #is_active = age >= 18
+    initial_minor_status = MINOR_STATUS_PENDING if age < 18 else MINOR_STATUS_NOT_REQUIRED
 
     repo = UserRepository(db)
 
@@ -505,6 +593,10 @@ def register(
             role="user",
             is_active=False
         )
+        user.minor_accreditation_status = initial_minor_status
+        if initial_minor_status != MINOR_STATUS_NOT_REQUIRED:
+            force_minor_private_profile_flags(user)
+
         token = generate_email_verification_token()
 
         verification = EmailVerificationToken(
@@ -528,15 +620,7 @@ def register(
             detail="El correo electrónico ya está registrado.",
         )
 
-    return UserPublic(
-        user_number=user.id,
-        email=user.email,
-        role=user.role,
-        guardian_rank=user.guardian_rank,
-        username=user.username,
-        username_updated_at=user.username_updated_at,
-        is_active=user.is_active,
-    )
+    return _to_user_public(user)
 
 
 
@@ -665,6 +749,195 @@ def refresh(
 @router.get("/me", response_model=UserPublic)
 def me(current: UserPublic = Depends(get_current_user)):
     return current
+
+
+@router.get("/minor-accreditation/status", response_model=MinorAccreditationStatusOut)
+def get_minor_accreditation_status(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    user = _sync_minor_protected_state(db=db, user=user)
+    return _minor_status_out(user)
+
+
+@router.post("/minor-accreditation/request", response_model=MinorAccreditationRequestOut)
+def request_minor_accreditation(
+    payload: MinorAccreditationRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    user = _sync_minor_protected_state(db=db, user=user)
+    current_status = resolve_minor_status(user)
+
+    if current_status == MINOR_STATUS_NOT_REQUIRED:
+        return MinorAccreditationRequestOut(
+            requested=False,
+            status=MINOR_STATUS_NOT_REQUIRED,
+            is_minor_protected=False,
+            can_publish_public=True,
+            message="Tu cuenta no requiere acreditación por edad.",
+        )
+
+    if current_status == MINOR_STATUS_APPROVED:
+        return MinorAccreditationRequestOut(
+            requested=False,
+            status=MINOR_STATUS_APPROVED,
+            is_minor_protected=False,
+            can_publish_public=True,
+            message="Tu cuenta ya fue acreditada por un adulto responsable.",
+        )
+
+    guardian_phone = " ".join((payload.guardian_phone or "").strip().split())
+    guardian_email = str(payload.guardian_email or "").strip().lower()
+    relationship = normalize_minor_relationship(payload.relationship)
+
+    if not guardian_phone:
+        raise HTTPException(status_code=400, detail="Debes registrar el teléfono del adulto responsable.")
+    if not guardian_email:
+        raise HTTPException(status_code=400, detail="Debes registrar el correo del adulto responsable.")
+
+    token = secrets.token_urlsafe(32)
+    token_hash = _hash_minor_approval_token(token)
+    now_utc = datetime.now(timezone.utc)
+    token_expires_at = now_utc + timedelta(days=MINOR_ACCREDITATION_TOKEN_EXPIRE_DAYS)
+
+    user.minor_guardian_phone = guardian_phone
+    user.minor_guardian_email = guardian_email
+    user.minor_guardian_relationship = relationship
+    user.minor_accreditation_status = MINOR_STATUS_REQUESTED
+    user.minor_accreditation_requested_at = now_utc
+    user.minor_accreditation_approved_at = None
+    user.minor_accreditation_token_hash = token_hash
+    user.minor_accreditation_token_expires_at = token_expires_at
+    force_minor_private_profile_flags(user)
+
+    db.commit()
+    db.refresh(user)
+
+    profile_username = (user.username or "").strip()
+    if profile_username:
+        minor_username = f"@{profile_username}"
+    else:
+        minor_username = f"{(user.first_name or '').strip()} {(user.last_name or '').strip()}".strip() or f"Usuario {user.id}"
+
+    registration_date_label = (
+        user.created_at.astimezone(timezone.utc).strftime("%Y-%m-%d")
+        if user.created_at
+        else datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    )
+    approval_url = f"{settings.BACKEND_URL}/auth/minor-accreditation/approve?token={token}"
+
+    try:
+        send_minor_account_accreditation_email(
+            to_email=guardian_email,
+            minor_username=minor_username,
+            minor_email=user.email,
+            registration_date_label=registration_date_label,
+            approval_url=approval_url,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo enviar el correo de acreditación al adulto responsable.",
+        )
+
+    return MinorAccreditationRequestOut(
+        requested=True,
+        status=MINOR_STATUS_REQUESTED,
+        is_minor_protected=True,
+        can_publish_public=False,
+        message="Solicitud enviada. El adulto responsable debe aprobarla desde el enlace seguro.",
+    )
+
+
+def _minor_approval_html(*, title: str, body: str, success: bool) -> HTMLResponse:
+    safe_title = title.strip() or "Validación de cuenta"
+    safe_body = body.strip() or "No se pudo procesar la solicitud."
+    color = "#0b5f2a" if success else "#8f1e1e"
+    status_code = 200 if success else 400
+    html = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>{safe_title}</title>
+    </head>
+    <body style="margin:0;padding:0;background:#0e1a14;font-family:Arial,Helvetica,sans-serif;">
+      <main style="max-width:640px;margin:48px auto;padding:24px;background:#fff;border-radius:14px;">
+        <h1 style="margin:0 0 12px;color:{color};font-size:24px;">{safe_title}</h1>
+        <p style="margin:0;color:#1e1e1e;line-height:1.7;">{safe_body}</p>
+      </main>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html, status_code=status_code)
+
+
+@router.get("/minor-accreditation/approve", response_class=HTMLResponse)
+def approve_minor_accreditation(
+    token: str = Query(..., min_length=24, max_length=255),
+    db: Session = Depends(get_db),
+):
+    raw_token = (token or "").strip()
+    if not raw_token:
+        return _minor_approval_html(
+            title="Enlace inválido",
+            body="No se encontró un token válido de aprobación.",
+            success=False,
+        )
+
+    token_hash = _hash_minor_approval_token(raw_token)
+    now_utc = datetime.now(timezone.utc)
+
+    user = db.execute(
+        select(User).where(
+            User.minor_accreditation_token_hash == token_hash,
+            User.minor_accreditation_token_expires_at.is_not(None),
+            User.minor_accreditation_token_expires_at >= now_utc,
+        )
+    ).scalar_one_or_none()
+    if user is None:
+        return _minor_approval_html(
+            title="Enlace expirado o inválido",
+            body="El enlace de aprobación ya no está disponible. Solicita uno nuevo desde la cuenta del menor.",
+            success=False,
+        )
+
+    if not user.is_active:
+        return _minor_approval_html(
+            title="Cuenta no disponible",
+            body="La cuenta del menor no está activa en este momento.",
+            success=False,
+        )
+
+    if is_underage(user.birth_date):
+        user.minor_accreditation_status = MINOR_STATUS_APPROVED
+        user.minor_accreditation_approved_at = now_utc
+        message = "La validación fue aprobada correctamente. La cuenta ya puede habilitar funciones públicas."
+    else:
+        user.minor_accreditation_status = MINOR_STATUS_NOT_REQUIRED
+        user.minor_accreditation_approved_at = None
+        message = "La cuenta ya no requiere validación por edad."
+
+    user.minor_accreditation_token_hash = None
+    user.minor_accreditation_token_expires_at = None
+
+    db.commit()
+
+    return _minor_approval_html(
+        title="Validación completada",
+        body=message,
+        success=True,
+    )
 
 
 @router.get("/username", response_model=UsernameState)
@@ -912,6 +1185,13 @@ def close_account(
     user.public_profile_show_calendar = False
     user.public_profile_show_oracle = False
     user.public_profile_show_personal_posts = False
+    user.public_profile_show_cooperative_wishes = False
+    user.public_profile_show_followers = False
+    user.public_profile_show_gallery = False
+    user.public_profile_show_recent_achievements = False
+    user.public_profile_show_stars = False
+    user.public_profile_show_cover_purposes = False
+    user.public_profile_show_biography = False
     user.account_closure_requested_at = now_utc
     user.account_closure_restore_deadline_at = restore_deadline
     user.is_active = False

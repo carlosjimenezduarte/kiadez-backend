@@ -4,6 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
+from app.db.models.profile_report import ProfileReportCaseStatus, ProfileReportReason
 from app.db.models.guardian_wish_request import GuardianWishRequestStatus
 from app.db.models.guardian_wish_message import GuardianWishMessageKind
 from app.db.models.post import PostMediaKind, PostReportCaseStatus, PostReportReason
@@ -24,6 +25,28 @@ class GuardianWishRequestUserOut(BaseModel):
     username: str | None = None
     handle: str
     profile_url: str
+
+
+class GuardianRankUserOut(BaseModel):
+    user_id: int
+    full_name: str
+    username: str | None = None
+    handle: str
+    profile_url: str
+    role: str
+    guardian_rank: int
+    guardian_rank_name: str
+    next_guardian_rank: int | None = None
+    next_guardian_rank_name: str | None = None
+    can_promote: bool
+    is_self: bool
+
+
+class GuardianRankPromotionOut(BaseModel):
+    promoted: bool
+    previous_guardian_rank: int
+    previous_guardian_rank_name: str
+    target: GuardianRankUserOut
 
 
 class GuardianWishRequestOut(BaseModel):
@@ -131,6 +154,61 @@ class GuardianReportedPostOut(BaseModel):
 
 class GuardianReportedPostListOut(BaseModel):
     items: list[GuardianReportedPostOut] = Field(default_factory=list)
+    page: int = 1
+    page_size: int = 10
+    total: int = 0
+    total_pages: int = 1
+    range_start: int = 0
+    range_end: int = 0
+
+
+class GuardianReportedProfileReportOut(BaseModel):
+    id: int
+    reporter_user_id: int
+    reporter_handle: str
+    reason: ProfileReportReason
+    other_reason: str | None = None
+    created_at: datetime
+
+
+class GuardianReportedProfilePostOut(BaseModel):
+    id: int
+    status: PostReportCaseStatus
+    report_count: int
+    post_id: int | None = None
+    post_text: str | None = None
+    post_media_kind: PostMediaKind | None = None
+    post_author: GuardianWishRequestUserOut
+    post_url: str | None = None
+    first_reported_at: datetime
+    last_reported_at: datetime
+
+
+class GuardianReportedProfilePostListOut(BaseModel):
+    items: list[GuardianReportedProfilePostOut] = Field(default_factory=list)
+    page: int = 1
+    page_size: int = 10
+    total: int = 0
+    total_pages: int = 1
+    range_start: int = 0
+    range_end: int = 0
+
+
+class GuardianReportedProfileOut(BaseModel):
+    id: int
+    status: ProfileReportCaseStatus
+    report_count: int
+    reported_user: GuardianWishRequestUserOut
+    resolved_by_guardian: GuardianWishRequestUserOut | None = None
+    first_reported_at: datetime
+    last_reported_at: datetime
+    resolved_at: datetime | None = None
+    reports: list[GuardianReportedProfileReportOut] = Field(default_factory=list)
+    reported_posts: GuardianReportedProfilePostListOut
+
+
+class GuardianReportedProfileListOut(BaseModel):
+    items: list[GuardianReportedProfileOut] = Field(default_factory=list)
     page: int = 1
     page_size: int = 10
     total: int = 0

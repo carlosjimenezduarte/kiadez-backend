@@ -4,6 +4,7 @@
 
   const API = "http://127.0.0.1:8000";
   const GUARDIAN_REQUIRED_RANK = 3;
+  const GUARDIAN_MAX_RANK = 8;
 
   const getAccessToken = () => localStorage.getItem("access_token") || "";
 
@@ -62,6 +63,12 @@
   let reportedPostsActionLoading = false;
   let showDeleteReportedPostModal = false;
   let showKeepReportedPostModal = false;
+  let reportedProfilesLoading = false;
+  let reportedProfilesError = "";
+  let reportedProfilesPage = 1;
+  let reportedProfilesTotalPages = 1;
+  let reportedProfilesItems = [];
+  const REPORTED_PROFILES_PAGE_SIZE = 10;
 
   let showSealCommitmentModal = false;
   let showDenyModal = false;
@@ -78,6 +85,14 @@
   let ownerMessageBody = "";
   let ownerMessageSubjectError = false;
   let ownerMessageBodyError = false;
+
+  let rankLookupQuery = "";
+  let rankLookupLoading = false;
+  let rankLookupError = "";
+  let rankLookupResult = null;
+  let showPromoteRankModal = false;
+  let rankPromoteLoading = false;
+  let rankPromoteError = "";
 
   const modules = [
     {
@@ -99,6 +114,12 @@
       note: "Solicitudes: “Yo puedo cumplir este deseo”.",
     },
     {
+      key: "rank_management",
+      icon: "🛡️",
+      title: "Gestión de Rangos",
+      note: "Buscar por @id y subir nivel de Guardián sin saltos.",
+    },
+    {
       key: "messaging",
       icon: "💬",
       title: "Mensajería",
@@ -116,6 +137,14 @@
     }
     if (activeModuleKey === "reported_posts" && isGuardian) {
       void loadReportedPosts(1);
+      return;
+    }
+    if (activeModuleKey === "reported_profiles" && isGuardian) {
+      void loadReportedProfiles(1);
+      return;
+    }
+    if (activeModuleKey === "rank_management" && isGuardian) {
+      rankLookupError = "";
     }
   };
 
@@ -157,6 +186,29 @@
     if (value === "other") {
       const note = String(otherReason || "").trim();
       return note ? `Otra razón: ${note}` : "Otra razón";
+    }
+    return value || "Razón no especificada";
+  };
+
+  const formatProfileReportStatusLabel = (item) => {
+    const value = String(item?.status || "").toLowerCase();
+    if (value === "open") return "Pendiente";
+    if (value === "reviewed") return "Revisado";
+    return value || "Desconocida";
+  };
+
+  const formatProfileReportReasonLabel = (reason, otherReason = "") => {
+    const value = String(reason || "").toLowerCase();
+    if (value === "fake_or_illegal") return "Perfil falso o contenido ilegal";
+    if (value === "external_manipulation")
+      return "Manipulación hacia otros usuarios en la vida real a través de medios externos";
+    if (value === "star_manipulation") return "Abuso de publicaciones para atraer estrellas";
+    if (value === "abusive_or_coercive") return "Conducta abusiva o coercitiva";
+    if (value === "wish_system_abuse") return "Uso indebido del sistema de deseos";
+    if (value === "safety_risk") return "Riesgo para la seguridad de otros";
+    if (value === "other") {
+      const note = String(otherReason || "").trim();
+      return note ? `Otro: ${note}` : "Otro";
     }
     return value || "Razón no especificada";
   };
@@ -221,6 +273,80 @@
     showKeepReportedPostModal = false;
     activeReportedPost = null;
     reportedPostsActionError = "";
+  };
+
+  const closePromoteRankModal = () => {
+    showPromoteRankModal = false;
+    rankPromoteError = "";
+  };
+
+  const openPromoteRankModal = () => {
+    if (!rankLookupResult?.can_promote || rankPromoteLoading) return;
+    rankPromoteError = "";
+    showPromoteRankModal = true;
+  };
+
+  const searchRankUser = async () => {
+    const query = String(rankLookupQuery || "").trim();
+    rankLookupError = "";
+    rankLookupResult = null;
+    if (!query) {
+      rankLookupError = "Escribe un @id o @username para buscar.";
+      return;
+    }
+
+    rankLookupLoading = true;
+    try {
+      const res = await apiFetch(
+        `/guardian-center/rank-management/user?query=${encodeURIComponent(query)}`
+      );
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo encontrar el usuario.");
+      }
+      rankLookupResult = data || null;
+      if (!rankLookupResult?.user_id) {
+        throw new Error("Respuesta inválida al cargar el usuario.");
+      }
+    } catch (err) {
+      rankLookupError = err?.message || "No se pudo encontrar el usuario.";
+      rankLookupResult = null;
+    } finally {
+      rankLookupLoading = false;
+    }
+  };
+
+  const promoteRankUser = async () => {
+    const targetUserId = Number(rankLookupResult?.user_id || 0);
+    if (!Number.isFinite(targetUserId) || targetUserId <= 0) return;
+    if (!rankLookupResult?.can_promote || rankPromoteLoading) return;
+
+    rankPromoteLoading = true;
+    rankPromoteError = "";
+    try {
+      const res = await apiFetch(
+        `/guardian-center/rank-management/users/${encodeURIComponent(String(targetUserId))}/promote`,
+        { method: "POST" }
+      );
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo promover el rango.");
+      }
+
+      const updatedTarget = data?.target || null;
+      if (!updatedTarget?.user_id) {
+        throw new Error("Respuesta inválida al promover el usuario.");
+      }
+      rankLookupResult = updatedTarget;
+      if (updatedTarget.is_self) {
+        guardianRank = Number(updatedTarget.guardian_rank || guardianRank) || guardianRank;
+      }
+      closePromoteRankModal();
+    } catch (err) {
+      rankPromoteError = err?.message || "No se pudo promover el rango.";
+    } finally {
+      rankPromoteLoading = false;
+    }
   };
 
   const openSealCommitmentModal = (req) => {
@@ -313,6 +439,92 @@
       reportedPostsTotalPages = 1;
     } finally {
       reportedPostsLoading = false;
+    }
+  };
+
+  const normalizeReportedProfileItem = (item) => ({
+    ...(item || {}),
+    reported_posts_loading: false,
+    reported_posts_error: "",
+  });
+
+  const loadReportedProfiles = async (page = 1) => {
+    reportedProfilesLoading = true;
+    reportedProfilesError = "";
+    const requestedPage = Math.max(1, Number(page || 1));
+
+    try {
+      const res = await apiFetch(
+        `/guardian-center/reported-profiles?page=${encodeURIComponent(String(requestedPage))}&page_size=${encodeURIComponent(String(REPORTED_PROFILES_PAGE_SIZE))}`
+      );
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudieron cargar los perfiles denunciados.");
+      }
+      const nextItems = Array.isArray(data?.items) ? data.items : [];
+      reportedProfilesItems = nextItems.map((item) => normalizeReportedProfileItem(item));
+      reportedProfilesTotalPages = Math.max(1, Number(data?.total_pages || 1));
+      reportedProfilesPage = Math.max(1, Math.min(Number(data?.page || requestedPage), reportedProfilesTotalPages));
+    } catch (err) {
+      reportedProfilesError = err?.message || "No se pudieron cargar los perfiles denunciados.";
+      reportedProfilesItems = [];
+      reportedProfilesPage = 1;
+      reportedProfilesTotalPages = 1;
+    } finally {
+      reportedProfilesLoading = false;
+    }
+  };
+
+  const loadReportedProfilePostsPage = async (caseId, page = 1) => {
+    const targetCaseId = Number(caseId || 0);
+    if (!Number.isFinite(targetCaseId) || targetCaseId <= 0) return;
+    const requestedPage = Math.max(1, Number(page || 1));
+
+    reportedProfilesItems = reportedProfilesItems.map((item) =>
+      Number(item?.id) === targetCaseId
+        ? { ...item, reported_posts_loading: true, reported_posts_error: "" }
+        : item
+    );
+
+    try {
+      const res = await apiFetch(
+        `/guardian-center/reported-profiles/${encodeURIComponent(String(targetCaseId))}/reported-posts?page=${encodeURIComponent(String(requestedPage))}&page_size=10`
+      );
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudieron cargar las publicaciones denunciadas de este perfil.");
+      }
+      const normalizedPosts = {
+        items: Array.isArray(data?.items) ? data.items : [],
+        page: Math.max(1, Number(data?.page || requestedPage)),
+        page_size: Math.max(1, Number(data?.page_size || 10)),
+        total: Math.max(0, Number(data?.total || 0)),
+        total_pages: Math.max(1, Number(data?.total_pages || 1)),
+        range_start: Math.max(0, Number(data?.range_start || 0)),
+        range_end: Math.max(0, Number(data?.range_end || 0)),
+      };
+
+      reportedProfilesItems = reportedProfilesItems.map((item) =>
+        Number(item?.id) === targetCaseId
+          ? {
+              ...item,
+              reported_posts: normalizedPosts,
+              reported_posts_loading: false,
+              reported_posts_error: "",
+            }
+          : item
+      );
+    } catch (err) {
+      reportedProfilesItems = reportedProfilesItems.map((item) =>
+        Number(item?.id) === targetCaseId
+          ? {
+              ...item,
+              reported_posts_loading: false,
+              reported_posts_error:
+                err?.message || "No se pudieron cargar las publicaciones denunciadas de este perfil.",
+            }
+          : item
+      );
     }
   };
 
@@ -457,9 +669,15 @@
     const pollingMs = 15000;
     const poller = window.setInterval(() => {
       if (!isGuardian || isLoading) return;
-      if (activeModuleKey !== "reported_posts") return;
-      if (reportedPostsLoading || reportedPostsActionLoading) return;
-      void loadReportedPosts(reportedPostsPage);
+      if (activeModuleKey === "reported_posts") {
+        if (reportedPostsLoading || reportedPostsActionLoading) return;
+        void loadReportedPosts(reportedPostsPage);
+        return;
+      }
+      if (activeModuleKey === "reported_profiles") {
+        if (reportedProfilesLoading) return;
+        void loadReportedProfiles(reportedProfilesPage);
+      }
     }, pollingMs);
 
     (async () => {
@@ -478,6 +696,8 @@
         if (isGuardian) {
           if (activeModuleKey === "reported_posts") {
             await loadReportedPosts(1);
+          } else if (activeModuleKey === "reported_profiles") {
+            await loadReportedProfiles(1);
           } else if (activeModuleKey === "wish_management") {
             await loadWishRequests(1);
           }
@@ -614,7 +834,7 @@
           <section class="guardian-center-module" aria-label={activeModule.title}>
             <div class="guardian-center-module-head">
               <h3 class="guardian-center-module-title">{activeModule.title}</h3>
-              {#if activeModuleKey === "wish_management" || activeModuleKey === "reported_posts"}
+              {#if activeModuleKey === "wish_management" || activeModuleKey === "reported_posts" || activeModuleKey === "reported_profiles" || activeModuleKey === "rank_management"}
                 <span class="guardian-center-module-pill">En vivo</span>
               {:else}
                 <span class="guardian-center-module-pill">Próximamente</span>
@@ -628,6 +848,14 @@
             {:else if activeModuleKey === "reported_posts"}
               <p class="panel-muted guardian-center-module-note">
                 Denuncias de publicaciones recibidas en tiempo real. Revisa el reporte y decide si se conserva o se elimina la publicación.
+              </p>
+            {:else if activeModuleKey === "reported_profiles"}
+              <p class="panel-muted guardian-center-module-note">
+                Denuncias de perfiles recibidas en tiempo real, con las publicaciones denunciadas asociadas a cada usuario.
+              </p>
+            {:else if activeModuleKey === "rank_management"}
+              <p class="panel-muted guardian-center-module-note">
+                Busca usuarios por <strong>@id</strong> o <strong>@username</strong>, revisa su rango actual y promuévelos al siguiente nivel sin saltos.
               </p>
             {:else}
               <p class="panel-muted guardian-center-module-note">
@@ -938,7 +1166,266 @@
                 </div>
               {/if}
             {:else if activeModuleKey === "reported_profiles"}
-              <div class="guardian-center-empty">No hay perfiles denunciados por ahora.</div>
+              {#if reportedProfilesError}
+                <div class="guardian-center-empty is-error">{reportedProfilesError}</div>
+              {:else if reportedProfilesLoading}
+                <div class="guardian-center-empty">Cargando perfiles denunciados...</div>
+              {:else if !reportedProfilesItems.length}
+                <div class="guardian-center-empty">No hay perfiles denunciados por ahora.</div>
+              {:else}
+                <div class="guardian-reported-posts guardian-reported-profiles" aria-label="Perfiles denunciados">
+                  {#each reportedProfilesItems as item (item.id)}
+                    {@const statusLabel = formatProfileReportStatusLabel(item)}
+                    {@const postsData = item.reported_posts || { items: [], page: 1, total_pages: 1, total: 0, range_start: 0, range_end: 0 }}
+                    <article class="guardian-reported-card guardian-reported-profile-card">
+                      <header class="guardian-reported-head">
+                        <div class="guardian-reported-title-wrap">
+                          <div class="guardian-reported-title">Caso de perfil #{item.id}</div>
+                          <div class="guardian-reported-meta">
+                            <span>Reportes: {item.report_count}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>Primero: {formatDateTime(item.first_reported_at)}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>Último: {formatDateTime(item.last_reported_at)}</span>
+                          </div>
+                        </div>
+                        <span class={`guardian-reported-status is-${String(item.status || "").toLowerCase()}`}>{statusLabel}</span>
+                      </header>
+
+                      <div class="guardian-reported-body">
+                        <div class="guardian-reported-field">
+                          <div class="guardian-wish-label">Usuario denunciado</div>
+                          <div class="guardian-wish-value">
+                            {item.reported_user.full_name}
+                            <span class="guardian-wish-handle">{item.reported_user.handle}</span>
+                          </div>
+                        </div>
+
+                        {#if item.reports?.length}
+                          <div class="guardian-reported-field">
+                            <div class="guardian-wish-label">Últimos reportes de perfil</div>
+                            <div class="guardian-reported-reasons">
+                              {#each item.reports as rep (rep.id)}
+                                <div class="guardian-reported-reason-item">
+                                  <span class="guardian-wish-handle">{rep.reporter_handle}</span>
+                                  <span>{formatProfileReportReasonLabel(rep.reason, rep.other_reason)}</span>
+                                  <span class="panel-muted">{formatDateTime(rep.created_at)}</span>
+                                </div>
+                              {/each}
+                            </div>
+                          </div>
+                        {/if}
+
+                        <div class="guardian-reported-field guardian-reported-profile-posts">
+                          <div class="guardian-reported-profile-posts-head">
+                            <div class="guardian-wish-label">Publicaciones denunciadas</div>
+                            <span class="guardian-reported-profile-posts-counter">{Number(postsData.total || 0)} / {Number(postsData.total || 0)}</span>
+                          </div>
+
+                          {#if item.reported_posts_error}
+                            <div class="guardian-center-empty is-error">{item.reported_posts_error}</div>
+                          {:else if item.reported_posts_loading}
+                            <div class="guardian-center-empty">Cargando publicaciones denunciadas del perfil...</div>
+                          {:else if !postsData.items?.length}
+                            <p class="panel-muted">0/0. Este usuario está limpio en publicaciones denunciadas.</p>
+                          {:else}
+                            <div class="guardian-reported-profile-post-list">
+                              {#each postsData.items as postCase (postCase.id)}
+                                <article class="guardian-reported-profile-post-item">
+                                  <div class="guardian-reported-profile-post-main">
+                                    <div class="guardian-reported-profile-post-title">
+                                      Caso #{postCase.id} · Reportes: {postCase.report_count}
+                                    </div>
+                                    <div class="guardian-reported-profile-post-meta">
+                                      Último reporte: {formatDateTime(postCase.last_reported_at)}
+                                    </div>
+                                    {#if postCase.post_text}
+                                      <div class="guardian-reported-text">{postCase.post_text}</div>
+                                    {/if}
+                                  </div>
+                                  <div class="guardian-reported-profile-post-actions">
+                                    {#if postCase.post_url}
+                                      <a class="btn btn-outline btn-compact" href={postCase.post_url} target="_blank" rel="noopener noreferrer">
+                                        Ver publicación
+                                      </a>
+                                    {:else}
+                                      <span class="panel-muted">Publicación no disponible.</span>
+                                    {/if}
+                                  </div>
+                                </article>
+                              {/each}
+                            </div>
+                          {/if}
+
+                          {#if Number(postsData.total_pages || 1) > 1}
+                            <div class="guardian-wish-pagination guardian-reported-profile-post-pagination" aria-label={`Paginación de publicaciones denunciadas del caso ${item.id}`}>
+                              <button
+                                class="btn btn-outline btn-compact"
+                                type="button"
+                                disabled={item.reported_posts_loading || Number(postsData.page || 1) <= 1}
+                                on:click={() => loadReportedProfilePostsPage(item.id, Number(postsData.page || 1) - 1)}
+                              >
+                                Anterior
+                              </button>
+                              <span class="guardian-wish-page">{Number(postsData.page || 1)} / {Number(postsData.total_pages || 1)}</span>
+                              <button
+                                class="btn btn-outline btn-compact"
+                                type="button"
+                                disabled={item.reported_posts_loading || Number(postsData.page || 1) >= Number(postsData.total_pages || 1)}
+                                on:click={() => loadReportedProfilePostsPage(item.id, Number(postsData.page || 1) + 1)}
+                              >
+                                Siguiente
+                              </button>
+                            </div>
+                          {/if}
+                        </div>
+
+                        {#if item.resolved_by_guardian}
+                          <div class="guardian-reported-field">
+                            <div class="guardian-wish-label">Última revisión</div>
+                            <div class="guardian-wish-value">
+                              {item.resolved_by_guardian.full_name}
+                              <span class="guardian-wish-handle">{item.resolved_by_guardian.handle}</span>
+                              {#if item.resolved_at}
+                                <span class="guardian-wish-commitment-date">· {formatDateTime(item.resolved_at)}</span>
+                              {/if}
+                            </div>
+                          </div>
+                        {/if}
+                      </div>
+
+                      <div class="guardian-reported-actions">
+                        <a class="btn btn-outline btn-compact" href={item.reported_user.profile_url} target="_blank" rel="noopener noreferrer">
+                          Ver perfil
+                        </a>
+                      </div>
+                    </article>
+                  {/each}
+                </div>
+
+                <div class="guardian-wish-pagination" aria-label="Paginación de perfiles denunciados">
+                  <button
+                    class="btn btn-outline btn-compact"
+                    type="button"
+                    disabled={reportedProfilesLoading || reportedProfilesPage <= 1}
+                    on:click={() => loadReportedProfiles(reportedProfilesPage - 1)}
+                  >
+                    Anterior
+                  </button>
+                  <span class="guardian-wish-page">{reportedProfilesPage} / {reportedProfilesTotalPages}</span>
+                  <button
+                    class="btn btn-outline btn-compact"
+                    type="button"
+                    disabled={reportedProfilesLoading || reportedProfilesPage >= reportedProfilesTotalPages}
+                    on:click={() => loadReportedProfiles(reportedProfilesPage + 1)}
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              {/if}
+            {:else if activeModuleKey === "rank_management"}
+              <section class="guardian-rank-manager" aria-label="Gestión de rangos">
+                <form
+                  class="guardian-rank-search"
+                  on:submit|preventDefault={searchRankUser}
+                >
+                  <label class="modal-label guardian-rank-label" for="rankLookupQuery">
+                    Usuario objetivo (@id o @username)
+                  </label>
+                  <div class="guardian-rank-search-row">
+                    <input
+                      id="rankLookupQuery"
+                      class="modal-input guardian-rank-input"
+                      type="text"
+                      placeholder="@id12 o @carlosjduarte"
+                      maxlength="80"
+                      bind:value={rankLookupQuery}
+                      on:input={() => {
+                        rankLookupError = "";
+                      }}
+                    />
+                    <button
+                      class="btn btn-primary btn-compact"
+                      type="submit"
+                      disabled={rankLookupLoading}
+                    >
+                      {rankLookupLoading ? "Buscando..." : "Buscar usuario"}
+                    </button>
+                  </div>
+                  <p class="panel-muted guardian-rank-search-hint">
+                    El ascenso siempre será de nivel en nivel hasta máximo Rango {GUARDIAN_MAX_RANK}.
+                  </p>
+                </form>
+
+                {#if rankLookupError}
+                  <div class="guardian-center-empty is-error">{rankLookupError}</div>
+                {/if}
+
+                {#if rankLookupResult}
+                  <article class="guardian-rank-card">
+                    <header class="guardian-rank-card-head">
+                      <div>
+                        <h4 class="guardian-rank-card-title">{rankLookupResult.full_name}</h4>
+                        <div class="guardian-rank-card-meta">
+                          <span>{rankLookupResult.handle}</span>
+                          <span aria-hidden="true">·</span>
+                          <span>Rol: {rankLookupResult.role}</span>
+                        </div>
+                      </div>
+                      <a
+                        class="btn btn-outline btn-compact"
+                        href={rankLookupResult.profile_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Ver perfil
+                      </a>
+                    </header>
+
+                    <div class="guardian-rank-grid">
+                      <div class="guardian-rank-slot">
+                        <div class="guardian-wish-label">Rango actual</div>
+                        <div class="guardian-rank-value">
+                          Nivel {rankLookupResult.guardian_rank} · {rankLookupResult.guardian_rank_name}
+                        </div>
+                      </div>
+                      <div class="guardian-rank-slot">
+                        <div class="guardian-wish-label">Siguiente nivel</div>
+                        <div class="guardian-rank-value">
+                          {#if rankLookupResult.next_guardian_rank !== null && rankLookupResult.next_guardian_rank !== undefined}
+                            Nivel {rankLookupResult.next_guardian_rank} · {rankLookupResult.next_guardian_rank_name}
+                          {:else}
+                            Rango máximo alcanzado
+                          {/if}
+                        </div>
+                      </div>
+                    </div>
+
+                    {#if rankLookupResult.is_self}
+                      <p class="panel-muted guardian-rank-self-note">
+                        Este usuario corresponde a tu propia cuenta.
+                      </p>
+                    {/if}
+
+                    <div class="guardian-rank-actions">
+                      <button
+                        class="btn btn-primary btn-compact"
+                        type="button"
+                        disabled={!rankLookupResult.can_promote || rankPromoteLoading}
+                        on:click={openPromoteRankModal}
+                      >
+                        {#if rankPromoteLoading}
+                          Promoviendo...
+                        {:else if rankLookupResult.can_promote}
+                          Subir al siguiente nivel
+                        {:else}
+                          Rango máximo alcanzado
+                        {/if}
+                      </button>
+                    </div>
+                  </article>
+                {/if}
+              </section>
             {:else if activeModuleKey === "messaging"}
               <div class="guardian-center-empty">
                 Aquí aparecerán conversaciones y coordinación entre Guardianes y usuarios.
@@ -1178,6 +1665,57 @@
     </div>
   </div>
 
+  <div
+    class="modal-overlay guardian-center-modal-overlay"
+    class:hidden={!showPromoteRankModal}
+    aria-hidden={!showPromoteRankModal}
+    on:click={(event) => {
+      if (event.target === event.currentTarget && !rankPromoteLoading) closePromoteRankModal();
+    }}
+  >
+    <div class="modal wish-modal guardian-center-modal" role="dialog" aria-modal="true" aria-label="Confirmar ascenso de rango">
+      <div class="modal-head guardian-center-modal-head">
+        <h3>Confirmar ascenso de rango</h3>
+      </div>
+      <div class="modal-body">
+        {#if rankLookupResult}
+          <p>
+            ¿Estás seguro que quieres subir a
+            <strong> {rankLookupResult.full_name}</strong>
+            ({rankLookupResult.handle})
+            al
+            <strong>
+              nivel {rankLookupResult.next_guardian_rank} ({rankLookupResult.next_guardian_rank_name})
+            </strong>
+            ?
+          </p>
+          <p class="panel-muted">
+            Rango actual: Nivel {rankLookupResult.guardian_rank} ({rankLookupResult.guardian_rank_name}).
+          </p>
+        {:else}
+          <p class="panel-muted">No hay usuario seleccionado.</p>
+        {/if}
+
+        {#if rankPromoteError}
+          <div class="wish-error is-visible">{rankPromoteError}</div>
+        {/if}
+      </div>
+      <div class="modal-actions">
+        <button
+          class="btn btn-primary btn-compact"
+          type="button"
+          disabled={rankPromoteLoading || !rankLookupResult?.can_promote}
+          on:click={promoteRankUser}
+        >
+          {rankPromoteLoading ? "Procesando..." : "Sí, subir nivel"}
+        </button>
+        <button class="btn btn-outline btn-compact" type="button" disabled={rankPromoteLoading} on:click={closePromoteRankModal}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
   <footer class="kiadez-footer">
     <div class="footer-main">
       <div class="footer-column footer-origin">
@@ -1219,6 +1757,7 @@
         <div class="footer-column">
           <h4>Información legal</h4>
           <ul>
+            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
             <li><a href="/terms.html">Términos y condiciones</a></li>
             <li><a href="/privacy.html">Privacidad</a></li>
           </ul>

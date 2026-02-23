@@ -278,6 +278,7 @@
                     <div class="footer-column">
                         <h4>Legal</h4>
                         <ul>
+                            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
                             <li><a href="/terms.html">Términos</a></li>
                             <li><a href="/privacy.html">Privacidad</a></li>
                         </ul>

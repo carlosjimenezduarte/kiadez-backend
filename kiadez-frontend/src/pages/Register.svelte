@@ -313,6 +313,7 @@
                     <div class="footer-column">
                         <h4>Información legal</h4>
                         <ul>
+                            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
                             <li><a href="/terms.html">Términos y condiciones</a></li>
                             <li><a href="/privacy.html">Privacidad</a></li>
                         </ul>

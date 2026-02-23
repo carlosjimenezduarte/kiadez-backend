@@ -66,6 +66,11 @@
       description: "Controla si otras personas pueden ver tu módulo de presentación personal.",
     },
     {
+      key: "public_profile_show_biography",
+      label: "Mi biografía",
+      description: "Controla la visibilidad de tu módulo de biografía pública en el perfil.",
+    },
+    {
       key: "public_profile_show_fulfilled_wishes",
       label: "Mis deseos cumplidos",
       description: "Permite o bloquea la visibilidad externa de tus deseos ya cumplidos.",
@@ -74,6 +79,36 @@
       key: "public_profile_show_public_wishes",
       label: "Mis deseos públicos",
       description: "Permite o bloquea la visibilidad externa de tu listado de deseos públicos.",
+    },
+    {
+      key: "public_profile_show_cooperative_wishes",
+      label: "Deseos cooperativos",
+      description: "Controla si otros usuarios pueden ver e interactuar con tus deseos cooperativos.",
+    },
+    {
+      key: "public_profile_show_followers",
+      label: "Seguidores",
+      description: "Decide si otros usuarios pueden ver el conteo de seguidores de tu perfil.",
+    },
+    {
+      key: "public_profile_show_gallery",
+      label: "Galería",
+      description: "Controla si el acceso a tu módulo de galería aparece visible en tu perfil.",
+    },
+    {
+      key: "public_profile_show_recent_achievements",
+      label: "Logros recientes",
+      description: "Controla si el acceso a tus logros aparece visible para otros usuarios.",
+    },
+    {
+      key: "public_profile_show_stars",
+      label: "Estrellas",
+      description: "Controla la visibilidad del módulo de estrellas dentro de tu perfil público.",
+    },
+    {
+      key: "public_profile_show_cover_purposes",
+      label: "Portada y propósitos",
+      description: "Controla si tu portada y tus propósitos de vida se muestran en tu perfil público.",
     },
     {
       key: "public_profile_show_calendar",
@@ -94,8 +129,15 @@
 
   const DEFAULT_PRIVACY_SETTINGS = {
     public_profile_show_about: true,
+    public_profile_show_biography: true,
     public_profile_show_fulfilled_wishes: true,
     public_profile_show_public_wishes: true,
+    public_profile_show_cooperative_wishes: true,
+    public_profile_show_followers: true,
+    public_profile_show_gallery: true,
+    public_profile_show_recent_achievements: true,
+    public_profile_show_stars: true,
+    public_profile_show_cover_purposes: true,
     public_profile_show_calendar: true,
     public_profile_show_oracle: true,
     public_profile_show_personal_posts: true,
@@ -521,8 +563,15 @@
 
   const normalizePrivacySettings = (payload) => ({
     public_profile_show_about: Boolean(payload?.public_profile_show_about ?? true),
+    public_profile_show_biography: Boolean(payload?.public_profile_show_biography ?? true),
     public_profile_show_fulfilled_wishes: Boolean(payload?.public_profile_show_fulfilled_wishes ?? true),
     public_profile_show_public_wishes: Boolean(payload?.public_profile_show_public_wishes ?? true),
+    public_profile_show_cooperative_wishes: Boolean(payload?.public_profile_show_cooperative_wishes ?? true),
+    public_profile_show_followers: Boolean(payload?.public_profile_show_followers ?? true),
+    public_profile_show_gallery: Boolean(payload?.public_profile_show_gallery ?? true),
+    public_profile_show_recent_achievements: Boolean(payload?.public_profile_show_recent_achievements ?? true),
+    public_profile_show_stars: Boolean(payload?.public_profile_show_stars ?? true),
+    public_profile_show_cover_purposes: Boolean(payload?.public_profile_show_cover_purposes ?? true),
     public_profile_show_calendar: Boolean(payload?.public_profile_show_calendar ?? true),
     public_profile_show_oracle: Boolean(payload?.public_profile_show_oracle ?? true),
     public_profile_show_personal_posts: Boolean(payload?.public_profile_show_personal_posts ?? true),
@@ -808,6 +857,7 @@
         <div class="footer-column">
           <h4>Información legal</h4>
           <ul>
+            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
             <li><a href="/terms.html">Términos y condiciones</a></li>
             <li><a href="/privacy.html">Privacidad</a></li>
           </ul>

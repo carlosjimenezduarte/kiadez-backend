@@ -15,9 +15,16 @@ from app.core.config import settings
 from app.core.storage import S3NotConfiguredError, generate_presigned_get_url
 from app.db.database import get_db
 from app.db.models.media import Media, MediaVisibility
+from app.db.models.profile_report import ProfileReport, ProfileReportCase, ProfileReportCaseStatus
 from app.db.models.user import User
 from app.db.models.user_follow import UserFollow
-from app.follows.schemas import FollowActionResponse, FollowListResponse, FollowUserOut
+from app.follows.schemas import (
+    FollowActionResponse,
+    FollowListResponse,
+    FollowUserOut,
+    ProfileReportCreateRequest,
+    ProfileReportResponse,
+)
 
 router = APIRouter(prefix="/follows", tags=["follows"])
 
@@ -150,6 +157,8 @@ def _rows_to_items(
         first_name = (payload["first_name"] or "").strip()
         last_name = (payload["last_name"] or "").strip()
         full_name = f"{first_name} {last_name}".strip() or f"Usuario {user_id}"
+        show_followers_count = user_id == int(current_user_id) or bool(payload.get("public_profile_show_followers", True))
+        show_stars_total = user_id == int(current_user_id) or bool(payload.get("public_profile_show_stars", True))
 
         media_id = payload["profile_photo_media_id"]
         media = media_map.get(int(media_id)) if media_id is not None else None
@@ -164,8 +173,8 @@ def _rows_to_items(
                 avatar_url=_safe_avatar_url(media, current_user_id=current_user_id),
                 role=payload["role"],
                 guardian_rank=payload["guardian_rank"],
-                followers_count=max(0, int(payload["followers_count"] or 0)),
-                received_stars_total=max(0, int(payload["received_stars_total"] or 0)),
+                followers_count=max(0, int(payload["followers_count"] or 0)) if show_followers_count else 0,
+                received_stars_total=max(0, int(payload["received_stars_total"] or 0)) if show_stars_total else 0,
                 is_following=user_id in is_following_ids,
                 follows_me=user_id in follows_me_ids,
             )
@@ -278,6 +287,9 @@ def get_user_profile(
 
     normalized_username = (target_user.username or "").strip() or None
     full_name = f"{(target_user.first_name or '').strip()} {(target_user.last_name or '').strip()}".strip() or f"Usuario {target_user.id}"
+    is_owner = int(target_user.id) == int(current_user_id)
+    followers_count = _count_followers(db, user_id=int(target_user.id)) if is_owner or bool(target_user.public_profile_show_followers) else 0
+    received_stars_total = max(0, int(target_user.received_stars_total or 0)) if is_owner or bool(target_user.public_profile_show_stars) else 0
 
     return FollowUserOut(
         user_id=int(target_user.id),
@@ -288,8 +300,8 @@ def get_user_profile(
         avatar_url=_safe_avatar_url(media, current_user_id=current_user_id),
         role=target_user.role,
         guardian_rank=target_user.guardian_rank,
-        followers_count=_count_followers(db, user_id=int(target_user.id)),
-        received_stars_total=max(0, int(target_user.received_stars_total or 0)),
+        followers_count=followers_count,
+        received_stars_total=received_stars_total,
         is_following=int(target_user.id) in is_following_ids,
         follows_me=int(target_user.id) in follows_me_ids,
     )
@@ -341,6 +353,8 @@ def list_follow_suggestions(
             User.guardian_rank.label("guardian_rank"),
             User.profile_photo_media_id.label("profile_photo_media_id"),
             User.received_stars_total.label("received_stars_total"),
+            User.public_profile_show_followers.label("public_profile_show_followers"),
+            User.public_profile_show_stars.label("public_profile_show_stars"),
             func.coalesce(followers_count_sq.c.followers_count, 0).label("followers_count"),
         )
         .outerjoin(followers_count_sq, followers_count_sq.c.user_id == User.id)
@@ -407,6 +421,8 @@ def list_guardians(
             User.guardian_rank.label("guardian_rank"),
             User.profile_photo_media_id.label("profile_photo_media_id"),
             User.received_stars_total.label("received_stars_total"),
+            User.public_profile_show_followers.label("public_profile_show_followers"),
+            User.public_profile_show_stars.label("public_profile_show_stars"),
             func.coalesce(followers_count_sq.c.followers_count, 0).label("followers_count"),
         )
         .outerjoin(followers_count_sq, followers_count_sq.c.user_id == User.id)
@@ -463,6 +479,8 @@ def list_my_followers(
             User.guardian_rank.label("guardian_rank"),
             User.profile_photo_media_id.label("profile_photo_media_id"),
             User.received_stars_total.label("received_stars_total"),
+            User.public_profile_show_followers.label("public_profile_show_followers"),
+            User.public_profile_show_stars.label("public_profile_show_stars"),
             func.coalesce(followers_count_sq.c.followers_count, 0).label("followers_count"),
         )
         .select_from(UserFollow)
@@ -527,6 +545,8 @@ def list_my_following(
             User.guardian_rank.label("guardian_rank"),
             User.profile_photo_media_id.label("profile_photo_media_id"),
             User.received_stars_total.label("received_stars_total"),
+            User.public_profile_show_followers.label("public_profile_show_followers"),
+            User.public_profile_show_stars.label("public_profile_show_stars"),
             func.coalesce(followers_count_sq.c.followers_count, 0).label("followers_count"),
         )
         .select_from(UserFollow)
@@ -555,6 +575,70 @@ def list_my_following(
         follows_me_ids=follows_me_ids,
     )
     return _build_follow_list_response(page_data=page_data, items=items)
+
+
+@router.post("/profile/{target_user_id}/reports", response_model=ProfileReportResponse)
+def report_profile(
+    target_user_id: int,
+    payload: ProfileReportCreateRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user_id = int(current.user_number)
+    if int(target_user_id) == current_user_id:
+        raise HTTPException(status_code=400, detail="No puedes reportar tu propio perfil.")
+
+    target_user = db.execute(
+        select(User).where(
+            User.id == target_user_id,
+            User.is_active.is_(True),
+        )
+    ).scalar_one_or_none()
+    if target_user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    now = datetime.now(timezone.utc)
+    report_case = db.execute(
+        select(ProfileReportCase).where(ProfileReportCase.reported_user_id == int(target_user_id))
+    ).scalar_one_or_none()
+    if report_case is None:
+        report_case = ProfileReportCase(
+            reported_user_id=int(target_user_id),
+            status=ProfileReportCaseStatus.open,
+            report_count=0,
+            first_reported_at=now,
+            last_reported_at=now,
+        )
+        db.add(report_case)
+        db.flush()
+    else:
+        if report_case.status != ProfileReportCaseStatus.open:
+            report_case.status = ProfileReportCaseStatus.open
+            report_case.resolved_at = None
+            report_case.resolved_by_guardian_id = None
+        report_case.updated_at = now
+
+    report = ProfileReport(
+        case_id=int(report_case.id),
+        reported_user_id=int(target_user_id),
+        reporter_id=current_user_id,
+        reason=payload.reason,
+        other_reason=(payload.other_reason or "").strip() or None,
+    )
+    db.add(report)
+
+    report_case.report_count = max(0, int(report_case.report_count or 0)) + 1
+    if report_case.first_reported_at is None:
+        report_case.first_reported_at = now
+    report_case.last_reported_at = now
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Ya reportaste este perfil.")
+
+    return ProfileReportResponse(reported=True, target_user_id=int(target_user_id), reason=payload.reason)
 
 
 @router.post("/{target_user_id}", response_model=FollowActionResponse, status_code=status.HTTP_200_OK)
@@ -599,7 +683,11 @@ def follow_user(
         target_user_id=target_user_id,
         is_following=True,
         my_following_total=_count_following(db, user_id=current_user_id),
-        target_followers_total=_count_followers(db, user_id=target_user_id),
+        target_followers_total=(
+            _count_followers(db, user_id=target_user_id)
+            if bool(target_user.public_profile_show_followers)
+            else 0
+        ),
     )
 
 
@@ -624,9 +712,17 @@ def unfollow_user(
         db.delete(relation)
         db.commit()
 
+    target_user = db.execute(
+        select(User).where(
+            User.id == target_user_id,
+            User.is_active.is_(True),
+        )
+    ).scalar_one_or_none()
+    show_target_followers = bool(target_user.public_profile_show_followers) if target_user is not None else True
+
     return FollowActionResponse(
         target_user_id=target_user_id,
         is_following=False,
         my_following_total=_count_following(db, user_id=current_user_id),
-        target_followers_total=_count_followers(db, user_id=target_user_id),
+        target_followers_total=_count_followers(db, user_id=target_user_id) if show_target_followers else 0,
     )

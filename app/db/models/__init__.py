@@ -19,6 +19,12 @@ from .post import (
     PostStar,
     PostVisibility,
 )  # noqa
+from .profile_report import (
+    ProfileReport,
+    ProfileReportCase,
+    ProfileReportCaseStatus,
+    ProfileReportReason,
+)  # noqa
 from .biography_personal_info import BiographyPersonalInfo  # noqa
 from .biography_physical_traits import BiographyPhysicalTraits  # noqa
 from .biography_education import BiographyEducation  # noqa

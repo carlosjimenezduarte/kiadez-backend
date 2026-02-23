@@ -275,6 +275,17 @@ def _require_guardian(current: UserPublic) -> None:
     )
 
 
+def _ensure_public_biography_visibility(
+    *,
+    user: User,
+    viewer_user_id: int,
+) -> None:
+    if int(user.id) == int(viewer_user_id):
+        return
+    if not bool(user.public_profile_show_biography):
+        raise HTTPException(status_code=403, detail="La biografía de este perfil está oculta por privacidad.")
+
+
 def _serialize_distinctions(
     *,
     distinctions: BiographyDistinctions | None,
@@ -320,6 +331,7 @@ def get_activity_stats(
 ):
     target_user_id = int(current.user_number)
     requested_user_id = int(user_id) if user_id is not None else None
+    show_cooperative_stats = True
 
     if requested_user_id is not None and requested_user_id != int(current.user_number):
         target_user = db.execute(
@@ -330,7 +342,9 @@ def get_activity_stats(
         ).scalar_one_or_none()
         if target_user is None:
             raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        _ensure_public_biography_visibility(user=target_user, viewer_user_id=current.user_number)
         target_user_id = int(target_user.id)
+        show_cooperative_stats = bool(target_user.public_profile_show_cooperative_wishes)
     else:
         current_user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
         if current_user is None:
@@ -354,14 +368,16 @@ def get_activity_stats(
         or 0
     )
 
-    cooperative_wishes_fulfilled = int(
-        db.execute(
-            select(func.count(PublicCooperativeWishFulfillment.id)).where(
-                PublicCooperativeWishFulfillment.wish_owner_user_id == target_user_id
-            )
-        ).scalar_one()
-        or 0
-    )
+    cooperative_wishes_fulfilled = 0
+    if show_cooperative_stats:
+        cooperative_wishes_fulfilled = int(
+            db.execute(
+                select(func.count(PublicCooperativeWishFulfillment.id)).where(
+                    PublicCooperativeWishFulfillment.wish_owner_user_id == target_user_id
+                )
+            ).scalar_one()
+            or 0
+        )
 
     wishes_fulfilled_total = max(0, public_wishes_fulfilled + private_wishes_fulfilled)
 
@@ -629,6 +645,8 @@ def get_distinctions_for_user(
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
+    _ensure_public_biography_visibility(user=user, viewer_user_id=current.user_number)
+
     distinctions = db.execute(
         select(BiographyDistinctions).where(BiographyDistinctions.user_id == user_id)
     ).scalar_one_or_none()
@@ -719,6 +737,8 @@ def get_about_for_user(
     ).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    _ensure_public_biography_visibility(user=user, viewer_user_id=current.user_number)
 
     is_owner = int(current.user_number) == int(user_id)
     if not is_owner and not bool(user.public_profile_show_about):

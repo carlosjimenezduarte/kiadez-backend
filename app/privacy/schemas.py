@@ -10,6 +10,13 @@ class PublicProfilePrivacyOut(BaseModel):
     public_profile_show_calendar: bool = True
     public_profile_show_oracle: bool = True
     public_profile_show_personal_posts: bool = True
+    public_profile_show_cooperative_wishes: bool = True
+    public_profile_show_followers: bool = True
+    public_profile_show_gallery: bool = True
+    public_profile_show_recent_achievements: bool = True
+    public_profile_show_stars: bool = True
+    public_profile_show_cover_purposes: bool = True
+    public_profile_show_biography: bool = True
 
 
 class PublicProfilePrivacyUpdateRequest(BaseModel):
@@ -19,3 +26,10 @@ class PublicProfilePrivacyUpdateRequest(BaseModel):
     public_profile_show_calendar: bool | None = None
     public_profile_show_oracle: bool | None = None
     public_profile_show_personal_posts: bool | None = None
+    public_profile_show_cooperative_wishes: bool | None = None
+    public_profile_show_followers: bool | None = None
+    public_profile_show_gallery: bool | None = None
+    public_profile_show_recent_achievements: bool | None = None
+    public_profile_show_stars: bool | None = None
+    public_profile_show_cover_purposes: bool | None = None
+    public_profile_show_biography: bool | None = None

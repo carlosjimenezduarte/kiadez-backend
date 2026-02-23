@@ -1453,7 +1453,6 @@
       }
     };
 
-    btnEditPurposes?.addEventListener("click", openLifeProposalModal);
     lifeProposalClose?.addEventListener("click", closeLifeProposalModal);
     lifeProposalCloseFooter?.addEventListener("click", closeLifeProposalModal);
     lifeProposalOverlay?.addEventListener("click", (event) => {

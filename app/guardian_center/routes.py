@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, desc, func, select, update
 from sqlalchemy.orm import Session
 
+from app.auth.minor_accreditation import is_minor_protected
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.core.config import settings
@@ -19,12 +20,20 @@ from app.db.models.message_entry import MessageEntry
 from app.db.models.message_thread import MessageThread
 from app.db.models.media import Media
 from app.db.models.post import Post, PostReport, PostReportCase, PostReportCaseStatus
+from app.db.models.profile_report import ProfileReport, ProfileReportCase, ProfileReportCaseStatus
 from app.db.models.public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus
 from app.db.models.user import User
 from app.guardian_center.schemas import (
+    GuardianRankPromotionOut,
+    GuardianRankUserOut,
     GuardianReportedPostListOut,
     GuardianReportedPostOut,
     GuardianReportedPostReportOut,
+    GuardianReportedProfileListOut,
+    GuardianReportedProfileOut,
+    GuardianReportedProfilePostListOut,
+    GuardianReportedProfilePostOut,
+    GuardianReportedProfileReportOut,
     GuardianWishMessageOut,
     GuardianWishRequestCreate,
     GuardianWishRequestDenyInput,
@@ -37,10 +46,26 @@ from app.guardian_center.schemas import (
 router = APIRouter(prefix="/guardian-center", tags=["guardian-center"])
 
 GUARDIANS_MIN_RANK = 3
+GUARDIANS_MAX_RANK = 8
+GUARDIAN_RANK_NAMES: dict[int, str] = {
+    0: "Sin rango",
+    1: "Aspirante",
+    2: "Aprendiz",
+    3: "Guardián",
+    4: "Guardián Consagrado",
+    5: "Guardián Mayor",
+    6: "Guardián del Logos",
+    7: "Guardián del Umbral",
+    8: "Guardián de Guardianes",
+}
 PAGE_SIZE_DEFAULT = 10
 PAGE_SIZE_MAX = 25
 REPORTED_POSTS_PAGE_SIZE_DEFAULT = 10
 REPORTED_POSTS_PAGE_SIZE_MAX = 25
+REPORTED_PROFILES_PAGE_SIZE_DEFAULT = 10
+REPORTED_PROFILES_PAGE_SIZE_MAX = 25
+REPORTED_PROFILE_POSTS_PAGE_SIZE_DEFAULT = 10
+REPORTED_PROFILE_POSTS_PAGE_SIZE_MAX = 25
 
 
 def _require_guardian(current: UserPublic) -> None:
@@ -63,6 +88,50 @@ def _build_handle(*, username: str | None, user_id: int) -> str:
     return f"@id{int(user_id)}"
 
 
+def _guardian_rank_name(rank: int) -> str:
+    return GUARDIAN_RANK_NAMES.get(int(rank), f"Rango {int(rank)}")
+
+
+def _parse_rank_lookup_query(raw: str) -> tuple[int | None, str | None]:
+    normalized = str(raw or "").strip()
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Debes escribir un @id o @username.")
+
+    while normalized.startswith("@"):
+        normalized = normalized[1:]
+    normalized = normalized.strip().lower()
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Debes escribir un @id o @username.")
+
+    if normalized.startswith("id"):
+        suffix = normalized[2:].strip()
+        if suffix.isdigit():
+            return int(suffix), None
+    if normalized.isdigit():
+        return int(normalized), None
+    return None, normalized
+
+
+def _rank_user_out(*, user: User, current_user_id: int) -> GuardianRankUserOut:
+    base = _user_out(user)
+    current_rank = max(0, int(user.guardian_rank or 0))
+    next_rank = current_rank + 1 if current_rank < GUARDIANS_MAX_RANK else None
+    return GuardianRankUserOut(
+        user_id=base.user_id,
+        full_name=base.full_name,
+        username=base.username,
+        handle=base.handle,
+        profile_url=base.profile_url,
+        role=str(user.role or "user"),
+        guardian_rank=current_rank,
+        guardian_rank_name=_guardian_rank_name(current_rank),
+        next_guardian_rank=next_rank,
+        next_guardian_rank_name=(_guardian_rank_name(next_rank) if next_rank is not None else None),
+        can_promote=(next_rank is not None),
+        is_self=(int(user.id) == int(current_user_id)),
+    )
+
+
 def _build_wish_url(*, wish_owner: User, wish_id: int) -> str:
     qp: dict[str, str] = {"wish": str(int(wish_id))}
     username = (wish_owner.username or "").strip()
@@ -71,6 +140,18 @@ def _build_wish_url(*, wish_owner: User, wish_id: int) -> str:
     else:
         qp["id"] = str(int(wish_owner.id))
     return f"/my-public-whishes.html?{urlencode(qp)}"
+
+
+def _build_post_url(*, post_author: User, post_id: int | None) -> str | None:
+    if not post_id:
+        return None
+    qp: dict[str, str] = {"post": str(int(post_id))}
+    username = (post_author.username or "").strip()
+    if username:
+        qp["u"] = username
+    else:
+        qp["id"] = str(int(post_author.id))
+    return f"/home_user.html?{urlencode(qp)}"
 
 
 def _build_commitment_code(request_id: int) -> str:
@@ -317,6 +398,158 @@ def _load_related_maps_for_report_cases(
     return users_map, medias_map, reports_map
 
 
+def _load_profile_reporter_handles(
+    *,
+    db: Session,
+    case_ids: list[int],
+) -> dict[int, list[GuardianReportedProfileReportOut]]:
+    if not case_ids:
+        return {}
+
+    rows = db.execute(
+        select(ProfileReport, User)
+        .join(User, User.id == ProfileReport.reporter_id)
+        .where(ProfileReport.case_id.in_(case_ids))
+        .order_by(desc(ProfileReport.created_at), desc(ProfileReport.id))
+    ).all()
+
+    out: dict[int, list[GuardianReportedProfileReportOut]] = {}
+    for report, reporter in rows:
+        case_id = int(report.case_id)
+        bucket = out.setdefault(case_id, [])
+        if len(bucket) >= 5:
+            continue
+        bucket.append(
+            GuardianReportedProfileReportOut(
+                id=int(report.id),
+                reporter_user_id=int(reporter.id),
+                reporter_handle=_build_handle(username=reporter.username, user_id=int(reporter.id)),
+                reason=report.reason,
+                other_reason=(report.other_reason or None),
+                created_at=report.created_at,
+            )
+        )
+    return out
+
+
+def _load_related_maps_for_profile_report_cases(
+    *,
+    db: Session,
+    items: list[ProfileReportCase],
+) -> tuple[dict[int, User], dict[int, list[GuardianReportedProfileReportOut]]]:
+    user_ids: set[int] = set()
+    case_ids: list[int] = []
+
+    for item in items:
+        case_ids.append(int(item.id))
+        if item.reported_user_id:
+            user_ids.add(int(item.reported_user_id))
+        if item.resolved_by_guardian_id:
+            user_ids.add(int(item.resolved_by_guardian_id))
+
+    users_map: dict[int, User] = {}
+    if user_ids:
+        users = db.execute(select(User).where(User.id.in_(sorted(user_ids)))).scalars().all()
+        users_map = {int(user.id): user for user in users}
+
+    reports_map = _load_profile_reporter_handles(db=db, case_ids=case_ids)
+    return users_map, reports_map
+
+
+def _reported_profile_post_out(
+    *,
+    item: PostReportCase,
+    post_author: User,
+) -> GuardianReportedProfilePostOut:
+    return GuardianReportedProfilePostOut(
+        id=int(item.id),
+        status=item.status,
+        report_count=max(0, int(item.report_count or 0)),
+        post_id=int(item.post_id) if item.post_id else None,
+        post_text=item.post_text_snapshot,
+        post_media_kind=item.post_media_kind_snapshot,
+        post_author=_user_out(post_author),
+        post_url=_build_post_url(post_author=post_author, post_id=(int(item.post_id) if item.post_id else None)),
+        first_reported_at=item.first_reported_at,
+        last_reported_at=item.last_reported_at,
+    )
+
+
+def _load_reported_posts_for_profile(
+    *,
+    db: Session,
+    reported_user: User,
+    page: int = 1,
+    page_size: int = REPORTED_PROFILE_POSTS_PAGE_SIZE_DEFAULT,
+) -> GuardianReportedProfilePostListOut:
+    total = int(
+        db.execute(
+            select(func.count(PostReportCase.id)).where(PostReportCase.post_author_id == int(reported_user.id))
+        ).scalar_one()
+        or 0
+    )
+    normalized_size = max(1, min(int(page_size), REPORTED_PROFILE_POSTS_PAGE_SIZE_MAX))
+    total_pages = max(1, ceil(total / normalized_size)) if total else 1
+    normalized_page = max(1, min(int(page), total_pages))
+    offset = (normalized_page - 1) * normalized_size
+
+    status_priority = case(
+        (PostReportCase.status == PostReportCaseStatus.open, 0),
+        else_=1,
+    )
+    rows = db.execute(
+        select(PostReportCase)
+        .where(PostReportCase.post_author_id == int(reported_user.id))
+        .order_by(status_priority.asc(), desc(PostReportCase.last_reported_at), desc(PostReportCase.id))
+        .offset(offset)
+        .limit(normalized_size)
+    ).scalars().all()
+
+    items = [_reported_profile_post_out(item=item, post_author=reported_user) for item in rows]
+    range_start = offset + 1 if total > 0 and items else 0
+    range_end = offset + len(items) if total > 0 and items else 0
+    return GuardianReportedProfilePostListOut(
+        items=items,
+        page=normalized_page,
+        page_size=normalized_size,
+        total=total,
+        total_pages=total_pages,
+        range_start=range_start,
+        range_end=range_end,
+    )
+
+
+def _reported_profile_out(
+    *,
+    db: Session,
+    item: ProfileReportCase,
+    users: dict[int, User],
+    reports_map: dict[int, list[GuardianReportedProfileReportOut]],
+) -> GuardianReportedProfileOut:
+    reported_user = users.get(int(item.reported_user_id)) if item.reported_user_id else None
+    if reported_user is None:
+        raise HTTPException(status_code=500, detail="No se pudo construir el reporte (usuario faltante).")
+    resolver = users.get(int(item.resolved_by_guardian_id)) if item.resolved_by_guardian_id else None
+    reported_posts = _load_reported_posts_for_profile(
+        db=db,
+        reported_user=reported_user,
+        page=1,
+        page_size=REPORTED_PROFILE_POSTS_PAGE_SIZE_DEFAULT,
+    )
+    return GuardianReportedProfileOut(
+        id=int(item.id),
+        status=item.status,
+        report_count=max(0, int(item.report_count or 0)),
+        reported_user=_user_out(reported_user),
+        resolved_by_guardian=_user_out(resolver) if resolver else None,
+        first_reported_at=item.first_reported_at,
+        last_reported_at=item.last_reported_at,
+        resolved_at=item.resolved_at,
+        reports=reports_map.get(int(item.id), []),
+        reported_posts=reported_posts,
+    )
+
+
 def _mirror_guardian_message_in_inbox(*, db: Session, msg: GuardianWishMessage) -> None:
     sender_guardian_id = int(msg.sender_guardian_id) if msg.sender_guardian_id else None
     if sender_guardian_id is None:
@@ -355,6 +588,11 @@ def create_wish_request(
     ).scalar_one_or_none()
     if requester is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if is_minor_protected(requester):
+        raise HTTPException(
+            status_code=403,
+            detail="Tu cuenta está en modo protegido. No puedes formalizar acuerdos hasta completar la acreditación.",
+        )
 
     reason = (payload.reason or "").strip()
     phone = (payload.phone or "").strip()
@@ -483,6 +721,66 @@ def list_wish_requests(
     )
 
 
+@router.get("/rank-management/user", response_model=GuardianRankUserOut)
+def get_rank_management_user(
+    query: str = Query(..., min_length=1, max_length=80),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_guardian(current)
+
+    user_id, username = _parse_rank_lookup_query(query)
+    target: User | None = None
+    if user_id is not None:
+        target = db.execute(
+            select(User).where(User.id == int(user_id), User.is_active.is_(True))
+        ).scalar_one_or_none()
+    elif username is not None:
+        target = db.execute(
+            select(User).where(User.username == username, User.is_active.is_(True))
+        ).scalar_one_or_none()
+
+    if target is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    return _rank_user_out(user=target, current_user_id=current.user_number)
+
+
+@router.post("/rank-management/users/{user_id}/promote", response_model=GuardianRankPromotionOut)
+def promote_user_guardian_rank(
+    user_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_guardian(current)
+
+    target = db.execute(
+        select(User).where(User.id == int(user_id), User.is_active.is_(True))
+    ).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    previous_rank = max(0, int(target.guardian_rank or 0))
+    if previous_rank >= GUARDIANS_MAX_RANK:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Este usuario ya está en el rango máximo ({GUARDIANS_MAX_RANK}).",
+        )
+
+    target.guardian_rank = previous_rank + 1
+    if str(target.role or "").strip().lower() == "user":
+        target.role = "guardian"
+
+    db.commit()
+    db.refresh(target)
+
+    return GuardianRankPromotionOut(
+        promoted=True,
+        previous_guardian_rank=previous_rank,
+        previous_guardian_rank_name=_guardian_rank_name(previous_rank),
+        target=_rank_user_out(user=target, current_user_id=current.user_number),
+    )
+
+
 @router.get("/reported-posts", response_model=GuardianReportedPostListOut)
 def list_reported_posts(
     page: int = Query(default=1, ge=1),
@@ -527,6 +825,85 @@ def list_reported_posts(
         total_pages=total_pages,
         range_start=range_start,
         range_end=range_end,
+    )
+
+
+@router.get("/reported-profiles", response_model=GuardianReportedProfileListOut)
+def list_reported_profiles(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=REPORTED_PROFILES_PAGE_SIZE_DEFAULT, ge=1, le=REPORTED_PROFILES_PAGE_SIZE_MAX),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_guardian(current)
+
+    total = int(db.execute(select(func.count(ProfileReportCase.id))).scalar_one() or 0)
+    normalized_size = max(1, min(int(page_size), REPORTED_PROFILES_PAGE_SIZE_MAX))
+    total_pages = max(1, ceil(total / normalized_size)) if total else 1
+    normalized_page = max(1, min(int(page), total_pages))
+    offset = (normalized_page - 1) * normalized_size
+
+    status_priority = case(
+        (ProfileReportCase.status == ProfileReportCaseStatus.open, 0),
+        else_=1,
+    )
+    rows = db.execute(
+        select(ProfileReportCase)
+        .order_by(status_priority.asc(), desc(ProfileReportCase.last_reported_at), desc(ProfileReportCase.id))
+        .offset(offset)
+        .limit(normalized_size)
+    ).scalars().all()
+
+    users_map, reports_map = _load_related_maps_for_profile_report_cases(db=db, items=rows)
+    items = [
+        _reported_profile_out(db=db, item=item, users=users_map, reports_map=reports_map)
+        for item in rows
+    ]
+
+    range_start = offset + 1 if total > 0 and items else 0
+    range_end = offset + len(items) if total > 0 and items else 0
+    return GuardianReportedProfileListOut(
+        items=items,
+        page=normalized_page,
+        page_size=normalized_size,
+        total=total,
+        total_pages=total_pages,
+        range_start=range_start,
+        range_end=range_end,
+    )
+
+
+@router.get("/reported-profiles/{case_id}/reported-posts", response_model=GuardianReportedProfilePostListOut)
+def list_reported_posts_for_profile_case(
+    case_id: int,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(
+        default=REPORTED_PROFILE_POSTS_PAGE_SIZE_DEFAULT,
+        ge=1,
+        le=REPORTED_PROFILE_POSTS_PAGE_SIZE_MAX,
+    ),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_guardian(current)
+
+    profile_case = db.execute(
+        select(ProfileReportCase).where(ProfileReportCase.id == int(case_id))
+    ).scalar_one_or_none()
+    if profile_case is None:
+        raise HTTPException(status_code=404, detail="Reporte de perfil no encontrado.")
+
+    reported_user = db.execute(
+        select(User).where(User.id == int(profile_case.reported_user_id))
+    ).scalar_one_or_none()
+    if reported_user is None:
+        raise HTTPException(status_code=404, detail="Usuario reportado no encontrado.")
+
+    return _load_reported_posts_for_profile(
+        db=db,
+        reported_user=reported_user,
+        page=page,
+        page_size=page_size,
     )
 
 

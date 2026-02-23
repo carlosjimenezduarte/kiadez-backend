@@ -4,6 +4,8 @@ from typing import Optional, Literal
 from enum import Enum
 
 Role = Literal["user", "guardian", "admin"]
+MinorAccreditationStatus = Literal["not_required", "pending", "requested", "approved"]
+MinorGuardianRelationship = Literal["padre", "madre", "tutor_legal", "adulto_responsable"]
 
 class RegisterRequest(BaseModel):
     first_name: str
@@ -30,6 +32,10 @@ class UserPublic(BaseModel):
     username: Optional[str] = None
     username_updated_at: Optional[datetime] = None
     is_active: bool = True
+    minor_accreditation_status: MinorAccreditationStatus = "not_required"
+    minor_accreditation_required: bool = False
+    is_minor_protected: bool = False
+    can_publish_public: bool = True
 
 class UserInternal(UserPublic):
     password_hash: str
@@ -101,3 +107,29 @@ class UsernameUpdateRequest(BaseModel):
 class UsernameUpdateResponse(BaseModel):
     updated: bool
     state: UsernameState
+
+
+class MinorAccreditationRequest(BaseModel):
+    guardian_phone: str = Field(min_length=6, max_length=40)
+    guardian_email: EmailStr
+    relationship: MinorGuardianRelationship
+
+
+class MinorAccreditationStatusOut(BaseModel):
+    required: bool
+    status: MinorAccreditationStatus
+    is_minor_protected: bool
+    can_publish_public: bool
+    guardian_phone: Optional[str] = None
+    guardian_email: Optional[str] = None
+    relationship: Optional[MinorGuardianRelationship] = None
+    requested_at: Optional[datetime] = None
+    approved_at: Optional[datetime] = None
+
+
+class MinorAccreditationRequestOut(BaseModel):
+    requested: bool
+    status: MinorAccreditationStatus
+    is_minor_protected: bool
+    can_publish_public: bool
+    message: str

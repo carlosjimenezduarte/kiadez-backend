@@ -51,6 +51,21 @@
   let activeDaysTotal = 0;
   let todayUtc = "";
   let selectedDateUtc = "";
+  let daySummaryOpen = false;
+  let daySummaryDateUtc = "";
+  let daySummaryLoading = false;
+  let daySummaryError = "";
+  let daySummaryData = null;
+
+  const DAY_SUMMARY_EMPTY_TOTALS = {
+    stars_received: 0,
+    fulfilled_wishes: 0,
+    public_wishes: 0,
+    achievements: 0,
+    posts: 0,
+    total_interactions: 0,
+  };
+  const daySummaryCache = new Map();
 
   const getAccessToken = () =>
     localStorage.getItem("access_token") || localStorage.getItem("kiadez_access_token") || "";
@@ -128,6 +143,47 @@
       return normalized;
     }
   };
+
+  const formatTimeLabel = (value) => {
+    if (!value) return "";
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return "";
+    return new Intl.DateTimeFormat("es-CO", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "UTC",
+    }).format(dt);
+  };
+
+  const addDaysIsoUtc = (isoDate, daysToAdd) => {
+    const normalized = toIsoDateUtc(isoDate);
+    if (!normalized) return "";
+    const base = new Date(`${normalized}T00:00:00Z`);
+    if (Number.isNaN(base.getTime())) return "";
+    base.setUTCDate(base.getUTCDate() + Number(daysToAdd || 0));
+    return base.toISOString().slice(0, 10);
+  };
+
+  const currentTodayIsoUtc = () => toIsoDateUtc(todayUtc) || new Date().toISOString().slice(0, 10);
+
+  const isClosedCalendarDay = (isoDate) => {
+    const normalized = toIsoDateUtc(isoDate);
+    if (!normalized) return false;
+    const todayIso = currentTodayIsoUtc();
+    return normalized < todayIso;
+  };
+
+  const buildPendingDaySummary = (isoDate, message) => ({
+    user_id: Number(activeProfileUserId || 0),
+    date_utc: isoDate,
+    available_from_utc: addDaysIsoUtc(isoDate, 1) || isoDate,
+    is_day_closed: false,
+    message: String(message || ""),
+    totals: { ...DAY_SUMMARY_EMPTY_TOTALS },
+    posts_items: [],
+    fulfilled_wishes_items: [],
+    achievements_items: [],
+  });
 
   const fetchViewerIdentity = async () => {
     const res = await apiFetch("/auth/me");
@@ -348,6 +404,66 @@
     selectedDateUtc = toIsoDateUtc(isoDate);
   };
 
+  const closeDaySummaryModal = () => {
+    daySummaryOpen = false;
+    daySummaryLoading = false;
+    daySummaryError = "";
+  };
+
+  const openDaySummaryModal = async (isoDate) => {
+    const normalized = toIsoDateUtc(isoDate);
+    if (!normalized) return;
+
+    setSelectedDate(normalized);
+    daySummaryDateUtc = normalized;
+    daySummaryError = "";
+    daySummaryLoading = false;
+    daySummaryData = null;
+    daySummaryOpen = true;
+
+    if (!isViewingOwnProfile) {
+      daySummaryData = buildPendingDaySummary(
+        normalized,
+        "Este resumen detallado está disponible solo en tu propio calendario."
+      );
+      return;
+    }
+
+    if (!isClosedCalendarDay(normalized)) {
+      const dayLabel = formatDateLabel(normalized) || normalized;
+      const availableIso = addDaysIsoUtc(normalized, 1) || normalized;
+      const availableLabel = formatDateLabel(availableIso) || availableIso;
+      daySummaryData = buildPendingDaySummary(
+        normalized,
+        `El resumen de ${dayLabel} se habilita cuando ese día finaliza. Disponible desde ${availableLabel}.`
+      );
+      return;
+    }
+
+    const cached = daySummaryCache.get(normalized);
+    if (cached) {
+      daySummaryData = cached;
+      return;
+    }
+
+    daySummaryLoading = true;
+    try {
+      const res = await apiFetch(`/calendar/mine/day-summary?date_utc=${encodeURIComponent(normalized)}`);
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data?.detail || "No se pudo cargar el resumen del día.");
+      }
+      daySummaryData = data && typeof data === "object" ? data : null;
+      if (daySummaryData) {
+        daySummaryCache.set(normalized, daySummaryData);
+      }
+    } catch (error) {
+      daySummaryError = error?.message || "No se pudo cargar el resumen del día.";
+    } finally {
+      daySummaryLoading = false;
+    }
+  };
+
   const changeYear = async (offset) => {
     const nextYear = Math.max(MIN_YEAR, Math.min(MAX_YEAR, Number(calendarYear || 0) + Number(offset || 0)));
     if (nextYear === calendarYear) return;
@@ -428,6 +544,26 @@
     todayIsoDate: toIsoDateUtc(todayUtc),
   });
 
+  $: daySummaryDateLabel = daySummaryDateUtc ? formatDateLabel(daySummaryDateUtc) : "";
+  $: daySummaryTotals = daySummaryData?.totals || DAY_SUMMARY_EMPTY_TOTALS;
+  $: daySummaryPosts = Array.isArray(daySummaryData?.posts_items) ? daySummaryData.posts_items : [];
+  $: daySummaryFulfilledWishes = Array.isArray(daySummaryData?.fulfilled_wishes_items)
+    ? daySummaryData.fulfilled_wishes_items
+    : [];
+  $: daySummaryAchievements = Array.isArray(daySummaryData?.achievements_items)
+    ? daySummaryData.achievements_items
+    : [];
+  $: daySummaryMetrics = DAILY_METRIC_DEFINITIONS.map((metric) => {
+    const value = Number(daySummaryTotals?.[metric.key] || 0);
+    return {
+      ...metric,
+      value,
+      valueLabel: formatCount(value),
+    };
+  });
+  $: daySummaryMessage = String(daySummaryData?.message || "");
+  $: daySummaryIsClosed = Boolean(daySummaryData?.is_day_closed);
+
   onMount(() => {
     initPurposeCoverModule();
     void syncProfileStarsTotal("calendarStarsTotal");
@@ -441,6 +577,16 @@
       }
       await loadCalendarYearActivity();
     })();
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape" && daySummaryOpen) {
+        closeDaySummaryModal();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
   });
 </script>
 
@@ -603,7 +749,7 @@
 
             <article class="calendar-year" aria-label={`Vista anual ${calendarYear}`}>
               <h3 class="year-label">{calendarYear} · Enero a Diciembre</h3>
-              <p class="calendar-year-note">Pulsa un día para actualizar el resumen diario.</p>
+              <p class="calendar-year-note">Pulsa un día para abrir el resumen diario (disponible al día siguiente).</p>
               <div class="month-grid">
                 {#each yearMonths as month}
                   <article class="month-card" aria-label={`Mes ${month.name}`}>
@@ -622,7 +768,7 @@
                           type="button"
                           title={day.title}
                           aria-label={day.title}
-                          on:click={() => setSelectedDate(day.date_utc)}
+                          on:click={() => void openDaySummaryModal(day.date_utc)}
                         ></button>
                       {/each}
                     </div>
@@ -643,6 +789,149 @@
       {/if}
     </div>
   </main>
+
+  <div
+    class={`modal-overlay calendar-day-summary-overlay ${daySummaryOpen ? "" : "hidden"}`}
+    aria-hidden={daySummaryOpen ? "false" : "true"}
+    on:click={(event) => {
+      if (event.target === event.currentTarget) closeDaySummaryModal();
+    }}
+  >
+    <div
+      class="modal wish-modal calendar-day-summary-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Resumen diario del calendario"
+      tabindex="-1"
+    >
+      <div class="modal-head">
+        <h3>Resumen diario</h3>
+        <button class="modal-close" type="button" on:click={() => closeDaySummaryModal()}>✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="calendar-summary-meta">
+          <span class="calendar-summary-chip">{daySummaryDateLabel || "Sin fecha seleccionada"}</span>
+          <span class="calendar-summary-chip">
+            Disponible desde: {formatDateLabel(daySummaryData?.available_from_utc || addDaysIsoUtc(daySummaryDateUtc, 1))}
+          </span>
+        </div>
+
+        {#if daySummaryLoading}
+          <p class="panel-muted">Cargando resumen del día...</p>
+        {:else if daySummaryError}
+          <p class="achievements-sync-error">{daySummaryError}</p>
+        {:else if !daySummaryData}
+          <p class="panel-muted">Selecciona un día para ver su resumen.</p>
+        {:else if !daySummaryIsClosed}
+          <p class="calendar-summary-pending">{daySummaryMessage || "Este resumen estará disponible cuando el día finalice."}</p>
+        {:else}
+          <div class="calendar-daily-grid calendar-summary-daily-grid">
+            {#each daySummaryMetrics as metric}
+              <article class="calendar-daily-card" aria-label={`${metric.label}: ${metric.valueLabel}`}>
+                <div class="calendar-daily-icon" aria-hidden="true">{metric.icon}</div>
+                <div class="calendar-daily-content">
+                  <h4>{metric.label}</h4>
+                  <p>{metric.valueLabel}</p>
+                </div>
+              </article>
+            {/each}
+          </div>
+
+          <p class="calendar-day-total">
+            Interacciones totales:
+            <strong>{formatCount(daySummaryTotals?.total_interactions || 0)}</strong>
+          </p>
+
+          <section class="calendar-summary-section" aria-label="Publicaciones del día">
+            <div class="calendar-summary-section-head">
+              <h4>Publicaciones del día</h4>
+              <span>{formatCount(daySummaryPosts.length)}</span>
+            </div>
+            {#if !daySummaryPosts.length}
+              <p class="panel-muted">No se registraron publicaciones para este día.</p>
+            {:else}
+              <div class="calendar-summary-posts">
+                {#each daySummaryPosts as post}
+                  <article class="calendar-summary-post-card" aria-label={`Publicación ${post.id}`}>
+                    {#if post.media_url}
+                      {#if post.media_kind === "video"}
+                        <video class="calendar-summary-media" src={post.media_url} controls preload="metadata">
+                          <track kind="captions" />
+                        </video>
+                      {:else}
+                        <img class="calendar-summary-media" src={post.media_url} alt="Publicación del día" />
+                      {/if}
+                    {:else}
+                      <div class="calendar-summary-media calendar-summary-media-placeholder">Sin archivo visual</div>
+                    {/if}
+                    <div class="calendar-summary-post-content">
+                      <p class="calendar-summary-post-text">{post.text || "Publicación sin texto."}</p>
+                      <p class="calendar-summary-post-meta">
+                        {formatTimeLabel(post.created_at)} UTC · ⭐ {formatCount(post.star_count || 0)} ·
+                        💬 {formatCount(post.comment_count || 0)} · 🔁 {formatCount(post.share_count || 0)}
+                      </p>
+                    </div>
+                  </article>
+                {/each}
+              </div>
+            {/if}
+          </section>
+
+          <section class="calendar-summary-section" aria-label="Deseos cumplidos del día">
+            <div class="calendar-summary-section-head">
+              <h4>Deseos cumplidos</h4>
+              <span>{formatCount(daySummaryFulfilledWishes.length)}</span>
+            </div>
+            {#if !daySummaryFulfilledWishes.length}
+              <p class="panel-muted">No se registraron deseos cumplidos para este día.</p>
+            {:else}
+              <div class="calendar-summary-list">
+                {#each daySummaryFulfilledWishes as wish}
+                  <article class="calendar-summary-list-item">
+                    <p class="calendar-summary-list-title">{wish.wish_text}</p>
+                    <p class="calendar-summary-list-meta">
+                      {wish.wish_type || "Deseo"} · {formatTimeLabel(wish.fulfilled_at)} UTC
+                    </p>
+                  </article>
+                {/each}
+              </div>
+            {/if}
+          </section>
+
+          <section class="calendar-summary-section" aria-label="Logros del día">
+            <div class="calendar-summary-section-head">
+              <h4>Logros</h4>
+              <span>{formatCount(daySummaryAchievements.length)}</span>
+            </div>
+            {#if !daySummaryAchievements.length}
+              <p class="panel-muted">No hubo logros desbloqueados este día.</p>
+            {:else}
+              <div class="calendar-summary-list">
+                {#each daySummaryAchievements as achievement}
+                  <article class="calendar-summary-list-item calendar-summary-achievement-item">
+                    {#if achievement.image_url}
+                      <img class="calendar-summary-achievement-img" src={achievement.image_url} alt={achievement.title} />
+                    {/if}
+                    <div class="calendar-summary-achievement-content">
+                      <p class="calendar-summary-list-title">{achievement.title}</p>
+                      <p class="calendar-summary-list-meta">{achievement.description}</p>
+                    </div>
+                  </article>
+                {/each}
+              </div>
+            {/if}
+          </section>
+        {/if}
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-compact" type="button" on:click={() => closeDaySummaryModal()}>
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
 
   <footer class="kiadez-footer">
     <div class="footer-main">
@@ -685,6 +974,7 @@
         <div class="footer-column">
           <h4>Información legal</h4>
           <ul>
+            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
             <li><a href="/terms.html">Términos y condiciones</a></li>
             <li><a href="/privacy.html">Privacidad</a></li>
           </ul>

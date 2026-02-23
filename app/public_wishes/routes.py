@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.auth.minor_accreditation import is_minor_protected
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.core.config import settings
@@ -53,6 +54,9 @@ PERSONAL_ACTIVE_LIMIT = 50
 COOPERATIVE_ACTIVE_LIMIT = 20
 GUARDIAN_REQUIRED_RANK = 3
 FULFILLMENT_SECRET_MESSAGE = "Quien cumplió el deseo decidió obrar desde lo secreto."
+MINOR_PUBLIC_ACTION_BLOCK_DETAIL = (
+    "Tu cuenta está en modo protegido. Debes completar la acreditación para habilitar acciones públicas."
+)
 
 
 def _build_media_url(media: Media | None) -> str | None:
@@ -224,6 +228,15 @@ def _resolve_owned_media(*, db: Session, media_id: int | None, user_id: int) -> 
     return media
 
 
+def _require_public_actions_allowed(*, db: Session, user_id: int) -> User:
+    user = db.execute(select(User).where(User.id == user_id, User.is_active.is_(True))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if is_minor_protected(user):
+        raise HTTPException(status_code=403, detail=MINOR_PUBLIC_ACTION_BLOCK_DETAIL)
+    return user
+
+
 def _load_cooperative_fulfillment_for_wish(
     *,
     db: Session,
@@ -232,6 +245,19 @@ def _load_cooperative_fulfillment_for_wish(
     return db.execute(
         select(PublicCooperativeWishFulfillment).where(PublicCooperativeWishFulfillment.wish_id == wish_id)
     ).scalar_one_or_none()
+
+
+def _ensure_cooperative_visibility(
+    *,
+    owner: User,
+    viewer_user_id: int,
+) -> None:
+    if int(owner.id) == int(viewer_user_id):
+        return
+    if is_minor_protected(owner):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+    if not bool(owner.public_profile_show_cooperative_wishes):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
 
 
 def _load_cooperative_participations_map(
@@ -554,6 +580,8 @@ def list_user_personal_wishes(
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
     is_owner = int(current.user_number) == int(user_id)
+    if not is_owner and is_minor_protected(target):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
     if not is_owner and not bool(target.public_profile_show_public_wishes):
         raise HTTPException(status_code=403, detail="Este módulo es privado.")
 
@@ -653,9 +681,7 @@ def list_user_cooperative_wishes(
     if target is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
-    is_owner = int(current.user_number) == int(user_id)
-    if not is_owner and not bool(target.public_profile_show_public_wishes):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+    _ensure_cooperative_visibility(owner=target, viewer_user_id=current.user_number)
 
     wishes = db.execute(
         select(PublicCooperativeWish)
@@ -705,9 +731,7 @@ def create_cooperative_wish(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _require_public_actions_allowed(db=db, user_id=current.user_number)
 
     active_count = db.execute(
         select(func.count(PublicCooperativeWish.id))
@@ -770,9 +794,7 @@ def update_cooperative_wish(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _require_public_actions_allowed(db=db, user_id=current.user_number)
 
     wish = db.execute(
         select(PublicCooperativeWish)
@@ -826,6 +848,8 @@ def participate_in_cooperative_wish(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _require_public_actions_allowed(db=db, user_id=current.user_number)
+
     wish = db.execute(select(PublicCooperativeWish).where(PublicCooperativeWish.id == wish_id)).scalar_one_or_none()
     if wish is None:
         raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
@@ -841,8 +865,7 @@ def participate_in_cooperative_wish(
     if int(current.user_number) == int(wish.user_id):
         raise HTTPException(status_code=409, detail="No puedes registrar participación en tu propio deseo cooperativo.")
 
-    if not bool(owner.public_profile_show_public_wishes):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+    _ensure_cooperative_visibility(owner=owner, viewer_user_id=current.user_number)
 
     participation = db.execute(
         select(PublicCooperativeWishParticipation)
@@ -912,6 +935,8 @@ def cancel_my_cooperative_participation(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _require_public_actions_allowed(db=db, user_id=current.user_number)
+
     wish = db.execute(select(PublicCooperativeWish).where(PublicCooperativeWish.id == wish_id)).scalar_one_or_none()
     if wish is None:
         raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
@@ -920,6 +945,13 @@ def cancel_my_cooperative_participation(
 
     if int(current.user_number) == int(wish.user_id):
         raise HTTPException(status_code=409, detail="No puedes cancelar participación en tu propio deseo cooperativo.")
+
+    owner = db.execute(
+        select(User).where(User.id == int(wish.user_id), User.is_active.is_(True))
+    ).scalar_one_or_none()
+    if owner is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _ensure_cooperative_visibility(owner=owner, viewer_user_id=current.user_number)
 
     participation = db.execute(
         select(PublicCooperativeWishParticipation)
@@ -969,6 +1001,8 @@ def complete_my_cooperative_participation(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _require_public_actions_allowed(db=db, user_id=current.user_number)
+
     wish = db.execute(select(PublicCooperativeWish).where(PublicCooperativeWish.id == wish_id)).scalar_one_or_none()
     if wish is None:
         raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
@@ -977,6 +1011,13 @@ def complete_my_cooperative_participation(
 
     if int(current.user_number) == int(wish.user_id):
         raise HTTPException(status_code=409, detail="No puedes registrar participación en tu propio deseo cooperativo.")
+
+    owner = db.execute(
+        select(User).where(User.id == int(wish.user_id), User.is_active.is_(True))
+    ).scalar_one_or_none()
+    if owner is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _ensure_cooperative_visibility(owner=owner, viewer_user_id=current.user_number)
 
     participation = db.execute(
         select(PublicCooperativeWishParticipation)
@@ -1034,6 +1075,8 @@ def validate_cooperative_participation(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _require_public_actions_allowed(db=db, user_id=current.user_number)
+
     wish = db.execute(
         select(PublicCooperativeWish)
         .where(PublicCooperativeWish.id == wish_id)
@@ -1098,6 +1141,8 @@ def fulfill_cooperative_wish(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _require_public_actions_allowed(db=db, user_id=current.user_number)
+
     wish = db.execute(
         select(PublicCooperativeWish)
         .where(PublicCooperativeWish.id == wish_id)
@@ -1191,9 +1236,7 @@ def delete_cooperative_wish(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _require_public_actions_allowed(db=db, user_id=current.user_number)
 
     wish = db.execute(
         select(PublicCooperativeWish)
@@ -1298,7 +1341,11 @@ def list_user_fulfilled_cooperative_wishes(
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
     is_owner = int(current.user_number) == int(user_id)
+    if not is_owner and is_minor_protected(target):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
     if not is_owner and not bool(target.public_profile_show_fulfilled_wishes):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+    if not is_owner and not bool(target.public_profile_show_cooperative_wishes):
         raise HTTPException(status_code=403, detail="Este módulo es privado.")
 
     total = db.execute(
@@ -1434,6 +1481,8 @@ def list_user_fulfilled_personal_wishes(
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
     is_owner = int(current.user_number) == int(user_id)
+    if not is_owner and is_minor_protected(target):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
     if not is_owner and not bool(target.public_profile_show_fulfilled_wishes):
         raise HTTPException(status_code=403, detail="Este módulo es privado.")
 
@@ -1488,9 +1537,7 @@ def create_personal_wish(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _require_public_actions_allowed(db=db, user_id=current.user_number)
 
     active_count = db.execute(
         select(func.count(PublicPersonalWish.id))
@@ -1529,9 +1576,7 @@ def update_personal_wish(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _require_public_actions_allowed(db=db, user_id=current.user_number)
 
     wish = db.execute(
         select(PublicPersonalWish)
@@ -1562,9 +1607,7 @@ def fulfill_personal_wish(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _require_public_actions_allowed(db=db, user_id=current.user_number)
 
     wish = db.execute(
         select(PublicPersonalWish)
@@ -1807,9 +1850,7 @@ def delete_personal_wish(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _require_public_actions_allowed(db=db, user_id=current.user_number)
 
     wish = db.execute(
         select(PublicPersonalWish)

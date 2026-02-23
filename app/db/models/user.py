@@ -129,6 +129,90 @@ class User(Base):
         default=True,
     )
 
+    public_profile_show_cooperative_wishes: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    public_profile_show_followers: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    public_profile_show_gallery: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    public_profile_show_recent_achievements: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    public_profile_show_stars: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    public_profile_show_cover_purposes: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    public_profile_show_biography: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    minor_accreditation_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="not_required",
+    )
+
+    minor_guardian_phone: Mapped[str | None] = mapped_column(
+        String(40),
+        nullable=True,
+    )
+
+    minor_guardian_email: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    minor_guardian_relationship: Mapped[str | None] = mapped_column(
+        String(40),
+        nullable=True,
+    )
+
+    minor_accreditation_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    minor_accreditation_approved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    minor_accreditation_token_hash: Mapped[str | None] = mapped_column(
+        String(128),
+        nullable=True,
+        index=True,
+    )
+
+    minor_accreditation_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     username_updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

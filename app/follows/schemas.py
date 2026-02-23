@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from app.db.models.profile_report import ProfileReportReason
 
 
 class FollowUserOut(BaseModel):
@@ -34,3 +36,22 @@ class FollowActionResponse(BaseModel):
     is_following: bool
     my_following_total: int
     target_followers_total: int
+
+
+class ProfileReportCreateRequest(BaseModel):
+    reason: ProfileReportReason
+    other_reason: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def validate_other_reason(self):
+        if self.reason == ProfileReportReason.other and not (self.other_reason or "").strip():
+            raise ValueError("Debes describir la otra razón del reporte.")
+        if self.reason != ProfileReportReason.other:
+            self.other_reason = None
+        return self
+
+
+class ProfileReportResponse(BaseModel):
+    reported: bool
+    target_user_id: int
+    reason: ProfileReportReason

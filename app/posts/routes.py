@@ -7,6 +7,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.auth.minor_accreditation import is_minor_protected
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.core.config import settings
@@ -179,6 +180,11 @@ def _ensure_post_access(post: Post, current_user_id: int) -> None:
 def _ensure_author_posts_visibility(author: User, viewer_user_id: int) -> None:
     if int(author.id) == int(viewer_user_id):
         return
+    if is_minor_protected(author):
+        raise HTTPException(
+            status_code=403,
+            detail="Esta cuenta está en modo protegido y sus publicaciones públicas no están disponibles.",
+        )
     if not bool(author.public_profile_show_personal_posts):
         raise HTTPException(
             status_code=403,
@@ -268,6 +274,8 @@ def _query_posts(
 
     result: list[PostOut] = []
     for post, author in rows:
+        if int(post.author_id) != int(current_user_id) and is_minor_protected(author):
+            continue
         result.append(
             _post_out(
                 post=post,
@@ -409,6 +417,11 @@ def list_user_posts(
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
     is_owner = int(user_id) == int(current_user_id)
+    if not is_owner and is_minor_protected(target):
+        raise HTTPException(
+            status_code=403,
+            detail="Esta cuenta está en modo protegido y no expone publicaciones públicas.",
+        )
     if not is_owner and not bool(target.public_profile_show_personal_posts):
         raise HTTPException(
             status_code=403,
@@ -494,6 +507,12 @@ def create_post(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    author = db.execute(
+        select(User).where(User.id == current.user_number, User.is_active.is_(True))
+    ).scalar_one_or_none()
+    if author is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
     text = (payload.text or "").strip() or None
     media: Media | None = None
 
@@ -514,10 +533,14 @@ def create_post(
         elif mime.startswith("video/"):
             media_kind = PostMediaKind.video
 
+    effective_visibility = payload.visibility
+    if is_minor_protected(author):
+        effective_visibility = PostVisibility.private
+
     post = Post(
         author_id=current.user_number,
         text=text,
-        visibility=payload.visibility,
+        visibility=effective_visibility,
         media_id=payload.media_id,
         media_kind=media_kind,
         star_count=0,
@@ -528,7 +551,6 @@ def create_post(
     db.commit()
     db.refresh(post)
 
-    author = db.execute(select(User).where(User.id == current.user_number)).scalar_one()
     media_map = {media.id: media} if media else {}
     return _post_out(
         post=post,

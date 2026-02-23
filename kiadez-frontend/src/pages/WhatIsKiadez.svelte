@@ -64,7 +64,7 @@
                     </p>
 
                     <p>
-                        5. Si alguien te contacta a través de tu muro solicitando datos personales o garantizándote el
+                        5. Si alguien te contacta de manera externa a Kiadez.com solicitando datos personales o garantizándote el
                         cumplimiento de tu deseo por fuera del servicio de los Guardianes oficiales, desconfía. Por esta
                         razón, Kiadez no cuenta con mensajes privados ni salas de chat. Tus datos personales serán
                         siempre tu mayor tesoro y responsabilidad.
@@ -82,7 +82,7 @@
                         7. Si deseas aspirar algún día al rango de Guardián, contribuye activamente a cuidar este
                         espacio:
                         denuncia a quienes contaminen la red con mensajes tóxicos, actitudes que fomenten la lástima o
-                        solicitudes de información personal en los muros.
+                        solicitudes de información personal a través de sus propios muros.
                     </p>
 
                     <p>
@@ -141,6 +141,7 @@
                     <div class="footer-column">
                         <h4>Información legal</h4>
                         <ul>
+                            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
                             <li><a href="/terms.html">Términos y condiciones</a></li>
                             <li><a href="/privacy.html">Privacidad</a></li>
                         </ul>

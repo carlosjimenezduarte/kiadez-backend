@@ -26,6 +26,7 @@
   import Contact from './pages/Contact.svelte';
   import Terms from './pages/Terms.svelte';
   import Privacy from './pages/Privacy.svelte';
+  import MyGameRules from './pages/MyGameRules.svelte';
   import ForgotPassword from './pages/ForgotPassword.svelte';
   import FulfilledWishes from './pages/FulfilledWishes.svelte';
   import ResetPassword from './pages/ResetPassword.svelte';
@@ -90,6 +91,8 @@
     '/terms.html': Terms,
     '/privacy': Privacy,
     '/privacy.html': Privacy,
+    '/mygamerules': MyGameRules,
+    '/mygamerules.html': MyGameRules,
     '/forgot-password': ForgotPassword,
     '/forgot-password.html': ForgotPassword,
     '/fulfilled-wishes': FulfilledWishes,

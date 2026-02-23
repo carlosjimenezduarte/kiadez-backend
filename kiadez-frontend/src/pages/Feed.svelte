@@ -5,6 +5,7 @@
 
   const API = "http://127.0.0.1:8000";
   const FEED_LIMIT = 40;
+  const MINOR_FEED_COLLAPSED_KEY = "feed_minor_protected_collapsed";
 
   let feedLoading = true;
   let feedError = "";
@@ -13,6 +14,16 @@
   let postActionBusyMap = {};
   let postsStatus = "";
   let postsStatusIsError = false;
+  let minorProtectedState = null;
+  let minorProtectedVisible = false;
+  let minorProtectedCollapsed = false;
+  let showMinorAccreditationModal = false;
+  let minorAccreditationBusy = false;
+  let minorAccreditationStatus = "";
+  let minorAccreditationStatusIsError = false;
+  let minorGuardianPhone = "";
+  let minorGuardianEmail = "";
+  let minorRelationship = "padre";
 
   const getAccessToken = () =>
     localStorage.getItem("access_token") ||
@@ -92,6 +103,113 @@
     postsStatusIsError = Boolean(isError);
   };
 
+  const setMinorAccreditationStatus = (message, isError = false) => {
+    minorAccreditationStatus = String(message || "").trim();
+    minorAccreditationStatusIsError = Boolean(isError);
+  };
+
+  const minorStatusLabel = (status) => {
+    if (status === "requested") return "Solicitud enviada a adulto responsable";
+    if (status === "pending") return "Acreditación pendiente";
+    if (status === "approved") return "Cuenta acreditada";
+    return "";
+  };
+
+  const applyMinorAccreditationPayload = (payload) => {
+    minorProtectedState = payload || null;
+    minorProtectedVisible = Boolean(payload?.is_minor_protected);
+    if (!minorProtectedVisible) {
+      showMinorAccreditationModal = false;
+      return;
+    }
+
+    minorGuardianPhone = String(payload?.guardian_phone || "").trim();
+    minorGuardianEmail = String(payload?.guardian_email || "").trim();
+    const relationship = String(payload?.relationship || "padre").trim().toLowerCase();
+    if (["padre", "madre", "tutor_legal", "adulto_responsable"].includes(relationship)) {
+      minorRelationship = relationship;
+    } else {
+      minorRelationship = "padre";
+    }
+  };
+
+  const loadMinorAccreditationStatus = async () => {
+    try {
+      const response = await apiFetch("/auth/minor-accreditation/status");
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo cargar la acreditación de cuenta."));
+      }
+      applyMinorAccreditationPayload(data);
+    } catch (error) {
+      applyMinorAccreditationPayload(null);
+      console.error(error);
+    }
+  };
+
+  const toggleMinorProtectedPanel = () => {
+    minorProtectedCollapsed = !minorProtectedCollapsed;
+    try {
+      localStorage.setItem(MINOR_FEED_COLLAPSED_KEY, minorProtectedCollapsed ? "1" : "0");
+    } catch (error) {
+      console.warn(error);
+    }
+  };
+
+  const openMinorAccreditationModal = () => {
+    if (!minorProtectedVisible) return;
+    setMinorAccreditationStatus("");
+    showMinorAccreditationModal = true;
+  };
+
+  const closeMinorAccreditationModal = () => {
+    showMinorAccreditationModal = false;
+    setMinorAccreditationStatus("");
+  };
+
+  const submitMinorAccreditationRequest = async () => {
+    const guardianPhone = String(minorGuardianPhone || "").trim();
+    const guardianEmail = String(minorGuardianEmail || "").trim();
+    const relationship = String(minorRelationship || "padre").trim().toLowerCase();
+
+    if (!guardianPhone) {
+      setMinorAccreditationStatus("Debes registrar el teléfono del adulto responsable.", true);
+      return;
+    }
+    if (!guardianEmail) {
+      setMinorAccreditationStatus("Debes registrar el correo del adulto responsable.", true);
+      return;
+    }
+
+    minorAccreditationBusy = true;
+    setMinorAccreditationStatus("");
+
+    try {
+      const response = await apiFetch("/auth/minor-accreditation/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          guardian_phone: guardianPhone,
+          guardian_email: guardianEmail,
+          relationship,
+        }),
+      });
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(readApiError(data, "No se pudo enviar la solicitud."));
+      }
+
+      await loadMinorAccreditationStatus();
+      setMinorAccreditationStatus(
+        data?.message || "Solicitud enviada. El adulto responsable debe aprobarla por correo."
+      );
+    } catch (error) {
+      setMinorAccreditationStatus(readUnknownError(error, "No se pudo enviar la solicitud."), true);
+    } finally {
+      minorAccreditationBusy = false;
+    }
+  };
+
   const relativeTime = (value) => {
     const date = new Date(value || "");
     if (Number.isNaN(date.getTime())) return "";
@@ -121,6 +239,14 @@
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const buildAuthorProfileUrl = (author) => {
+    const authorId = Number(author?.id || 0);
+    if (Number.isFinite(authorId) && authorId > 0) {
+      return `/home_user.html?id=${encodeURIComponent(String(authorId))}`;
+    }
+    return "/home_user.html";
   };
 
   const buildDisplayPosts = (posts) => {
@@ -359,6 +485,12 @@
 
     const cleanupFns = [];
     let previewObjectUrl = "";
+    try {
+      minorProtectedCollapsed = localStorage.getItem(MINOR_FEED_COLLAPSED_KEY) === "1";
+    } catch (error) {
+      console.warn(error);
+      minorProtectedCollapsed = false;
+    }
 
     const bind = (element, eventName, handler) => {
       if (!element) return;
@@ -399,6 +531,17 @@
     const postVisibility = document.getElementById("postVisibility");
     const publishPostBtn = document.getElementById("publishPost");
 
+    const applyMinorPostVisibilityGuard = () => {
+      if (!postVisibility) return;
+      const publicOption = postVisibility.querySelector('option[value="public"]');
+      if (publicOption) {
+        publicOption.disabled = minorProtectedVisible;
+      }
+      if (minorProtectedVisible && postVisibility.value === "public") {
+        postVisibility.value = "private";
+      }
+    };
+
     const resetPreview = () => {
       if (previewObjectUrl) {
         URL.revokeObjectURL(previewObjectUrl);
@@ -414,6 +557,7 @@
 
     const openPost = () => {
       if (!postModalOverlay) return;
+      applyMinorPostVisibilityGuard();
       postModalOverlay.classList.remove("hidden");
       postModalOverlay.setAttribute("aria-hidden", "false");
     };
@@ -424,7 +568,10 @@
       postModalOverlay.setAttribute("aria-hidden", "true");
       resetPreview();
       if (postTextInput) postTextInput.value = "";
-      if (postVisibility) postVisibility.value = "public";
+      if (postVisibility) {
+        postVisibility.value = minorProtectedVisible ? "private" : "public";
+      }
+      applyMinorPostVisibilityGuard();
     };
 
     bind(composerInput, "click", openPost);
@@ -468,6 +615,12 @@
     });
 
     bind(publishPostBtn, "click", () => {
+      if (minorProtectedVisible && postVisibility?.value === "public") {
+        postVisibility.value = "private";
+        setPostsStatus("Tu cuenta está en modo protegido. La publicación se guardará en privado.");
+      } else {
+        setPostsStatus("Publicación creada (mock).");
+      }
       alert("Publicación creada (mock). En backend luego la guardamos en DB.");
       closePost();
     });
@@ -496,7 +649,10 @@
     bind(oracleToggle, "change", syncOracleVisibility);
     syncOracleVisibility();
 
-    void loadFeed();
+    void (async () => {
+      await Promise.all([loadFeed(), loadMinorAccreditationStatus()]);
+      applyMinorPostVisibilityGuard();
+    })();
 
     return () => {
       for (const cleanup of cleanupFns) cleanup();
@@ -624,6 +780,31 @@
             </div>
           </article>
 
+          {#if minorProtectedVisible}
+            <article class="panel minor-protected-panel">
+              <div class="panel-head minor-protected-head">
+                <h3 class="panel-title">Cuenta en modo protegido</h3>
+                <button class="btn btn-outline btn-compact minor-protected-toggle" type="button" on:click={toggleMinorProtectedPanel}>
+                  {minorProtectedCollapsed ? "Expandir" : "Reducir"}
+                </button>
+              </div>
+              {#if !minorProtectedCollapsed}
+                <div class="minor-protected-body">
+                  <p class="panel-muted">
+                    Según la fecha de nacimiento registrada, tu perfil requiere validación de un padre, madre o tutor legal para habilitar funciones públicas.
+                    Puedes usar la plataforma con normalidad, pero tu contenido permanecerá privado hasta completar este proceso.
+                  </p>
+                  <p class="panel-muted minor-protected-state">{minorStatusLabel(minorProtectedState?.status)}</p>
+                  <div class="minor-protected-actions">
+                    <button class="btn btn-primary btn-compact" type="button" on:click={openMinorAccreditationModal}>
+                      Acreditar cuenta
+                    </button>
+                  </div>
+                </div>
+              {/if}
+            </article>
+          {/if}
+
           {#if postsStatus}
             <p class={`posts-status ${postsStatusIsError ? "posts-status-error" : ""}`} aria-live="polite">
               {postsStatus}
@@ -648,10 +829,11 @@
           {:else}
             {#each displayPosts as post (post.id)}
               {@const isAlbumGroup = post.__kind === "album" && Number(post.album_total_items || 0) > 1}
+              {@const authorProfileUrl = buildAuthorProfileUrl(post?.author)}
               <article class="panel post">
                 <div class="post-head">
                   <div>
-                    <strong>{post.author?.name || "Usuario"}</strong>
+                    <a class="post-author-link" href={authorProfileUrl}>{post.author?.name || "Usuario"}</a>
                     <span class="post-meta">
                       · {relativeTime(post.created_at)} · {post.visibility === "private" ? "Privado" : "Público"}
                     </span>
@@ -781,6 +963,7 @@
           </article>
 
           <div class="feed-mini-footer">
+            <a href="/mygamerules.html">Mis reglas de juego</a>
             <a href="/terms.html">Términos y condiciones</a>
             <a href="/privacy.html">Privacidad</a>
             <a href="/privacy-and-settings.html">Cookies</a>
@@ -827,6 +1010,75 @@
       <div class="modal-actions">
         <button class="btn btn-outline btn-compact" type="button" id="cancelPost">Cancelar</button>
         <button class="btn btn-primary btn-compact" type="button" id="publishPost">Publicar</button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class={`modal-overlay ${showMinorAccreditationModal ? "" : "hidden"}`}
+    aria-hidden={showMinorAccreditationModal ? "false" : "true"}
+    on:click={(event) => {
+      if (event.target === event.currentTarget) closeMinorAccreditationModal();
+    }}
+  >
+    <div class="modal minor-accreditation-modal" role="dialog" aria-modal="true" aria-label="Acreditar cuenta">
+      <div class="modal-head">
+        <h3>Acreditar cuenta</h3>
+        <button class="modal-close" type="button" on:click={closeMinorAccreditationModal}>✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="panel-muted">
+          Registra los datos del padre, madre o tutor legal para enviar la solicitud de validación.
+        </p>
+
+        <label class="modal-label" for="feedMinorGuardianPhone">Teléfono del padre, madre o tutor legal</label>
+        <input
+          class="modal-input"
+          id="feedMinorGuardianPhone"
+          type="tel"
+          maxlength="40"
+          placeholder="+57 321 6852619"
+          bind:value={minorGuardianPhone}
+        />
+
+        <label class="modal-label" for="feedMinorGuardianEmail">Correo electrónico del adulto responsable</label>
+        <input
+          class="modal-input"
+          id="feedMinorGuardianEmail"
+          type="email"
+          maxlength="255"
+          placeholder="ejemplo@correo.com"
+          bind:value={minorGuardianEmail}
+        />
+
+        <label class="modal-label" for="feedMinorRelationship">Parentesco</label>
+        <select class="modal-select" id="feedMinorRelationship" bind:value={minorRelationship}>
+          <option value="padre">Padre</option>
+          <option value="madre">Madre</option>
+          <option value="tutor_legal">Tutor legal</option>
+          <option value="adulto_responsable">Adulto responsable</option>
+        </select>
+
+        {#if minorAccreditationStatus}
+          <p class={`minor-accreditation-modal-status ${minorAccreditationStatusIsError ? "is-error" : ""}`}>
+            {minorAccreditationStatus}
+          </p>
+        {/if}
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-compact" type="button" on:click={closeMinorAccreditationModal}>
+          Cancelar
+        </button>
+        <button
+          class="btn btn-primary btn-compact"
+          type="button"
+          disabled={minorAccreditationBusy}
+          on:click={() => void submitMinorAccreditationRequest()}
+        >
+          {minorAccreditationBusy ? "Enviando..." : "Enviar solicitud"}
+        </button>
       </div>
     </div>
   </div>

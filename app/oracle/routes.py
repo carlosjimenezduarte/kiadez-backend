@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.auth.minor_accreditation import is_minor_protected
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.db.database import get_db
@@ -153,6 +154,8 @@ def get_public_oracle_state(
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
     is_owner = int(current.user_number) == int(user_id)
+    if not is_owner and is_minor_protected(target):
+        raise HTTPException(status_code=403, detail="Este módulo es privado.")
     if not is_owner and not bool(target.public_profile_show_oracle):
         raise HTTPException(status_code=403, detail="Este módulo es privado.")
 
@@ -189,6 +192,23 @@ def respond_oracle_card(
     db: Session = Depends(get_db),
 ):
     user_id = int(current.user_number)
+    user = (
+        db.query(User)
+        .filter(
+            User.id == user_id,
+            User.is_active.is_(True),
+        )
+        .one_or_none()
+    )
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    if is_minor_protected(user) and payload.response_type == OracleResponseType.public:
+        raise HTTPException(
+            status_code=403,
+            detail="Tu cuenta está en modo protegido. Solo puedes registrar respuestas privadas por ahora.",
+        )
+
     state, _ = _get_or_create_state(db=db, user_id=user_id)
 
     now = _utcnow()

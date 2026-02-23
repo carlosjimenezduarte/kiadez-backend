@@ -23,6 +23,19 @@
     const postVisibility = document.getElementById('postVisibility');
     const postsList = document.getElementById('homePostsList');
     const postsStatus = document.getElementById('postsStatus');
+    const minorProtectedPanel = document.getElementById('minorProtectedPanel');
+    const minorProtectedBody = document.getElementById('minorProtectedBody');
+    const minorProtectedStateLabel = document.getElementById('minorProtectedStateLabel');
+    const toggleMinorProtectedPanelBtn = document.getElementById('toggleMinorProtectedPanel');
+    const openMinorAccreditationModalBtn = document.getElementById('openMinorAccreditationModal');
+    const minorAccreditationModalOverlay = document.getElementById('minorAccreditationModalOverlay');
+    const closeMinorAccreditationModalBtn = document.getElementById('closeMinorAccreditationModal');
+    const cancelMinorAccreditationModalBtn = document.getElementById('cancelMinorAccreditationModal');
+    const submitMinorAccreditationBtn = document.getElementById('submitMinorAccreditation');
+    const minorGuardianPhoneInput = document.getElementById('minorGuardianPhoneInput');
+    const minorGuardianEmailInput = document.getElementById('minorGuardianEmailInput');
+    const minorRelationshipSelect = document.getElementById('minorRelationshipSelect');
+    const minorAccreditationModalStatus = document.getElementById('minorAccreditationModalStatus');
     const starsTotalLabel = document.getElementById('homeStarsTotal');
 
     const deletePostOverlay = document.getElementById('deletePostModalOverlay');
@@ -36,6 +49,13 @@
     const submitReportPost = document.getElementById('submitReportPost');
     const reportReasonOtherWrap = document.getElementById('reportReasonOtherWrap');
     const reportReasonOther = document.getElementById('reportReasonOther');
+    const reportProfileOverlay = document.getElementById('reportProfileModalOverlay');
+    const closeReportProfileModal = document.getElementById('closeReportProfileModal');
+    const cancelReportProfile = document.getElementById('cancelReportProfile');
+    const submitReportProfile = document.getElementById('submitReportProfile');
+    const reportProfileReasonOtherWrap = document.getElementById('reportProfileReasonOtherWrap');
+    const reportProfileReasonOther = document.getElementById('reportProfileReasonOther');
+    const reportProfileModalStatus = document.getElementById('reportProfileModalStatus');
 
     const commentsOverlay = document.getElementById('postCommentsModalOverlay');
     const closeCommentsModal = document.getElementById('closePostCommentsModal');
@@ -60,6 +80,7 @@
     const homeUsernameLink = document.getElementById('homeUsernameLink');
     const homeUsernameValue = document.getElementById('homeUsernameValue');
     const homeUsernameEditBtn = document.getElementById('homeUsernameEditBtn');
+    const homeUsernameReportBtn = document.getElementById('homeUsernameReportBtn');
     const homeUsernameCooldown = document.getElementById('homeUsernameCooldown');
     const homeUsernameModalOverlay = document.getElementById('homeUsernameModalOverlay');
     const closeHomeUsernameModal = document.getElementById('closeHomeUsernameModal');
@@ -102,6 +123,7 @@
     const homeCooperativePanel = document.getElementById('homeCooperativePanel');
     const homeCalendarPanel = document.getElementById('homeCalendarPanel');
     const homeOraclePanel = document.getElementById('homeOraclePanel');
+    const homeCoverSection = document.getElementById('cover');
     const profilePhotoPostOverlay = document.getElementById('profilePhotoPostModalOverlay');
     const closeProfilePhotoPostModal = document.getElementById('closeProfilePhotoPostModal');
     const cancelProfilePhotoPostModal = document.getElementById('cancelProfilePhotoPostModal');
@@ -123,6 +145,7 @@
     let selectedCommentPostId = null;
     let selectedDeletePostId = null;
     let selectedReportPostId = null;
+    let selectedReportProfileUserId = null;
     let currentFeedPosts = [];
     let profilePhotoMediaId = null;
     let profilePhotoPost = null;
@@ -142,6 +165,8 @@
     let activeProfileUrl = '/home_user.html';
     let isViewingOwnProfile = true;
     let hasActiveCooperativeWishes = false;
+    let minorAccreditationState = null;
+    let minorProtectedCollapsed = false;
 
     const HOME_ABOUT_MAX_WORDS = 50;
     const USERNAME_MIN_LENGTH = 4;
@@ -150,6 +175,7 @@
     const PROFILE_PHOTO_POST_STORAGE_KEY = 'home_profile_photo_post_id';
     const PROFILE_PHOTO_POST_TEXT = 'Actualice mi foto de perfil.';
     const DEFAULT_AVATAR_SRC = '/assets/avatar-default.jpg';
+    const MINOR_PROTECTED_COLLAPSED_KEY = 'home_minor_protected_collapsed';
     const DEFAULT_PROFILE_PRIVACY_VISIBILITY = {
       public_profile_show_about: true,
       public_profile_show_fulfilled_wishes: true,
@@ -157,6 +183,13 @@
       public_profile_show_calendar: true,
       public_profile_show_oracle: true,
       public_profile_show_personal_posts: true,
+      public_profile_show_cooperative_wishes: true,
+      public_profile_show_followers: true,
+      public_profile_show_gallery: true,
+      public_profile_show_recent_achievements: true,
+      public_profile_show_stars: true,
+      public_profile_show_cover_purposes: true,
+      public_profile_show_biography: true,
     };
     let activeProfilePrivacyVisibility = { ...DEFAULT_PROFILE_PRIVACY_VISIBILITY };
 
@@ -174,6 +207,172 @@
       if (!postsStatus) return;
       postsStatus.textContent = message || '';
       postsStatus.classList.toggle('posts-status-error', Boolean(isError));
+    };
+
+    const setMinorAccreditationModalStatus = (message, isError = false) => {
+      if (!minorAccreditationModalStatus) return;
+      minorAccreditationModalStatus.textContent = message || '';
+      minorAccreditationModalStatus.classList.toggle('is-error', Boolean(isError));
+    };
+
+    const minorStatusLabel = (status) => {
+      if (status === 'requested') return 'Solicitud enviada a adulto responsable';
+      if (status === 'pending') return 'Acreditación pendiente';
+      if (status === 'approved') return 'Cuenta acreditada';
+      return '';
+    };
+
+    const syncPostVisibilityMinorGuard = () => {
+      if (!postVisibility) return;
+      const publicOption = postVisibility.querySelector('option[value="public"]');
+      const isProtected = Boolean(minorAccreditationState?.is_minor_protected);
+      if (publicOption) {
+        publicOption.disabled = isProtected;
+      }
+      if (isProtected && postVisibility.value === 'public') {
+        postVisibility.value = 'private';
+      }
+    };
+
+    const setMinorProtectedCollapsedState = (collapsed, { persist = true } = {}) => {
+      minorProtectedCollapsed = Boolean(collapsed);
+      if (minorProtectedBody) {
+        minorProtectedBody.classList.toggle('hidden', minorProtectedCollapsed);
+      }
+      if (toggleMinorProtectedPanelBtn) {
+        toggleMinorProtectedPanelBtn.textContent = minorProtectedCollapsed ? 'Expandir' : 'Reducir';
+      }
+      if (persist) {
+        try {
+          localStorage.setItem(MINOR_PROTECTED_COLLAPSED_KEY, minorProtectedCollapsed ? '1' : '0');
+        } catch (error) {
+          console.warn(error);
+        }
+      }
+    };
+
+    const applyMinorProtectedPanelState = () => {
+      const isProtected = Boolean(minorAccreditationState?.is_minor_protected);
+      const shouldShow = isViewingOwnProfile && isProtected;
+      minorProtectedPanel?.classList.toggle('hidden', !shouldShow);
+
+      if (!shouldShow) {
+        syncPostVisibilityMinorGuard();
+        return;
+      }
+
+      if (minorProtectedStateLabel) {
+        minorProtectedStateLabel.textContent = minorStatusLabel(minorAccreditationState?.status);
+      }
+      if (minorGuardianPhoneInput) {
+        minorGuardianPhoneInput.value = String(minorAccreditationState?.guardian_phone || '').trim();
+      }
+      if (minorGuardianEmailInput) {
+        minorGuardianEmailInput.value = String(minorAccreditationState?.guardian_email || '').trim();
+      }
+      if (minorRelationshipSelect) {
+        minorRelationshipSelect.value = String(minorAccreditationState?.relationship || 'padre');
+      }
+
+      setMinorProtectedCollapsedState(minorProtectedCollapsed, { persist: false });
+      syncPostVisibilityMinorGuard();
+    };
+
+    const loadMinorAccreditationStatus = async () => {
+      if (!isViewingOwnProfile) {
+        minorAccreditationState = null;
+        applyMinorProtectedPanelState();
+        return;
+      }
+
+      try {
+        const res = await apiFetch('/auth/minor-accreditation/status');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar el estado de acreditación.');
+        minorAccreditationState = data || null;
+      } catch (error) {
+        console.error(error);
+        minorAccreditationState = null;
+      }
+
+      applyMinorProtectedPanelState();
+    };
+
+    const openMinorAccreditationModal = () => {
+      if (!minorAccreditationState?.is_minor_protected) return;
+      setMinorAccreditationModalStatus('');
+      minorAccreditationModalOverlay?.classList.remove('hidden');
+      minorAccreditationModalOverlay?.setAttribute('aria-hidden', 'false');
+    };
+
+    const closeMinorAccreditationModal = () => {
+      minorAccreditationModalOverlay?.classList.add('hidden');
+      minorAccreditationModalOverlay?.setAttribute('aria-hidden', 'true');
+      setMinorAccreditationModalStatus('');
+    };
+
+    const submitMinorAccreditation = async () => {
+      const guardianPhone = String(minorGuardianPhoneInput?.value || '').trim();
+      const guardianEmail = String(minorGuardianEmailInput?.value || '').trim();
+      const relationship = String(minorRelationshipSelect?.value || 'padre').trim().toLowerCase();
+
+      if (!guardianPhone) {
+        setMinorAccreditationModalStatus('Debes indicar el teléfono del adulto responsable.', true);
+        return;
+      }
+      if (!guardianEmail) {
+        setMinorAccreditationModalStatus('Debes indicar el correo del adulto responsable.', true);
+        return;
+      }
+
+      const oldLabel = submitMinorAccreditationBtn?.textContent || 'Enviar solicitud';
+      if (submitMinorAccreditationBtn) {
+        submitMinorAccreditationBtn.disabled = true;
+        submitMinorAccreditationBtn.textContent = 'Enviando...';
+      }
+      setMinorAccreditationModalStatus('');
+
+      try {
+        const res = await apiFetch('/auth/minor-accreditation/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            guardian_phone: guardianPhone,
+            guardian_email: guardianEmail,
+            relationship,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'No se pudo enviar la solicitud de acreditación.');
+        }
+
+        await loadMinorAccreditationStatus();
+        setMinorAccreditationModalStatus(
+          data.message || 'Solicitud enviada. Revisa con el adulto responsable el correo de validación.',
+          false
+        );
+      } catch (error) {
+        setMinorAccreditationModalStatus(
+          error.message || 'No se pudo enviar la solicitud de acreditación.',
+          true
+        );
+      } finally {
+        if (submitMinorAccreditationBtn) {
+          submitMinorAccreditationBtn.disabled = false;
+          submitMinorAccreditationBtn.textContent = oldLabel;
+        }
+      }
+    };
+
+    const handleMinorProtectedToggle = () => {
+      setMinorProtectedCollapsedState(!minorProtectedCollapsed);
+    };
+
+    const handleMinorAccreditationOverlayClick = (event) => {
+      if (event.target === minorAccreditationModalOverlay) {
+        closeMinorAccreditationModal();
+      }
     };
 
     const setHomeAboutModalStatus = (message, isError = false) => {
@@ -218,9 +417,15 @@
       homePrivateWishStatus.classList.toggle('is-error', Boolean(isError));
     };
 
+    const setReportProfileModalStatus = (message, isError = false) => {
+      if (!reportProfileModalStatus) return;
+      reportProfileModalStatus.textContent = message || '';
+      reportProfileModalStatus.classList.toggle('is-error', Boolean(isError));
+    };
+
     const updateHomeCooperativePanelVisibility = () => {
-      const canShowPublicWishes = Boolean(activeProfilePrivacyVisibility.public_profile_show_public_wishes);
-      const isVisible = canShowPublicWishes && hasActiveCooperativeWishes;
+      const canShowCooperative = Boolean(activeProfilePrivacyVisibility.public_profile_show_cooperative_wishes);
+      const isVisible = canShowCooperative && hasActiveCooperativeWishes;
       homeCooperativePanel?.classList.toggle('hidden', !isVisible);
     };
 
@@ -255,6 +460,14 @@
 	      return '/home_user.html';
 	    };
 
+	    const buildAuthorProfileUrl = (author) => {
+	      const authorId = Number(author?.id || 0);
+	      if (Number.isFinite(authorId) && authorId > 0) {
+	        return `/home_user.html?id=${encodeURIComponent(String(authorId))}`;
+	      }
+	      return '/home_user.html';
+	    };
+
 	    const buildProfileQueryParams = () => {
 	      if (activeProfileUsername) {
 	        return { key: 'u', value: activeProfileUsername };
@@ -285,6 +498,10 @@
       public_wishes: '/my-public-whishes.html',
       public_wishes_cooperative: '/my-public-whishes.html#cooperative-wishes',
       fulfilled_wishes: '/my-fulfilled-whises.html',
+      followers: '/followers.html',
+      achievements: '/achievements.html',
+      gallery: '/gallery.html',
+      stars: '/star-pool-found.html',
       calendar: '/calendar.html',
       oracle: '/oracle.html',
       biography: '/my-biography.html'
@@ -353,6 +570,13 @@
       public_profile_show_calendar: Boolean(value?.public_profile_show_calendar ?? true),
       public_profile_show_oracle: Boolean(value?.public_profile_show_oracle ?? true),
       public_profile_show_personal_posts: Boolean(value?.public_profile_show_personal_posts ?? true),
+      public_profile_show_cooperative_wishes: Boolean(value?.public_profile_show_cooperative_wishes ?? true),
+      public_profile_show_followers: Boolean(value?.public_profile_show_followers ?? true),
+      public_profile_show_gallery: Boolean(value?.public_profile_show_gallery ?? true),
+      public_profile_show_recent_achievements: Boolean(value?.public_profile_show_recent_achievements ?? true),
+      public_profile_show_stars: Boolean(value?.public_profile_show_stars ?? true),
+      public_profile_show_cover_purposes: Boolean(value?.public_profile_show_cover_purposes ?? true),
+      public_profile_show_biography: Boolean(value?.public_profile_show_biography ?? true),
     });
 
     const setProfileModuleVisibility = (moduleKey, visible) => {
@@ -375,11 +599,18 @@
       updateHomeCooperativePanelVisibility();
       homeCalendarPanel?.classList.toggle('hidden', !visibility.public_profile_show_calendar);
       homeOraclePanel?.classList.toggle('hidden', !visibility.public_profile_show_oracle);
+      homeCoverSection?.classList.toggle('hidden', !visibility.public_profile_show_cover_purposes);
 
       setProfileModuleVisibility('fulfilled_wishes', visibility.public_profile_show_fulfilled_wishes);
       setProfileModuleVisibility('public_wishes', visibility.public_profile_show_public_wishes);
+      setProfileModuleVisibility('public_wishes_cooperative', visibility.public_profile_show_cooperative_wishes);
+      setProfileModuleVisibility('followers', visibility.public_profile_show_followers);
+      setProfileModuleVisibility('achievements', visibility.public_profile_show_recent_achievements);
+      setProfileModuleVisibility('gallery', visibility.public_profile_show_gallery);
+      setProfileModuleVisibility('stars', visibility.public_profile_show_stars);
       setProfileModuleVisibility('calendar', visibility.public_profile_show_calendar);
       setProfileModuleVisibility('oracle', visibility.public_profile_show_oracle);
+      setProfileModuleVisibility('biography', visibility.public_profile_show_biography);
     };
 
     const loadForeignProfilePrivacyVisibility = async () => {
@@ -413,6 +644,12 @@
     };
 
     setProfilePhotoPostId(localStorage.getItem(PROFILE_PHOTO_POST_STORAGE_KEY));
+    try {
+      minorProtectedCollapsed = localStorage.getItem(MINOR_PROTECTED_COLLAPSED_KEY) === '1';
+    } catch (error) {
+      console.warn(error);
+      minorProtectedCollapsed = false;
+    }
 
     const relativeTime = (isoDate) => {
       const ts = Date.parse(isoDate);
@@ -449,6 +686,7 @@
     const applyReadOnlyProfileMode = () => {
       // When viewing someone else's profile, hide any "my account" panels and editing actions.
       homeUsernameEditBtn?.classList.add('hidden');
+      homeUsernameReportBtn?.classList.remove('hidden');
       homeUsernameCooldown?.classList.add('hidden');
       homeAboutEditBtn?.classList.add('hidden');
       homeAvatarUploadBtn?.classList.add('hidden');
@@ -460,9 +698,10 @@
 
       homeAvatarDropdown?.removeAttribute('open');
 
-	      homePrivateWishCount?.closest('article.panel')?.classList.add('hidden');
+      homePrivateWishCount?.closest('article.panel')?.classList.add('hidden');
 
 	      openPostModal?.closest('.composer')?.classList.add('hidden');
+      minorProtectedPanel?.classList.add('hidden');
 	    };
 
     const fetchViewerIdentity = async () => {
@@ -542,6 +781,7 @@
 	      activeProfileUsername = viewerUsername;
 	      activeProfileUrl = '/home_user.html';
 	      isViewingOwnProfile = true;
+	      homeUsernameReportBtn?.classList.add('hidden');
 	      setMyHomeLinks(buildViewerHomeUrl());
 	      syncProfileModuleLinks();
 
@@ -1102,7 +1342,7 @@
     };
 
     const loadHomeCooperativeWishes = async () => {
-      if (!isViewingOwnProfile && !activeProfilePrivacyVisibility.public_profile_show_public_wishes) {
+      if (!isViewingOwnProfile && !activeProfilePrivacyVisibility.public_profile_show_cooperative_wishes) {
         hasActiveCooperativeWishes = false;
         updateHomeCooperativePanelVisibility();
         setHomeCooperativeWishStatus('');
@@ -1336,18 +1576,20 @@
           const albumMeta = isAlbumGroup
             ? `<p class="post-album-meta">${escapeHtml(post.album_name || "Álbum")} · ${Number(post.album_total_items || 0)} archivo(s)</p>`
             : '';
-          const openAlbumBtn = isAlbumGroup
-            ? `<button class="post-btn" type="button" data-action="open-album-gallery" data-album-id="${Number(post.album_id || 0)}">🖼️ Hojear álbum (${Number(post.album_total_items || 0)})</button>`
-            : '';
+	          const openAlbumBtn = isAlbumGroup
+	            ? `<button class="post-btn" type="button" data-action="open-album-gallery" data-album-id="${Number(post.album_id || 0)}">🖼️ Hojear álbum (${Number(post.album_total_items || 0)})</button>`
+	            : '';
+	          const authorProfileUrl = escapeHtml(buildAuthorProfileUrl(post?.author));
+	          const authorName = escapeHtml(post?.author?.name || 'Usuario');
 
-          return `
-            <article class="panel post" data-post-id="${post.id}">
-              <div class="post-head">
-                <div>
-                  <strong>${escapeHtml(post.author.name)}</strong>
-                  <span class="post-meta">· ${relativeTime(post.created_at)} · ${post.visibility === 'private' ? 'Privado' : 'Publico'}</span>
-                </div>
-                <div class="post-head-actions">
+	          return `
+	            <article class="panel post" data-post-id="${post.id}">
+	              <div class="post-head">
+	                <div>
+	                  <a class="post-author-link" href="${authorProfileUrl}">${authorName}</a>
+	                  <span class="post-meta">· ${relativeTime(post.created_at)} · ${post.visibility === 'private' ? 'Privado' : 'Publico'}</span>
+	                </div>
+	                <div class="post-head-actions">
                   ${reportBtn}
                   ${deleteBtn}
                 </div>
@@ -1370,10 +1612,26 @@
 
     const loadMyStats = async () => {
       try {
-        const res = await apiFetch('/posts/me/stats');
+        if (!starsTotalLabel) return;
+        if (isViewingOwnProfile) {
+          const res = await apiFetch('/posts/me/stats');
+          const data = await res.json();
+          if (res.ok) {
+            starsTotalLabel.textContent = Number(data.my_received_stars_total || 0).toLocaleString('es-CO');
+          }
+          return;
+        }
+
+        const profileId = Number(activeProfileUserId);
+        if (!Number.isFinite(profileId) || profileId <= 0) {
+          starsTotalLabel.textContent = '0';
+          return;
+        }
+
+        const res = await apiFetch(`/follows/profile?user_id=${encodeURIComponent(String(profileId))}`);
         const data = await res.json();
-        if (res.ok && starsTotalLabel) {
-          starsTotalLabel.textContent = Number(data.my_received_stars_total || 0).toLocaleString('es-CO');
+        if (res.ok) {
+          starsTotalLabel.textContent = Number(data.received_stars_total || 0).toLocaleString('es-CO');
         }
       } catch (error) {
         console.error(error);
@@ -1406,6 +1664,7 @@
 
     const openPost = () => {
       if (!isViewingOwnProfile) return;
+      syncPostVisibilityMinorGuard();
       postModalOverlay?.classList.remove('hidden');
       postModalOverlay?.setAttribute('aria-hidden', 'false');
     };
@@ -1425,7 +1684,9 @@
       selectedFile = null;
       if (postFile) postFile.value = '';
       if (postText) postText.value = '';
-      if (postVisibility) postVisibility.value = 'public';
+      if (postVisibility) {
+        postVisibility.value = minorAccreditationState?.is_minor_protected ? 'private' : 'public';
+      }
     };
 
     const handlePostOverlayClick = (event) => {
@@ -1589,7 +1850,12 @@
       }
 
       try {
-        const visibilityValue = (postVisibility?.value || 'public').toLowerCase();
+        let visibilityValue = (postVisibility?.value || 'public').toLowerCase();
+        if (minorAccreditationState?.is_minor_protected && visibilityValue === 'public') {
+          visibilityValue = 'private';
+          if (postVisibility) postVisibility.value = 'private';
+          setPostsStatus('Tu cuenta está en modo protegido. Esta publicación se guardará en privado.');
+        }
         const mediaData = await uploadMediaIfNeeded(visibilityValue);
         const payload = {
           text: text || null,
@@ -1627,7 +1893,9 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: text || null,
-          visibility: (visibility || 'public').toLowerCase(),
+          visibility: (
+            minorAccreditationState?.is_minor_protected ? 'private' : (visibility || 'public')
+          ).toLowerCase(),
           media_id: media_id ?? null,
           media_kind: media_kind ?? null
         })
@@ -1852,6 +2120,17 @@
       if (reportReasonOther) reportReasonOther.value = '';
       if (reportReasonOtherWrap) reportReasonOtherWrap.classList.add('hidden');
       const defaultOption = document.querySelector('input[name="postReportReason"][value="violent"]');
+      if (defaultOption) defaultOption.checked = true;
+    };
+
+    const closeReportProfileModalPanel = () => {
+      reportProfileOverlay?.classList.add('hidden');
+      reportProfileOverlay?.setAttribute('aria-hidden', 'true');
+      selectedReportProfileUserId = null;
+      setReportProfileModalStatus('');
+      if (reportProfileReasonOther) reportProfileReasonOther.value = '';
+      if (reportProfileReasonOtherWrap) reportProfileReasonOtherWrap.classList.add('hidden');
+      const defaultOption = document.querySelector('input[name="profileReportReason"][value="fake_or_illegal"]');
       if (defaultOption) defaultOption.checked = true;
     };
 
@@ -2095,6 +2374,13 @@
       else reportReasonOtherWrap.classList.add('hidden');
     };
 
+    const handleProfileReportReasonChange = (event) => {
+      const selected = event.target?.value || '';
+      if (!reportProfileReasonOtherWrap) return;
+      if (selected === 'other') reportProfileReasonOtherWrap.classList.remove('hidden');
+      else reportProfileReasonOtherWrap.classList.add('hidden');
+    };
+
     const handleSubmitReport = async () => {
       if (!selectedReportPostId) return;
       const selected = document.querySelector('input[name="postReportReason"]:checked');
@@ -2121,6 +2407,60 @@
         closeReportModal();
       } catch (error) {
         setPostsStatus(error.message || 'No se pudo enviar el reporte.', true);
+      }
+    };
+
+    const handleOpenProfileReportModal = () => {
+      if (isViewingOwnProfile) return;
+      const targetUserId = Number(activeProfileUserId);
+      if (!Number.isFinite(targetUserId) || targetUserId <= 0) {
+        setPostsStatus('No se pudo identificar el usuario a denunciar.', true);
+        return;
+      }
+      selectedReportProfileUserId = targetUserId;
+      setReportProfileModalStatus('');
+      reportProfileOverlay?.classList.remove('hidden');
+      reportProfileOverlay?.setAttribute('aria-hidden', 'false');
+    };
+
+    const handleSubmitProfileReport = async () => {
+      if (!selectedReportProfileUserId) return;
+      const selected = document.querySelector('input[name="profileReportReason"]:checked');
+      const reason = selected?.value;
+      if (!reason) {
+        setReportProfileModalStatus('Debes elegir una razón de reporte.', true);
+        return;
+      }
+      const otherReason = (reportProfileReasonOther?.value || '').trim();
+      if (reason === 'other' && !otherReason) {
+        setReportProfileModalStatus('Debes escribir la razón cuando eliges "Otro".', true);
+        return;
+      }
+
+      const oldLabel = submitReportProfile?.textContent || 'Enviar reporte';
+      if (submitReportProfile) {
+        submitReportProfile.disabled = true;
+        submitReportProfile.textContent = 'Enviando...';
+      }
+      setReportProfileModalStatus('');
+
+      try {
+        const res = await apiFetch(`/follows/profile/${encodeURIComponent(String(selectedReportProfileUserId))}/reports`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason, other_reason: otherReason || null })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudo enviar el reporte de perfil.');
+        setPostsStatus('Reporte de perfil enviado correctamente.');
+        closeReportProfileModalPanel();
+      } catch (error) {
+        setReportProfileModalStatus(error.message || 'No se pudo enviar el reporte de perfil.', true);
+      } finally {
+        if (submitReportProfile) {
+          submitReportProfile.disabled = false;
+          submitReportProfile.textContent = oldLabel;
+        }
       }
     };
 
@@ -2160,6 +2500,7 @@
     homeAvatarGalleryModalOverlay?.addEventListener('click', handleHomeAvatarGalleryOverlayClick);
     homeAvatarGalleryGrid?.addEventListener('click', handleHomeAvatarGalleryPick);
     homeUsernameEditBtn?.addEventListener('click', openHomeUsernameModalPanel);
+    homeUsernameReportBtn?.addEventListener('click', handleOpenProfileReportModal);
     closeHomeUsernameModal?.addEventListener('click', closeHomeUsernameModalPanel);
     cancelHomeUsernameModal?.addEventListener('click', closeHomeUsernameModalPanel);
     saveHomeUsernameBtn?.addEventListener('click', handlePrepareUsernameChange);
@@ -2187,6 +2528,12 @@
     postFile?.addEventListener('change', handlePostFileChange);
     publishPost?.addEventListener('click', handlePublishPost);
     postsList?.addEventListener('click', handlePostsClick);
+    toggleMinorProtectedPanelBtn?.addEventListener('click', handleMinorProtectedToggle);
+    openMinorAccreditationModalBtn?.addEventListener('click', openMinorAccreditationModal);
+    closeMinorAccreditationModalBtn?.addEventListener('click', closeMinorAccreditationModal);
+    cancelMinorAccreditationModalBtn?.addEventListener('click', closeMinorAccreditationModal);
+    submitMinorAccreditationBtn?.addEventListener('click', submitMinorAccreditation);
+    minorAccreditationModalOverlay?.addEventListener('click', handleMinorAccreditationOverlayClick);
 
     closeDeletePostModal?.addEventListener('click', closeDeleteModal);
     cancelDeletePost?.addEventListener('click', closeDeleteModal);
@@ -2204,6 +2551,16 @@
     document
       .querySelectorAll('input[name="postReportReason"]')
       .forEach((input) => input.addEventListener('change', handleReportReasonChange));
+
+    closeReportProfileModal?.addEventListener('click', closeReportProfileModalPanel);
+    cancelReportProfile?.addEventListener('click', closeReportProfileModalPanel);
+    submitReportProfile?.addEventListener('click', handleSubmitProfileReport);
+    reportProfileOverlay?.addEventListener('click', (event) => {
+      if (event.target === reportProfileOverlay) closeReportProfileModalPanel();
+    });
+    document
+      .querySelectorAll('input[name="profileReportReason"]')
+      .forEach((input) => input.addEventListener('change', handleProfileReportReasonChange));
 
     closeCommentsModal?.addEventListener('click', closeComments);
     cancelCommentsModal?.addEventListener('click', closeComments);
@@ -2223,6 +2580,7 @@
 
       if (isViewingOwnProfile) {
         await Promise.all([
+          loadMinorAccreditationStatus(),
           loadHomeAbout(),
           loadProfilePhoto(),
           loadUsernameState(),
@@ -2264,6 +2622,7 @@
       homeAvatarGalleryModalOverlay?.removeEventListener('click', handleHomeAvatarGalleryOverlayClick);
       homeAvatarGalleryGrid?.removeEventListener('click', handleHomeAvatarGalleryPick);
       homeUsernameEditBtn?.removeEventListener('click', openHomeUsernameModalPanel);
+      homeUsernameReportBtn?.removeEventListener('click', handleOpenProfileReportModal);
       closeHomeUsernameModal?.removeEventListener('click', closeHomeUsernameModalPanel);
       cancelHomeUsernameModal?.removeEventListener('click', closeHomeUsernameModalPanel);
       saveHomeUsernameBtn?.removeEventListener('click', handlePrepareUsernameChange);
@@ -2291,6 +2650,12 @@
       postFile?.removeEventListener('change', handlePostFileChange);
       publishPost?.removeEventListener('click', handlePublishPost);
       postsList?.removeEventListener('click', handlePostsClick);
+      toggleMinorProtectedPanelBtn?.removeEventListener('click', handleMinorProtectedToggle);
+      openMinorAccreditationModalBtn?.removeEventListener('click', openMinorAccreditationModal);
+      closeMinorAccreditationModalBtn?.removeEventListener('click', closeMinorAccreditationModal);
+      cancelMinorAccreditationModalBtn?.removeEventListener('click', closeMinorAccreditationModal);
+      submitMinorAccreditationBtn?.removeEventListener('click', submitMinorAccreditation);
+      minorAccreditationModalOverlay?.removeEventListener('click', handleMinorAccreditationOverlayClick);
 
       closeDeletePostModal?.removeEventListener('click', closeDeleteModal);
       cancelDeletePost?.removeEventListener('click', closeDeleteModal);
@@ -2302,6 +2667,13 @@
       document
         .querySelectorAll('input[name="postReportReason"]')
         .forEach((input) => input.removeEventListener('change', handleReportReasonChange));
+
+      closeReportProfileModal?.removeEventListener('click', closeReportProfileModalPanel);
+      cancelReportProfile?.removeEventListener('click', closeReportProfileModalPanel);
+      submitReportProfile?.removeEventListener('click', handleSubmitProfileReport);
+      document
+        .querySelectorAll('input[name="profileReportReason"]')
+        .forEach((input) => input.removeEventListener('change', handleProfileReportReasonChange));
 
       closeCommentsModal?.removeEventListener('click', closeComments);
       cancelCommentsModal?.removeEventListener('click', closeComments);
@@ -2331,7 +2703,7 @@
 
     <div class="feed-topbar-zone feed-topbar-center">
 	      <button class="topbar-btn is-active" id="homeTopbarBtn" type="button">🏠 Home</button>
-	      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+	      <a class="topbar-btn" href="/gallery.html" data-profile-module="gallery">🖼️ Galería</a>
 	      <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 Deseos públicos</a>
 	      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
 	      <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ Deseos cumplidos</a>
@@ -2363,8 +2735,8 @@
             Publicar
           </button>
           <a href="/home_user.html" role="menuitem" data-my-home-link="true">Mi Home</a>
-          <a href="/achievements.html" role="menuitem">Logros recientes</a>
-          <a href="/gallery.html" role="menuitem">Galería</a>
+          <a href="/achievements.html" role="menuitem" data-profile-module="achievements">Logros recientes</a>
+          <a href="/gallery.html" role="menuitem" data-profile-module="gallery">Galería</a>
 	          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
           <a href="/my-biography.html" role="menuitem" data-profile-module="biography">Mi Biografía</a>
           <a href="/messages.html" role="menuitem">Mensajes</a>
@@ -2374,7 +2746,7 @@
   </header>
 
   <main class="user-home">
-    <section class="cover" id="cover">
+    <section class="cover" id="cover" data-profile-module="cover_purposes">
       <div class="cover-media" id="coverMedia">
         <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
 
@@ -2412,14 +2784,14 @@
     <div class="home-body">
       <nav class="profile-nav" aria-label="Navegación de perfil">
         <a class="nav-pill" href="/home_user.html" title="Home" data-profile-link="true">Home</a>
-        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas" data-profile-module="stars">
           <span class="nav-icon">⭐</span>
           <span><strong id="homeStarsTotal">0</strong> estrellas</span>
         </a>
 
-        <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
+        <a class="nav-pill" href="/followers.html" title="Seguidores" data-profile-module="followers">Seguidores</a>
+        <a class="nav-pill" href="/achievements.html" title="Logros recientes" data-profile-module="achievements">Logros recientes</a>
+        <a class="nav-pill" href="/gallery.html" title="Galería" data-profile-module="gallery">Galería</a>
 	        <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
         <a class="nav-pill" href="/my-biography.html" title="Mi biografía" data-profile-module="biography">Mi biografía</a>
         <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
@@ -2455,6 +2827,9 @@
                   </a>
                   <button class="infobox-edit-btn home-username-edit-btn" id="homeUsernameEditBtn" type="button" title="Modificar nombre de usuario">
                     <img src="/css/icons/iconedit.webp" alt="Editar usuario" />
+                  </button>
+                  <button class="post-head-btn home-username-report-btn hidden" id="homeUsernameReportBtn" type="button" title="Denunciar perfil" aria-label="Denunciar perfil">
+                    🚩
                   </button>
                 </div>
                 <p class="home-username-cooldown" id="homeUsernameCooldown"></p>
@@ -2620,6 +2995,27 @@
             </div>
           </article>
 
+          <article class="panel minor-protected-panel hidden" id="minorProtectedPanel">
+            <div class="panel-head minor-protected-head">
+              <h3 class="panel-title">Cuenta en modo protegido</h3>
+              <button class="btn btn-outline btn-compact minor-protected-toggle" id="toggleMinorProtectedPanel" type="button">
+                Reducir
+              </button>
+            </div>
+            <div class="minor-protected-body" id="minorProtectedBody">
+              <p class="panel-muted">
+                Según la fecha de nacimiento registrada, tu perfil requiere validación de un padre, madre o tutor legal para habilitar funciones públicas.
+                Puedes usar la plataforma con normalidad, pero tu contenido permanecerá privado hasta completar este proceso.
+              </p>
+              <p class="panel-muted minor-protected-state" id="minorProtectedStateLabel"></p>
+              <div class="minor-protected-actions">
+                <button class="btn btn-primary btn-compact" id="openMinorAccreditationModal" type="button">
+                  Acreditar cuenta
+                </button>
+              </div>
+            </div>
+          </article>
+
           <p class="posts-status" id="postsStatus"></p>
           <div class="posts-list" id="homePostsList"></div>
         </section>
@@ -2668,6 +3064,7 @@
         <div class="footer-column">
           <h4>Información legal</h4>
           <ul>
+            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
             <li><a href="/terms.html">Términos y condiciones</a></li>
             <li><a href="/privacy.html">Privacidad</a></li>
           </ul>
@@ -2714,6 +3111,54 @@
     <div class="modal-actions">
       <button class="btn btn-outline btn-compact" type="button" id="cancelPost">Cancelar</button>
       <button class="btn btn-primary btn-compact" type="button" id="publishPost">Publicar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="minorAccreditationModalOverlay" aria-hidden="true">
+  <div class="modal minor-accreditation-modal" role="dialog" aria-modal="true" aria-label="Acreditar cuenta">
+    <div class="modal-head">
+      <h3>Acreditar cuenta</h3>
+      <button class="modal-close" type="button" id="closeMinorAccreditationModal">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <p class="panel-muted">
+        Registra los datos del padre, madre o tutor legal para enviar la solicitud de validación.
+      </p>
+
+      <label class="modal-label" for="minorGuardianPhoneInput">Teléfono del padre, madre o tutor legal</label>
+      <input
+        class="modal-input"
+        id="minorGuardianPhoneInput"
+        type="tel"
+        maxlength="40"
+        placeholder="+57 321 6852619"
+      />
+
+      <label class="modal-label" for="minorGuardianEmailInput">Correo electrónico del adulto responsable</label>
+      <input
+        class="modal-input"
+        id="minorGuardianEmailInput"
+        type="email"
+        maxlength="255"
+        placeholder="ejemplo@correo.com"
+      />
+
+      <label class="modal-label" for="minorRelationshipSelect">Parentesco</label>
+      <select class="modal-select" id="minorRelationshipSelect">
+        <option value="padre">Padre</option>
+        <option value="madre">Madre</option>
+        <option value="tutor_legal">Tutor legal</option>
+        <option value="adulto_responsable">Adulto responsable</option>
+      </select>
+
+      <p class="minor-accreditation-modal-status" id="minorAccreditationModalStatus" aria-live="polite"></p>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-compact" type="button" id="cancelMinorAccreditationModal">Cancelar</button>
+      <button class="btn btn-primary btn-compact" type="button" id="submitMinorAccreditation">Enviar solicitud</button>
     </div>
   </div>
 </div>
@@ -2889,6 +3334,38 @@
     <div class="modal-actions">
       <button class="btn btn-outline btn-compact" type="button" id="cancelReportPost">Cancelar</button>
       <button class="btn btn-primary btn-compact" type="button" id="submitReportPost">Enviar reporte</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="reportProfileModalOverlay" aria-hidden="true">
+  <div class="modal wish-modal fulfill-wish-modal" role="dialog" aria-modal="true" aria-label="Reportar perfil">
+    <div class="modal-head">
+      <h3>Reportar perfil</h3>
+      <button class="modal-close" type="button" id="closeReportProfileModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-label-center">
+        Selecciona la razón por la cual deseas reportar este perfil.
+      </p>
+      <div class="report-reasons">
+        <label class="report-option"><input type="radio" name="profileReportReason" value="fake_or_illegal" checked /> Perfil falso o contenido ilegal</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="external_manipulation" /> Manipulación hacia otros usuarios en la vida real a través de medios externos a esta plataforma</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="star_manipulation" /> Abuso de publicaciones para atraer estrellas</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="abusive_or_coercive" /> Conducta abusiva o coercitiva</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="wish_system_abuse" /> Uso indebido del sistema de deseos</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="safety_risk" /> Riesgo para la seguridad de otros</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="other" /> Otro (Especificar)</label>
+      </div>
+      <div id="reportProfileReasonOtherWrap" class="report-other-wrap hidden">
+        <label class="modal-label" for="reportProfileReasonOther">Describe la razón</label>
+        <textarea class="modal-textarea" id="reportProfileReasonOther" rows="3" placeholder="Escribe tu razón"></textarea>
+      </div>
+      <p class="infobox-photo-status" id="reportProfileModalStatus" aria-live="polite"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-compact" type="button" id="cancelReportProfile">Cancelar</button>
+      <button class="btn btn-primary btn-compact" type="button" id="submitReportProfile">Enviar reporte</button>
     </div>
   </div>
 </div>
