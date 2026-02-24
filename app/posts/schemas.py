@@ -24,11 +24,25 @@ class PostCreateRequest(BaseModel):
         return self
 
 
+class PostUpdateTextRequest(BaseModel):
+    text: str = Field(..., max_length=2000)
+
+
 class PostAuthorOut(BaseModel):
     id: int
     name: str
     role: str
     guardian_rank: int | None = None
+
+
+class PostMentionOut(BaseModel):
+    mentioned_user_id: int
+    username: str | None = None
+    handle: str
+    profile_url: str
+    start_index: int = Field(ge=0)
+    end_index: int = Field(ge=1)
+    is_active: bool = False
 
 
 class PostOut(BaseModel):
@@ -46,7 +60,32 @@ class PostOut(BaseModel):
     share_count: int
     starred_by_me: bool = False
     is_mine: bool = False
+    mentions: list[PostMentionOut] = Field(default_factory=list)
     created_at: datetime
+
+
+class PostSearchUserOut(BaseModel):
+    user_id: int
+    full_name: str
+    username: str | None = None
+    handle: str
+    profile_url: str
+
+
+class PostSearchHashtagOut(BaseModel):
+    tag: str
+    normalized_tag: str
+    post_count: int = Field(ge=0)
+    href: str
+
+
+class PostSearchOut(BaseModel):
+    query: str
+    query_type: Literal["mixed", "hashtag"]
+    hashtag: str | None = None
+    users: list[PostSearchUserOut] = Field(default_factory=list)
+    hashtags: list[PostSearchHashtagOut] = Field(default_factory=list)
+    posts: list[PostOut] = Field(default_factory=list)
 
 
 class PostDeleteResponse(BaseModel):

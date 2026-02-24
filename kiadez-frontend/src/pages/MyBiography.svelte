@@ -365,6 +365,22 @@
       return data;
     };
 
+    const buildProfileFullName = (payload = {}) => {
+      const fullName = String(payload?.full_name || "").trim();
+      if (fullName) return fullName;
+      const firstName = String(payload?.first_name || "").trim();
+      const lastName = String(payload?.last_name || "").trim();
+      return `${firstName} ${lastName}`.trim();
+    };
+
+    const applyInfoName = (value) => {
+      if (!infoName) return;
+      const normalizedName = String(value || "").trim() || "Usuario Kiadez";
+      infoName.textContent = normalizedName;
+      infoName.classList.toggle("is-long", normalizedName.length > 26);
+      infoName.classList.toggle("is-very-long", normalizedName.length > 36);
+    };
+
     const applyDistinctionsEditorVisibility = () => {
       const canEdit = isViewerGuardian();
       if (distinctionsEditBtn) {
@@ -404,6 +420,22 @@
       activeProfileUserId = viewerUserId;
       activeProfileUsername = viewerUsername;
       isViewingOwnProfile = true;
+      const meFullName = buildProfileFullName(me);
+      if (meFullName) {
+        applyInfoName(meFullName);
+      }
+
+      if (viewerUserId || viewerUsername) {
+        try {
+          const viewerProfile = await fetchFollowProfile({ userId: viewerUserId, username: viewerUsername });
+          const viewerFullName = buildProfileFullName(viewerProfile);
+          if (viewerFullName) {
+            applyInfoName(viewerFullName);
+          }
+        } catch {
+          // Keep the best-effort name from /auth/me.
+        }
+      }
 
       const params = new URLSearchParams(window.location.search);
       const requestedUserId = parsePositiveId(params.get("id"));
@@ -425,7 +457,7 @@
             activeProfileUsername = normalizeUsername(profile?.username || "");
             isViewingOwnProfile = Boolean(viewerUserId && targetUserId === viewerUserId);
             const fullName = String(profile?.full_name || "").trim();
-            if (fullName && infoName) infoName.textContent = fullName;
+            if (fullName) applyInfoName(fullName);
           }
         }
       }
@@ -2412,7 +2444,7 @@
           <aside class="bio-card bio-infobox" aria-label="Ficha del usuario">
 
             <div class="infobox-head">
-              <h2 class="infobox-title" id="infoName">Carlos Jiménez</h2>
+              <h2 class="infobox-title" id="infoName">Carlos Jiménez Duarte</h2>
             </div>
 
             <figure class="infobox-photo">
@@ -2429,7 +2461,6 @@
 
                 <input id="bioPhotoFile" type="file" accept="image/*" class="hidden" />
               </div>
-              <figcaption id="photoCaption">Jiménez en 2025.</figcaption>
             </figure>
             <p class="infobox-photo-status" id="bioPhotoStatus" aria-live="polite"></p>
 

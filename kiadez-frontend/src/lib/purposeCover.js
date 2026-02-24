@@ -1,3 +1,5 @@
+import { clearDekSession, getDekSessionHex, setDekSessionHex } from "./dekSession";
+
 const API = "http://127.0.0.1:8000";
 const AAD_PURPOSE = new TextEncoder().encode("kiadez-life-purpose-v1");
 const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
@@ -7,22 +9,30 @@ const PURPOSE_PREFIX = "Deseo ";
 const PURPOSE_SECRET_TEXT = "Deseo marcado como secreto";
 const PURPOSE_UNDEFINED_TEXT = "Deseo de propósito sin definir";
 const PURPOSE_REVEAL_PREFIX = "Este deseo será revelado";
-const PURPOSE_STORAGE_VERSION = 2;
-const LS = {
-  purpose: "kiadez_user_purpose",
-  coverImg: "kiadez_user_cover_img",
-  coverPos: "kiadez_user_cover_pos"
-};
 const COVER_PRESETS = [
   "/assets/cover-default.jpg",
   "/assets/post-1.jpg",
   "/assets/post-2.jpg"
 ];
+const COVER_DEFAULT_IMAGE = "/assets/cover-default.jpg";
 
 const DEFAULT_PURPOSE_TEXT = {
   1: "Deseo #1: Secreto",
   2: "Deseo construir el Reino de Combray",
   3: "Deseo estar unido a Jesús"
+};
+
+const getAccessToken = () =>
+  localStorage.getItem("access_token") ||
+  localStorage.getItem("kiadez_access_token") ||
+  "";
+
+const parseResponseJson = async (response) => {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
 };
 
 const bufToHex = (buf) =>
@@ -133,32 +143,6 @@ const normalizePurposeState = (raw) => {
     .filter(Boolean);
 };
 
-const readPurposeStorage = () => {
-  const raw = localStorage.getItem(LS.purpose);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-};
-
-const storePurposeValues = (slots) => {
-  const slotMap = getPurposeSlotMap(slots);
-  const normalizedSlots = [1, 2, 3]
-    .map((slotNumber) => {
-      const slot = slotMap.get(slotNumber);
-      if (!slot) return null;
-      return normalizePurposeSlot(slot, slotNumber);
-    })
-    .filter(Boolean);
-
-  localStorage.setItem(LS.purpose, JSON.stringify({
-    version: PURPOSE_STORAGE_VERSION,
-    slots: normalizedSlots
-  }));
-};
-
 const setLifeInputValue = (input, value) => {
   if (!input) return;
   const normalized = normalizePurposeText(value || "");
@@ -169,25 +153,6 @@ const setLifeInputValue = (input, value) => {
 const updateModalScrollLock = () => {
   const hasOpenModal = document.querySelector(".modal-overlay:not(.hidden)");
   document.body.classList.toggle("modal-open", Boolean(hasOpenModal));
-};
-
-const readCoverPosition = () => {
-  const raw = localStorage.getItem(LS.coverPos);
-  if (!raw) return { x: 0, y: 0 };
-  try {
-    const parsed = JSON.parse(raw);
-    return {
-      x: Number(parsed?.x) || 0,
-      y: Number(parsed?.y) || 0
-    };
-  } catch {
-    return { x: 0, y: 0 };
-  }
-};
-
-const storeCoverState = (src, x, y) => {
-  if (src) localStorage.setItem(LS.coverImg, src);
-  localStorage.setItem(LS.coverPos, JSON.stringify({ x, y }));
 };
 
 const ensureCoverSelectModal = () => {
@@ -337,9 +302,15 @@ const initCoverEditor = () => {
   let coverOffsetY = 0;
   let coverMaxOffsetX = 0;
   let coverMaxOffsetY = 0;
-  let coverSavedSrc = "";
+  let coverSavedSrc = COVER_DEFAULT_IMAGE;
+  let coverSavedMediaId = null;
+  let coverActiveMediaId = null;
   let coverSavedOffsetX = 0;
   let coverSavedOffsetY = 0;
+  let coverPendingPresetSrc = "";
+  let coverPendingUploadFile = null;
+  let coverPreviewObjectUrl = "";
+  let coverSaving = false;
   let coverDirty = false;
 
   const closeCoverMenu = () => {
@@ -389,21 +360,172 @@ const initCoverEditor = () => {
     showCoverActions();
   };
 
-  const commitCoverState = () => {
-    coverSavedSrc = coverImg.src;
-    coverSavedOffsetX = coverOffsetX;
-    coverSavedOffsetY = coverOffsetY;
-    coverDirty = false;
-    setCoverMoveState(false);
-    hideCoverActions();
-    storeCoverState(coverSavedSrc, coverSavedOffsetX, coverSavedOffsetY);
+  const revokeCoverPreviewUrl = () => {
+    if (!coverPreviewObjectUrl) return;
+    try {
+      URL.revokeObjectURL(coverPreviewObjectUrl);
+    } catch {
+      // no-op
+    }
+    coverPreviewObjectUrl = "";
+  };
+
+  const resetCoverPendingMedia = () => {
+    coverPendingPresetSrc = "";
+    coverPendingUploadFile = null;
+    revokeCoverPreviewUrl();
+  };
+
+  const uploadCoverImageFile = async (file) => {
+    const token = getAccessToken();
+    if (!token) throw new Error("No hay sesión activa.");
+
+    const formData = new FormData();
+    formData.append("visibility", "public");
+    formData.append("file", file);
+
+    const response = await fetch(`${API}/media/upload/direct`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    const data = await parseResponseJson(response);
+    if (!response.ok) {
+      throw new Error(data?.detail || "No se pudo subir la portada.");
+    }
+    const mediaId = Number(data?.media_id || 0) || null;
+    if (!mediaId) {
+      throw new Error("No se recibió media_id para la portada.");
+    }
+    return {
+      media_id: mediaId,
+      url: String(data?.url || "").trim() || null,
+    };
+  };
+
+  const uploadCoverPreset = async (presetSrc) => {
+    const response = await fetch(presetSrc);
+    if (!response.ok) {
+      throw new Error("No se pudo cargar la imagen base de portada.");
+    }
+    const blob = await response.blob();
+    const rawPath = String(presetSrc || "").split("?")[0];
+    const ext = (rawPath.includes(".") ? rawPath.slice(rawPath.lastIndexOf(".")) : "").toLowerCase();
+    const fileName = `cover-preset-${Date.now()}${ext || ".jpg"}`;
+    const mimeType = blob.type || "image/jpeg";
+    const file = new File([blob], fileName, { type: mimeType });
+    return uploadCoverImageFile(file);
+  };
+
+  const loadCoverFromApi = async () => {
+    const token = getAccessToken();
+    if (!token) return;
+    try {
+      const response = await fetch(`${API}/media/cover-photo`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await parseResponseJson(response);
+      if (!response.ok) return;
+
+      coverSavedMediaId = Number(data?.media_id || 0) || null;
+      coverActiveMediaId = coverSavedMediaId;
+      coverSavedSrc = String(data?.url || "").trim() || COVER_DEFAULT_IMAGE;
+      coverSavedOffsetX = Number(data?.offset_x || 0) || 0;
+      coverSavedOffsetY = Number(data?.offset_y || 0) || 0;
+      coverOffsetX = coverSavedOffsetX;
+      coverOffsetY = coverSavedOffsetY;
+      coverDirty = false;
+      resetCoverPendingMedia();
+      coverImg.src = coverSavedSrc;
+      recalcCoverBounds();
+      updateCoverTransform(coverOffsetX, coverOffsetY);
+    } catch {
+      // no-op: keep default cover if API is unavailable.
+    }
+  };
+
+  const commitCoverState = async () => {
+    if (coverSaving) return;
+    const token = getAccessToken();
+    if (!token) {
+      window.location.href = "/login.html";
+      return;
+    }
+    coverSaving = true;
+    if (coverSaveBtn) coverSaveBtn.disabled = true;
+    if (coverCancelBtn) coverCancelBtn.disabled = true;
+    try {
+      let mediaIdToSave = coverActiveMediaId;
+      if (coverPendingUploadFile) {
+        const uploaded = await uploadCoverImageFile(coverPendingUploadFile);
+        mediaIdToSave = uploaded.media_id;
+        coverActiveMediaId = uploaded.media_id;
+        if (uploaded.url) {
+          coverImg.src = uploaded.url;
+        }
+      } else if (coverPendingPresetSrc) {
+        const uploaded = await uploadCoverPreset(coverPendingPresetSrc);
+        mediaIdToSave = uploaded.media_id;
+        coverActiveMediaId = uploaded.media_id;
+        if (uploaded.url) {
+          coverImg.src = uploaded.url;
+        }
+      }
+
+      const response = await fetch(`${API}/media/cover-photo`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          media_id: mediaIdToSave,
+          offset_x: Math.round(coverOffsetX),
+          offset_y: Math.round(coverOffsetY),
+        }),
+      });
+      const data = await parseResponseJson(response);
+      if (!response.ok) {
+        throw new Error(data?.detail || "No se pudo guardar la portada.");
+      }
+
+      coverSavedMediaId = Number(data?.media_id || 0) || null;
+      coverActiveMediaId = coverSavedMediaId;
+      coverSavedSrc = String(data?.url || "").trim() || coverImg.src || COVER_DEFAULT_IMAGE;
+      coverSavedOffsetX = Number(data?.offset_x || 0) || 0;
+      coverSavedOffsetY = Number(data?.offset_y || 0) || 0;
+      coverOffsetX = coverSavedOffsetX;
+      coverOffsetY = coverSavedOffsetY;
+      coverDirty = false;
+      resetCoverPendingMedia();
+      setCoverMoveState(false);
+      hideCoverActions();
+      if (coverSavedSrc) {
+        coverImg.src = coverSavedSrc;
+      }
+      recalcCoverBounds();
+      updateCoverTransform(coverOffsetX, coverOffsetY);
+      window.dispatchEvent(new CustomEvent("kiadez:cover-photo-updated", { detail: data }));
+    } catch (error) {
+      window.alert(error?.message || "No se pudo guardar la portada.");
+    } finally {
+      coverSaving = false;
+      if (coverSaveBtn) coverSaveBtn.disabled = false;
+      if (coverCancelBtn) coverCancelBtn.disabled = false;
+    }
   };
 
   const revertCoverState = () => {
     coverOffsetX = coverSavedOffsetX;
     coverOffsetY = coverSavedOffsetY;
+    coverActiveMediaId = coverSavedMediaId;
     if (coverSavedSrc) coverImg.src = coverSavedSrc;
     coverDirty = false;
+    resetCoverPendingMedia();
     setCoverMoveState(false);
     hideCoverActions();
     updateCoverTransform(coverOffsetX, coverOffsetY);
@@ -423,38 +545,20 @@ const initCoverEditor = () => {
     updateModalScrollLock();
   };
 
-  const loadCoverFromStorage = () => {
-    const savedImg = localStorage.getItem(LS.coverImg);
-    const savedPos = readCoverPosition();
-    coverOffsetX = savedPos.x;
-    coverOffsetY = savedPos.y;
-    coverSavedOffsetX = savedPos.x;
-    coverSavedOffsetY = savedPos.y;
-    if (savedImg) {
-      coverSavedSrc = savedImg;
-      coverImg.src = savedImg;
-      return;
-    }
-    coverSavedSrc = coverImg.src;
-    updateCoverTransform(coverOffsetX, coverOffsetY);
-  };
-
   const handleCoverUpload = () => coverFile?.click();
   const handleCoverFileChange = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== "string") return;
-      coverImg.src = reader.result;
-      coverOffsetX = 0;
-      coverOffsetY = 0;
-      markCoverDirty();
-      closeCoverMenu();
-      setCoverMoveState(true);
-      recalcCoverBounds();
-    };
-    reader.readAsDataURL(file);
+    resetCoverPendingMedia();
+    coverPendingUploadFile = file;
+    coverPreviewObjectUrl = URL.createObjectURL(file);
+    coverImg.src = coverPreviewObjectUrl;
+    coverOffsetX = 0;
+    coverOffsetY = 0;
+    markCoverDirty();
+    closeCoverMenu();
+    setCoverMoveState(true);
+    recalcCoverBounds();
     event.target.value = "";
   };
 
@@ -478,6 +582,8 @@ const initCoverEditor = () => {
     if (!button) return;
     const src = button.dataset.coverSrc;
     if (!src) return;
+    resetCoverPendingMedia();
+    coverPendingPresetSrc = src;
     coverImg.src = src;
     coverOffsetX = 0;
     coverOffsetY = 0;
@@ -529,7 +635,7 @@ const initCoverEditor = () => {
   coverSelectExisting?.addEventListener("click", handleOpenSelect);
   coverSelectCancel?.addEventListener("click", closeCoverSelectModal);
   coverSelectModal?.addEventListener("click", handleSelectModalClick);
-  coverSaveBtn?.addEventListener("click", commitCoverState);
+  coverSaveBtn?.addEventListener("click", () => void commitCoverState());
   coverCancelBtn?.addEventListener("click", revertCoverState);
   coverMedia.addEventListener("mousedown", handleCoverMouseDown);
   window.addEventListener("mousemove", handleCoverMouseMove);
@@ -537,10 +643,12 @@ const initCoverEditor = () => {
   coverImg.addEventListener("load", handleCoverImageLoad);
   window.addEventListener("resize", recalcCoverBounds);
 
-  loadCoverFromStorage();
+  void loadCoverFromApi();
   hideCoverActions();
 
-  return () => {};
+  return () => {
+    revokeCoverPreviewUrl();
+  };
 };
 
 const ensurePurposeModals = () => {
@@ -981,8 +1089,6 @@ const ensurePurposeLayout = () => {
   };
 };
 
-const getAccessToken = () => localStorage.getItem("access_token") || "";
-
 export const initPurposeCoverModule = () => {
   const cleanupCoverEditor = initCoverEditor();
   ensurePurposeModals();
@@ -1134,28 +1240,6 @@ export const initPurposeCoverModule = () => {
     });
   };
 
-  const mergePurposeSlots = (remoteSlots, localSlots) => {
-    const remoteMap = getPurposeSlotMap(remoteSlots);
-    const localMap = getPurposeSlotMap(localSlots);
-    return [1, 2, 3]
-      .map((slotNumber) => {
-        const remoteSlot = remoteMap.get(slotNumber);
-        const localSlot = localMap.get(slotNumber);
-        if (remoteSlot) {
-          const mergedTextInput = String(remoteSlot.status || "active") === "fulfilled"
-            ? ""
-            : (remoteSlot.text_public || localSlot?.text_input || "");
-          return normalizePurposeSlot({
-            ...remoteSlot,
-            text_input: mergedTextInput
-          }, slotNumber);
-        }
-        if (localSlot) return normalizePurposeSlot(localSlot, slotNumber);
-        return null;
-      })
-      .filter(Boolean);
-  };
-
   const parseResponseJson = async (res) => {
     try {
       return await res.json();
@@ -1200,19 +1284,10 @@ export const initPurposeCoverModule = () => {
     }
   };
 
-  const loadPurposeFromStorage = async () => {
-    const storedSlots = normalizePurposeState(readPurposeStorage());
-    if (storedSlots.length) {
-      purposeSlots = storedSlots;
-      renderPurposeSlots(purposeSlots);
-    }
-
+  const loadPurposeSlots = async () => {
     const remoteSlots = await fetchPurposeSlotsFromApi();
-    if (!remoteSlots.length) return;
-
-    purposeSlots = mergePurposeSlots(remoteSlots, storedSlots);
+    purposeSlots = remoteSlots;
     renderPurposeSlots(purposeSlots);
-    storePurposeValues(purposeSlots);
   };
 
   const applyPurposeStateToForm = (groupEl, slotData) => {
@@ -1265,9 +1340,7 @@ export const initPurposeCoverModule = () => {
   };
 
   const openLifeProposalModal = () => {
-    const fallbackSlots = purposeSlots.length
-      ? purposeSlots
-      : normalizePurposeState(readPurposeStorage());
+    const fallbackSlots = Array.isArray(purposeSlots) ? purposeSlots : [];
     const fallbackMap = getPurposeSlotMap(fallbackSlots);
 
     const input1 = lifeProposalOverlay.querySelector("#p1");
@@ -1525,8 +1598,7 @@ export const initPurposeCoverModule = () => {
         throw new Error(data.detail || "No se pudo restaurar tu clave privada.");
       }
 
-      sessionStorage.removeItem("dek_hex");
-      localStorage.removeItem(LS.purpose);
+      clearDekSession();
 
       closePurposeVaultResetPasswordFinalModal();
       closePurposeVaultResetPasswordModal();
@@ -1546,7 +1618,7 @@ export const initPurposeCoverModule = () => {
       return false;
     }
 
-    const sessionDek = sessionStorage.getItem("dek_hex");
+    const sessionDek = getDekSessionHex();
     if (sessionDek && String(sessionDek).trim()) {
       return true;
     }
@@ -1739,7 +1811,7 @@ export const initPurposeCoverModule = () => {
       kek,
       wrappedDek
     );
-    sessionStorage.setItem("dek_hex", bufToHex(dekRaw));
+    setDekSessionHex(bufToHex(dekRaw));
     return dekRaw;
   };
 
@@ -1749,7 +1821,7 @@ export const initPurposeCoverModule = () => {
   };
 
   const importDekFromSession = async () => {
-    const dekHex = sessionStorage.getItem("dek_hex");
+    const dekHex = getDekSessionHex();
     if (!dekHex) {
       throw new Error("Digita tu clave privada personal para confirmar tu decisión.");
     }
@@ -1837,7 +1909,6 @@ export const initPurposeCoverModule = () => {
         };
       });
       renderPurposeSlots(purposeSlots);
-      storePurposeValues(purposeSlots);
       closePurposeUnlockModal();
     } catch (err) {
       purposeUnlockError.textContent = err?.message || "No se pudo desbloquear el deseo.";
@@ -2128,7 +2199,6 @@ export const initPurposeCoverModule = () => {
 
       const publishedScope = purposePublishTo;
       renderPurposeSlots(purposeSlots);
-      storePurposeValues(purposeSlots);
       closePurposeFulfillModal();
 
       window.dispatchEvent(new CustomEvent("kiadez:fulfilled-wishes-changed", {
@@ -2310,26 +2380,30 @@ export const initPurposeCoverModule = () => {
       }
     }
 
-    purposeSlots = localSlots
-      .map((slot) => normalizePurposeSlot(slot, Number(slot.slot_number)))
-      .sort((a, b) => a.slot_number - b.slot_number);
-    renderPurposeSlots(purposeSlots);
-    storePurposeValues(purposeSlots);
-
     try {
-      await fetch(`${API}/life-purpose/save`, {
+      const res = await apiFetch("/life-purpose/save", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`
         },
-        body: JSON.stringify({ slots })
+        body: JSON.stringify({ slots }),
       });
-    } catch (err) {
-      console.error(err);
-    }
+      const payload = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(payload?.detail || "No se pudieron guardar los propósitos.");
+      }
 
-    closeLifeProposalModal();
+      purposeSlots = localSlots
+        .map((slot) => normalizePurposeSlot(slot, Number(slot.slot_number)))
+        .sort((a, b) => a.slot_number - b.slot_number);
+      renderPurposeSlots(purposeSlots);
+      closeLifeProposalModal();
+    } catch (err) {
+      const message = err?.message || "No se pudieron guardar los propósitos.";
+      groups.forEach((groupEl) => {
+        setPurposeStatus(groupEl, message);
+      });
+    }
   });
 
   btnEditPurposes?.addEventListener("click", () => {
@@ -2447,7 +2521,7 @@ export const initPurposeCoverModule = () => {
     });
   });
 
-  void loadPurposeFromStorage();
+  void loadPurposeSlots();
 
   return () => {};
 };

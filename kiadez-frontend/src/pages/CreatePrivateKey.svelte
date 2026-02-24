@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { setDekSessionHex } from "../lib/dekSession";
 
   const API = "http://127.0.0.1:8000";
   const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
@@ -194,7 +195,7 @@
       throw new Error(data.detail || "No se pudo crear vault.");
     }
 
-    sessionStorage.setItem("dek_hex", bufToHex(dekRaw));
+    setDekSessionHex(bufToHex(dekRaw));
   }
 
   async function handleSubmit(event) {

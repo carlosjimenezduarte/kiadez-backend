@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { getDekSessionHex } from "../lib/dekSession";
 
   onMount(() => {
     const API = "http://127.0.0.1:8000";
@@ -44,7 +45,7 @@
         }
     
         async function importDekFromSession() {
-          const dekHex = sessionStorage.getItem("dek_hex");
+          const dekHex = getDekSessionHex();
           if (!dekHex) {
             throw new Error("Vault no desbloqueado. Crea tu clave privada o desbloquéala primero.");
           }

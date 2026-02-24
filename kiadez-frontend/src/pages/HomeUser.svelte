@@ -42,6 +42,12 @@
     const closeDeletePostModal = document.getElementById('closeDeletePostModal');
     const cancelDeletePost = document.getElementById('cancelDeletePost');
     const confirmDeletePost = document.getElementById('confirmDeletePost');
+    const editPostOverlay = document.getElementById('editPostModalOverlay');
+    const closeEditPostModal = document.getElementById('closeEditPostModal');
+    const cancelEditPost = document.getElementById('cancelEditPost');
+    const saveEditPost = document.getElementById('saveEditPost');
+    const editPostTextInput = document.getElementById('editPostText');
+    const editPostModalStatus = document.getElementById('editPostModalStatus');
 
     const reportPostOverlay = document.getElementById('reportPostModalOverlay');
     const closeReportPostModal = document.getElementById('closeReportPostModal');
@@ -96,15 +102,22 @@
     const homePublicWishList = document.getElementById('homePublicWishList');
     const homePublicWishCount = document.getElementById('homePublicWishCount');
     const homePublicWishStatus = document.getElementById('homePublicWishStatus');
-    const homeCooperativeWishList = document.getElementById('homeCooperativeWishList');
-    const homeCooperativeWishCount = document.getElementById('homeCooperativeWishCount');
-    const homeCooperativeWishStatus = document.getElementById('homeCooperativeWishStatus');
-    const homeFulfilledWishList = document.getElementById('homeFulfilledWishList');
-    const homeFulfilledWishCount = document.getElementById('homeFulfilledWishCount');
-    const homeFulfilledWishStatus = document.getElementById('homeFulfilledWishStatus');
-	    const homePrivateWishCount = document.getElementById('homePrivateWishCount');
-	    const homePrivateWishTotal = document.getElementById('homePrivateWishTotal');
-	    const homePrivateWishStatus = document.getElementById('homePrivateWishStatus');
+	    const homeCooperativeWishList = document.getElementById('homeCooperativeWishList');
+	    const homeCooperativeWishCount = document.getElementById('homeCooperativeWishCount');
+	    const homeCooperativeWishStatus = document.getElementById('homeCooperativeWishStatus');
+	    const homeFulfilledWishList = document.getElementById('homeFulfilledWishList');
+	    const homeFulfilledWishCount = document.getElementById('homeFulfilledWishCount');
+	    const homeFulfilledWishStatus = document.getElementById('homeFulfilledWishStatus');
+	    const homeCalendarDots = document.getElementById('homeCalendarDots');
+	    const homeCalendarMonthName = document.getElementById('homeCalendarMonthName');
+	    const homeCalendarMonthProgress = document.getElementById('homeCalendarMonthProgress');
+	    const homeCalendarStatus = document.getElementById('homeCalendarStatus');
+	    const homeOracleCardImage = document.getElementById('homeOracleCardImage');
+	    const homeOracleSummary = document.getElementById('homeOracleSummary');
+	    const homeOracleStatus = document.getElementById('homeOracleStatus');
+		    const homePrivateWishCount = document.getElementById('homePrivateWishCount');
+		    const homePrivateWishTotal = document.getElementById('homePrivateWishTotal');
+		    const homePrivateWishStatus = document.getElementById('homePrivateWishStatus');
 	    const btnChangeCover = document.getElementById('btnChangeCover');
 	    const btnEditPurposes = document.getElementById('btnEditPurposes');
 	    const homeAboutTextValue = document.getElementById('homeAboutTextValue');
@@ -143,6 +156,7 @@
     let selectedFile = null;
     let selectedFileURL = null;
     let selectedCommentPostId = null;
+    let selectedEditPostId = null;
     let selectedDeletePostId = null;
     let selectedReportPostId = null;
     let selectedReportProfileUserId = null;
@@ -172,11 +186,26 @@
     const USERNAME_MIN_LENGTH = 4;
     const USERNAME_MAX_LENGTH = 30;
     const USERNAME_PATTERN = /^[a-z0-9._]{4,30}$/;
-    const PROFILE_PHOTO_POST_STORAGE_KEY = 'home_profile_photo_post_id';
-    const PROFILE_PHOTO_POST_TEXT = 'Actualice mi foto de perfil.';
-    const DEFAULT_AVATAR_SRC = '/assets/avatar-default.jpg';
-    const MINOR_PROTECTED_COLLAPSED_KEY = 'home_minor_protected_collapsed';
-    const DEFAULT_PROFILE_PRIVACY_VISIBILITY = {
+	    const PROFILE_PHOTO_POST_TEXT = 'Actualice mi foto de perfil.';
+	    const DEFAULT_AVATAR_SRC = '/assets/avatar-default.jpg';
+	    const DEFAULT_COVER_SRC = '/assets/cover-default.jpg';
+	    const ORACLE_BACK_CARD_IMAGE = '/css/oracle/carta.webp';
+	    const HASHTAG_PATTERN = /(^|[^A-Za-z0-9_])#([A-Za-z0-9_]{2,50})/g;
+	    const MONTH_LABELS = [
+	      'Enero',
+	      'Febrero',
+	      'Marzo',
+	      'Abril',
+	      'Mayo',
+	      'Junio',
+	      'Julio',
+	      'Agosto',
+	      'Septiembre',
+	      'Octubre',
+	      'Noviembre',
+	      'Diciembre'
+	    ];
+	    const DEFAULT_PROFILE_PRIVACY_VISIBILITY = {
       public_profile_show_about: true,
       public_profile_show_fulfilled_wishes: true,
       public_profile_show_public_wishes: true,
@@ -195,13 +224,54 @@
 
     const getAccessToken = () => localStorage.getItem('access_token') || '';
 
-    const escapeHtml = (value) =>
-      (value || '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
+	    const escapeHtml = (value) =>
+	      (value || '')
+	        .replaceAll('&', '&amp;')
+	        .replaceAll('<', '&lt;')
+	        .replaceAll('>', '&gt;')
+	        .replaceAll('"', '&quot;')
+	        .replaceAll("'", '&#39;');
+
+	    const normalizeHashtag = (value) =>
+	      String(value || '')
+	        .trim()
+	        .toLowerCase()
+	        .replace(/^#+/, '')
+	        .replace(/[^a-z0-9_]/g, '');
+
+	    const buildFeedHashtagHref = (value) => {
+	      const normalized = normalizeHashtag(value);
+	      if (!normalized) return '/feed.html';
+	      return `/feed.html?search=%23${encodeURIComponent(normalized)}`;
+	    };
+
+	    const renderPlainTextWithHashtags = (value) => {
+	      const text = String(value || '');
+	      if (!text) return '';
+
+	      HASHTAG_PATTERN.lastIndex = 0;
+	      let cursor = 0;
+	      let html = '';
+	      let match;
+	      while ((match = HASHTAG_PATTERN.exec(text)) !== null) {
+	        const full = String(match[0] || '');
+	        const prefix = full.startsWith('#') ? '' : full[0];
+	        const tag = String(match[2] || '').trim();
+	        if (!tag) continue;
+
+	        const token = `#${tag}`;
+	        const tokenStart = Number(match.index) + prefix.length;
+	        if (tokenStart < cursor) continue;
+
+	        html += escapeHtml(text.slice(cursor, Number(match.index)));
+	        html += escapeHtml(prefix);
+	        html += `<a class="post-hashtag-link" href="${escapeHtml(buildFeedHashtagHref(tag))}">${escapeHtml(token)}</a>`;
+	        cursor = tokenStart + token.length;
+	      }
+
+	      html += escapeHtml(text.slice(cursor));
+	      return html;
+	    };
 
     const setPostsStatus = (message, isError = false) => {
       if (!postsStatus) return;
@@ -234,22 +304,15 @@
       }
     };
 
-    const setMinorProtectedCollapsedState = (collapsed, { persist = true } = {}) => {
-      minorProtectedCollapsed = Boolean(collapsed);
-      if (minorProtectedBody) {
-        minorProtectedBody.classList.toggle('hidden', minorProtectedCollapsed);
-      }
-      if (toggleMinorProtectedPanelBtn) {
-        toggleMinorProtectedPanelBtn.textContent = minorProtectedCollapsed ? 'Expandir' : 'Reducir';
-      }
-      if (persist) {
-        try {
-          localStorage.setItem(MINOR_PROTECTED_COLLAPSED_KEY, minorProtectedCollapsed ? '1' : '0');
-        } catch (error) {
-          console.warn(error);
-        }
-      }
-    };
+	    const setMinorProtectedCollapsedState = (collapsed) => {
+	      minorProtectedCollapsed = Boolean(collapsed);
+	      if (minorProtectedBody) {
+	        minorProtectedBody.classList.toggle('hidden', minorProtectedCollapsed);
+	      }
+	      if (toggleMinorProtectedPanelBtn) {
+	        toggleMinorProtectedPanelBtn.textContent = minorProtectedCollapsed ? 'Expandir' : 'Reducir';
+	      }
+	    };
 
     const applyMinorProtectedPanelState = () => {
       const isProtected = Boolean(minorAccreditationState?.is_minor_protected);
@@ -274,9 +337,9 @@
         minorRelationshipSelect.value = String(minorAccreditationState?.relationship || 'padre');
       }
 
-      setMinorProtectedCollapsedState(minorProtectedCollapsed, { persist: false });
-      syncPostVisibilityMinorGuard();
-    };
+	      setMinorProtectedCollapsedState(minorProtectedCollapsed);
+	      syncPostVisibilityMinorGuard();
+	    };
 
     const loadMinorAccreditationStatus = async () => {
       if (!isViewingOwnProfile) {
@@ -411,15 +474,27 @@
       homeFulfilledWishStatus.classList.toggle('is-error', Boolean(isError));
     };
 
-    const setHomePrivateWishStatus = (message, isError = false) => {
-      if (!homePrivateWishStatus) return;
-      homePrivateWishStatus.textContent = message || '';
-      homePrivateWishStatus.classList.toggle('is-error', Boolean(isError));
-    };
+	    const setHomePrivateWishStatus = (message, isError = false) => {
+	      if (!homePrivateWishStatus) return;
+	      homePrivateWishStatus.textContent = message || '';
+	      homePrivateWishStatus.classList.toggle('is-error', Boolean(isError));
+	    };
 
-    const setReportProfileModalStatus = (message, isError = false) => {
-      if (!reportProfileModalStatus) return;
-      reportProfileModalStatus.textContent = message || '';
+	    const setHomeCalendarStatus = (message, isError = false) => {
+	      if (!homeCalendarStatus) return;
+	      homeCalendarStatus.textContent = message || '';
+	      homeCalendarStatus.classList.toggle('is-error', Boolean(isError));
+	    };
+
+	    const setHomeOracleStatus = (message, isError = false) => {
+	      if (!homeOracleStatus) return;
+	      homeOracleStatus.textContent = message || '';
+	      homeOracleStatus.classList.toggle('is-error', Boolean(isError));
+	    };
+
+	    const setReportProfileModalStatus = (message, isError = false) => {
+	      if (!reportProfileModalStatus) return;
+	      reportProfileModalStatus.textContent = message || '';
       reportProfileModalStatus.classList.toggle('is-error', Boolean(isError));
     };
 
@@ -443,15 +518,112 @@
       return normalized;
     };
 
-    const formatIsoDate = (isoDate) => {
-      if (!isoDate) return '';
-      const dateValue = new Date(isoDate);
-      if (Number.isNaN(dateValue.getTime())) return '';
+	    const formatIsoDate = (isoDate) => {
+	      if (!isoDate) return '';
+	      const dateValue = new Date(isoDate);
+	      if (Number.isNaN(dateValue.getTime())) return '';
       return dateValue.toLocaleDateString('es-CO', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       });
+    };
+
+    const toIsoDateUtc = (value) => {
+      if (!value) return '';
+      if (typeof value === 'string') {
+        const normalized = value.trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+        const parsed = new Date(normalized);
+        if (Number.isNaN(parsed.getTime())) return '';
+        return parsed.toISOString().slice(0, 10);
+      }
+      if (value instanceof Date) {
+        if (Number.isNaN(value.getTime())) return '';
+        return value.toISOString().slice(0, 10);
+      }
+      return '';
+    };
+
+    const formatHomeCalendarDayLabel = (isoDate) => {
+      const normalized = toIsoDateUtc(isoDate);
+      if (!normalized) return '';
+      try {
+        const dateValue = new Date(`${normalized}T00:00:00Z`);
+        return new Intl.DateTimeFormat('es-CO', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+          timeZone: 'UTC'
+        }).format(dateValue);
+      } catch {
+        return normalized;
+      }
+    };
+
+    const buildHomeCalendarMonth = ({ year, monthIndex, items, todayIsoDate }) => {
+      const safeYear = Number.isFinite(Number(year)) ? Number(year) : new Date().getUTCFullYear();
+      const safeMonthIndex = Math.max(0, Math.min(11, Number(monthIndex || 0)));
+      const totalDays = new Date(Date.UTC(safeYear, safeMonthIndex + 1, 0)).getUTCDate();
+      const firstWeekday = (new Date(Date.UTC(safeYear, safeMonthIndex, 1)).getUTCDay() + 6) % 7;
+      const itemMap = new Map(
+        (Array.isArray(items) ? items : []).map((item) => [toIsoDateUtc(item?.date_utc), item])
+      );
+
+      let activeDays = 0;
+      const days = [];
+      for (let day = 1; day <= totalDays; day += 1) {
+        const isoDate = `${safeYear}-${String(safeMonthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const item = itemMap.get(isoDate);
+        const posts = Math.max(0, Number(item?.posts || 0));
+        const hasPosts = posts > 0;
+        if (hasPosts) activeDays += 1;
+
+        days.push({
+          date_utc: isoDate,
+          posts,
+          hasPosts,
+          isToday: isoDate === todayIsoDate
+        });
+      }
+
+      return {
+        name: MONTH_LABELS[safeMonthIndex] || 'Mes actual',
+        activeDays,
+        totalDays,
+        padding: Array.from({ length: firstWeekday }, (_, idx) => `pad-${safeYear}-${safeMonthIndex + 1}-${idx}`),
+        days
+      };
+    };
+
+    const renderHomeCalendarMonth = (monthData) => {
+      if (!homeCalendarDots) return;
+
+      const monthName = String(monthData?.name || 'Mes actual');
+      const activeDays = Math.max(0, Number(monthData?.activeDays || 0));
+      const totalDays = Math.max(0, Number(monthData?.totalDays || 0));
+      const padding = Array.isArray(monthData?.padding) ? monthData.padding : [];
+      const days = Array.isArray(monthData?.days) ? monthData.days : [];
+
+      if (homeCalendarMonthName) homeCalendarMonthName.textContent = monthName;
+      if (homeCalendarMonthProgress) homeCalendarMonthProgress.textContent = `${activeDays} / ${totalDays}`;
+
+      const dotsHtml = [
+        ...padding.map(
+          (padKey) => `<span class="month-dot is-pad" aria-hidden="true" data-key="${escapeHtml(String(padKey))}"></span>`
+        ),
+        ...days.map((day) => {
+          const posts = Math.max(0, Number(day?.posts || 0));
+          const hasPosts = posts > 0;
+          const postsLabel = posts === 1 ? '1 publicación' : `${posts} publicaciones`;
+          const dayLabel = formatHomeCalendarDayLabel(day?.date_utc) || String(day?.date_utc || '');
+          const title = `${dayLabel} · ${postsLabel}`;
+          const stateClass = hasPosts ? 'is-active' : 'is-idle';
+          const todayClass = day?.isToday ? ' is-today' : '';
+          return `<button class="month-dot-btn ${stateClass}${todayClass}" type="button" disabled title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"></button>`;
+        })
+      ];
+      homeCalendarDots.innerHTML = dotsHtml.join('');
     };
 
 	    const buildViewerHomeUrl = () => {
@@ -516,6 +688,13 @@
 	      });
 	    };
 
+	    const truncateText = (value, maxLength = 220) => {
+	      const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+	      if (!normalized) return '';
+	      if (normalized.length <= maxLength) return normalized;
+	      return `${normalized.slice(0, Math.max(1, maxLength - 1)).trimEnd()}...`;
+	    };
+
     const setMyHomeLinks = (profilePath) => {
       const normalizedPath = profilePath || '/home_user.html';
       document.querySelectorAll('a[data-my-home-link="true"]').forEach((link) => {
@@ -537,8 +716,8 @@
       }
     };
 
-    const setHomeAvatarSource = (url) => {
-      const avatarUrl = (url || '').trim() || DEFAULT_AVATAR_SRC;
+	    const setHomeAvatarSource = (url) => {
+	      const avatarUrl = (url || '').trim() || DEFAULT_AVATAR_SRC;
       const shouldUpdateViewer = isViewingOwnProfile;
       if (shouldUpdateViewer) {
         viewerAvatarImages.forEach((img) => {
@@ -548,20 +727,41 @@
       profileAvatarImages.forEach((img) => {
         img.src = avatarUrl;
       });
-      if (isViewingOwnProfile && profilePhotoPostImage && !profilePhotoPost) {
-        profilePhotoPostImage.src = avatarUrl;
-      }
-    };
+	      if (isViewingOwnProfile && profilePhotoPostImage && !profilePhotoPost) {
+	        profilePhotoPostImage.src = avatarUrl;
+	      }
+	    };
 
-    const setProfilePhotoPostId = (postId) => {
-      const normalized = Number(postId);
-      profilePhotoPostId = Number.isFinite(normalized) && normalized > 0 ? normalized : null;
-      if (profilePhotoPostId) {
-        localStorage.setItem(PROFILE_PHOTO_POST_STORAGE_KEY, String(profilePhotoPostId));
-      } else {
-        localStorage.removeItem(PROFILE_PHOTO_POST_STORAGE_KEY);
-      }
-    };
+	    const applyCoverState = (payload) => {
+	      const coverImage = document.getElementById('coverImg');
+	      if (!coverImage) return;
+	      const coverUrl = String(payload?.url || '').trim() || DEFAULT_COVER_SRC;
+	      const offsetX = Number(payload?.offset_x || 0) || 0;
+	      const offsetY = Number(payload?.offset_y || 0) || 0;
+	      coverImage.src = coverUrl;
+	      coverImage.style.objectPosition = `calc(50% + ${offsetX}px) calc(50% + ${offsetY}px)`;
+	    };
+
+	    const loadHomeCover = async (userId = null) => {
+	      const profileId = Number(userId);
+	      const endpoint = !isViewingOwnProfile && Number.isFinite(profileId) && profileId > 0
+	        ? `/media/cover-photo/user/${encodeURIComponent(String(profileId))}`
+	        : '/media/cover-photo';
+	      try {
+	        const res = await apiFetch(endpoint);
+	        const data = await res.json();
+	        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar la portada del perfil.');
+	        applyCoverState(data);
+	      } catch (error) {
+	        console.error(error);
+	        applyCoverState({ url: DEFAULT_COVER_SRC, offset_x: 0, offset_y: 0 });
+	      }
+	    };
+
+	    const setProfilePhotoPostId = (postId) => {
+	      const normalized = Number(postId);
+	      profilePhotoPostId = Number.isFinite(normalized) && normalized > 0 ? normalized : null;
+	    };
 
     const normalizeProfilePrivacyVisibility = (value) => ({
       public_profile_show_about: Boolean(value?.public_profile_show_about ?? true),
@@ -643,13 +843,7 @@
       homeAboutWordCounter.classList.toggle('is-error', words > HOME_ABOUT_MAX_WORDS);
     };
 
-    setProfilePhotoPostId(localStorage.getItem(PROFILE_PHOTO_POST_STORAGE_KEY));
-    try {
-      minorProtectedCollapsed = localStorage.getItem(MINOR_PROTECTED_COLLAPSED_KEY) === '1';
-    } catch (error) {
-      console.warn(error);
-      minorProtectedCollapsed = false;
-    }
+	    minorProtectedCollapsed = false;
 
     const relativeTime = (isoDate) => {
       const ts = Date.parse(isoDate);
@@ -1463,6 +1657,146 @@
       }
     };
 
+	    const loadHomeCalendar = async () => {
+	      if (!homeCalendarDots) return;
+
+      const fallbackTodayIso = new Date().toISOString().slice(0, 10);
+      const fallbackYear = Number(fallbackTodayIso.slice(0, 4));
+      const fallbackMonthIndex = Math.max(0, Math.min(11, Number(fallbackTodayIso.slice(5, 7)) - 1));
+      const renderFallbackCalendar = () => {
+        const fallbackMonth = buildHomeCalendarMonth({
+          year: fallbackYear,
+          monthIndex: fallbackMonthIndex,
+          items: [],
+          todayIsoDate: fallbackTodayIso
+        });
+        renderHomeCalendarMonth(fallbackMonth);
+      };
+
+      if (!isViewingOwnProfile && !activeProfilePrivacyVisibility.public_profile_show_calendar) {
+        renderFallbackCalendar();
+        setHomeCalendarStatus('');
+        return;
+      }
+
+      setHomeCalendarStatus('Cargando actividad del mes actual...');
+      renderFallbackCalendar();
+
+      try {
+        const profileId = Number(activeProfileUserId);
+        if (!isViewingOwnProfile && (!Number.isFinite(profileId) || profileId <= 0)) {
+          throw new Error('No se pudo identificar este perfil para cargar su calendario.');
+        }
+
+        const requestYear = new Date().getUTCFullYear();
+        const endpoint = !isViewingOwnProfile
+          ? `/calendar/user/${encodeURIComponent(String(profileId))}?year=${encodeURIComponent(String(requestYear))}`
+          : `/calendar/mine?year=${encodeURIComponent(String(requestYear))}`;
+
+        const res = await apiFetch(endpoint);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar el calendario del mes actual.');
+
+        const todayIso = toIsoDateUtc(data?.today_utc) || fallbackTodayIso;
+        const monthYear = Number(todayIso.slice(0, 4)) || requestYear;
+        const monthIndex = Math.max(0, Math.min(11, Number(todayIso.slice(5, 7)) - 1));
+        const monthData = buildHomeCalendarMonth({
+          year: monthYear,
+          monthIndex,
+          items: Array.isArray(data?.items) ? data.items : [],
+          todayIsoDate: todayIso
+        });
+
+        renderHomeCalendarMonth(monthData);
+        setHomeCalendarStatus('');
+      } catch (error) {
+        renderFallbackCalendar();
+        setHomeCalendarStatus(error?.message || 'No se pudo cargar el calendario del mes actual.', true);
+	      }
+	    };
+
+	    const getOracleCardImage = (cardId) => `/css/oracle/Oracle${cardId}.webp`;
+
+	    const applyHomeOracleNoSelectionState = (summaryText) => {
+	      if (homeOracleCardImage) {
+	        homeOracleCardImage.src = ORACLE_BACK_CARD_IMAGE;
+	        homeOracleCardImage.alt = 'Carta del Oráculo en reverso';
+	      }
+	      if (homeOracleSummary) {
+	        homeOracleSummary.textContent =
+	          summaryText || 'Conoce El Oráculo y elige tu primera carta para reflexionar sobre tu presente.';
+	      }
+	    };
+
+	    const loadHomeOracle = async () => {
+	      if (!homeOracleCardImage) return;
+
+	      if (!isViewingOwnProfile && !activeProfilePrivacyVisibility.public_profile_show_oracle) {
+	        applyHomeOracleNoSelectionState('Este módulo es privado en este perfil.');
+	        setHomeOracleStatus('');
+	        return;
+	      }
+
+	      setHomeOracleStatus('Cargando estado del Oráculo...');
+	      applyHomeOracleNoSelectionState('');
+
+	      try {
+	        const profileId = Number(activeProfileUserId);
+	        if (!isViewingOwnProfile && (!Number.isFinite(profileId) || profileId <= 0)) {
+	          throw new Error('No se pudo identificar este perfil para cargar su Oráculo.');
+	        }
+
+	        const endpoint = isViewingOwnProfile
+	          ? '/oracle/state'
+	          : `/oracle/public/${encodeURIComponent(String(profileId))}`;
+	        const res = await apiFetch(endpoint);
+	        const data = await res.json();
+	        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar el estado del Oráculo.');
+
+	        const responses = Array.isArray(data?.responses) ? data.responses : [];
+	        const latest = responses.find((entry) => {
+	          const cardId = Number(entry?.card_id || 0);
+	          return Number.isFinite(cardId) && cardId >= 1 && cardId <= 30;
+	        });
+
+	        if (!latest) {
+	          applyHomeOracleNoSelectionState(
+	            isViewingOwnProfile
+	              ? 'Conoce El Oráculo y elige tu primera carta para reflexionar sobre tu presente.'
+	              : 'Este usuario aún no ha compartido una carta del Oráculo.'
+	          );
+	          setHomeOracleStatus('');
+	          return;
+	        }
+
+	        const cardId = Number(latest?.card_id || 0);
+	        const responseType = String(latest?.response_type || '').trim().toLowerCase();
+	        const textPublic = String(latest?.text_public || '').trim();
+
+	        homeOracleCardImage.src = getOracleCardImage(cardId);
+	        homeOracleCardImage.alt = `Carta más reciente elegida en El Oráculo (${cardId})`;
+
+	        if (responseType === 'public' && textPublic) {
+	          if (homeOracleSummary) homeOracleSummary.textContent = truncateText(textPublic);
+	        } else if (responseType === 'secret' && isViewingOwnProfile) {
+	          if (homeOracleSummary) homeOracleSummary.textContent = 'Tu respuesta a esta carta está guardada en secreto en tu Vault.';
+	        } else if (responseType === 'heart' && isViewingOwnProfile) {
+	          if (homeOracleSummary) homeOracleSummary.textContent = 'Elegiste dejar esta carta reposando en tu corazón.';
+	        } else {
+	          if (homeOracleSummary) homeOracleSummary.textContent = 'Esta es la carta más reciente que se eligió en El Oráculo.';
+	        }
+
+	        setHomeOracleStatus('');
+	      } catch (error) {
+	        applyHomeOracleNoSelectionState(
+	          isViewingOwnProfile
+	            ? 'Conoce El Oráculo y elige tu primera carta para reflexionar sobre tu presente.'
+	            : 'No se pudo cargar este módulo del Oráculo.'
+	        );
+	        setHomeOracleStatus(error?.message || 'No se pudo cargar el estado del Oráculo.', true);
+	      }
+	    };
+
     const buildDisplayPosts = (posts) => {
       const list = Array.isArray(posts) ? posts : [];
       const grouped = new Map();
@@ -1512,9 +1846,47 @@
       });
     };
 
-    const renderPosts = (posts) => {
-      if (!postsList) return;
-      const displayPosts = buildDisplayPosts(posts);
+	    const renderPostTextHtml = (post) => {
+	      const text = String(post?.text || '');
+	      if (!text) return '';
+
+      const mentions = Array.isArray(post?.mentions)
+        ? post.mentions
+            .filter((item) => Number.isFinite(Number(item?.start_index)) && Number.isFinite(Number(item?.end_index)))
+            .map((item) => ({
+              start_index: Number(item.start_index),
+              end_index: Number(item.end_index),
+              profile_url: String(item?.profile_url || '').trim(),
+              is_active: Boolean(item?.is_active)
+            }))
+            .sort((a, b) => a.start_index - b.start_index || a.end_index - b.end_index)
+        : [];
+
+	      if (!mentions.length) return renderPlainTextWithHashtags(text);
+
+      let cursor = 0;
+      let html = '';
+      for (const mention of mentions) {
+        const start = Math.max(0, mention.start_index);
+        const end = Math.min(text.length, Math.max(start, mention.end_index));
+        if (start < cursor || end <= start) continue;
+
+	        html += renderPlainTextWithHashtags(text.slice(cursor, start));
+	        const fragment = text.slice(start, end);
+	        if (mention.is_active && mention.profile_url) {
+	          html += `<a class="post-mention-link" href="${escapeHtml(mention.profile_url)}">${escapeHtml(fragment)}</a>`;
+	        } else {
+	          html += escapeHtml(fragment);
+	        }
+	        cursor = end;
+	      }
+	      html += renderPlainTextWithHashtags(text.slice(cursor));
+	      return html;
+	    };
+
+	    const renderPosts = (posts) => {
+	      if (!postsList) return;
+	      const displayPosts = buildDisplayPosts(posts);
 
       if (!Array.isArray(displayPosts) || displayPosts.length === 0) {
         postsList.innerHTML = `
@@ -1570,6 +1942,9 @@
           const reportBtn = post.is_mine
             ? ''
             : `<button class="post-head-btn" type="button" data-action="report-post" data-post-id="${post.id}" title="Reportar publicacion">🚩</button>`;
+          const editBtn = post.is_mine
+            ? `<button class="post-head-btn" type="button" data-action="edit-post" data-post-id="${post.id}" title="Editar texto de la publicacion">📝</button>`
+            : '';
           const deleteBtn = post.is_mine
             ? `<button class="post-head-btn" type="button" data-action="delete-post" data-post-id="${post.id}" title="Eliminar publicacion">🗑</button>`
             : '';
@@ -1579,23 +1954,30 @@
 	          const openAlbumBtn = isAlbumGroup
 	            ? `<button class="post-btn" type="button" data-action="open-album-gallery" data-album-id="${Number(post.album_id || 0)}">🖼️ Hojear álbum (${Number(post.album_total_items || 0)})</button>`
 	            : '';
-	          const authorProfileUrl = escapeHtml(buildAuthorProfileUrl(post?.author));
+	          const authorProfileUrl = escapeHtml(String(post?.__author_profile_url || buildAuthorProfileUrl(post?.author)));
 	          const authorName = escapeHtml(post?.author?.name || 'Usuario');
+	          const authorAvatarUrl = escapeHtml(String(post?.__author_avatar_url || DEFAULT_AVATAR_SRC).trim() || DEFAULT_AVATAR_SRC);
 
 	          return `
 	            <article class="panel post" data-post-id="${post.id}">
 	              <div class="post-head">
-	                <div>
-	                  <a class="post-author-link" href="${authorProfileUrl}">${authorName}</a>
-	                  <span class="post-meta">· ${relativeTime(post.created_at)} · ${post.visibility === 'private' ? 'Privado' : 'Publico'}</span>
+	                <div class="post-head-author">
+	                  <a class="post-author-avatar-link" href="${authorProfileUrl}">
+	                    <img class="post-author-avatar" src="${authorAvatarUrl}" alt="Foto de perfil de ${authorName}" loading="lazy" />
+	                  </a>
+	                  <div class="post-head-main">
+	                    <a class="post-author-link" href="${authorProfileUrl}">${authorName}</a>
+	                    <span class="post-meta">· ${relativeTime(post.created_at)} · ${post.visibility === 'private' ? 'Privado' : 'Publico'}</span>
+	                  </div>
 	                </div>
 	                <div class="post-head-actions">
-                  ${reportBtn}
-                  ${deleteBtn}
-                </div>
+	                  ${reportBtn}
+	                  ${editBtn}
+	                  ${deleteBtn}
+	                </div>
               </div>
               ${albumMeta}
-              ${post.text ? `<p class="post-text">${escapeHtml(post.text)}</p>` : ''}
+              ${post.text ? `<p class="post-text">${renderPostTextHtml(post)}</p>` : ''}
               ${mediaHtml}
               <p class="post-warning">La donacion de estrella es irreversible.</p>
               <div class="post-actions">
@@ -1638,28 +2020,58 @@
       }
     };
 
-    const loadFeed = async () => {
-      try {
-        const profileId = Number(activeProfileUserId);
+	    const loadFeed = async () => {
+	      try {
+	        const profileId = Number(activeProfileUserId);
         const endpoint = isViewingOwnProfile
           ? '/posts/mine?limit=40'
           : Number.isFinite(profileId) && profileId > 0
             ? `/posts/user/${encodeURIComponent(String(profileId))}?limit=40`
             : '/posts/mine?limit=40';
 
-        const res = await apiFetch(endpoint);
-        const data = await res.json();
-        if (!res.ok) {
-          setPostsStatus(data.detail || 'No se pudo cargar las publicaciones.', true);
-          return;
-        }
-        currentFeedPosts = Array.isArray(data) ? data : [];
-        renderPosts(data);
-        if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
-        setPostsStatus('');
-      } catch (error) {
-        setPostsStatus('No se pudo conectar con el servidor de publicaciones.', true);
-      }
+	        const res = await apiFetch(endpoint);
+	        const data = await res.json();
+	        if (!res.ok) {
+	          setPostsStatus(data.detail || 'No se pudo cargar las publicaciones.', true);
+	          return;
+	        }
+	        const sourcePosts = Array.isArray(data) ? data : [];
+	        const uniqueAuthorIds = Array.from(
+	          new Set(
+	            sourcePosts
+	              .map((post) => Number(post?.author?.id || 0))
+	              .filter((id) => Number.isFinite(id) && id > 0)
+	          )
+	        );
+	        const profilesByAuthorId = new Map();
+	        await Promise.all(
+	          uniqueAuthorIds.map(async (authorId) => {
+	            try {
+	              const profile = await fetchFollowProfile({ userId: authorId });
+	              profilesByAuthorId.set(authorId, profile);
+	            } catch {
+	              profilesByAuthorId.set(authorId, null);
+	            }
+	          })
+	        );
+	        const enrichedPosts = sourcePosts.map((post) => {
+	          const authorId = Number(post?.author?.id || 0);
+	          const profile = profilesByAuthorId.get(authorId);
+	          const authorAvatarUrl = String(profile?.avatar_url || '').trim() || DEFAULT_AVATAR_SRC;
+	          const authorProfileUrl = String(profile?.profile_url || '').trim() || buildAuthorProfileUrl(post?.author);
+	          return {
+	            ...post,
+	            __author_avatar_url: authorAvatarUrl,
+	            __author_profile_url: authorProfileUrl
+	          };
+	        });
+	        currentFeedPosts = enrichedPosts;
+	        renderPosts(enrichedPosts);
+	        if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
+	        setPostsStatus('');
+	      } catch (error) {
+	        setPostsStatus('No se pudo conectar con el servidor de publicaciones.', true);
+	      }
     };
 
     const openPost = () => {
@@ -1876,7 +2288,7 @@
 
         setPostsStatus('Publicacion creada correctamente.');
         closePost();
-        await Promise.all([loadFeed(), loadMyStats()]);
+        await Promise.all([loadFeed(), loadMyStats(), loadHomeCalendar()]);
       } catch (error) {
         setPostsStatus(error.message || 'No se pudo publicar.', true);
       } finally {
@@ -1941,6 +2353,7 @@
       });
       setProfilePhotoPostId(created.id);
       await loadFeed();
+      await loadHomeCalendar();
       syncProfilePhotoPostFromFeed();
       return Boolean(profilePhotoPostId);
     };
@@ -2105,6 +2518,20 @@
 
     const handleProfilePhotoPostOverlayClick = (event) => {
       if (event.target === profilePhotoPostOverlay) closeProfilePhotoPost();
+    };
+
+    const setEditPostModalStatus = (message, isError = false) => {
+      if (!editPostModalStatus) return;
+      editPostModalStatus.textContent = message || '';
+      editPostModalStatus.classList.toggle('is-error', Boolean(isError));
+    };
+
+    const closeEditModal = () => {
+      editPostOverlay?.classList.add('hidden');
+      editPostOverlay?.setAttribute('aria-hidden', 'true');
+      selectedEditPostId = null;
+      if (editPostTextInput) editPostTextInput.value = '';
+      setEditPostModalStatus('');
     };
 
     const closeDeleteModal = () => {
@@ -2309,6 +2736,21 @@
       setProfilePhotoViewerByIndex(profilePhotoHistoryIndex - 1);
     };
 
+    const handleOpenEditPostModal = (postId) => {
+      const normalizedPostId = Number(postId || 0);
+      if (!normalizedPostId) return;
+      const post = Array.isArray(currentFeedPosts)
+        ? currentFeedPosts.find((item) => Number(item?.id) === normalizedPostId)
+        : null;
+      if (!post || !post.is_mine) return;
+
+      selectedEditPostId = normalizedPostId;
+      if (editPostTextInput) editPostTextInput.value = String(post.text || '');
+      setEditPostModalStatus('');
+      editPostOverlay?.classList.remove('hidden');
+      editPostOverlay?.setAttribute('aria-hidden', 'false');
+    };
+
     const handlePostsClick = async (event) => {
       const button = event.target.closest('[data-action]');
       if (!button) return;
@@ -2339,6 +2781,11 @@
         return;
       }
 
+      if (action === 'edit-post') {
+        handleOpenEditPostModal(postId);
+        return;
+      }
+
       if (action === 'delete-post') {
         selectedDeletePostId = postId;
         deletePostOverlay?.classList.remove('hidden');
@@ -2361,9 +2808,46 @@
         if (!res.ok) throw new Error(data.detail || 'No se pudo eliminar la publicacion.');
         setPostsStatus(`Publicacion eliminada. Se restaron ${data.removed_stars || 0} estrellas asociadas.`);
         closeDeleteModal();
-        await Promise.all([loadFeed(), loadMyStats()]);
+        await Promise.all([loadFeed(), loadMyStats(), loadHomeCalendar()]);
       } catch (error) {
         setPostsStatus(error.message || 'No se pudo eliminar la publicacion.', true);
+      }
+    };
+
+    const handleSaveEditedPost = async () => {
+      if (!selectedEditPostId) return;
+      const text = (editPostTextInput?.value || '').trim();
+      if (!text) {
+        setEditPostModalStatus('El texto de la publicación no puede estar vacío.', true);
+        return;
+      }
+
+      const oldLabel = saveEditPost?.textContent || 'Guardar cambios';
+      if (saveEditPost) {
+        saveEditPost.disabled = true;
+        saveEditPost.textContent = 'Guardando...';
+      }
+      setEditPostModalStatus('');
+
+      try {
+        const res = await apiFetch(`/posts/${selectedEditPostId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudo editar la publicación.');
+
+        closeEditModal();
+        setPostsStatus('Publicación actualizada.');
+        await Promise.all([loadFeed(), loadMyStats(), loadHomeCalendar()]);
+      } catch (error) {
+        setEditPostModalStatus(error.message || 'No se pudo editar la publicación.', true);
+      } finally {
+        if (saveEditPost) {
+          saveEditPost.disabled = false;
+          saveEditPost.textContent = oldLabel;
+        }
       }
     };
 
@@ -2542,6 +3026,13 @@
       if (event.target === deletePostOverlay) closeDeleteModal();
     });
 
+    closeEditPostModal?.addEventListener('click', closeEditModal);
+    cancelEditPost?.addEventListener('click', closeEditModal);
+    saveEditPost?.addEventListener('click', handleSaveEditedPost);
+    editPostOverlay?.addEventListener('click', (event) => {
+      if (event.target === editPostOverlay) closeEditModal();
+    });
+
     closeReportPostModal?.addEventListener('click', closeReportModal);
     cancelReportPost?.addEventListener('click', closeReportModal);
     submitReportPost?.addEventListener('click', handleSubmitReport);
@@ -2578,31 +3069,37 @@
         setPostsStatus(error.message || 'No se pudo cargar el perfil.', true);
       }
 
-      if (isViewingOwnProfile) {
-        await Promise.all([
-          loadMinorAccreditationStatus(),
-          loadHomeAbout(),
-          loadProfilePhoto(),
-          loadUsernameState(),
-          loadHomePublicWishes(),
-          loadHomeCooperativeWishes(),
-          loadHomeFulfilledWishes(),
-          loadHomePrivateWishes(),
-          loadMyStats()
-        ]);
+	      if (isViewingOwnProfile) {
+		        await Promise.all([
+		          loadMinorAccreditationStatus(),
+		          loadHomeAbout(),
+		          loadHomeCover(),
+		          loadProfilePhoto(),
+		          loadUsernameState(),
+		          loadHomePublicWishes(),
+	          loadHomeCooperativeWishes(),
+	          loadHomeFulfilledWishes(),
+	          loadHomePrivateWishes(),
+	          loadHomeCalendar(),
+	          loadHomeOracle(),
+	          loadMyStats()
+	        ]);
         await loadFeed();
         syncProfilePhotoPostFromFeed();
         return;
       }
 
 		      await loadForeignProfilePrivacyVisibility();
-		      await Promise.all([
-		        loadHomeAbout(activeProfileUserId),
-		        loadHomePublicWishes(),
-	        loadHomeCooperativeWishes(),
-	        loadHomeFulfilledWishes(),
-	        loadMyStats(),
-	      ]);
+				      await Promise.all([
+				        loadHomeAbout(activeProfileUserId),
+			        loadHomeCover(activeProfileUserId),
+				        loadHomePublicWishes(),
+			        loadHomeCooperativeWishes(),
+			        loadHomeFulfilledWishes(),
+	          loadHomeCalendar(),
+	          loadHomeOracle(),
+		        loadMyStats(),
+		      ]);
 	      await loadFeed();
 	    })();
 
@@ -2660,6 +3157,9 @@
       closeDeletePostModal?.removeEventListener('click', closeDeleteModal);
       cancelDeletePost?.removeEventListener('click', closeDeleteModal);
       confirmDeletePost?.removeEventListener('click', handleConfirmDeletePost);
+      closeEditPostModal?.removeEventListener('click', closeEditModal);
+      cancelEditPost?.removeEventListener('click', closeEditModal);
+      saveEditPost?.removeEventListener('click', handleSaveEditedPost);
 
       closeReportPostModal?.removeEventListener('click', closeReportModal);
       cancelReportPost?.removeEventListener('click', closeReportModal);
@@ -2690,7 +3190,7 @@
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
-<div class="page-background page-background-user home-background">
+<div class="page-background page-background-user home-background home-user-page">
   <header class="feed-topbar">
     <div class="feed-topbar-zone feed-topbar-left">
       <a class="topbar-logo" href="/feed.html" aria-label="Kiadez">
@@ -2920,80 +3420,50 @@
           <article class="panel" id="homeCalendarPanel">
             <div class="panel-head">
               <h3 class="panel-title">Calendario</h3>
-              <span class="panel-badge">Actividad</span>
+              <span class="panel-badge">Mes actual</span>
             </div>
 
-            <div class="heatmap" aria-label="Actividad del usuario (mock)">
-              <div class="heat-col">
-                <span class="heat-cell lv0"></span><span class="heat-cell lv1"></span><span class="heat-cell lv2"></span><span class="heat-cell lv1"></span><span class="heat-cell lv0"></span><span class="heat-cell lv0"></span><span class="heat-cell lv1"></span>
-              </div>
-              <div class="heat-col">
-                <span class="heat-cell lv1"></span><span class="heat-cell lv1"></span><span class="heat-cell lv0"></span><span class="heat-cell lv2"></span><span class="heat-cell lv3"></span><span class="heat-cell lv1"></span><span class="heat-cell lv0"></span>
-              </div>
-              <div class="heat-col">
-                <span class="heat-cell lv0"></span><span class="heat-cell lv2"></span><span class="heat-cell lv2"></span><span class="heat-cell lv1"></span><span class="heat-cell lv0"></span><span class="heat-cell lv3"></span><span class="heat-cell lv2"></span>
-              </div>
-              <div class="heat-col">
-                <span class="heat-cell lv1"></span><span class="heat-cell lv0"></span><span class="heat-cell lv1"></span><span class="heat-cell lv2"></span><span class="heat-cell lv1"></span><span class="heat-cell lv0"></span><span class="heat-cell lv1"></span>
-              </div>
-              <div class="heat-col">
-                <span class="heat-cell lv2"></span><span class="heat-cell lv3"></span><span class="heat-cell lv1"></span><span class="heat-cell lv0"></span><span class="heat-cell lv1"></span><span class="heat-cell lv2"></span><span class="heat-cell lv3"></span>
-              </div>
-              <div class="heat-col">
-                <span class="heat-cell lv0"></span><span class="heat-cell lv0"></span><span class="heat-cell lv1"></span><span class="heat-cell lv1"></span><span class="heat-cell lv2"></span><span class="heat-cell lv1"></span><span class="heat-cell lv0"></span>
-              </div>
-              <div class="heat-col">
-                <span class="heat-cell lv1"></span><span class="heat-cell lv2"></span><span class="heat-cell lv1"></span><span class="heat-cell lv3"></span><span class="heat-cell lv2"></span><span class="heat-cell lv1"></span><span class="heat-cell lv0"></span>
-              </div>
-              <div class="heat-col">
-                <span class="heat-cell lv0"></span><span class="heat-cell lv1"></span><span class="heat-cell lv0"></span><span class="heat-cell lv1"></span><span class="heat-cell lv2"></span><span class="heat-cell lv3"></span><span class="heat-cell lv2"></span>
-              </div>
-              <div class="heat-col">
-                <span class="heat-cell lv2"></span><span class="heat-cell lv1"></span><span class="heat-cell lv0"></span><span class="heat-cell lv0"></span><span class="heat-cell lv1"></span><span class="heat-cell lv2"></span><span class="heat-cell lv1"></span>
-              </div>
-              <div class="heat-col">
-                <span class="heat-cell lv1"></span><span class="heat-cell lv2"></span><span class="heat-cell lv3"></span><span class="heat-cell lv2"></span><span class="heat-cell lv1"></span><span class="heat-cell lv0"></span><span class="heat-cell lv0"></span>
-              </div>
-              <div class="heat-col">
-                <span class="heat-cell lv0"></span><span class="heat-cell lv1"></span><span class="heat-cell lv2"></span><span class="heat-cell lv1"></span><span class="heat-cell lv0"></span><span class="heat-cell lv1"></span><span class="heat-cell lv2"></span>
-              </div>
-              <div class="heat-col">
-                <span class="heat-cell lv1"></span><span class="heat-cell lv0"></span><span class="heat-cell lv1"></span><span class="heat-cell lv2"></span><span class="heat-cell lv3"></span><span class="heat-cell lv2"></span><span class="heat-cell lv1"></span>
-              </div>
+            <div class="home-calendar-shell" aria-label="Actividad mensual de publicaciones">
+              <article class="month-card home-calendar-month-card">
+                <div class="month-name">
+                  <span id="homeCalendarMonthName">Mes actual</span>
+                  <span class="month-status" id="homeCalendarMonthProgress">0 / 0</span>
+                </div>
+                <div class="month-dots home-calendar-dots" id="homeCalendarDots"></div>
+              </article>
             </div>
+            <p class="home-public-wish-status" id="homeCalendarStatus" aria-live="polite"></p>
 
-	            <a href="/calendar.html" class="btn btn-outline btn-compact btn-inline" data-profile-module="calendar">Ver calendario</a>
+	            <a href="/calendar.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="calendar">Ver más</a>
           </article>
 
-          <article class="panel" id="homeOraclePanel">
-            <div class="panel-head">
-              <h3 class="panel-title">Oráculo</h3>
-              <span class="panel-badge">Última carta</span>
-            </div>
+	          <article class="panel" id="homeOraclePanel">
+	            <div class="panel-head">
+	              <h3 class="panel-title">Oráculo</h3>
+	              <span class="panel-badge">Última carta</span>
+	            </div>
 
-            <div class="oracle-card">
-              <img src="assets/oracle-default.jpg" alt="Última carta del Oráculo" />
-            </div>
+	            <div class="oracle-card">
+	              <img id="homeOracleCardImage" src="/css/oracle/carta.webp" alt="Carta del Oráculo en reverso" />
+	            </div>
+	            <p class="panel-muted" id="homeOracleSummary">
+	              Conoce El Oráculo y elige tu primera carta para reflexionar sobre tu presente.
+	            </p>
+	            <p class="home-public-wish-status" id="homeOracleStatus" aria-live="polite"></p>
 
-	            <a href="/oracle.html" class="btn btn-outline btn-compact btn-inline" data-profile-module="oracle">Abrir Oráculo</a>
-          </article>
-        </aside>
+		            <a href="/oracle.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="oracle">Visitar el Oráculo</a>
+	          </article>
+	        </aside>
 
-        <section class="right-col">
-          <article class="panel composer">
-            <div class="composer-row">
-              <img class="avatar avatar-sm" src="/assets/avatar-default.jpg" alt="Avatar" data-viewer-avatar />
-              <button class="composer-input" id="openPostModal" type="button">
-                ¿Qué estás pensando?
-              </button>
-            </div>
-
-            <div class="composer-actions">
-              <button class="mini-action" type="button" data-kind="text">Texto</button>
-              <button class="mini-action" type="button" data-kind="image">Imagen</button>
-              <button class="mini-action" type="button" data-kind="video">Video</button>
-            </div>
-          </article>
+	        <section class="right-col">
+	          <article class="panel composer">
+	            <div class="composer-row">
+	              <img class="avatar avatar-sm composer-avatar" src="/assets/avatar-default.jpg" alt="Avatar" data-viewer-avatar />
+	              <button class="composer-input" id="openPostModal" type="button">
+	                ¿Qué estás pensando?
+	              </button>
+	            </div>
+	          </article>
 
           <article class="panel minor-protected-panel hidden" id="minorProtectedPanel">
             <div class="panel-head minor-protected-head">
@@ -3085,11 +3555,11 @@
       <button class="modal-close" type="button" id="closePostModal">✕</button>
     </div>
 
-    <div class="modal-body">
-      <div class="post-modal-top">
-        <img class="avatar avatar-sm" src="/assets/avatar-default.jpg" alt="Avatar" data-viewer-avatar />
-        <div>
-          <div class="post-modal-name"><strong>Carlos Jiménez Duarte</strong></div>
+	    <div class="modal-body">
+	      <div class="post-modal-top">
+	        <img class="avatar avatar-sm composer-avatar" src="/assets/avatar-default.jpg" alt="Avatar" data-viewer-avatar />
+	        <div>
+	          <div class="post-modal-name"><strong>Carlos Jiménez Duarte</strong></div>
           <select class="modal-select" id="postVisibility">
             <option value="public">Público</option>
             <option value="private">Privado</option>
@@ -3306,6 +3776,27 @@
     <div class="modal-actions">
       <button class="btn btn-outline btn-compact" type="button" id="cancelDeletePost">Cancelar</button>
       <button class="btn btn-primary btn-compact" type="button" id="confirmDeletePost">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="editPostModalOverlay" aria-hidden="true">
+  <div class="modal wish-modal fulfill-wish-modal" role="dialog" aria-modal="true" aria-label="Editar publicación">
+    <div class="modal-head">
+      <h3>Editar publicación</h3>
+      <button class="modal-close" type="button" id="closeEditPostModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-label-center">
+        Puedes corregir ortografía o gramática del texto publicado.
+      </p>
+      <label class="modal-label" for="editPostText">Texto</label>
+      <textarea class="modal-textarea" id="editPostText" rows="5" maxlength="2000" placeholder="Escribe el texto actualizado"></textarea>
+      <p class="infobox-photo-status" id="editPostModalStatus" aria-live="polite"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-compact" type="button" id="cancelEditPost">Cancelar</button>
+      <button class="btn btn-primary btn-compact" type="button" id="saveEditPost">Guardar cambios</button>
     </div>
   </div>
 </div>

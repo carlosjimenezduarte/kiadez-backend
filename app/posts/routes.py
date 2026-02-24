@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
 from datetime import datetime, timezone
+import re
 
-from sqlalchemy import func, or_, select, update
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from sqlalchemy import and_, delete, func, or_, select, tuple_, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -15,9 +17,12 @@ from app.core.storage import S3NotConfiguredError, generate_presigned_get_url
 from app.db.database import get_db
 from app.db.models.media import Media
 from app.db.models.post import (
+    Hashtag,
     Post,
     PostComment,
+    PostHashtag,
     PostMediaKind,
+    PostMention,
     PostReport,
     PostReportCase,
     PostReportCaseStatus,
@@ -36,6 +41,11 @@ from app.posts.schemas import (
     PostCommentOut,
     PostCreateRequest,
     PostDeleteResponse,
+    PostSearchHashtagOut,
+    PostSearchOut,
+    PostSearchUserOut,
+    PostUpdateTextRequest,
+    PostMentionOut,
     PostOut,
     PostReportCreateRequest,
     PostReportResponse,
@@ -93,6 +103,287 @@ DONATION_STAR_ACHIEVEMENTS: list[tuple[str, str, int, str]] = [
     ("donation_9", "Arquitecto del Bien Común", 500000, "/css/AKI/Donation/9.webp"),
     ("donation_10", "Semilla del Infinito", 1000000, "/css/AKI/Donation/10.webp"),
 ]
+
+MENTION_PATTERN = re.compile(r"(?<![A-Za-z0-9._])@([A-Za-z0-9._]{4,30})(?![A-Za-z0-9._])")
+HASHTAG_PATTERN = re.compile(r"(?<![A-Za-z0-9_])#([A-Za-z0-9_]{2,50})(?![A-Za-z0-9_])")
+
+
+def _build_profile_url(username: str | None, *, user_id: int) -> str:
+    normalized = (username or "").strip()
+    if normalized:
+        return f"/home_user.html?u={normalized}"
+    return f"/home_user.html?id={int(user_id)}"
+
+
+def _build_handle(*, username: str | None, user_id: int) -> str:
+    normalized = (username or "").strip()
+    if normalized:
+        return f"@{normalized}"
+    return f"@id{int(user_id)}"
+
+
+def _extract_mentions_from_text(text: str | None) -> list[tuple[str, int, int]]:
+    if not text:
+        return []
+    matches: list[tuple[str, int, int]] = []
+    for match in MENTION_PATTERN.finditer(text):
+        username = (match.group(1) or "").strip().lower()
+        if not username:
+            continue
+        matches.append((username, int(match.start()), int(match.end())))
+    return matches
+
+
+def _normalize_search_query(raw: str | None) -> str:
+    value = re.sub(r"\s+", " ", str(raw or "").strip())
+    return value
+
+
+def _normalize_hashtag_query(raw: str | None) -> str:
+    value = str(raw or "").strip().lower()
+    while value.startswith("#"):
+        value = value[1:]
+    if not value:
+        return ""
+    return re.sub(r"[^a-z0-9_]", "", value)
+
+
+def _extract_hashtags_from_text(text: str | None) -> list[str]:
+    if not text:
+        return []
+    hashtags: list[str] = []
+    seen: set[str] = set()
+    for match in HASHTAG_PATTERN.finditer(text):
+        tag = (match.group(1) or "").strip().lower()
+        if not tag or tag in seen:
+            continue
+        seen.add(tag)
+        hashtags.append(tag)
+    return hashtags
+
+
+def _attach_post_hashtags(
+    *,
+    db: Session,
+    post_id: int,
+    text: str | None,
+) -> None:
+    tags = _extract_hashtags_from_text(text)
+    if not tags:
+        return
+
+    existing_rows = db.execute(select(Hashtag).where(Hashtag.tag.in_(tags))).scalars().all()
+    existing_by_tag = {str(row.tag).strip().lower(): row for row in existing_rows}
+
+    missing_tags = [tag for tag in tags if tag not in existing_by_tag]
+    if missing_tags:
+        db.add_all([Hashtag(tag=tag) for tag in missing_tags])
+        db.flush()
+        refreshed_rows = db.execute(select(Hashtag).where(Hashtag.tag.in_(missing_tags))).scalars().all()
+        for row in refreshed_rows:
+            existing_by_tag[str(row.tag).strip().lower()] = row
+
+    for tag in tags:
+        hashtag = existing_by_tag.get(tag)
+        if hashtag is None:
+            continue
+        db.add(PostHashtag(post_id=int(post_id), hashtag_id=int(hashtag.id)))
+
+
+def _search_users(
+    *,
+    db: Session,
+    query_text: str,
+    limit: int,
+) -> list[PostSearchUserOut]:
+    normalized_query = _normalize_search_query(query_text).lower()
+    if not normalized_query:
+        return []
+
+    search_like = f"%{normalized_query}%"
+    rows = db.execute(
+        select(User).where(
+            User.is_active.is_(True),
+            User.username.is_not(None),
+            User.username != "",
+            or_(
+                func.lower(User.username).like(search_like),
+                func.lower(
+                    func.concat(
+                        func.coalesce(User.first_name, ""),
+                        " ",
+                        func.coalesce(User.last_name, ""),
+                    )
+                ).like(search_like),
+            ),
+        )
+        .order_by(func.lower(User.username).asc(), User.id.asc())
+        .limit(max(1, int(limit)))
+    ).scalars().all()
+
+    return [
+        PostSearchUserOut(
+            user_id=int(user.id),
+            full_name=f"{(user.first_name or '').strip()} {(user.last_name or '').strip()}".strip() or f"Usuario {user.id}",
+            username=(user.username or "").strip() or None,
+            handle=_build_handle(username=(user.username or "").strip() or None, user_id=int(user.id)),
+            profile_url=_build_profile_url((user.username or "").strip() or None, user_id=int(user.id)),
+        )
+        for user in rows
+    ]
+
+
+def _search_hashtags(
+    *,
+    db: Session,
+    current_user_id: int,
+    hashtag_prefix: str,
+    limit: int,
+) -> list[PostSearchHashtagOut]:
+    normalized_prefix = _normalize_hashtag_query(hashtag_prefix)
+    filters = [
+        User.is_active.is_(True),
+        or_(
+            Post.author_id == int(current_user_id),
+            and_(
+                Post.visibility == PostVisibility.public,
+                User.public_profile_show_personal_posts.is_(True),
+            ),
+        ),
+    ]
+    if normalized_prefix:
+        filters.append(func.lower(Hashtag.tag).like(f"{normalized_prefix}%"))
+
+    post_count_expr = func.count(func.distinct(Post.id))
+    rows = db.execute(
+        select(Hashtag.tag, post_count_expr)
+        .join(PostHashtag, PostHashtag.hashtag_id == Hashtag.id)
+        .join(Post, Post.id == PostHashtag.post_id)
+        .join(User, User.id == Post.author_id)
+        .where(*filters)
+        .group_by(Hashtag.id, Hashtag.tag)
+        .order_by(post_count_expr.desc(), Hashtag.tag.asc())
+        .limit(max(1, int(limit)))
+    ).all()
+
+    return [
+        PostSearchHashtagOut(
+            tag=f"#{tag}",
+            normalized_tag=tag,
+            post_count=int(post_count),
+            href=f"/feed.html?search=%23{tag}",
+        )
+        for tag, post_count in rows
+    ]
+
+
+def _search_posts_by_hashtag(
+    *,
+    db: Session,
+    current_user_id: int,
+    hashtag: str,
+    limit: int,
+) -> list[PostOut]:
+    normalized_hashtag = _normalize_hashtag_query(hashtag)
+    if not normalized_hashtag:
+        return []
+
+    stmt = (
+        select(Post, User)
+        .join(User, User.id == Post.author_id)
+        .join(PostHashtag, PostHashtag.post_id == Post.id)
+        .join(Hashtag, Hashtag.id == PostHashtag.hashtag_id)
+        .where(
+            User.is_active.is_(True),
+            Hashtag.tag == normalized_hashtag,
+            or_(
+                Post.author_id == int(current_user_id),
+                and_(
+                    Post.visibility == PostVisibility.public,
+                    User.public_profile_show_personal_posts.is_(True),
+                ),
+            ),
+        )
+        .order_by(Post.created_at.desc())
+        .limit(max(1, int(limit)))
+    )
+    return _query_posts(stmt=stmt, current_user_id=current_user_id, db=db)
+
+
+def _resolve_post_mentions_payload(
+    *,
+    db: Session,
+    author_id: int,
+    text: str | None,
+) -> list[dict[str, int]]:
+    extracted = _extract_mentions_from_text(text)
+    if not extracted:
+        return []
+
+    usernames = sorted({item[0] for item in extracted if item[0]})
+    users = db.execute(
+        select(User).where(
+            User.username.in_(usernames),
+            User.is_active.is_(True),
+        )
+    ).scalars().all()
+    user_by_username = {(user.username or "").strip().lower(): user for user in users if (user.username or "").strip()}
+
+    missing = sorted({username for username in usernames if username not in user_by_username})
+    if missing:
+        formatted = ", ".join(f"@{item}" for item in missing[:5])
+        suffix = "..." if len(missing) > 5 else ""
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se pudo etiquetar: {formatted}{suffix}.",
+        )
+
+    mentioned_user_ids = sorted({int(user_by_username[username].id) for username in usernames})
+    outgoing_rows = db.execute(
+        select(UserFollow.followed_id).where(
+            UserFollow.follower_id == int(author_id),
+            UserFollow.followed_id.in_(mentioned_user_ids),
+        )
+    ).all()
+    outgoing_ids = {int(row[0]) for row in outgoing_rows}
+
+    incoming_rows = db.execute(
+        select(UserFollow.follower_id).where(
+            UserFollow.followed_id == int(author_id),
+            UserFollow.follower_id.in_(mentioned_user_ids),
+        )
+    ).all()
+    incoming_ids = {int(row[0]) for row in incoming_rows}
+
+    mutual_ids = outgoing_ids & incoming_ids
+    disallowed_usernames = sorted(
+        username
+        for username in usernames
+        if int(user_by_username[username].id) not in mutual_ids
+    )
+    if disallowed_usernames:
+        formatted = ", ".join(f"@{item}" for item in disallowed_usernames[:5])
+        suffix = "..." if len(disallowed_usernames) > 5 else ""
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Solo puedes etiquetar usuarios con seguimiento mutuo. "
+                f"Revisa: {formatted}{suffix}."
+            ),
+        )
+
+    mentions_payload: list[dict[str, int]] = []
+    for username, start_index, end_index in extracted:
+        user = user_by_username[username]
+        mentions_payload.append(
+            {
+                "mentioned_user_id": int(user.id),
+                "start_index": int(start_index),
+                "end_index": int(end_index),
+            }
+        )
+    return mentions_payload
+
 
 
 def _publication_achievement_description(threshold: int) -> str:
@@ -209,6 +500,77 @@ def _build_media_url(post: Post, media_map: dict[int, Media]) -> str | None:
         return None
 
 
+def _load_post_mentions_by_post_id(
+    *,
+    db: Session,
+    posts_by_id: dict[int, Post],
+) -> dict[int, list[PostMentionOut]]:
+    post_ids = sorted(int(post_id) for post_id in posts_by_id.keys())
+    if not post_ids:
+        return {}
+
+    mention_rows = db.execute(
+        select(PostMention, User)
+        .join(User, User.id == PostMention.mentioned_user_id)
+        .where(PostMention.post_id.in_(post_ids))
+        .order_by(PostMention.post_id.asc(), PostMention.start_index.asc(), PostMention.id.asc())
+    ).all()
+    if not mention_rows:
+        return {}
+
+    relation_pairs: set[tuple[int, int]] = set()
+    for mention, _mentioned_user in mention_rows:
+        post = posts_by_id.get(int(mention.post_id))
+        if post is None:
+            continue
+        author_id = int(post.author_id)
+        mentioned_user_id = int(mention.mentioned_user_id)
+        if author_id <= 0 or mentioned_user_id <= 0 or author_id == mentioned_user_id:
+            continue
+        relation_pairs.add((author_id, mentioned_user_id))
+        relation_pairs.add((mentioned_user_id, author_id))
+
+    follow_edges: set[tuple[int, int]] = set()
+    if relation_pairs:
+        follow_rows = db.execute(
+            select(UserFollow.follower_id, UserFollow.followed_id).where(
+                tuple_(UserFollow.follower_id, UserFollow.followed_id).in_(list(relation_pairs))
+            )
+        ).all()
+        follow_edges = {(int(follower_id), int(followed_id)) for follower_id, followed_id in follow_rows}
+
+    mentions_by_post_id: dict[int, list[PostMentionOut]] = {}
+    for mention, mentioned_user in mention_rows:
+        post_id = int(mention.post_id)
+        post = posts_by_id.get(post_id)
+        if post is None:
+            continue
+
+        author_id = int(post.author_id)
+        mentioned_user_id = int(mention.mentioned_user_id)
+        is_active = (
+            bool(mentioned_user.is_active)
+            and author_id != mentioned_user_id
+            and (author_id, mentioned_user_id) in follow_edges
+            and (mentioned_user_id, author_id) in follow_edges
+        )
+
+        username = (mentioned_user.username or "").strip() or None
+        mentions_by_post_id.setdefault(post_id, []).append(
+            PostMentionOut(
+                mentioned_user_id=mentioned_user_id,
+                username=username,
+                handle=_build_handle(username=username, user_id=mentioned_user_id),
+                profile_url=_build_profile_url(username, user_id=mentioned_user_id),
+                start_index=max(0, int(mention.start_index)),
+                end_index=max(1, int(mention.end_index)),
+                is_active=is_active,
+            )
+        )
+
+    return mentions_by_post_id
+
+
 def _post_out(
     *,
     post: Post,
@@ -217,6 +579,7 @@ def _post_out(
     starred_by_me: bool,
     media_url: str | None,
     album_name: str | None = None,
+    mentions: list[PostMentionOut] | None = None,
 ) -> PostOut:
     return PostOut(
         id=post.id,
@@ -233,6 +596,7 @@ def _post_out(
         share_count=post.share_count,
         starred_by_me=starred_by_me,
         is_mine=is_mine,
+        mentions=mentions or [],
         created_at=post.created_at,
     )
 
@@ -272,6 +636,9 @@ def _query_posts(
         ).all()
         album_name_map = {int(album_id): str(name) for album_id, name in album_rows}
 
+    posts_by_id = {int(post.id): post for post, _author in rows}
+    mentions_map = _load_post_mentions_by_post_id(db=db, posts_by_id=posts_by_id)
+
     result: list[PostOut] = []
     for post, author in rows:
         if int(post.author_id) != int(current_user_id) and is_minor_protected(author):
@@ -284,6 +651,7 @@ def _query_posts(
                 starred_by_me=post.id in starred_ids,
                 media_url=_build_media_url(post, media_map),
                 album_name=album_name_map.get(int(post.album_id)) if post.album_id is not None else None,
+                mentions=mentions_map.get(int(post.id), []),
             )
         )
     return result
@@ -377,6 +745,62 @@ def get_feed(
         .limit(limit)
     )
     return _query_posts(stmt=stmt, current_user_id=current_user_id, db=db)
+
+
+@router.get("/search", response_model=PostSearchOut)
+def search_posts_and_people(
+    q: str = Query(..., min_length=1, max_length=80),
+    user_limit: int = Query(default=8, ge=1, le=20),
+    hashtag_limit: int = Query(default=10, ge=1, le=20),
+    post_limit: int = Query(default=40, ge=1, le=100),
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    normalized_query = _normalize_search_query(q)
+    if not normalized_query:
+        raise HTTPException(status_code=400, detail="Digita un texto para buscar.")
+
+    normalized_user_query = normalized_query
+    while normalized_user_query.startswith("@"):
+        normalized_user_query = normalized_user_query[1:]
+    normalized_user_query = _normalize_search_query(normalized_user_query)
+
+    hashtag = _normalize_hashtag_query(normalized_query) if normalized_query.startswith("#") else ""
+    query_type = "hashtag" if hashtag else "mixed"
+
+    users: list[PostSearchUserOut] = []
+    if normalized_user_query:
+        users = _search_users(
+            db=db,
+            query_text=normalized_user_query,
+            limit=user_limit,
+        )
+
+    hashtag_prefix = hashtag or _normalize_hashtag_query(normalized_user_query)
+    hashtags = _search_hashtags(
+        db=db,
+        current_user_id=int(current.user_number),
+        hashtag_prefix=hashtag_prefix,
+        limit=hashtag_limit,
+    )
+
+    posts: list[PostOut] = []
+    if hashtag:
+        posts = _search_posts_by_hashtag(
+            db=db,
+            current_user_id=int(current.user_number),
+            hashtag=hashtag,
+            limit=post_limit,
+        )
+
+    return PostSearchOut(
+        query=normalized_query,
+        query_type=query_type,
+        hashtag=f"#{hashtag}" if hashtag else None,
+        users=users,
+        hashtags=hashtags,
+        posts=posts,
+    )
 
 
 @router.get("/mine", response_model=list[PostOut])
@@ -537,6 +961,12 @@ def create_post(
     if is_minor_protected(author):
         effective_visibility = PostVisibility.private
 
+    mentions_payload = _resolve_post_mentions_payload(
+        db=db,
+        author_id=int(current.user_number),
+        text=text,
+    )
+
     post = Post(
         author_id=current.user_number,
         text=text,
@@ -548,10 +978,32 @@ def create_post(
         share_count=0,
     )
     db.add(post)
+    db.flush()
+
+    for mention in mentions_payload:
+        db.add(
+            PostMention(
+                post_id=int(post.id),
+                mentioned_user_id=int(mention["mentioned_user_id"]),
+                start_index=int(mention["start_index"]),
+                end_index=int(mention["end_index"]),
+            )
+        )
+
+    _attach_post_hashtags(
+        db=db,
+        post_id=int(post.id),
+        text=text,
+    )
+
     db.commit()
     db.refresh(post)
 
     media_map = {media.id: media} if media else {}
+    mentions_map = _load_post_mentions_by_post_id(
+        db=db,
+        posts_by_id={int(post.id): post},
+    )
     return _post_out(
         post=post,
         author=author,
@@ -559,6 +1011,89 @@ def create_post(
         starred_by_me=False,
         media_url=_build_media_url(post, media_map),
         album_name=None,
+        mentions=mentions_map.get(int(post.id), []),
+    )
+
+
+@router.patch("/{post_id}", response_model=PostOut)
+def update_post_text(
+    post_id: int,
+    payload: PostUpdateTextRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    row = db.execute(
+        select(Post, User)
+        .join(User, User.id == Post.author_id)
+        .where(Post.id == post_id)
+    ).one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+
+    post, author = row
+    if int(post.author_id) != int(current.user_number):
+        raise HTTPException(status_code=403, detail="No autorizado para editar esta publicación.")
+
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="El texto de la publicación no puede estar vacío.")
+
+    post.text = text
+
+    # Mentions and hashtags are derived from text and must stay in sync when text changes.
+    db.execute(delete(PostMention).where(PostMention.post_id == int(post.id)))
+    db.execute(delete(PostHashtag).where(PostHashtag.post_id == int(post.id)))
+
+    mentions_payload = _resolve_post_mentions_payload(
+        db=db,
+        author_id=int(current.user_number),
+        text=text,
+    )
+    for mention in mentions_payload:
+        db.add(
+            PostMention(
+                post_id=int(post.id),
+                mentioned_user_id=int(mention["mentioned_user_id"]),
+                start_index=int(mention["start_index"]),
+                end_index=int(mention["end_index"]),
+            )
+        )
+
+    _attach_post_hashtags(
+        db=db,
+        post_id=int(post.id),
+        text=text,
+    )
+
+    report_case = db.execute(
+        select(PostReportCase).where(PostReportCase.post_id == int(post.id))
+    ).scalar_one_or_none()
+    if report_case is not None:
+        report_case.post_text_snapshot = text
+        report_case.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(post)
+
+    media_map: dict[int, Media] = {}
+    if post.media_id is not None:
+        media = db.execute(select(Media).where(Media.id == int(post.media_id))).scalar_one_or_none()
+        if media is not None:
+            media_map[int(media.id)] = media
+
+    mentions_map = _load_post_mentions_by_post_id(
+        db=db,
+        posts_by_id={int(post.id): post},
+    )
+
+    return _post_out(
+        post=post,
+        author=author,
+        is_mine=True,
+        starred_by_me=False,
+        media_url=_build_media_url(post, media_map),
+        album_name=None,
+        mentions=mentions_map.get(int(post.id), []),
     )
 
 

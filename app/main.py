@@ -19,6 +19,7 @@ from app.messages.routes import router as messages_router
 from app.achievements.routes import router as achievements_router
 from app.gallery.routes import router as gallery_router
 from app.calendar.routes import router as calendar_router
+from app.notifications.routes import router as notifications_router
 
 
 app = FastAPI(
@@ -54,6 +55,7 @@ app.include_router(messages_router)
 app.include_router(achievements_router)
 app.include_router(gallery_router)
 app.include_router(calendar_router)
+app.include_router(notifications_router)
 
 
 @app.get("/health")

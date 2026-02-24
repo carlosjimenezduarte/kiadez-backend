@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { getDekSessionHex, setDekSessionHex } from "../lib/dekSession";
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { logout } from "../lib/logout";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
@@ -8,10 +9,6 @@
     document.body.dataset.visitor = "false";
     void syncProfileStarsTotal("myPublicWishesStarsTotal");
     initPurposeCoverModule();
-
-    const LS = {
-      purpose: "kiadez_user_purpose"
-    };
 
     const prefixInputs = document.querySelectorAll(".wish-prefix-input");
     const suffixInputs = document.querySelectorAll("[data-suffix]");
@@ -542,29 +539,11 @@
     };
 
     const readPurposeStorage = () => {
-      const raw = localStorage.getItem(LS.purpose);
-      if (!raw) return null;
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
+      return null;
     };
 
     const storePurposeValues = (slots) => {
-      const slotMap = getPurposeSlotMap(slots);
-      const normalizedSlots = [1, 2, 3]
-        .map((slotNumber) => {
-          const slot = slotMap.get(slotNumber);
-          if (!slot) return null;
-          return normalizePurposeSlot(slot, slotNumber);
-        })
-        .filter(Boolean);
-
-      localStorage.setItem(LS.purpose, JSON.stringify({
-        version: PURPOSE_STORAGE_VERSION,
-        slots: normalizedSlots
-      }));
+      return slots;
     };
 
     const getPurposePresentation = (slot) => {
@@ -1353,12 +1332,12 @@
         kek,
         wrappedDek
       );
-      sessionStorage.setItem("dek_hex", bufToHex(dekRaw));
+      setDekSessionHex(bufToHex(dekRaw));
       return crypto.subtle.importKey("raw", dekRaw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
     };
 
     const importDekFromSession = async () => {
-      const dekHex = sessionStorage.getItem("dek_hex");
+      const dekHex = getDekSessionHex();
       if (!dekHex) {
         throw new Error("Vault no desbloqueado. Crea tu clave privada o desbloquéala primero.");
       }
@@ -5562,7 +5541,7 @@
                   <h2 class="modal-label modal-label-center">Descripción del deseo</h2>
                   <label class="modal-label hidden" for="cooperativeWishText">Descripción del deseo
                     cooperativo</label>
-                  <h5 class="modal-label modal-label-center"><i>Ejemplo: Deseo nivelar a 50 personajes del videojuego
+                  <h5 class="modal-label modal-label-center"><i>Ejemplo: Deseo nivelar a 10 personajes del videojuego
                       Dofus, del servidor Tal Kasha, a nivel 200 en Anutropia.</i></h5>
                   <textarea class="modal-textarea wish-prefix-input wish-textarea-compact" id="cooperativeWishText"
                     rows="3" maxlength="120" data-prefix="Deseo ">Deseo </textarea>

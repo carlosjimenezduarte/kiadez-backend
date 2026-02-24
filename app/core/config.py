@@ -68,6 +68,12 @@ class Settings(BaseSettings):
     MEDIA_MAX_IMAGE_MB: int = 10
     MEDIA_MAX_VIDEO_MB: int = 100
 
+    # 💬 Messaging
+    # Usernames/emails allowed to use "@allusers" broadcast in /messages/threads.
+    # Comma-separated values, without @ for usernames.
+    MESSAGES_BROADCAST_ALLOW_USERNAMES: str = "carlosjimenezd"
+    MESSAGES_BROADCAST_ALLOW_EMAILS: str = ""
+
     @model_validator(mode="after")
     def validate_s3_for_environment(self):
         app_env = (self.APP_ENV or "").strip().lower()

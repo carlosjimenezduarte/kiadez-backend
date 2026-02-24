@@ -74,6 +74,24 @@ class User(Base):
         index=True,
     )
 
+    cover_photo_media_id: Mapped[int | None] = mapped_column(
+        ForeignKey("media.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    cover_photo_offset_x: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    cover_photo_offset_y: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
     emblem_media_id: Mapped[int | None] = mapped_column(
         ForeignKey("media.id", ondelete="SET NULL"),
         nullable=True,
@@ -166,6 +184,48 @@ class User(Base):
     )
 
     public_profile_show_biography: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    notif_calendar_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    notif_oracle_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    notif_followers_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    notif_messages_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    notif_achievements_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    notif_mentions_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    notif_stars_enabled: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         default=True,

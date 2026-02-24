@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { initPurposeCoverModule } from "../lib/purposeCover";
+  import { clearDekSession, getDekSessionHex, setDekSessionHex } from "../lib/dekSession";
   import { logout } from "../lib/logout";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
 
@@ -208,7 +209,7 @@
     };
 
     const importDekFromSession = async () => {
-      const dekHex = sessionStorage.getItem("dek_hex");
+      const dekHex = getDekSessionHex();
       if (!dekHex) {
         throw new Error("Debes desbloquear tu clave privada personal primero.");
       }
@@ -268,7 +269,7 @@
         kek,
         wrappedDek
       );
-      sessionStorage.setItem("dek_hex", bufToHex(dekRaw));
+      setDekSessionHex(bufToHex(dekRaw));
       return dekRaw;
     };
 
@@ -445,7 +446,7 @@
 
       // Ensure sensitive session data is not kept once the UI is censored.
       try {
-        sessionStorage.removeItem("dek_hex");
+        clearDekSession();
       } catch {
         // ignore
       }
@@ -705,8 +706,7 @@
         }
 
         // Limpieza local para que la UI no quede en un estado inconsistente.
-        sessionStorage.removeItem("dek_hex");
-        localStorage.removeItem("kiadez_user_purpose");
+        clearDekSession();
 
         setResetPasswordFinalModal(false);
         setResetPasswordModal(false);

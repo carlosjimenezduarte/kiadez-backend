@@ -3,7 +3,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from enum import Enum
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Enum as SAEnum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -79,6 +88,77 @@ class Post(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
+    )
+
+
+class PostMention(Base):
+    __tablename__ = "post_mentions"
+    __table_args__ = (
+        UniqueConstraint(
+            "post_id",
+            "mentioned_user_id",
+            "start_index",
+            "end_index",
+            name="uq_post_mentions_post_user_span",
+        ),
+        CheckConstraint("start_index >= 0", name="ck_post_mentions_start_non_negative"),
+        CheckConstraint("end_index > start_index", name="ck_post_mentions_span_positive"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("posts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    mentioned_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    start_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
+    )
+
+
+class Hashtag(Base):
+    __tablename__ = "hashtags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tag: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
+    )
+
+
+class PostHashtag(Base):
+    __tablename__ = "post_hashtags"
+    __table_args__ = (UniqueConstraint("post_id", "hashtag_id", name="uq_post_hashtags_post_hashtag"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("posts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    hashtag_id: Mapped[int] = mapped_column(
+        ForeignKey("hashtags.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
     )
 
 

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
+from app.core.config import settings
 from app.db.database import get_db
 from app.db.models.guardian_wish_message import GuardianWishMessage
 from app.db.models.message_entry import MessageEntry
@@ -24,6 +25,18 @@ from app.messages.schemas import (
 router = APIRouter(prefix="/messages", tags=["messages"])
 
 GUARDIANS_MIN_RANK = 3
+BROADCAST_ALL_USERS_KEYWORD = "allusers"
+
+
+def _parse_csv_set(value: str | None) -> set[str]:
+    raw = (value or "").strip()
+    if not raw:
+        return set()
+    return {
+        item.strip().lower()
+        for item in raw.split(",")
+        if item and item.strip()
+    }
 
 
 def _is_guardian(current: UserPublic) -> bool:
@@ -43,6 +56,30 @@ def _normalize_username(value: str | None) -> str:
     while normalized.startswith("@"):
         normalized = normalized[1:]
     return normalized
+
+
+def _is_all_users_broadcast(payload: MessageThreadCreateInput) -> bool:
+    return payload.to_user_id is None and _normalize_username(payload.to_username) == BROADCAST_ALL_USERS_KEYWORD
+
+
+def _can_use_all_users_broadcast(current: UserPublic) -> bool:
+    allowed_usernames = _parse_csv_set(settings.MESSAGES_BROADCAST_ALLOW_USERNAMES)
+    allowed_emails = _parse_csv_set(settings.MESSAGES_BROADCAST_ALLOW_EMAILS)
+    current_username = _normalize_username(current.username)
+    current_email = (current.email or "").strip().lower()
+
+    return (bool(current_username) and current_username in allowed_usernames) or (
+        bool(current_email) and current_email in allowed_emails
+    )
+
+
+def _require_all_users_broadcast_access(current: UserPublic) -> None:
+    if _can_use_all_users_broadcast(current):
+        return
+    raise HTTPException(
+        status_code=403,
+        detail="El envío a @allusers es exclusivo para cuentas autorizadas.",
+    )
 
 
 def _build_handle(*, username: str | None, user_id: int | None) -> str:
@@ -276,6 +313,17 @@ def _resolve_recipient_for_create(*, db: Session, payload: MessageThreadCreateIn
     return user
 
 
+def _resolve_all_users_recipients(*, db: Session, sender_user_id: int) -> list[User]:
+    recipients = db.execute(
+        select(User).where(
+            User.is_active.is_(True),
+            User.id != sender_user_id,
+        )
+        .order_by(User.id.asc())
+    ).scalars().all()
+    return recipients
+
+
 def _resolve_thread_for_participant(
     *,
     db: Session,
@@ -314,9 +362,47 @@ def create_thread(
     db: Session = Depends(get_db),
 ):
     _require_guardian(current)
+    sender_user_id = int(current.user_number)
+
+    if _is_all_users_broadcast(payload):
+        _require_all_users_broadcast_access(current)
+        recipients = _resolve_all_users_recipients(db=db, sender_user_id=sender_user_id)
+        if not recipients:
+            raise HTTPException(
+                status_code=409,
+                detail="No hay usuarios activos disponibles para enviar con @allusers.",
+            )
+
+        created_threads: list[MessageThread] = []
+        for recipient in recipients:
+            thread = MessageThread(
+                guardian_user_id=sender_user_id,
+                recipient_user_id=int(recipient.id),
+                subject=payload.subject,
+                is_guardian_center_origin=False,
+            )
+            db.add(thread)
+            db.flush()
+
+            entry = MessageEntry(
+                thread_id=int(thread.id),
+                sender_user_id=sender_user_id,
+                body=payload.body,
+            )
+            db.add(entry)
+            db.flush()
+
+            thread.updated_at = entry.created_at or datetime.now(timezone.utc)
+            created_threads.append(thread)
+
+        db.commit()
+        last_created_thread = created_threads[-1]
+        db.refresh(last_created_thread)
+
+        items = _build_threads_out(db=db, threads=[last_created_thread], current=current)
+        return items[0]
 
     recipient = _resolve_recipient_for_create(db=db, payload=payload)
-    sender_user_id = int(current.user_number)
 
     if int(recipient.id) == sender_user_id:
         raise HTTPException(status_code=400, detail="No puedes enviarte mensajes a ti mismo.")

@@ -9,9 +9,12 @@ from .life_purpose import LifePurpose  # noqa
 from .media import Media  # noqa
 from .password_reset_token import PasswordResetToken  # noqa
 from .post import (
+    Hashtag,
     Post,
     PostComment,
+    PostHashtag,
     PostMediaKind,
+    PostMention,
     PostReport,
     PostReportCase,
     PostReportCaseStatus,
@@ -56,6 +59,7 @@ from .guardian_wish_request import GuardianWishRequest, GuardianWishRequestStatu
 from .guardian_wish_message import GuardianWishMessage, GuardianWishMessageKind  # noqa
 from .message_thread import MessageThread  # noqa
 from .message_entry import MessageEntry  # noqa
+from .notification_read import NotificationRead  # noqa
 from .gallery_folder import GalleryFolder  # noqa
 from .gallery_folder_item import GalleryFolderItem  # noqa
 from .achievement_unlock_event import AchievementUnlockEvent  # noqa

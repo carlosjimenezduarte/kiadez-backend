@@ -25,6 +25,8 @@ from app.db.models.media import Media, MediaVisibility
 from app.db.models.user import User
 from app.db.repositories.user_repository import UserRepository
 from app.media.schemas import (
+    CoverPhotoResponse,
+    CoverPhotoSetRequest,
     MediaConfirmRequest,
     MediaDeleteResponse,
     MediaImageOption,
@@ -38,6 +40,8 @@ from app.media.schemas import (
 
 router = APIRouter(prefix="/media", tags=["media"])
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
+COVER_OFFSET_LIMIT = 4000
 
 
 def _ensure_media_storage_ready() -> None:
@@ -118,6 +122,66 @@ def _get_user_from_token(token: str | None, db: Session):
     if not user or not user.is_active:
         return None
     return user
+
+
+def _clamp_cover_offset(value: int | None) -> int:
+    normalized = int(value or 0)
+    if normalized < -COVER_OFFSET_LIMIT:
+        return -COVER_OFFSET_LIMIT
+    if normalized > COVER_OFFSET_LIMIT:
+        return COVER_OFFSET_LIMIT
+    return normalized
+
+
+def _cover_photo_response_for_user(
+    *,
+    user: User,
+    current_user_id: int,
+    db: Session,
+    allow_cleanup: bool = False,
+) -> CoverPhotoResponse:
+    offset_x = _clamp_cover_offset(user.cover_photo_offset_x)
+    offset_y = _clamp_cover_offset(user.cover_photo_offset_y)
+
+    media_id = int(user.cover_photo_media_id) if user.cover_photo_media_id is not None else None
+    if media_id is None:
+        return CoverPhotoResponse(offset_x=offset_x, offset_y=offset_y)
+
+    media = db.query(Media).filter(Media.id == media_id).one_or_none()
+    if media is None:
+        if allow_cleanup:
+            user.cover_photo_media_id = None
+            db.commit()
+        return CoverPhotoResponse(offset_x=offset_x, offset_y=offset_y)
+
+    if media.owner_id != int(user.id):
+        if allow_cleanup:
+            user.cover_photo_media_id = None
+            db.commit()
+        return CoverPhotoResponse(offset_x=offset_x, offset_y=offset_y)
+
+    if media.status != "ready":
+        return CoverPhotoResponse(offset_x=offset_x, offset_y=offset_y)
+
+    if not (media.mime_type or "").lower().startswith("image/"):
+        if allow_cleanup:
+            user.cover_photo_media_id = None
+            db.commit()
+        return CoverPhotoResponse(offset_x=offset_x, offset_y=offset_y)
+
+    if media.visibility == MediaVisibility.private and int(current_user_id) != int(user.id):
+        return CoverPhotoResponse(offset_x=offset_x, offset_y=offset_y)
+
+    _ensure_media_storage_ready()
+    expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
+    url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
+    return CoverPhotoResponse(
+        media_id=media.id,
+        url=url,
+        offset_x=offset_x,
+        offset_y=offset_y,
+        expires_in=expires_in,
+    )
 
 
 @router.post("/presign/upload", response_model=MediaPresignResponse)
@@ -463,6 +527,90 @@ def set_profile_photo(
     expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
     url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
     return ProfilePhotoResponse(media_id=media.id, url=url, expires_in=expires_in)
+
+
+@router.get("/cover-photo", response_model=CoverPhotoResponse)
+def get_cover_photo(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == current.user_number).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    return _cover_photo_response_for_user(
+        user=user,
+        current_user_id=int(current.user_number),
+        db=db,
+        allow_cleanup=True,
+    )
+
+
+@router.post("/cover-photo", response_model=CoverPhotoResponse)
+def set_cover_photo(
+    payload: CoverPhotoSetRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == current.user_number).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    user.cover_photo_offset_x = _clamp_cover_offset(payload.offset_x)
+    user.cover_photo_offset_y = _clamp_cover_offset(payload.offset_y)
+
+    if payload.media_id is None:
+        user.cover_photo_media_id = None
+        db.commit()
+        return CoverPhotoResponse(
+            media_id=None,
+            url=None,
+            offset_x=int(user.cover_photo_offset_x or 0),
+            offset_y=int(user.cover_photo_offset_y or 0),
+            expires_in=0,
+        )
+
+    media = db.query(Media).filter(Media.id == payload.media_id).one_or_none()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media no encontrada.")
+    if media.owner_id != current.user_number:
+        raise HTTPException(status_code=403, detail="No autorizado.")
+    if media.status != "ready":
+        raise HTTPException(status_code=409, detail="Media aún no disponible.")
+    if not (media.mime_type or "").lower().startswith("image/"):
+        raise HTTPException(status_code=400, detail="Solo puedes asignar imágenes.")
+
+    user.cover_photo_media_id = media.id
+    db.commit()
+    db.refresh(user)
+
+    return _cover_photo_response_for_user(
+        user=user,
+        current_user_id=int(current.user_number),
+        db=db,
+        allow_cleanup=True,
+    )
+
+
+@router.get("/cover-photo/user/{user_id}", response_model=CoverPhotoResponse)
+def get_user_cover_photo(
+    user_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == int(user_id), User.is_active.is_(True)).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = int(user.id) == int(current.user_number)
+    if not is_owner and not bool(user.public_profile_show_cover_purposes):
+        return CoverPhotoResponse()
+
+    return _cover_photo_response_for_user(
+        user=user,
+        current_user_id=int(current.user_number),
+        db=db,
+        allow_cleanup=is_owner,
+    )
 
 
 @router.get("/emblem", response_model=ProfilePhotoResponse)

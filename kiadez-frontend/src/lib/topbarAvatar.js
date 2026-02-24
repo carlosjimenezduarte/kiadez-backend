@@ -3,7 +3,6 @@ const API_BASE_URL =
   "http://127.0.0.1:8000";
 
 const DEFAULT_AVATAR_SRC = "/assets/avatar-default.jpg";
-const AVATAR_CACHE_KEY = "kiadez_profile_avatar_url";
 
 const getAccessToken = () =>
   localStorage.getItem("access_token") ||
@@ -26,13 +25,10 @@ const applyAvatarToTopbar = (url) => {
 };
 
 export async function syncTopbarAvatar() {
-  const cached = localStorage.getItem(AVATAR_CACHE_KEY) || "";
-  if (cached) {
-    applyAvatarToTopbar(cached);
-  }
+  applyAvatarToTopbar(DEFAULT_AVATAR_SRC);
 
   const token = getAccessToken();
-  if (!token) return cached || null;
+  if (!token) return null;
 
   try {
     const response = await fetch(`${API_BASE_URL}/media/profile-photo`, {
@@ -42,19 +38,18 @@ export async function syncTopbarAvatar() {
     });
 
     if (response.status === 401) {
-      return cached || null;
+      return null;
     }
 
     const data = await parseJsonSafe(response);
     if (!response.ok) {
-      return cached || null;
+      return null;
     }
 
     const avatarUrl = (data?.url || "").trim() || DEFAULT_AVATAR_SRC;
     applyAvatarToTopbar(avatarUrl);
-    localStorage.setItem(AVATAR_CACHE_KEY, avatarUrl);
     return avatarUrl;
   } catch {
-    return cached || null;
+    return null;
   }
 }

@@ -241,7 +241,7 @@
     <div class="star-pool-body">
       <nav class="profile-nav" aria-label="Navegación de perfil">
         <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
-        <a class="nav-pill" href="/star-pool-found.html" id="openStarModal" title="Estrellas" on:click={openStars}>
+        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
           <span class="nav-icon">⭐</span>
           <span><strong>{formatStars(starPool.my_received_stars_total)}</strong> estrellas</span>
         </a>
@@ -260,17 +260,6 @@
             <h2 class="star-pool-title">Fondo Común de Estrellas</h2>
             <p class="star-pool-subtitle">Gracias por sostener el brillo colectivo.</p>
           </div>
-          <div class="star-pool-tags">
-            <span class="panel-badge">{justDonated ? 'Donación confirmada' : 'Estado actual'}</span>
-            <span class="panel-badge">
-              {starPool.unlocked_donation_achievements}/{starPool.donation_achievements.length || 10}
-              logros por donación
-            </span>
-            <span class="panel-badge">
-              {starPool.unlocked_publication_achievements}/{starPool.publication_achievements.length || 30}
-              logros por publicaciones
-            </span>
-          </div>
         </header>
 
         {#if isLoading}
@@ -288,17 +277,15 @@
         <article class="panel star-pool-card" id="donationSummary">
           <div class="star-pool-highlight">
             <div class="star-circle star-circle-lg">
-              <img src={justDonated ? '/css/star.webp' : '/css/fundstar.webp'} alt="Fondo Común de Estrellas" />
+              <img src="/css/fundstar.webp" alt="Acumulado del Fondo Común de Estrellas" />
             </div>
             <div>
-              {#if justDonated}
-                <h3 class="star-pool-message">
-                  Acabas de donar {formatStars(recentDonationAmount)} estrellas al Fondo Común de Estrellas
-                </h3>
-                <p class="star-pool-thanks">¡Muchas gracias por tu donación!</p>
-              {:else}
-                <h3 class="star-pool-message">Estrellas donadas por ti hasta ahora al Fondo Común de Estrellas</h3>
-                <p class="star-pool-thanks"><strong>{formatStars(starPool.my_donated_stars_total)}</strong> estrellas</p>
+              <h3 class="star-pool-message">Acumulado actual del Fondo Común de Estrellas</h3>
+              <p class="star-pool-thanks"><strong>{formatStars(starPool.common_pool_stars_total)}</strong> estrellas</p>
+              {#if justDonated && recentDonationAmount > 0}
+                <p class="star-pool-thanks">
+                  Tu donación de {formatStars(recentDonationAmount)} estrellas ya se sumó al acumulado global.
+                </p>
               {/if}
             </div>
           </div>
@@ -321,6 +308,11 @@
               <div>
                 <div class="star-pool-stat-label">Estrellas actualmente disponibles para donar</div>
                 <div class="star-pool-stat-value">{formatStars(starPool.my_donatable_stars_total)}</div>
+                {#if canDonate}
+                  <button class="btn btn-primary btn-compact btn-inline" type="button" on:click={openStars}>
+                    Donar estrellas
+                  </button>
+                {/if}
               </div>
             </div>
 

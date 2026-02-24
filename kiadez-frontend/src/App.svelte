@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import { syncTopbarAvatar } from './lib/topbarAvatar';
+  import { initTopbarNotifications } from './lib/topbarNotifications';
+  import { initTopbarSearch } from './lib/topbarSearch';
   import Landing from './pages/Landing.svelte';
   import StarPoolFound from './pages/StarPoolFound.svelte';
   import HomeUser from './pages/HomeUser.svelte';
@@ -35,6 +37,7 @@
   import PrivacyAndSettings from './pages/PrivacyAndSettings.svelte';
   import GuardianCenter from './pages/GuardianCenter.svelte';
   import Messages from './pages/Messages.svelte';
+  import Notifications from './pages/Notifications.svelte';
 
   const path = typeof window !== 'undefined' ? window.location.pathname : '/';
   const route = path.replace(/\/+$/, '') || '/';
@@ -109,12 +112,20 @@
     '/guardiancenter.html': GuardianCenter,
     '/messages': Messages,
     '/messages.html': Messages,
+    '/notifications': Notifications,
+    '/notifications.html': Notifications,
   };
 
   const Component = routes[route] || Landing;
 
   onMount(() => {
     void syncTopbarAvatar();
+    const cleanupNotifications = initTopbarNotifications();
+    const cleanupTopbarSearch = initTopbarSearch();
+    return () => {
+      if (typeof cleanupNotifications === 'function') cleanupNotifications();
+      if (typeof cleanupTopbarSearch === 'function') cleanupTopbarSearch();
+    };
   });
 </script>
 

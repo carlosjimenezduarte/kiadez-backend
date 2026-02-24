@@ -253,7 +253,7 @@
     const recipient = parseRecipientInput(composeTo);
     if (!recipient.userId && !recipient.username) {
       composeToError = true;
-      setComposeError("Debes escribir un @id o @usuario válido.");
+      setComposeError("Debes escribir un @id, @usuario o @allusers válido.");
       return;
     }
 
@@ -632,12 +632,15 @@
           type="text"
           maxlength="120"
           bind:value={composeTo}
-          placeholder="@id123 o @usuario"
+          placeholder="@id123, @usuario o @allusers"
           on:input={() => {
             composeToError = false;
             setComposeError("");
           }}
         />
+        <p class="panel-muted">
+          Puedes usar <strong>@allusers</strong> para enviar un mensaje masivo (solo cuentas autorizadas).
+        </p>
 
         <label class="modal-label" for="composeSubject">Asunto</label>
         <input

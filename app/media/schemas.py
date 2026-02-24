@@ -63,3 +63,17 @@ class ProfilePhotoResponse(BaseModel):
     media_id: Optional[int] = None
     url: Optional[str] = None
     expires_in: int = 0
+
+
+class CoverPhotoSetRequest(BaseModel):
+    media_id: Optional[int] = Field(default=None, gt=0)
+    offset_x: int = Field(default=0, ge=-4000, le=4000)
+    offset_y: int = Field(default=0, ge=-4000, le=4000)
+
+
+class CoverPhotoResponse(BaseModel):
+    media_id: Optional[int] = None
+    url: Optional[str] = None
+    offset_x: int = 0
+    offset_y: int = 0
+    expires_in: int = 0

@@ -9,6 +9,7 @@
   const PASSWORD_RE_SPECIAL = /[^a-zA-Z0-9]/;
 
   let changePasswordModalOpen = false;
+  let changeEmailModalOpen = false;
   let changePasswordMode = "change"; // change | reset
   let changePasswordStatus = "";
   let changePasswordError = "";
@@ -23,6 +24,7 @@
   let meEmail = "";
 
   let currentPassword = "";
+  let emailCurrentPassword = "";
   let newPassword = "";
   let newPasswordConfirm = "";
   let newEmail = "";
@@ -30,8 +32,10 @@
   let showCurrentPassword = false;
   let showNewPassword = false;
   let showNewPasswordConfirm = false;
+  let showEmailCurrentPassword = false;
 
   let currentPasswordInput;
+  let emailCurrentPasswordInput;
 
   // -------------------------
   // 2FA
@@ -216,22 +220,28 @@
   const resetChangePasswordState = () => {
     changePasswordStatus = "";
     changePasswordError = "";
-    emailChangeStatus = "";
-    emailChangeError = "";
     resetStatus = "";
     resetError = "";
     isChangingPassword = false;
-    isChangingEmail = false;
     isSendingReset = false;
 
     currentPassword = "";
     newPassword = "";
     newPasswordConfirm = "";
-    newEmail = "";
 
     showCurrentPassword = false;
     showNewPassword = false;
     showNewPasswordConfirm = false;
+  };
+
+  const resetChangeEmailState = () => {
+    emailChangeStatus = "";
+    emailChangeError = "";
+    isChangingEmail = false;
+
+    emailCurrentPassword = "";
+    newEmail = "";
+    showEmailCurrentPassword = false;
   };
 
   const openChangePasswordModal = async () => {
@@ -249,6 +259,20 @@
   const closeChangePasswordModal = () => {
     changePasswordModalOpen = false;
     resetChangePasswordState();
+  };
+
+  const openChangeEmailModal = async () => {
+    resetChangeEmailState();
+    changeEmailModalOpen = true;
+    void loadMeEmail();
+
+    await tick();
+    emailCurrentPasswordInput?.focus();
+  };
+
+  const closeChangeEmailModal = () => {
+    changeEmailModalOpen = false;
+    resetChangeEmailState();
   };
 
   const passwordChecks = (value) => {
@@ -355,7 +379,7 @@
     emailChangeError = "";
     emailChangeStatus = "";
 
-    const current = String(currentPassword || "").trim();
+    const current = String(emailCurrentPassword || "").trim();
     const nextEmail = String(newEmail || "").trim().toLowerCase();
     const currentEmail = String(meEmail || "").trim().toLowerCase();
 
@@ -396,8 +420,8 @@
 
       meEmail = String(data?.email || nextEmail);
       newEmail = "";
-      currentPassword = "";
-      showCurrentPassword = false;
+      emailCurrentPassword = "";
+      showEmailCurrentPassword = false;
       emailChangeStatus = data?.message || "Correo actualizado correctamente.";
     } catch (err) {
       emailChangeError = err?.message || "No se pudo actualizar el correo.";
@@ -794,7 +818,12 @@
         <div class="settings-actions">
           <button class="settings-action" type="button" on:click={openChangePasswordModal}>
             <span class="settings-action-icon" aria-hidden="true">🔑</span>
-            <span class="settings-action-label">Cambiar contraseña / Correo electrónico</span>
+            <span class="settings-action-label">Cambiar contraseña</span>
+          </button>
+
+          <button class="settings-action" type="button" on:click={openChangeEmailModal}>
+            <span class="settings-action-icon" aria-hidden="true">📧</span>
+            <span class="settings-action-label">Modificar correo electrónico</span>
           </button>
 
           <button class="settings-action" type="button" on:click={openTwoFAModal}>
@@ -1060,17 +1089,17 @@
       class="modal settings-change-password-modal"
       role="dialog"
       aria-modal="true"
-      aria-label="Cambiar contraseña y correo electrónico"
+      aria-label="Cambiar contraseña"
     >
       <div class="modal-head">
-        <h3>{changePasswordMode === "change" ? "Cambiar contraseña / Correo electrónico" : "Recuperar contraseña"}</h3>
+        <h3>{changePasswordMode === "change" ? "Cambiar contraseña" : "Recuperar contraseña"}</h3>
         <button class="modal-close" type="button" on:click={closeChangePasswordModal}>✕</button>
       </div>
 
       <div class="modal-body">
         {#if changePasswordMode === "change"}
           <p class="panel-text settings-change-intro">
-            Para actualizar contraseña o correo, primero confirma tu contraseña de inicio de sesión.
+            Para actualizar tu contraseña, primero confirma tu contraseña de inicio de sesión.
           </p>
 
           <label class="modal-label" for="settings-current-password">
@@ -1180,43 +1209,6 @@
               <p class="settings-form-success" role="status">{changePasswordStatus}</p>
             {/if}
           </div>
-
-          <div class="settings-change-divider" aria-hidden="true"></div>
-
-          <div class="settings-change-section">
-            <h4 class="settings-change-section-title">Cambiar correo electrónico</h4>
-
-            {#if meEmail}
-              <p class="panel-muted settings-change-current-email">
-                Correo actual: <strong>{meEmail}</strong>
-              </p>
-            {/if}
-
-            <label class="modal-label" for="settings-new-email">
-              Digita tu nuevo correo electrónico
-            </label>
-            <input
-              class="modal-input"
-              id="settings-new-email"
-              type="email"
-              bind:value={newEmail}
-              autocomplete="email"
-              placeholder="nuevo-correo@ejemplo.com"
-            />
-
-            <div class="settings-change-section-actions">
-              <button class="btn btn-primary btn-compact" type="button" on:click={handleChangeEmail} disabled={isChangingEmail}>
-                {isChangingEmail ? "Actualizando..." : "Actualizar correo"}
-              </button>
-            </div>
-
-            {#if emailChangeError}
-              <p class="settings-form-error" role="alert">{emailChangeError}</p>
-            {/if}
-            {#if emailChangeStatus}
-              <p class="settings-form-success" role="status">{emailChangeStatus}</p>
-            {/if}
-          </div>
         {:else}
           <p class="panel-text settings-reset-text">
             Si ya no recuerdas tu contraseña, te enviaremos un enlace seguro para restablecerla.
@@ -1250,6 +1242,96 @@
             Volver
           </button>
         {/if}
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal-overlay"
+    class:hidden={!changeEmailModalOpen}
+    aria-hidden={!changeEmailModalOpen}
+    on:click={(event) => {
+      if (event.target?.classList?.contains("modal-overlay")) closeChangeEmailModal();
+    }}
+  >
+    <div
+      class="modal settings-change-password-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Modificar correo electrónico"
+    >
+      <div class="modal-head">
+        <h3>Modificar correo electrónico</h3>
+        <button class="modal-close" type="button" on:click={closeChangeEmailModal}>✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="panel-text settings-change-intro">
+          Para actualizar tu correo, primero confirma tu contraseña de inicio de sesión.
+        </p>
+
+        <label class="modal-label" for="settings-email-current-password">
+          Digita tu contraseña actual
+        </label>
+        <div class="settings-password-row">
+          <input
+            class="modal-input"
+            id="settings-email-current-password"
+            bind:this={emailCurrentPasswordInput}
+            type={showEmailCurrentPassword ? "text" : "password"}
+            bind:value={emailCurrentPassword}
+            autocomplete="current-password"
+          />
+          <button
+            class="settings-password-toggle"
+            type="button"
+            aria-label={showEmailCurrentPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            on:click={() => (showEmailCurrentPassword = !showEmailCurrentPassword)}
+          >
+            👁️
+          </button>
+        </div>
+
+        <div class="settings-change-section">
+          <h4 class="settings-change-section-title">Cambiar correo electrónico</h4>
+
+          {#if meEmail}
+            <p class="panel-muted settings-change-current-email">
+              Correo actual: <strong>{meEmail}</strong>
+            </p>
+          {/if}
+
+          <label class="modal-label" for="settings-new-email">
+            Digita tu nuevo correo electrónico
+          </label>
+          <input
+            class="modal-input"
+            id="settings-new-email"
+            type="email"
+            bind:value={newEmail}
+            autocomplete="email"
+            placeholder="nuevo-correo@ejemplo.com"
+          />
+
+          <div class="settings-change-section-actions">
+            <button class="btn btn-primary btn-compact" type="button" on:click={handleChangeEmail} disabled={isChangingEmail}>
+              {isChangingEmail ? "Actualizando..." : "Actualizar correo"}
+            </button>
+          </div>
+
+          {#if emailChangeError}
+            <p class="settings-form-error" role="alert">{emailChangeError}</p>
+          {/if}
+          {#if emailChangeStatus}
+            <p class="settings-form-success" role="status">{emailChangeStatus}</p>
+          {/if}
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-compact" type="button" on:click={closeChangeEmailModal}>
+          Cerrar
+        </button>
       </div>
     </div>
   </div>
