@@ -2129,7 +2129,31 @@ body {
     color: rgba(11, 95, 42, 0.92);
 }
 
+.guardian-reported-status.is-reviewed {
+    background: rgba(30, 86, 122, 0.08);
+    border-color: rgba(30, 86, 122, 0.18);
+    color: rgba(20, 63, 89, 0.92);
+}
+
 .guardian-reported-status.is-deleted {
+    background: rgba(170, 35, 35, 0.08);
+    border-color: rgba(170, 35, 35, 0.18);
+    color: rgba(136, 26, 26, 0.92);
+}
+
+.guardian-reported-status.is-active {
+    background: rgba(11, 95, 42, 0.08);
+    border-color: rgba(11, 95, 42, 0.18);
+    color: rgba(11, 95, 42, 0.92);
+}
+
+.guardian-reported-status.is-suspended {
+    background: rgba(176, 124, 0, 0.10);
+    border-color: rgba(176, 124, 0, 0.24);
+    color: rgba(117, 80, 0, 0.96);
+}
+
+.guardian-reported-status.is-closed {
     background: rgba(170, 35, 35, 0.08);
     border-color: rgba(170, 35, 35, 0.18);
     color: rgba(136, 26, 26, 0.92);
@@ -9170,6 +9194,34 @@ body[data-visitor="true"] .visitor-only {
 
 .wish-modal {
     width: 100%;
+}
+
+.modal.wish-modal.guardian-rank-promote-modal {
+    width: clamp(420px, 40vw, 760px);
+}
+
+@media (max-width: 720px) {
+    .modal.wish-modal.guardian-rank-promote-modal {
+        width: min(92vw, 520px);
+    }
+}
+
+.modal.wish-modal.report-post-modal {
+    width: clamp(420px, 40vw, 640px);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal.wish-modal.report-post-modal .modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+}
+
+@media (max-width: 720px) {
+    .modal.wish-modal.report-post-modal {
+        width: min(92vw, 520px);
+    }
 }
 
 .delete-wish-modal {

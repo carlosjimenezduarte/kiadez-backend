@@ -140,6 +140,9 @@ USERNAME_PATTERN = re.compile(r"^[a-z0-9._]{4,30}$")
 USERNAME_COOLDOWN_DAYS = 30
 ACCOUNT_CLOSURE_GRACE_DAYS = 30
 MINOR_ACCREDITATION_TOKEN_EXPIRE_DAYS = 7
+GUARDIAN_MODERATION_STATUS_ACTIVE = "active"
+GUARDIAN_MODERATION_STATUS_SUSPENDED = "suspended"
+GUARDIAN_MODERATION_STATUS_CLOSED = "closed"
 USERNAME_RESERVED = {
     "admin",
     "support",
@@ -154,6 +157,25 @@ USERNAME_RESERVED = {
     "settings",
     "privacy",
 }
+
+
+def _normalize_guardian_moderation_status(raw: str | None) -> str:
+    value = str(raw or "").strip().lower()
+    if value in {
+        GUARDIAN_MODERATION_STATUS_SUSPENDED,
+        GUARDIAN_MODERATION_STATUS_CLOSED,
+    }:
+        return value
+    return GUARDIAN_MODERATION_STATUS_ACTIVE
+
+
+def _guardian_moderation_block_detail(status: str) -> str:
+    normalized = _normalize_guardian_moderation_status(status)
+    if normalized == GUARDIAN_MODERATION_STATUS_SUSPENDED:
+        return "Tu cuenta está suspendida por decisión de un Guardián."
+    if normalized == GUARDIAN_MODERATION_STATUS_CLOSED:
+        return "Tu cuenta fue cerrada de forma definitiva por decisión de un Guardián."
+    return "No autorizado."
 
 
 def _normalize_username(raw: str) -> str:
@@ -548,11 +570,20 @@ def get_current_user(
         repo = UserRepository(db)
         user = repo.get_user_by_id(user_id)
 
-        if not user or not user.is_active:
+        if not user:
+            raise ValueError("Usuario no encontrado o inactivo.")
+
+        moderation_status = _normalize_guardian_moderation_status(user.guardian_moderation_status)
+        if moderation_status != GUARDIAN_MODERATION_STATUS_ACTIVE:
+            raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(moderation_status))
+
+        if not user.is_active:
             raise ValueError("Usuario no encontrado o inactivo.")
 
         user = _sync_minor_protected_state(db=db, user=user)
         return _to_user_public(user)
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=401, detail="No autorizado")
 
@@ -648,10 +679,15 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
+    if not verify_password(data.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+
+    moderation_status = _normalize_guardian_moderation_status(user.guardian_moderation_status)
+
     if not user.is_active:
+        if moderation_status != GUARDIAN_MODERATION_STATUS_ACTIVE:
+            raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(moderation_status))
         if not _is_account_closure_pending(user, now=now_utc):
-            raise HTTPException(status_code=401, detail="Credenciales inválidas")
-        if not verify_password(data.password, user.password_hash):
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
         _mark_account_closure_restored(
@@ -662,9 +698,8 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         )
         db.commit()
         db.refresh(user)
-    else:
-        if not verify_password(data.password, user.password_hash):
-            raise HTTPException(status_code=401, detail="Credenciales inválidas")
+    elif moderation_status != GUARDIAN_MODERATION_STATUS_ACTIVE:
+        raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(moderation_status))
 
     # 🔐 Revisar si tiene 2FA activo
     two_fa_repo = User2FARepository(db)
@@ -717,7 +752,14 @@ def refresh(
         repo = UserRepository(db)
         user = repo.get_user_by_id(user_id)
 
-        if not user or not user.is_active:
+        if not user:
+            raise ValueError("Usuario no encontrado o inactivo.")
+
+        moderation_status = _normalize_guardian_moderation_status(user.guardian_moderation_status)
+        if moderation_status != GUARDIAN_MODERATION_STATUS_ACTIVE:
+            raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(moderation_status))
+
+        if not user.is_active:
             raise ValueError("Usuario no encontrado o inactivo.")
 
         access = create_access_token(
@@ -741,6 +783,8 @@ def refresh(
             access_token=access,
             refresh_token=new_refresh["token"],
         )
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=401, detail="Refresh inválido.")
 
@@ -1389,7 +1433,14 @@ def verify_2fa(
     repo = UserRepository(db)
     user = repo.get_user_by_id(user_id)
 
-    if not user or not user.is_active:
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario inválido")
+
+    moderation_status = _normalize_guardian_moderation_status(user.guardian_moderation_status)
+    if moderation_status != GUARDIAN_MODERATION_STATUS_ACTIVE:
+        raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(moderation_status))
+
+    if not user.is_active:
         raise HTTPException(status_code=401, detail="Usuario inválido")
 
     # Validar TOTP

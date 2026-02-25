@@ -1884,7 +1884,7 @@
       if (event.target === event.currentTarget) closeReportPostModal();
     }}
   >
-    <div class="modal wish-modal" role="dialog" aria-modal="true" aria-label="Reportar publicación">
+    <div class="modal wish-modal report-post-modal" role="dialog" aria-modal="true" aria-label="Reportar publicación">
       <div class="modal-head">
         <h3>Reportar publicación</h3>
         <button class="modal-close" type="button" on:click={closeReportPostModal}>✕</button>

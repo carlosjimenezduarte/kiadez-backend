@@ -5,7 +5,7 @@ from math import ceil
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import case, desc, func, select, update
+from sqlalchemy import case, delete, desc, func, select, update
 from sqlalchemy.orm import Session
 
 from app.auth.minor_accreditation import is_minor_protected
@@ -22,6 +22,7 @@ from app.db.models.media import Media
 from app.db.models.post import Post, PostReport, PostReportCase, PostReportCaseStatus
 from app.db.models.profile_report import ProfileReport, ProfileReportCase, ProfileReportCaseStatus
 from app.db.models.public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus
+from app.db.models.refresh_token import RefreshToken
 from app.db.models.user import User
 from app.guardian_center.schemas import (
     GuardianRankPromotionOut,
@@ -58,6 +59,9 @@ GUARDIAN_RANK_NAMES: dict[int, str] = {
     7: "Guardián del Umbral",
     8: "Guardián de Guardianes",
 }
+ACCOUNT_MODERATION_STATUS_ACTIVE = "active"
+ACCOUNT_MODERATION_STATUS_SUSPENDED = "suspended"
+ACCOUNT_MODERATION_STATUS_CLOSED = "closed"
 PAGE_SIZE_DEFAULT = 10
 PAGE_SIZE_MAX = 25
 REPORTED_POSTS_PAGE_SIZE_DEFAULT = 10
@@ -90,6 +94,28 @@ def _build_handle(*, username: str | None, user_id: int) -> str:
 
 def _guardian_rank_name(rank: int) -> str:
     return GUARDIAN_RANK_NAMES.get(int(rank), f"Rango {int(rank)}")
+
+
+def _normalize_account_moderation_status(raw: str | None) -> str:
+    value = str(raw or "").strip().lower()
+    if value in {
+        ACCOUNT_MODERATION_STATUS_SUSPENDED,
+        ACCOUNT_MODERATION_STATUS_CLOSED,
+    }:
+        return value
+    return ACCOUNT_MODERATION_STATUS_ACTIVE
+
+
+def _set_profile_case_reviewed(
+    *,
+    item: ProfileReportCase,
+    guardian_user_id: int,
+    now: datetime,
+) -> None:
+    item.status = ProfileReportCaseStatus.reviewed
+    item.resolved_at = now
+    item.resolved_by_guardian_id = int(guardian_user_id)
+    item.updated_at = now
 
 
 def _parse_rank_lookup_query(raw: str) -> tuple[int | None, str | None]:
@@ -452,6 +478,19 @@ def _load_related_maps_for_profile_report_cases(
         users = db.execute(select(User).where(User.id.in_(sorted(user_ids)))).scalars().all()
         users_map = {int(user.id): user for user in users}
 
+    moderator_user_ids: set[int] = set()
+    for item in items:
+        reported_user = users_map.get(int(item.reported_user_id)) if item.reported_user_id else None
+        if reported_user is None or not reported_user.guardian_moderated_by_user_id:
+            continue
+        moderator_user_ids.add(int(reported_user.guardian_moderated_by_user_id))
+
+    missing_moderator_ids = sorted(moderator_user_ids.difference(users_map.keys()))
+    if missing_moderator_ids:
+        moderators = db.execute(select(User).where(User.id.in_(missing_moderator_ids))).scalars().all()
+        for moderator in moderators:
+            users_map[int(moderator.id)] = moderator
+
     reports_map = _load_profile_reporter_handles(db=db, case_ids=case_ids)
     return users_map, reports_map
 
@@ -525,11 +564,19 @@ def _reported_profile_out(
     item: ProfileReportCase,
     users: dict[int, User],
     reports_map: dict[int, list[GuardianReportedProfileReportOut]],
+    current_user_id: int,
 ) -> GuardianReportedProfileOut:
     reported_user = users.get(int(item.reported_user_id)) if item.reported_user_id else None
     if reported_user is None:
         raise HTTPException(status_code=500, detail="No se pudo construir el reporte (usuario faltante).")
     resolver = users.get(int(item.resolved_by_guardian_id)) if item.resolved_by_guardian_id else None
+    moderation_status = _normalize_account_moderation_status(reported_user.guardian_moderation_status)
+    account_moderated_by_guardian = (
+        users.get(int(reported_user.guardian_moderated_by_user_id))
+        if reported_user.guardian_moderated_by_user_id
+        else None
+    )
+    is_self_target = int(reported_user.id) == int(current_user_id)
     reported_posts = _load_reported_posts_for_profile(
         db=db,
         reported_user=reported_user,
@@ -541,6 +588,14 @@ def _reported_profile_out(
         status=item.status,
         report_count=max(0, int(item.report_count or 0)),
         reported_user=_user_out(reported_user),
+        account_moderation_status=moderation_status,
+        account_moderated_at=reported_user.guardian_moderated_at,
+        account_moderated_by_guardian=(
+            _user_out(account_moderated_by_guardian) if account_moderated_by_guardian else None
+        ),
+        can_suspend_account=(not is_self_target and moderation_status == ACCOUNT_MODERATION_STATUS_ACTIVE),
+        can_enable_account=(not is_self_target and moderation_status == ACCOUNT_MODERATION_STATUS_SUSPENDED),
+        can_close_account=(not is_self_target and moderation_status != ACCOUNT_MODERATION_STATUS_CLOSED),
         resolved_by_guardian=_user_out(resolver) if resolver else None,
         first_reported_at=item.first_reported_at,
         last_reported_at=item.last_reported_at,
@@ -856,7 +911,13 @@ def list_reported_profiles(
 
     users_map, reports_map = _load_related_maps_for_profile_report_cases(db=db, items=rows)
     items = [
-        _reported_profile_out(db=db, item=item, users=users_map, reports_map=reports_map)
+        _reported_profile_out(
+            db=db,
+            item=item,
+            users=users_map,
+            reports_map=reports_map,
+            current_user_id=int(current.user_number),
+        )
         for item in rows
     ]
 
@@ -904,6 +965,169 @@ def list_reported_posts_for_profile_case(
         reported_user=reported_user,
         page=page,
         page_size=page_size,
+    )
+
+
+def _resolve_profile_case_and_target_user(
+    *,
+    db: Session,
+    case_id: int,
+    guardian_user_id: int,
+) -> tuple[ProfileReportCase, User]:
+    item = db.execute(
+        select(ProfileReportCase).where(ProfileReportCase.id == int(case_id))
+    ).scalar_one_or_none()
+    if item is None:
+        raise HTTPException(status_code=404, detail="Reporte de perfil no encontrado.")
+
+    target_user = db.execute(
+        select(User).where(User.id == int(item.reported_user_id))
+    ).scalar_one_or_none()
+    if target_user is None:
+        raise HTTPException(status_code=404, detail="Usuario reportado no encontrado.")
+    if int(target_user.id) == int(guardian_user_id):
+        raise HTTPException(status_code=400, detail="No puedes moderar tu propia cuenta.")
+
+    return item, target_user
+
+
+def _build_reported_profile_case_response(
+    *,
+    db: Session,
+    item: ProfileReportCase,
+    current_user_id: int,
+) -> GuardianReportedProfileOut:
+    users_map, reports_map = _load_related_maps_for_profile_report_cases(db=db, items=[item])
+    return _reported_profile_out(
+        db=db,
+        item=item,
+        users=users_map,
+        reports_map=reports_map,
+        current_user_id=current_user_id,
+    )
+
+
+@router.post("/reported-profiles/{case_id}/suspend-account", response_model=GuardianReportedProfileOut)
+def suspend_reported_profile_account(
+    case_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_guardian(current)
+
+    item, target_user = _resolve_profile_case_and_target_user(
+        db=db,
+        case_id=case_id,
+        guardian_user_id=int(current.user_number),
+    )
+
+    current_status = _normalize_account_moderation_status(target_user.guardian_moderation_status)
+    if current_status == ACCOUNT_MODERATION_STATUS_CLOSED:
+        raise HTTPException(status_code=409, detail="La cuenta ya está cerrada de forma definitiva.")
+    if current_status == ACCOUNT_MODERATION_STATUS_SUSPENDED:
+        raise HTTPException(status_code=409, detail="La cuenta ya está suspendida.")
+
+    now = datetime.now(timezone.utc)
+    target_user.guardian_moderation_status = ACCOUNT_MODERATION_STATUS_SUSPENDED
+    target_user.guardian_moderated_at = now
+    target_user.guardian_moderated_by_user_id = int(current.user_number)
+    target_user.is_active = False
+    target_user.account_closure_requested_at = None
+    target_user.account_closure_restore_deadline_at = None
+    target_user.updated_at = now
+
+    _set_profile_case_reviewed(item=item, guardian_user_id=int(current.user_number), now=now)
+    db.execute(delete(RefreshToken).where(RefreshToken.user_id == int(target_user.id)))
+
+    db.commit()
+    db.refresh(item)
+
+    return _build_reported_profile_case_response(
+        db=db,
+        item=item,
+        current_user_id=int(current.user_number),
+    )
+
+
+@router.post("/reported-profiles/{case_id}/enable-account", response_model=GuardianReportedProfileOut)
+def enable_reported_profile_account(
+    case_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_guardian(current)
+
+    item, target_user = _resolve_profile_case_and_target_user(
+        db=db,
+        case_id=case_id,
+        guardian_user_id=int(current.user_number),
+    )
+
+    current_status = _normalize_account_moderation_status(target_user.guardian_moderation_status)
+    if current_status == ACCOUNT_MODERATION_STATUS_CLOSED:
+        raise HTTPException(status_code=409, detail="La cuenta cerrada de forma definitiva no se puede habilitar.")
+    if current_status != ACCOUNT_MODERATION_STATUS_SUSPENDED:
+        raise HTTPException(status_code=409, detail="Solo una cuenta suspendida puede volver a habilitarse.")
+
+    now = datetime.now(timezone.utc)
+    target_user.guardian_moderation_status = ACCOUNT_MODERATION_STATUS_ACTIVE
+    target_user.guardian_moderated_at = now
+    target_user.guardian_moderated_by_user_id = int(current.user_number)
+    target_user.is_active = True
+    target_user.account_closure_requested_at = None
+    target_user.account_closure_restore_deadline_at = None
+    target_user.updated_at = now
+
+    _set_profile_case_reviewed(item=item, guardian_user_id=int(current.user_number), now=now)
+    db.execute(delete(RefreshToken).where(RefreshToken.user_id == int(target_user.id)))
+
+    db.commit()
+    db.refresh(item)
+
+    return _build_reported_profile_case_response(
+        db=db,
+        item=item,
+        current_user_id=int(current.user_number),
+    )
+
+
+@router.post("/reported-profiles/{case_id}/close-account", response_model=GuardianReportedProfileOut)
+def close_reported_profile_account(
+    case_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_guardian(current)
+
+    item, target_user = _resolve_profile_case_and_target_user(
+        db=db,
+        case_id=case_id,
+        guardian_user_id=int(current.user_number),
+    )
+
+    current_status = _normalize_account_moderation_status(target_user.guardian_moderation_status)
+    if current_status == ACCOUNT_MODERATION_STATUS_CLOSED:
+        raise HTTPException(status_code=409, detail="La cuenta ya fue cerrada de forma definitiva.")
+
+    now = datetime.now(timezone.utc)
+    target_user.guardian_moderation_status = ACCOUNT_MODERATION_STATUS_CLOSED
+    target_user.guardian_moderated_at = now
+    target_user.guardian_moderated_by_user_id = int(current.user_number)
+    target_user.is_active = False
+    target_user.account_closure_requested_at = None
+    target_user.account_closure_restore_deadline_at = None
+    target_user.updated_at = now
+
+    _set_profile_case_reviewed(item=item, guardian_user_id=int(current.user_number), now=now)
+    db.execute(delete(RefreshToken).where(RefreshToken.user_id == int(target_user.id)))
+
+    db.commit()
+    db.refresh(item)
+
+    return _build_reported_profile_case_response(
+        db=db,
+        item=item,
+        current_user_id=int(current.user_number),
     )
 
 

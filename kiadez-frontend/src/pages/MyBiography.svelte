@@ -180,6 +180,8 @@
     const wishesFulfilledValue = document.getElementById("wishesFulfilledValue");
     const cooperativeWishesFulfilledValue = document.getElementById("cooperativeWishesFulfilledValue");
     const wishesGrantedValue = document.getElementById("wishesGrantedValue");
+    const activityRankRow = document.getElementById("activityRankRow");
+    const activityRankValue = document.getElementById("activityRankValue");
 
     const defaultProfilePhotoSrc = profilePhoto?.getAttribute("src") || "/css/logo-kiadez.webp";
     const defaultEmblemSrc = emblemImage?.getAttribute("src") || "/css/logo-kiadez.webp";
@@ -190,6 +192,17 @@
     const FAVORITE_QUOTES_MAX_WORDS = 500;
     const DISTINCTIONS_MAX_SLOTS = 10;
     const GUARDIAN_MIN_RANK = 3;
+    const GUARDIAN_RANK_NAMES = Object.freeze({
+      0: "Sin rango",
+      1: "Aspirante",
+      2: "Aprendiz",
+      3: "Guardián",
+      4: "Guardián Consagrado",
+      5: "Guardián Mayor",
+      6: "Guardián del Logos",
+      7: "Guardián del Umbral",
+      8: "Guardián de Guardianes",
+    });
     const defaultAboutDisplayName = (aboutDisplayNameValue?.textContent || infoName?.textContent || "Usuario Kiadez").trim();
     const defaultDreamTitle = (dreamTitleValue?.textContent || "Sobre su mayor sueño").trim();
     const defaultProAchievementsTitle = (proAchievementsTitleValue?.textContent || "Logros profesionales").trim();
@@ -314,6 +327,12 @@
       return Math.trunc(normalized);
     };
 
+    const normalizeGuardianRank = (value) => {
+      const normalized = Number(value);
+      if (!Number.isFinite(normalized)) return 0;
+      return Math.max(0, Math.trunc(normalized));
+    };
+
     const normalizeUsername = (value) => {
       let normalized = String(value || "").trim().toLowerCase();
       while (normalized.startsWith("@")) normalized = normalized.slice(1);
@@ -381,6 +400,17 @@
       }
     };
 
+    const applyActivityRankToView = (rankValue) => {
+      const rank = normalizeGuardianRank(rankValue);
+      const rankName = GUARDIAN_RANK_NAMES[rank] || `Rango ${rank}`;
+      if (activityRankValue) {
+        activityRankValue.textContent = rank > 0 ? `Rango ${rank} · ${rankName}` : "";
+      }
+      if (activityRankRow) {
+        activityRankRow.classList.toggle("hidden", rank <= 0);
+      }
+    };
+
     const ensureDistinctionsForm = () => {
       if (!distinctionsForm) return;
       if (distinctionsForm.childElementCount > 0) return;
@@ -407,11 +437,12 @@
 
       const me = await fetchViewerIdentity();
       viewerUserId = parsePositiveId(me?.user_number || me?.user_id);
-      viewerGuardianRank = Number(me?.guardian_rank || 0) || 0;
+      viewerGuardianRank = normalizeGuardianRank(me?.guardian_rank);
       viewerUsername = normalizeUsername(me?.username || "");
       activeProfileUserId = viewerUserId;
       activeProfileUsername = viewerUsername;
       isViewingOwnProfile = true;
+      applyActivityRankToView(viewerGuardianRank);
       const meFullName = buildProfileFullName(me);
       if (meFullName) {
         applyInfoName(meFullName);
@@ -424,6 +455,8 @@
           if (viewerFullName) {
             applyInfoName(viewerFullName);
           }
+          viewerGuardianRank = normalizeGuardianRank(viewerProfile?.guardian_rank);
+          applyActivityRankToView(viewerGuardianRank);
         } catch {
           // Keep the best-effort name from /auth/me.
         }
@@ -450,6 +483,7 @@
             isViewingOwnProfile = Boolean(viewerUserId && targetUserId === viewerUserId);
             const fullName = String(profile?.full_name || "").trim();
             if (fullName) applyInfoName(fullName);
+            applyActivityRankToView(profile?.guardian_rank);
           }
         }
       }
@@ -2510,9 +2544,9 @@
                       decirlo</span>
                   </td>
                 </tr>
-                <tr data-field="rank">
+                <tr data-field="rank" id="activityRankRow" class="hidden">
                   <th>Rango</th>
-                  <td><span data-value>Guardián Rango 3</span><span class="infobox-hidden" data-hidden hidden>Prefiero
+                  <td><span id="activityRankValue" data-value></span><span class="infobox-hidden" data-hidden hidden>Prefiero
                       no
                       decirlo</span></td>
                 </tr>

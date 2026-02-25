@@ -199,6 +199,12 @@ class GuardianReportedProfileOut(BaseModel):
     status: ProfileReportCaseStatus
     report_count: int
     reported_user: GuardianWishRequestUserOut
+    account_moderation_status: str = "active"
+    account_moderated_at: datetime | None = None
+    account_moderated_by_guardian: GuardianWishRequestUserOut | None = None
+    can_suspend_account: bool = False
+    can_enable_account: bool = False
+    can_close_account: bool = False
     resolved_by_guardian: GuardianWishRequestUserOut | None = None
     first_reported_at: datetime
     last_reported_at: datetime

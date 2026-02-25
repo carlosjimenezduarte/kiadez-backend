@@ -77,6 +77,7 @@
     const homeAvatarUploadBtn = document.getElementById('homeAvatarUploadBtn');
     const homeAvatarFile = document.getElementById('homeAvatarFile');
     const homeProfileName = document.getElementById('homeProfileName');
+    const homeProfileRank = document.getElementById('homeProfileRank');
     const homeUsernameLink = document.getElementById('homeUsernameLink');
     const homeUsernameValue = document.getElementById('homeUsernameValue');
     const homeUsernameEditBtn = document.getElementById('homeUsernameEditBtn');
@@ -182,10 +183,21 @@
 	    const DEFAULT_AVATAR_SRC = '/assets/avatar-default.jpg';
 	    const DEFAULT_COVER_SRC = '/assets/cover-default.jpg';
 	    const ORACLE_BACK_CARD_IMAGE = '/css/oracle/carta.webp';
-	    const HASHTAG_PATTERN = /(^|[^A-Za-z0-9_])#([A-Za-z0-9_]{2,50})/g;
-	    const MONTH_LABELS = [
-	      'Enero',
-	      'Febrero',
+    const HASHTAG_PATTERN = /(^|[^A-Za-z0-9_])#([A-Za-z0-9_]{2,50})/g;
+    const GUARDIAN_RANK_NAMES = Object.freeze({
+      0: 'Sin rango',
+      1: 'Aspirante',
+      2: 'Aprendiz',
+      3: 'Guardián',
+      4: 'Guardián Consagrado',
+      5: 'Guardián Mayor',
+      6: 'Guardián del Logos',
+      7: 'Guardián del Umbral',
+      8: 'Guardián de Guardianes'
+    });
+    const MONTH_LABELS = [
+      'Enero',
+      'Febrero',
 	      'Marzo',
 	      'Abril',
 	      'Mayo',
@@ -215,6 +227,30 @@
     let activeProfilePrivacyVisibility = { ...DEFAULT_PROFILE_PRIVACY_VISIBILITY };
 
     const getAccessToken = () => localStorage.getItem('access_token') || '';
+
+    const normalizeGuardianRank = (value) => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return 0;
+      return Math.max(0, Math.trunc(parsed));
+    };
+
+    const formatGuardianRankLabel = (value) => {
+      const rank = normalizeGuardianRank(value);
+      const rankName = GUARDIAN_RANK_NAMES[rank] || `Rango ${rank}`;
+      return `Rango ${rank} · ${rankName}`;
+    };
+
+    const applyHomeProfileRank = (value) => {
+      if (!homeProfileRank) return;
+      const rank = normalizeGuardianRank(value);
+      if (rank <= 0) {
+        homeProfileRank.textContent = "";
+        homeProfileRank.classList.add("hidden");
+        return;
+      }
+      homeProfileRank.classList.remove("hidden");
+      homeProfileRank.textContent = formatGuardianRankLabel(rank);
+    };
 
 	    const escapeHtml = (value) =>
 	      (value || '')
@@ -896,9 +932,11 @@
         throw new Error(data.detail || 'No se pudo cargar tu perfil.');
       }
       const userId = Number(data?.user_number);
+      const guardianRank = normalizeGuardianRank(data?.guardian_rank);
       return {
         user_id: Number.isFinite(userId) && userId > 0 ? userId : null,
         username: normalizeUsername(data?.username || ''),
+        guardian_rank: guardianRank
       };
     };
 
@@ -936,6 +974,7 @@
         homeUsernameLink.classList.toggle('is-empty', false);
       }
       if (homeUsernameCooldown) homeUsernameCooldown.textContent = '';
+      applyHomeProfileRank(profile?.guardian_rank);
 
       const fullName = String(profile?.full_name || '').trim();
       if (fullName && homeProfileName) homeProfileName.textContent = fullName;
@@ -958,6 +997,7 @@
         const me = await fetchViewerIdentity();
         viewerUserId = me.user_id;
         viewerUsername = me.username;
+        applyHomeProfileRank(me.guardian_rank);
       } catch (error) {
         console.error(error);
       }
@@ -3207,7 +3247,7 @@
               <input id="homeAvatarFile" type="file" accept="image/*" class="hidden" />
               <div class="profile-meta">
                 <h2 class="profile-name" id="homeProfileName">Carlos Jiménez Duarte</h2>
-                <p class="profile-rank">Rango 2 · Aprendiz</p>
+                <p class="profile-rank hidden" id="homeProfileRank"></p>
                 <div class="home-username-row">
                   <a class="home-username-link is-empty" id="homeUsernameLink" href="/home_user.html" data-profile-link="true">
                     <span id="homeUsernameValue">@elige-tu-usuario</span>
@@ -3670,7 +3710,7 @@
 </div>
 
 <div class="modal-overlay hidden" id="reportPostModalOverlay" aria-hidden="true">
-  <div class="modal wish-modal fulfill-wish-modal" role="dialog" aria-modal="true" aria-label="Reportar publicación">
+  <div class="modal wish-modal fulfill-wish-modal report-post-modal" role="dialog" aria-modal="true" aria-label="Reportar publicación">
     <div class="modal-head">
       <h3>Reportar publicación</h3>
       <button class="modal-close" type="button" id="closeReportPostModal">✕</button>

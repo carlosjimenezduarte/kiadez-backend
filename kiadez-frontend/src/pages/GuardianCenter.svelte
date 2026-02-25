@@ -68,6 +68,12 @@
   let reportedProfilesPage = 1;
   let reportedProfilesTotalPages = 1;
   let reportedProfilesItems = [];
+  let activeReportedProfile = null;
+  let reportedProfilesActionError = "";
+  let reportedProfilesActionLoading = false;
+  let showSuspendReportedProfileModal = false;
+  let showEnableReportedProfileModal = false;
+  let showCloseReportedProfileModal = false;
   const REPORTED_PROFILES_PAGE_SIZE = 10;
 
   let showSealCommitmentModal = false;
@@ -197,6 +203,13 @@
     return value || "Desconocida";
   };
 
+  const formatAccountModerationStatusLabel = (value) => {
+    const status = String(value || "").toLowerCase();
+    if (status === "suspended") return "Cuenta suspendida";
+    if (status === "closed") return "Cuenta cerrada";
+    return "Cuenta activa";
+  };
+
   const formatProfileReportReasonLabel = (reason, otherReason = "") => {
     const value = String(reason || "").toLowerCase();
     if (value === "fake_or_illegal") return "Perfil falso o contenido ilegal";
@@ -278,6 +291,24 @@
   const closePromoteRankModal = () => {
     showPromoteRankModal = false;
     rankPromoteError = "";
+  };
+
+  const closeSuspendReportedProfileModal = () => {
+    showSuspendReportedProfileModal = false;
+    activeReportedProfile = null;
+    reportedProfilesActionError = "";
+  };
+
+  const closeEnableReportedProfileModal = () => {
+    showEnableReportedProfileModal = false;
+    activeReportedProfile = null;
+    reportedProfilesActionError = "";
+  };
+
+  const closeCloseReportedProfileModal = () => {
+    showCloseReportedProfileModal = false;
+    activeReportedProfile = null;
+    reportedProfilesActionError = "";
   };
 
   const openPromoteRankModal = () => {
@@ -390,6 +421,27 @@
     showKeepReportedPostModal = true;
   };
 
+  const openSuspendReportedProfileModal = (item) => {
+    if (reportedProfilesActionLoading) return;
+    activeReportedProfile = item || null;
+    reportedProfilesActionError = "";
+    showSuspendReportedProfileModal = true;
+  };
+
+  const openEnableReportedProfileModal = (item) => {
+    if (reportedProfilesActionLoading) return;
+    activeReportedProfile = item || null;
+    reportedProfilesActionError = "";
+    showEnableReportedProfileModal = true;
+  };
+
+  const openCloseReportedProfileModal = (item) => {
+    if (reportedProfilesActionLoading) return;
+    activeReportedProfile = item || null;
+    reportedProfilesActionError = "";
+    showCloseReportedProfileModal = true;
+  };
+
   const loadWishRequests = async (page = 1) => {
     wishRequestsLoading = true;
     wishRequestsError = "";
@@ -447,6 +499,19 @@
     reported_posts_loading: false,
     reported_posts_error: "",
   });
+
+  const updateReportedProfileItem = (updatedItem) => {
+    if (!updatedItem || !updatedItem.id) return;
+    const targetId = Number(updatedItem.id);
+    reportedProfilesItems = reportedProfilesItems.map((item) =>
+      Number(item?.id) === targetId
+        ? {
+            ...normalizeReportedProfileItem(item),
+            ...normalizeReportedProfileItem(updatedItem),
+          }
+        : item
+    );
+  };
 
   const loadReportedProfiles = async (page = 1) => {
     reportedProfilesLoading = true;
@@ -663,6 +728,42 @@
       reportedPostsActionLoading = false;
     }
   };
+
+  const runReportedProfileAccountAction = async (actionSuffix, fallbackError) => {
+    if (!activeReportedProfile?.id || reportedProfilesActionLoading) return;
+    const caseId = Number(activeReportedProfile.id || 0);
+    if (!Number.isFinite(caseId) || caseId <= 0) return;
+
+    reportedProfilesActionLoading = true;
+    reportedProfilesActionError = "";
+    try {
+      const res = await apiFetch(
+        `/guardian-center/reported-profiles/${encodeURIComponent(String(caseId))}/${actionSuffix}`,
+        { method: "POST" }
+      );
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || fallbackError);
+      }
+      updateReportedProfileItem(data);
+      closeSuspendReportedProfileModal();
+      closeEnableReportedProfileModal();
+      closeCloseReportedProfileModal();
+    } catch (err) {
+      reportedProfilesActionError = err?.message || fallbackError;
+    } finally {
+      reportedProfilesActionLoading = false;
+    }
+  };
+
+  const suspendReportedProfileAccount = async () =>
+    runReportedProfileAccountAction("suspend-account", "No se pudo suspender la cuenta.");
+
+  const enableReportedProfileAccount = async () =>
+    runReportedProfileAccountAction("enable-account", "No se pudo habilitar la cuenta.");
+
+  const closeReportedProfileAccount = async () =>
+    runReportedProfileAccountAction("close-account", "No se pudo cerrar la cuenta.");
 
   onMount(() => {
     document.body.dataset.visitor = "false";
@@ -1201,6 +1302,25 @@
                           </div>
                         </div>
 
+                        <div class="guardian-reported-field">
+                          <div class="guardian-wish-label">Estado de la cuenta</div>
+                          <div class="guardian-wish-value">
+                            <span class={`guardian-reported-status is-${String(item.account_moderation_status || "active").toLowerCase()}`}>
+                              {formatAccountModerationStatusLabel(item.account_moderation_status)}
+                            </span>
+                            {#if item.account_moderated_by_guardian}
+                              <span class="guardian-wish-handle">
+                                · por {item.account_moderated_by_guardian.handle}
+                              </span>
+                            {/if}
+                            {#if item.account_moderated_at}
+                              <span class="guardian-wish-commitment-date">
+                                · {formatDateTime(item.account_moderated_at)}
+                              </span>
+                            {/if}
+                          </div>
+                        </div>
+
                         {#if item.reports?.length}
                           <div class="guardian-reported-field">
                             <div class="guardian-wish-label">Últimos reportes de perfil</div>
@@ -1295,6 +1415,30 @@
                       </div>
 
                       <div class="guardian-reported-actions">
+                        <button
+                          class="btn btn-outline btn-compact"
+                          type="button"
+                          disabled={reportedProfilesActionLoading || !item.can_suspend_account}
+                          on:click={() => openSuspendReportedProfileModal(item)}
+                        >
+                          Suspender cuenta
+                        </button>
+                        <button
+                          class="btn btn-outline btn-compact"
+                          type="button"
+                          disabled={reportedProfilesActionLoading || !item.can_enable_account}
+                          on:click={() => openEnableReportedProfileModal(item)}
+                        >
+                          Habilitar cuenta
+                        </button>
+                        <button
+                          class="btn btn-primary btn-compact"
+                          type="button"
+                          disabled={reportedProfilesActionLoading || !item.can_close_account}
+                          on:click={() => openCloseReportedProfileModal(item)}
+                        >
+                          Cerrar cuenta
+                        </button>
                         <a class="btn btn-outline btn-compact" href={item.reported_user.profile_url} target="_blank" rel="noopener noreferrer">
                           Ver perfil
                         </a>
@@ -1673,7 +1817,7 @@
       if (event.target === event.currentTarget && !rankPromoteLoading) closePromoteRankModal();
     }}
   >
-    <div class="modal wish-modal guardian-center-modal" role="dialog" aria-modal="true" aria-label="Confirmar ascenso de rango">
+    <div class="modal wish-modal guardian-center-modal guardian-rank-promote-modal" role="dialog" aria-modal="true" aria-label="Confirmar ascenso de rango">
       <div class="modal-head guardian-center-modal-head">
         <h3>Confirmar ascenso de rango</h3>
       </div>
@@ -1710,6 +1854,128 @@
           {rankPromoteLoading ? "Procesando..." : "Sí, subir nivel"}
         </button>
         <button class="btn btn-outline btn-compact" type="button" disabled={rankPromoteLoading} on:click={closePromoteRankModal}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal-overlay guardian-center-modal-overlay"
+    class:hidden={!showSuspendReportedProfileModal}
+    aria-hidden={!showSuspendReportedProfileModal}
+    on:click={(event) => {
+      if (event.target === event.currentTarget && !reportedProfilesActionLoading) closeSuspendReportedProfileModal();
+    }}
+  >
+    <div class="modal wish-modal guardian-center-modal" role="dialog" aria-modal="true" aria-label="Suspender cuenta reportada">
+      <div class="modal-head guardian-center-modal-head">
+        <h3>Suspender cuenta</h3>
+      </div>
+      <div class="modal-body">
+        {#if activeReportedProfile}
+          <p>
+            ¿Estás seguro que quieres suspender la cuenta de
+            <strong> {activeReportedProfile.reported_user?.full_name}</strong>
+            ({activeReportedProfile.reported_user?.handle})?
+          </p>
+          <p class="panel-muted">
+            La suspensión no expira por tiempo. Solo un Guardián podrá habilitarla manualmente.
+          </p>
+        {:else}
+          <p class="panel-muted">No hay perfil seleccionado.</p>
+        {/if}
+
+        {#if reportedProfilesActionError}
+          <div class="wish-error is-visible">{reportedProfilesActionError}</div>
+        {/if}
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-compact" type="button" disabled={reportedProfilesActionLoading} on:click={suspendReportedProfileAccount}>
+          {reportedProfilesActionLoading ? "Procesando..." : "Sí, suspender"}
+        </button>
+        <button class="btn btn-outline btn-compact" type="button" disabled={reportedProfilesActionLoading} on:click={closeSuspendReportedProfileModal}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal-overlay guardian-center-modal-overlay"
+    class:hidden={!showEnableReportedProfileModal}
+    aria-hidden={!showEnableReportedProfileModal}
+    on:click={(event) => {
+      if (event.target === event.currentTarget && !reportedProfilesActionLoading) closeEnableReportedProfileModal();
+    }}
+  >
+    <div class="modal wish-modal guardian-center-modal" role="dialog" aria-modal="true" aria-label="Habilitar cuenta reportada">
+      <div class="modal-head guardian-center-modal-head">
+        <h3>Habilitar cuenta</h3>
+      </div>
+      <div class="modal-body">
+        {#if activeReportedProfile}
+          <p>
+            ¿Estas seguro que quieres habilitar cuenta?
+          </p>
+          <p class="panel-muted">
+            Usuario: <strong>{activeReportedProfile.reported_user?.full_name}</strong>
+            <span class="guardian-wish-handle">{activeReportedProfile.reported_user?.handle}</span>
+          </p>
+        {:else}
+          <p class="panel-muted">No hay perfil seleccionado.</p>
+        {/if}
+
+        {#if reportedProfilesActionError}
+          <div class="wish-error is-visible">{reportedProfilesActionError}</div>
+        {/if}
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-compact" type="button" disabled={reportedProfilesActionLoading} on:click={enableReportedProfileAccount}>
+          {reportedProfilesActionLoading ? "Procesando..." : "Sí, habilitar"}
+        </button>
+        <button class="btn btn-outline btn-compact" type="button" disabled={reportedProfilesActionLoading} on:click={closeEnableReportedProfileModal}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal-overlay guardian-center-modal-overlay"
+    class:hidden={!showCloseReportedProfileModal}
+    aria-hidden={!showCloseReportedProfileModal}
+    on:click={(event) => {
+      if (event.target === event.currentTarget && !reportedProfilesActionLoading) closeCloseReportedProfileModal();
+    }}
+  >
+    <div class="modal wish-modal guardian-center-modal" role="dialog" aria-modal="true" aria-label="Cerrar cuenta reportada">
+      <div class="modal-head guardian-center-modal-head">
+        <h3>Cerrar cuenta</h3>
+      </div>
+      <div class="modal-body">
+        {#if activeReportedProfile}
+          <p>
+            ¿Estas seguro que quieres cerrar cuenta de
+            <strong> {activeReportedProfile.reported_user?.full_name}</strong>
+            ({activeReportedProfile.reported_user?.handle})?
+          </p>
+          <p class="panel-muted">
+            Esta decisión es definitiva. La cuenta quedará cerrada de forma permanente y no podrá habilitarse.
+          </p>
+        {:else}
+          <p class="panel-muted">No hay perfil seleccionado.</p>
+        {/if}
+
+        {#if reportedProfilesActionError}
+          <div class="wish-error is-visible">{reportedProfilesActionError}</div>
+        {/if}
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-compact" type="button" disabled={reportedProfilesActionLoading} on:click={closeReportedProfileAccount}>
+          {reportedProfilesActionLoading ? "Procesando..." : "Sí, cerrar cuenta"}
+        </button>
+        <button class="btn btn-outline btn-compact" type="button" disabled={reportedProfilesActionLoading} on:click={closeCloseReportedProfileModal}>
           Cancelar
         </button>
       </div>
