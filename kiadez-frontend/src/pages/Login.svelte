@@ -4,6 +4,14 @@
   onMount(() => {
     const API = "http://127.0.0.1:8000";
             const form = document.getElementById("auth-form");
+            const authErrorEl = document.getElementById("auth-error");
+
+            function setAuthError(message) {
+                if (!authErrorEl) return;
+                const text = String(message || "");
+                authErrorEl.textContent = text;
+                authErrorEl.classList.toggle("hidden", !text);
+            }
 
             function persistTokens(data) {
                 if (data?.access_token) {
@@ -49,19 +57,21 @@
                 }
             }
     
-            async function login(email, password) {
-                const res = await fetch(`${API}/auth/login`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
+	            async function login(email, password) {
+	                const res = await fetch(`${API}/auth/login`, {
+	                    method: "POST",
+	                    headers: {
+	                        "Content-Type": "application/json",
                     },
                     body: JSON.stringify({ email, password }),
                 });
-    
-                const data = await res.json();
-                if (!res.ok) {
-                    throw new Error(data.detail || "Error al iniciar sesión");
-                }
+	    
+	                const data = await res.json();
+	                if (!res.ok) {
+	                    const error = new Error(data.detail || "Error al iniciar sesión");
+	                    error.status = res.status;
+	                    throw error;
+	                }
 
                 if (data?.["2fa_required"]) {
                     return {
@@ -148,13 +158,14 @@
                 window.location.href = "/life-proposal.html";
             }
     
-            form.addEventListener("submit", async (e) => {
-                e.preventDefault();
-    
-                const email = form.email.value;
-                const password = form.password.value;
-    
-                try {
+	            form.addEventListener("submit", async (e) => {
+	                e.preventDefault();
+                    setAuthError("");
+	    
+	                const email = form.email.value;
+	                const password = form.password.value;
+	    
+	                try {
                     const result = await login(email, password);
                     if (result?.twofa_required) {
                         pending2FATempToken = result?.temp_token || "";
@@ -162,13 +173,23 @@
                         return;
                     }
 
-                    const token = result?.access_token;
-                    await continueAfterLogin(token);
-                } catch (err) {
-                    alert(err.message);
-                    console.error(err);
-                }
-            });
+	                    const token = result?.access_token;
+	                    await continueAfterLogin(token);
+	                } catch (err) {
+                        const errorMessage = String(err?.message || "");
+                        const invalidCredentials =
+                            Number(err?.status) === 401 || /credenciales/i.test(errorMessage);
+                        if (invalidCredentials) {
+                            setAuthError("Correo electrónico o contraseña invalida");
+                        } else {
+                            setAuthError(errorMessage || "No se pudo iniciar sesión.");
+                        }
+	                    console.error(err);
+	                }
+	            });
+
+                form.email?.addEventListener("input", () => setAuthError(""));
+                form.password?.addEventListener("input", () => setAuthError(""));
 
             const handleTwofaConfirm = async () => {
                 setTwofaError("");
@@ -228,13 +249,14 @@
 
                 <h2 class="auth-title">Bienvenido de vuelta</h2>
 
-                <form id="auth-form">
-                    <input type="email" name="email" placeholder="Correo electrónico" required />
-                    <input type="password" name="password" placeholder="Contraseña" required />
+	            <form id="auth-form">
+	                    <input type="email" name="email" placeholder="Correo electrónico" required />
+	                    <input type="password" name="password" placeholder="Contraseña" required />
+                        <p id="auth-error" class="auth-form-error hidden" role="alert"></p>
 
-                    <button type="submit" class="btn btn-primary">
-                        Entrar a Kiadez
-                    </button>
+	                    <button type="submit" class="btn btn-primary">
+	                        Entrar a Kiadez
+	                    </button>
 
                     <a href="/forgot-password.html" class="auth-link">
                         ¿Olvidaste tu contraseña?

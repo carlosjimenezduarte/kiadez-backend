@@ -149,6 +149,7 @@
     const cooperativeWishText = document.getElementById("cooperativeWishText");
     const cooperativeWishCount = document.getElementById("cooperativeWishCount");
     const cooperativeWishSecurityCode = document.getElementById("cooperativeWishSecurityCode");
+    const cooperativeWishError = document.getElementById("cooperativeWishError");
     const disableLegacyPurposeCover = true;
     const getLegacyElement = (id) => (disableLegacyPurposeCover ? null : document.getElementById(id));
     const getLegacyQuery = (selector) => (disableLegacyPurposeCover ? null : document.querySelector(selector));
@@ -160,9 +161,6 @@
     const coverUploadBtn = getLegacyElement("coverUpload");
     const coverMoveBtn = getLegacyElement("coverMove");
     const coverMenu = getLegacyQuery(".cover-menu");
-    const coverSelectExisting = getLegacyElement("coverSelectExisting");
-    const coverSelectModal = getLegacyElement("coverSelectModal");
-    const coverSelectCancel = getLegacyElement("coverSelectCancel");
     const coverSaveActions = getLegacyElement("coverSaveActions");
     const coverSaveBtn = getLegacyElement("coverSaveBtn");
     const coverCancelBtn = getLegacyElement("coverCancelBtn");
@@ -1489,6 +1487,7 @@
       if (!isEditing) {
         resetCooperativeWishForm();
       }
+      setCooperativeWishError(false);
       cooperativeWishModal.classList.remove("hidden");
       cooperativeWishModal.setAttribute("aria-hidden", "false");
       updateModalScrollLock();
@@ -3359,8 +3358,20 @@
     };
 
     const isPersonalWishValid = () => getPersonalWishDescription().length > 0;
+    const getCooperativeWishDescription = () => {
+      if (!cooperativeWishText) return "";
+      const prefix = cooperativeWishText.dataset.prefix || "";
+      const value = cooperativeWishText.value || "";
+      if (prefix && value.startsWith(prefix)) {
+        return value.slice(prefix.length).trim();
+      }
+      return value.trim();
+    };
+    const isCooperativeWishValid = () => getCooperativeWishDescription().length > 0;
 
     const defaultPersonalWishErrorText = personalWishError?.textContent || "No has descrito tu deseo";
+    const defaultCooperativeWishErrorText =
+      cooperativeWishError?.textContent || "No has descrito tu deseo cooperativo.";
 
     const setPersonalWishError = (show, message = "") => {
       if (!personalWishError) return;
@@ -3370,9 +3381,23 @@
       personalWishError.classList.toggle("is-visible", show);
     };
 
+    const setCooperativeWishError = (show, message = "") => {
+      if (!cooperativeWishError) return;
+      cooperativeWishError.textContent = show
+        ? (message || defaultCooperativeWishErrorText)
+        : defaultCooperativeWishErrorText;
+      cooperativeWishError.classList.toggle("is-visible", show);
+    };
+
     if (personalWishText) {
       personalWishText.addEventListener("input", () => {
         setPersonalWishError(!isPersonalWishValid());
+      });
+    }
+
+    if (cooperativeWishText) {
+      cooperativeWishText.addEventListener("input", () => {
+        if (isCooperativeWishValid()) setCooperativeWishError(false);
       });
     }
 
@@ -4161,6 +4186,7 @@
         cooperativeWishMedia.value = "";
       }
       updateCooperativePreview(null);
+      setCooperativeWishError(false);
     };
 
     const personalTypeIconMap = {
@@ -4245,6 +4271,9 @@
         if (cooperativeWishSecurityCode.value !== cleaned) {
           cooperativeWishSecurityCode.value = cleaned;
         }
+        if (cleaned.length === 6) {
+          setCooperativeWishError(false);
+        }
       });
     }
 
@@ -4305,13 +4334,14 @@
 
     const handleConfirmCooperativeWish = async () => {
       if (!cooperativeWishList || !activeCooperativeSlot) return;
+      setCooperativeWishError(false);
       const description = cooperativeWishText ? cooperativeWishText.value.trim() : "";
       const prefix = cooperativeWishText ? (cooperativeWishText.dataset.prefix || "") : "";
       const cleanDescription = prefix && description.startsWith(prefix)
         ? description.slice(prefix.length).trim()
         : description;
       if (!cleanDescription) {
-        window.alert("No has descrito tu deseo cooperativo.");
+        setCooperativeWishError(true, "No has descrito tu deseo cooperativo.");
         return;
       }
 
@@ -4327,7 +4357,7 @@
       const securityCodeRaw = cooperativeWishSecurityCode ? cooperativeWishSecurityCode.value : "";
       const securityCode = securityCodeRaw.replace(/\D/g, "").slice(0, 6);
       if (securityCode.length !== 6) {
-        window.alert("El código de seguridad debe tener exactamente 6 dígitos.");
+        setCooperativeWishError(true, "El código de seguridad debe tener exactamente 6 dígitos.");
         return;
       }
       const file = cooperativeWishMedia && cooperativeWishMedia.files ? cooperativeWishMedia.files[0] : null;
@@ -4352,7 +4382,7 @@
         resetCooperativeWishForm();
         activeCooperativeSlot = null;
       } catch (error) {
-        window.alert(error?.message || "No se pudo guardar el deseo cooperativo.");
+        setCooperativeWishError(true, error?.message || "No se pudo guardar el deseo cooperativo.");
       }
     };
 
@@ -4518,20 +4548,6 @@
       coverOffsetY = clamped.y;
     };
 
-    const openCoverSelectModal = () => {
-      if (!coverSelectModal) return;
-      coverSelectModal.classList.remove("hidden");
-      coverSelectModal.setAttribute("aria-hidden", "false");
-      updateModalScrollLock();
-    };
-
-    const closeCoverSelectModal = () => {
-      if (!coverSelectModal) return;
-      coverSelectModal.classList.add("hidden");
-      coverSelectModal.setAttribute("aria-hidden", "true");
-      updateModalScrollLock();
-    };
-
     if (coverChangeBtn && coverFile) {
       coverChangeBtn.addEventListener("click", () => coverFile.click());
     }
@@ -4564,43 +4580,6 @@
         setCoverMoveState(!coverMoveEnabled);
         markCoverDirty();
         closeCoverMenu();
-      });
-    }
-
-    if (coverSelectExisting) {
-      coverSelectExisting.addEventListener("click", () => {
-        openCoverSelectModal();
-        closeCoverMenu();
-      });
-    }
-
-    if (coverSelectCancel) {
-      coverSelectCancel.addEventListener("click", closeCoverSelectModal);
-    }
-
-    if (coverSelectModal) {
-      coverSelectModal.addEventListener("click", (event) => {
-        if (event.target === coverSelectModal) closeCoverSelectModal();
-      });
-    }
-
-    if (coverSelectModal && coverImg) {
-      coverSelectModal.addEventListener("click", (event) => {
-        const button = event.target.closest(".cover-select-item");
-        if (!button) return;
-        const src = button.dataset.coverSrc;
-        if (!src) return;
-        if (coverPendingUrl) {
-          URL.revokeObjectURL(coverPendingUrl);
-          coverPendingUrl = null;
-        }
-        coverImg.src = src;
-        coverOffsetX = 0;
-        coverOffsetY = 0;
-        markCoverDirty();
-        closeCoverSelectModal();
-        setCoverMoveState(true);
-        recalcCoverBounds();
       });
     }
 
@@ -5023,9 +5002,6 @@
               Editar imagen de portada
             </summary>
             <div class="cover-menu-panel">
-              <button class="cover-menu-item" type="button" id="coverSelectExisting">
-                Seleccionar imagen
-              </button>
               <button class="cover-menu-item" type="button" id="coverUpload">
                 Subir imagen
               </button>
@@ -5299,31 +5275,6 @@
       </div>
     </div>
 
-    <div class="modal-overlay hidden" id="coverSelectModal" aria-hidden="true">
-      <div class="modal wish-modal cover-select-modal" role="dialog" aria-modal="true"
-        aria-label="Seleccionar imagen de portada">
-        <div class="modal-head">
-          <h3>Seleccionar imagen</h3>
-        </div>
-        <div class="modal-body">
-          <div class="cover-select-grid">
-            <button class="cover-select-item" type="button" data-cover-src="/assets/cover-default.jpg">
-              <img src="/assets/cover-default.jpg" alt="Portada 1" />
-            </button>
-            <button class="cover-select-item" type="button" data-cover-src="/assets/post-1.jpg">
-              <img src="/assets/post-1.jpg" alt="Portada 2" />
-            </button>
-            <button class="cover-select-item" type="button" data-cover-src="/assets/post-2.jpg">
-              <img src="/assets/post-2.jpg" alt="Portada 3" />
-            </button>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="coverSelectCancel">Cancelar</button>
-        </div>
-      </div>
-    </div>
-
     <div class="public-wishes-body">
       <!-- =========================
        *  NAV / LINKS
@@ -5556,6 +5507,7 @@
                   <label class="modal-label" for="cooperativeWishSecurityCode">Código de seguridad</label>
                   <input class="modal-input" id="cooperativeWishSecurityCode" type="text" inputmode="numeric"
                     maxlength="6" placeholder="000000" />
+                  <div class="wish-error" id="cooperativeWishError" role="alert">No has descrito tu deseo cooperativo.</div>
                 </div>
 
                 <div class="wish-modal-col">
@@ -5985,7 +5937,6 @@
     </div>
   </main>
 
-  <!-- FOOTER reutilizado -->
   <footer class="kiadez-footer">
     <div class="footer-main">
       <div class="footer-column footer-origin">
@@ -6000,28 +5951,36 @@
         <div class="footer-column">
           <h4>Sobre nuestra red social</h4>
           <ul>
-            <li><a href="#">Qué es Kiadez</a></li>
-            <li><a href="#">Rangos de Guardianes</a></li>
-            <li><a href="#">Ser Guardián</a></li>
-            <li><a href="#">Contacto</a></li>
+            <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
+            <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
+            <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
+            <li><a href="/contact.html">Contacto</a></li>
           </ul>
         </div>
 
         <div class="footer-column">
           <h4>Idiomas</h4>
           <ul>
-            <li><a href="#">Español</a></li>
-            <li><a href="#">English</a></li>
-            <li><a href="#">Français</a></li>
-            <li><a href="#">Português</a></li>
+            <li><a href="/?lang=es">Español</a></li>
+            <li><a href="/?lang=en">English</a></li>
+            <li><a href="/?lang=fr">Français</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h4>Contacto</h4>
+          <ul>
+            <li>info@kiadez.com</li>
+            <li>+57 333 225 6078</li>
           </ul>
         </div>
 
         <div class="footer-column">
           <h4>Información legal</h4>
           <ul>
-            <li><a href="#">Términos y condiciones</a></li>
-            <li><a href="#">Privacidad</a></li>
+            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
+            <li><a href="/terms.html">Términos y condiciones</a></li>
+            <li><a href="/privacy.html">Privacidad</a></li>
           </ul>
         </div>
       </div>

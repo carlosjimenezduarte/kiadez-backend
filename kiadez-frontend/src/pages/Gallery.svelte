@@ -802,7 +802,7 @@
       }
 
       await loadRecentPostsOnly({ preferredViewerPostId: postId });
-      setViewerStatus("Estrella donada. Esta acción es irreversible.");
+      setViewerStatus("Estrella donada.");
     } catch (error) {
       setViewerStatus(readUnknownError(error, "No se pudo donar la estrella."), true);
     } finally {
@@ -1367,8 +1367,6 @@
             {#if currentViewerPost.text}
               <p class="gallery-post-viewer-text">{currentViewerPost.text}</p>
             {/if}
-
-            <p class="post-warning">La donación de estrella es irreversible.</p>
 
             <div class="post-actions gallery-post-viewer-actions">
               <button

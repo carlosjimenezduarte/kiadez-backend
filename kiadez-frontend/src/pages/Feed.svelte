@@ -893,7 +893,7 @@
         starred_by_me: true,
         star_count: Number(data?.star_count ?? current?.star_count ?? 0),
       }));
-      setPostsStatus("Estrella donada. Esta acción es irreversible.");
+      setPostsStatus("Estrella donada.");
     } catch (error) {
       setPostsStatus(readUnknownError(error, "No se pudo donar la estrella."), true);
     } finally {
@@ -1674,8 +1674,6 @@
                     {/if}
                   </div>
                 {/if}
-
-                <p class="post-warning">La donación de estrella es irreversible.</p>
 
                 <div class="post-actions">
                   <button

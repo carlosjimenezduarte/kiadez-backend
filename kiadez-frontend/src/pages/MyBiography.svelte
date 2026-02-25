@@ -12,23 +12,15 @@
     const profilePhoto = document.getElementById("profilePhoto");
     const profilePhotoTrigger = document.getElementById("profilePhotoTrigger");
     const profilePhotoMenu = document.getElementById("profilePhotoMenu");
-    const bioPhotoSelectExisting = document.getElementById("bioPhotoSelectExisting");
     const bioPhotoUpload = document.getElementById("bioPhotoUpload");
     const bioPhotoFile = document.getElementById("bioPhotoFile");
     const bioPhotoStatus = document.getElementById("bioPhotoStatus");
-    const bioPhotoSelectModal = document.getElementById("bioPhotoSelectModal");
-    const bioPhotoSelectGrid = document.getElementById("bioPhotoSelectGrid");
-    const bioPhotoSelectCancel = document.getElementById("bioPhotoSelectCancel");
     const emblemImage = document.getElementById("emblemImage");
     const emblemTrigger = document.getElementById("emblemTrigger");
     const emblemMenu = document.getElementById("emblemMenu");
-    const emblemSelectExisting = document.getElementById("emblemSelectExisting");
     const emblemUpload = document.getElementById("emblemUpload");
     const emblemFile = document.getElementById("emblemFile");
     const emblemStatus = document.getElementById("emblemStatus");
-    const emblemSelectModal = document.getElementById("emblemSelectModal");
-    const emblemSelectGrid = document.getElementById("emblemSelectGrid");
-    const emblemSelectCancel = document.getElementById("emblemSelectCancel");
     const personalInfoEditBtn = document.getElementById("personalInfoEditBtn");
     const personalInfoModalOverlay = document.getElementById("personalInfoModalOverlay");
     const closePersonalInfoModal = document.getElementById("closePersonalInfoModal");
@@ -1192,72 +1184,6 @@
       emblemMenu?.classList.add("hidden");
     };
 
-    const openPhotoSelectModal = () => {
-      bioPhotoSelectModal?.classList.remove("hidden");
-      bioPhotoSelectModal?.setAttribute("aria-hidden", "false");
-      document.body.classList.add("modal-open");
-    };
-
-    const closePhotoSelectModal = () => {
-      bioPhotoSelectModal?.classList.add("hidden");
-      bioPhotoSelectModal?.setAttribute("aria-hidden", "true");
-      if (!document.querySelector(".modal-overlay:not(.hidden)")) {
-        document.body.classList.remove("modal-open");
-      }
-    };
-
-    const openEmblemSelectModal = () => {
-      emblemSelectModal?.classList.remove("hidden");
-      emblemSelectModal?.setAttribute("aria-hidden", "false");
-      document.body.classList.add("modal-open");
-    };
-
-    const closeEmblemSelectModal = () => {
-      emblemSelectModal?.classList.add("hidden");
-      emblemSelectModal?.setAttribute("aria-hidden", "true");
-      if (!document.querySelector(".modal-overlay:not(.hidden)")) {
-        document.body.classList.remove("modal-open");
-      }
-    };
-
-    const renderSelectableImages = (items) => {
-      if (!bioPhotoSelectGrid) return;
-      if (!items.length) {
-        bioPhotoSelectGrid.innerHTML = `
-          <p class="infobox-photo-empty">No tienes imágenes disponibles aún.</p>
-        `;
-        return;
-      }
-      bioPhotoSelectGrid.innerHTML = items
-        .map(
-          (item) => `
-          <button class="cover-select-item" type="button" data-media-id="${item.media_id}" data-media-url="${item.url}">
-            <img src="${item.url}" alt="Imagen subida ${item.media_id}" />
-          </button>
-        `
-        )
-        .join("");
-    };
-
-    const renderSelectableEmblemImages = (items) => {
-      if (!emblemSelectGrid) return;
-      if (!items.length) {
-        emblemSelectGrid.innerHTML = `
-          <p class="infobox-photo-empty">No tienes imágenes disponibles aún.</p>
-        `;
-        return;
-      }
-      emblemSelectGrid.innerHTML = items
-        .map(
-          (item) => `
-          <button class="cover-select-item" type="button" data-media-id="${item.media_id}" data-media-url="${item.url}">
-            <img src="${item.url}" alt="Imagen subida ${item.media_id}" />
-          </button>
-        `
-        )
-        .join("");
-    };
-
     const assignProfilePhoto = async (mediaId) => {
       const res = await apiFetch("/media/profile-photo", {
         method: "POST",
@@ -1320,15 +1246,6 @@
       }
     };
 
-    const loadSelectableImages = async () => {
-      const res = await apiFetch("/media/mine/images?limit=60");
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || "No se pudieron cargar tus imágenes.");
-      }
-      return Array.isArray(data.items) ? data.items : [];
-    };
-
     const uploadProfilePhotoFromFile = async (file) => {
       const formData = new FormData();
       formData.append("file", file);
@@ -1371,31 +1288,12 @@
       }
     };
 
-    const handleOpenExisting = () => {
-      closePhotoMenu();
-      window.location.href = "/gallery.html";
-    };
-
     const handleEmblemTriggerClick = (event) => {
       event.preventDefault();
       if (emblemMenu?.classList.contains("hidden")) {
         openEmblemMenu();
       } else {
         closeEmblemMenu();
-      }
-    };
-
-    const handleOpenExistingEmblem = async () => {
-      closeEmblemMenu();
-      setEmblemStatus("Cargando imágenes...");
-      openEmblemSelectModal();
-      try {
-        const items = await loadSelectableImages();
-        renderSelectableEmblemImages(items);
-        setEmblemStatus("");
-      } catch (error) {
-        renderSelectableEmblemImages([]);
-        setEmblemStatus(error.message || "No se pudieron cargar imágenes.", true);
       }
     };
 
@@ -1411,10 +1309,11 @@
         setBioPhotoStatus("Solo se permiten imágenes.", true);
         return;
       }
-      setBioPhotoStatus("Subiendo imagen a tu galería...");
+      setBioPhotoStatus("Subiendo imagen...");
       try {
-        await uploadProfilePhotoFromFile(file);
-        setBioPhotoStatus("Imagen subida. Para usarla como foto de perfil, ve a Home.");
+        const uploadData = await uploadProfilePhotoFromFile(file);
+        await assignProfilePhoto(uploadData.media_id);
+        setBioPhotoStatus("Foto de perfil actualizada.");
       } catch (error) {
         setBioPhotoStatus(error.message || "No se pudo subir la imagen.", true);
       } finally {
@@ -1445,22 +1344,6 @@
       }
     };
 
-    const handleSelectGridClick = () => {};
-
-    const handleEmblemSelectGridClick = async (event) => {
-      const button = event.target.closest("[data-media-id]");
-      if (!button) return;
-      const mediaId = Number(button.dataset.mediaId || "0");
-      if (!mediaId) return;
-      setEmblemStatus("Asignando imagen...");
-      try {
-        await assignEmblem(mediaId);
-        setEmblemStatus("Emblema actualizado.");
-        closeEmblemSelectModal();
-      } catch (error) {
-        setEmblemStatus(error.message || "No se pudo asignar la imagen.", true);
-      }
-    };
 
     const handlePageClick = (event) => {
       if (profilePhotoMenu && !profilePhotoMenu.classList.contains("hidden")) {
@@ -1477,18 +1360,6 @@
         if (!clickedInsideMenu && !clickedTrigger) {
           closeEmblemMenu();
         }
-      }
-    };
-
-    const handleModalOverlayClick = (event) => {
-      if (event.target === bioPhotoSelectModal) {
-        closePhotoSelectModal();
-      }
-    };
-
-    const handleEmblemModalOverlayClick = (event) => {
-      if (event.target === emblemSelectModal) {
-        closeEmblemSelectModal();
       }
     };
 
@@ -2083,18 +1954,11 @@
     saveDistinctionsBtn?.addEventListener("click", handleSaveDistinctions);
     distinctionsModalOverlay?.addEventListener("click", handleDistinctionsOverlayClick);
     profilePhotoTrigger?.addEventListener("click", handlePhotoTriggerClick);
-    bioPhotoSelectExisting?.addEventListener("click", handleOpenExisting);
     bioPhotoUpload?.addEventListener("click", handleUploadClick);
     bioPhotoFile?.addEventListener("change", handlePhotoFileChange);
-    bioPhotoSelectCancel?.addEventListener("click", closePhotoSelectModal);
-    bioPhotoSelectModal?.addEventListener("click", handleModalOverlayClick);
     emblemTrigger?.addEventListener("click", handleEmblemTriggerClick);
-    emblemSelectExisting?.addEventListener("click", handleOpenExistingEmblem);
     emblemUpload?.addEventListener("click", handleEmblemUploadClick);
     emblemFile?.addEventListener("change", handleEmblemFileChange);
-    emblemSelectGrid?.addEventListener("click", handleEmblemSelectGridClick);
-    emblemSelectCancel?.addEventListener("click", closeEmblemSelectModal);
-    emblemSelectModal?.addEventListener("click", handleEmblemModalOverlayClick);
     document.addEventListener("click", handlePageClick);
     ensureDistinctionsForm();
     applyDistinctionsEditorVisibility();
@@ -2188,18 +2052,11 @@
       saveDistinctionsBtn?.removeEventListener("click", handleSaveDistinctions);
       distinctionsModalOverlay?.removeEventListener("click", handleDistinctionsOverlayClick);
       profilePhotoTrigger?.removeEventListener("click", handlePhotoTriggerClick);
-      bioPhotoSelectExisting?.removeEventListener("click", handleOpenExisting);
       bioPhotoUpload?.removeEventListener("click", handleUploadClick);
       bioPhotoFile?.removeEventListener("change", handlePhotoFileChange);
-      bioPhotoSelectCancel?.removeEventListener("click", closePhotoSelectModal);
-      bioPhotoSelectModal?.removeEventListener("click", handleModalOverlayClick);
       emblemTrigger?.removeEventListener("click", handleEmblemTriggerClick);
-      emblemSelectExisting?.removeEventListener("click", handleOpenExistingEmblem);
       emblemUpload?.removeEventListener("click", handleEmblemUploadClick);
       emblemFile?.removeEventListener("change", handleEmblemFileChange);
-      emblemSelectGrid?.removeEventListener("click", handleEmblemSelectGridClick);
-      emblemSelectCancel?.removeEventListener("click", closeEmblemSelectModal);
-      emblemSelectModal?.removeEventListener("click", handleEmblemModalOverlayClick);
       document.removeEventListener("click", handlePageClick);
     };
   });
@@ -2450,13 +2307,12 @@
             <figure class="infobox-photo">
               <div class="infobox-photo-wrap">
                 <button class="infobox-photo-trigger" id="profilePhotoTrigger" type="button"
-                  title="Gestionar imágenes de galería">
+                  title="Gestionar foto de perfil">
                   <img id="profilePhoto" src="/css/logo-kiadez.webp" alt="Foto del usuario" />
                 </button>
 
                 <div class="infobox-photo-menu hidden" id="profilePhotoMenu">
-                  <button type="button" id="bioPhotoSelectExisting">Abrir galería</button>
-                  <button type="button" id="bioPhotoUpload">Subir a galería</button>
+                  <button type="button" id="bioPhotoUpload">Subir imagen</button>
                 </div>
 
                 <input id="bioPhotoFile" type="file" accept="image/*" class="hidden" />
@@ -2672,7 +2528,6 @@
                     <img id="emblemImage" src="/css/logo-kiadez.webp" alt="Emblema" />
                   </button>
                   <div class="infobox-photo-menu hidden" id="emblemMenu">
-                    <button type="button" id="emblemSelectExisting">Seleccionar imagen</button>
                     <button type="button" id="emblemUpload">Subir imagen</button>
                   </div>
                   <input id="emblemFile" type="file" accept="image/*" class="hidden" />
@@ -2697,36 +2552,6 @@
       </div>
 
     </main>
-
-    <div class="modal-overlay hidden" id="bioPhotoSelectModal" aria-hidden="true">
-      <div class="modal wish-modal cover-select-modal" role="dialog" aria-modal="true"
-        aria-label="Seleccionar imagen de perfil">
-        <div class="modal-head">
-          <h3>Seleccionar imagen</h3>
-        </div>
-        <div class="modal-body">
-          <div class="cover-select-grid" id="bioPhotoSelectGrid"></div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="bioPhotoSelectCancel">Cancelar</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="modal-overlay hidden" id="emblemSelectModal" aria-hidden="true">
-      <div class="modal wish-modal cover-select-modal" role="dialog" aria-modal="true"
-        aria-label="Seleccionar emblema">
-        <div class="modal-head">
-          <h3>Seleccionar imagen</h3>
-        </div>
-        <div class="modal-body">
-          <div class="cover-select-grid" id="emblemSelectGrid"></div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="emblemSelectCancel">Cancelar</button>
-        </div>
-      </div>
-    </div>
 
     <div class="modal-overlay hidden" id="aboutModalOverlay" aria-hidden="true">
       <div class="modal about-modal" role="dialog" aria-modal="true" aria-label="Editar biografía">

@@ -9,11 +9,6 @@ const PURPOSE_PREFIX = "Deseo ";
 const PURPOSE_SECRET_TEXT = "Deseo marcado como secreto";
 const PURPOSE_UNDEFINED_TEXT = "Deseo de propósito sin definir";
 const PURPOSE_REVEAL_PREFIX = "Este deseo será revelado";
-const COVER_PRESETS = [
-  "/assets/cover-default.jpg",
-  "/assets/post-1.jpg",
-  "/assets/post-2.jpg"
-];
 const COVER_DEFAULT_IMAGE = "/assets/cover-default.jpg";
 
 const DEFAULT_PURPOSE_TEXT = {
@@ -155,32 +150,6 @@ const updateModalScrollLock = () => {
   document.body.classList.toggle("modal-open", Boolean(hasOpenModal));
 };
 
-const ensureCoverSelectModal = () => {
-  if (document.getElementById("coverSelectModal")) return;
-
-  document.body.insertAdjacentHTML("beforeend", `
-    <div class="modal-overlay hidden" id="coverSelectModal" aria-hidden="true">
-      <div class="modal wish-modal cover-select-modal" role="dialog" aria-modal="true" aria-label="Seleccionar imagen de portada">
-        <div class="modal-head">
-          <h3>Seleccionar imagen</h3>
-        </div>
-        <div class="modal-body">
-          <div class="cover-select-grid">
-            ${COVER_PRESETS.map((src, idx) => `
-              <button class="cover-select-item" type="button" data-cover-src="${src}">
-                <img src="${src}" alt="Portada ${idx + 1}" />
-              </button>
-            `).join("")}
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="coverSelectCancel">Cancelar</button>
-        </div>
-      </div>
-    </div>
-  `);
-};
-
 const ensureCoverLayout = () => {
   const coverMedia = document.getElementById("coverMedia");
   const coverImg = document.getElementById("coverImg");
@@ -195,7 +164,6 @@ const ensureCoverLayout = () => {
     menuEl.innerHTML = `
       <summary class="icon-btn" id="btnChangeCover" title="Editar imagen de portada">Editar imagen de portada</summary>
       <div class="cover-menu-panel">
-        <button class="cover-menu-item" type="button" id="coverSelectExisting">Seleccionar imagen</button>
         <button class="cover-menu-item" type="button" id="coverUpload">Subir imagen</button>
         <button class="cover-menu-item" type="button" id="coverMove">Mover imagen</button>
       </div>
@@ -214,11 +182,9 @@ const ensureCoverLayout = () => {
     coverSummary.title = "Editar imagen de portada";
   }
 
-  if (!coverMenu.querySelector("#coverSelectExisting")) {
-    const panel = coverMenu.querySelector(".cover-menu-panel");
-    panel?.insertAdjacentHTML("afterbegin", `
-      <button class="cover-menu-item" type="button" id="coverSelectExisting">Seleccionar imagen</button>
-    `);
+  const coverSelectExisting = coverMenu.querySelector("#coverSelectExisting");
+  if (coverSelectExisting) {
+    coverSelectExisting.remove();
   }
   if (!coverMenu.querySelector("#coverUpload")) {
     const panel = coverMenu.querySelector(".cover-menu-panel");
@@ -255,20 +221,16 @@ const ensureCoverLayout = () => {
     coverMedia.appendChild(coverSaveActions);
   }
 
-  ensureCoverSelectModal();
   return {
     coverMedia,
     coverImg,
     coverMenu,
     coverFile,
-    coverSelectExisting: document.getElementById("coverSelectExisting"),
     coverUploadBtn: document.getElementById("coverUpload"),
     coverMoveBtn: document.getElementById("coverMove"),
     coverSaveActions: document.getElementById("coverSaveActions"),
     coverSaveBtn: document.getElementById("coverSaveBtn"),
-    coverCancelBtn: document.getElementById("coverCancelBtn"),
-    coverSelectModal: document.getElementById("coverSelectModal"),
-    coverSelectCancel: document.getElementById("coverSelectCancel")
+    coverCancelBtn: document.getElementById("coverCancelBtn")
   };
 };
 
@@ -281,14 +243,11 @@ const initCoverEditor = () => {
     coverImg,
     coverMenu,
     coverFile,
-    coverSelectExisting,
     coverUploadBtn,
     coverMoveBtn,
     coverSaveActions,
     coverSaveBtn,
-    coverCancelBtn,
-    coverSelectModal,
-    coverSelectCancel
+    coverCancelBtn
   } = refs;
 
   if (coverMedia.dataset.coverEditorBound === "true") return () => {};
@@ -307,7 +266,6 @@ const initCoverEditor = () => {
   let coverActiveMediaId = null;
   let coverSavedOffsetX = 0;
   let coverSavedOffsetY = 0;
-  let coverPendingPresetSrc = "";
   let coverPendingUploadFile = null;
   let coverPreviewObjectUrl = "";
   let coverSaving = false;
@@ -371,7 +329,6 @@ const initCoverEditor = () => {
   };
 
   const resetCoverPendingMedia = () => {
-    coverPendingPresetSrc = "";
     coverPendingUploadFile = null;
     revokeCoverPreviewUrl();
   };
@@ -403,20 +360,6 @@ const initCoverEditor = () => {
       media_id: mediaId,
       url: String(data?.url || "").trim() || null,
     };
-  };
-
-  const uploadCoverPreset = async (presetSrc) => {
-    const response = await fetch(presetSrc);
-    if (!response.ok) {
-      throw new Error("No se pudo cargar la imagen base de portada.");
-    }
-    const blob = await response.blob();
-    const rawPath = String(presetSrc || "").split("?")[0];
-    const ext = (rawPath.includes(".") ? rawPath.slice(rawPath.lastIndexOf(".")) : "").toLowerCase();
-    const fileName = `cover-preset-${Date.now()}${ext || ".jpg"}`;
-    const mimeType = blob.type || "image/jpeg";
-    const file = new File([blob], fileName, { type: mimeType });
-    return uploadCoverImageFile(file);
   };
 
   const loadCoverFromApi = async () => {
@@ -462,13 +405,6 @@ const initCoverEditor = () => {
       let mediaIdToSave = coverActiveMediaId;
       if (coverPendingUploadFile) {
         const uploaded = await uploadCoverImageFile(coverPendingUploadFile);
-        mediaIdToSave = uploaded.media_id;
-        coverActiveMediaId = uploaded.media_id;
-        if (uploaded.url) {
-          coverImg.src = uploaded.url;
-        }
-      } else if (coverPendingPresetSrc) {
-        const uploaded = await uploadCoverPreset(coverPendingPresetSrc);
         mediaIdToSave = uploaded.media_id;
         coverActiveMediaId = uploaded.media_id;
         if (uploaded.url) {
@@ -531,20 +467,6 @@ const initCoverEditor = () => {
     updateCoverTransform(coverOffsetX, coverOffsetY);
   };
 
-  const openCoverSelectModal = () => {
-    if (!coverSelectModal) return;
-    coverSelectModal.classList.remove("hidden");
-    coverSelectModal.setAttribute("aria-hidden", "false");
-    updateModalScrollLock();
-  };
-
-  const closeCoverSelectModal = () => {
-    if (!coverSelectModal) return;
-    coverSelectModal.classList.add("hidden");
-    coverSelectModal.setAttribute("aria-hidden", "true");
-    updateModalScrollLock();
-  };
-
   const handleCoverUpload = () => coverFile?.click();
   const handleCoverFileChange = (event) => {
     const file = event.target.files?.[0];
@@ -566,31 +488,6 @@ const initCoverEditor = () => {
     setCoverMoveState(!coverMoveEnabled);
     markCoverDirty();
     closeCoverMenu();
-  };
-
-  const handleOpenSelect = () => {
-    openCoverSelectModal();
-    closeCoverMenu();
-  };
-
-  const handleSelectModalClick = (event) => {
-    if (event.target === coverSelectModal) {
-      closeCoverSelectModal();
-      return;
-    }
-    const button = event.target.closest(".cover-select-item");
-    if (!button) return;
-    const src = button.dataset.coverSrc;
-    if (!src) return;
-    resetCoverPendingMedia();
-    coverPendingPresetSrc = src;
-    coverImg.src = src;
-    coverOffsetX = 0;
-    coverOffsetY = 0;
-    markCoverDirty();
-    closeCoverSelectModal();
-    setCoverMoveState(true);
-    recalcCoverBounds();
   };
 
   const handleCoverMouseDown = (event) => {
@@ -632,9 +529,6 @@ const initCoverEditor = () => {
   coverUploadBtn?.addEventListener("click", handleCoverUpload);
   coverFile?.addEventListener("change", handleCoverFileChange);
   coverMoveBtn?.addEventListener("click", handleToggleMove);
-  coverSelectExisting?.addEventListener("click", handleOpenSelect);
-  coverSelectCancel?.addEventListener("click", closeCoverSelectModal);
-  coverSelectModal?.addEventListener("click", handleSelectModalClick);
   coverSaveBtn?.addEventListener("click", () => void commitCoverState());
   coverCancelBtn?.addEventListener("click", revertCoverState);
   coverMedia.addEventListener("mousedown", handleCoverMouseDown);

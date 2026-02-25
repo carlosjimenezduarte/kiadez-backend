@@ -1461,9 +1461,6 @@
                 Editar imagen de portada
               </summary>
               <div class="cover-menu-panel">
-                <button class="cover-menu-item" type="button" id="coverSelectExisting">
-                  Seleccionar imagen
-                </button>
                 <button class="cover-menu-item" type="button" id="coverUpload">
                   Subir imagen
                 </button>

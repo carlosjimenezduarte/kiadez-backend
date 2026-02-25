@@ -75,13 +75,7 @@
     const homeAvatarButton = document.getElementById('homeAvatarButton');
     const homeAvatarViewBtn = document.getElementById('homeAvatarViewBtn');
     const homeAvatarUploadBtn = document.getElementById('homeAvatarUploadBtn');
-    const homeAvatarGalleryBtn = document.getElementById('homeAvatarGalleryBtn');
     const homeAvatarFile = document.getElementById('homeAvatarFile');
-    const homeAvatarGalleryModalOverlay = document.getElementById('homeAvatarGalleryModalOverlay');
-    const closeHomeAvatarGalleryModal = document.getElementById('closeHomeAvatarGalleryModal');
-    const cancelHomeAvatarGalleryModal = document.getElementById('cancelHomeAvatarGalleryModal');
-    const homeAvatarGalleryGrid = document.getElementById('homeAvatarGalleryGrid');
-    const homeAvatarGalleryStatus = document.getElementById('homeAvatarGalleryStatus');
     const homeProfileName = document.getElementById('homeProfileName');
     const homeUsernameLink = document.getElementById('homeUsernameLink');
     const homeUsernameValue = document.getElementById('homeUsernameValue');
@@ -142,7 +136,6 @@
     const cancelProfilePhotoPostModal = document.getElementById('cancelProfilePhotoPostModal');
     const profilePhotoPrevBtn = document.getElementById('profilePhotoPrevBtn');
     const profilePhotoNextBtn = document.getElementById('profilePhotoNextBtn');
-    const profilePhotoNavLabel = document.getElementById('profilePhotoNavLabel');
     const profilePhotoPostImage = document.getElementById('profilePhotoPostImage');
     const profilePhotoPostAuthor = document.getElementById('profilePhotoPostAuthor');
     const profilePhotoPostMeta = document.getElementById('profilePhotoPostMeta');
@@ -167,7 +160,6 @@
     let profilePhotoViewerPostId = null;
     let profilePhotoHistory = [];
     let profilePhotoHistoryIndex = 0;
-    let homeAvatarGalleryHasImages = false;
     let homeAvatarProfilePhotoBusy = false;
     let currentAboutDisplayName = (homeProfileName?.textContent || 'Usuario Kiadez').trim();
     let currentUsername = '';
@@ -884,7 +876,6 @@
       homeUsernameCooldown?.classList.add('hidden');
       homeAboutEditBtn?.classList.add('hidden');
       homeAvatarUploadBtn?.classList.add('hidden');
-	      homeAvatarGalleryBtn?.classList.add('hidden');
 	      homeAvatarViewBtn?.classList.add('hidden');
 	      menuPublishBtn?.classList.add('hidden');
 	      btnChangeCover?.classList.add('hidden');
@@ -1083,10 +1074,8 @@
       const hasMany = total > 1;
       profilePhotoPrevBtn?.classList.toggle('hidden', !hasMany);
       profilePhotoNextBtn?.classList.toggle('hidden', !hasMany);
-      profilePhotoNavLabel?.classList.toggle('hidden', !hasMany);
 
       if (!hasMany) {
-        if (profilePhotoNavLabel) profilePhotoNavLabel.textContent = '';
         if (profilePhotoPrevBtn) profilePhotoPrevBtn.disabled = true;
         if (profilePhotoNextBtn) profilePhotoNextBtn.disabled = true;
         return;
@@ -1094,7 +1083,6 @@
 
       const safeIndex = Math.max(0, Math.min(total - 1, Number(profilePhotoHistoryIndex) || 0));
       profilePhotoHistoryIndex = safeIndex;
-      if (profilePhotoNavLabel) profilePhotoNavLabel.textContent = `${safeIndex + 1} / ${total}`;
 
       // Feed is sorted newest -> oldest; "Anterior" goes to older photos.
       if (profilePhotoPrevBtn) profilePhotoPrevBtn.disabled = safeIndex >= total - 1;
@@ -1116,8 +1104,9 @@
       }
       if (profilePhotoStarPost) {
         const starredByMe = Boolean(post?.starred_by_me);
+        const isMine = Boolean(post?.is_mine);
         const starCount = Number(post?.star_count || 0);
-        profilePhotoStarPost.disabled = !post || starredByMe;
+        profilePhotoStarPost.disabled = !post || starredByMe || isMine;
         profilePhotoStarPost.textContent = starredByMe
           ? `⭐ Estrella donada (${starCount})`
           : `⭐ Donar estrella (${starCount})`;
@@ -1197,50 +1186,13 @@
       }
     };
 
-    const setHomeAvatarGalleryStatus = (message, isError = false) => {
-      if (!homeAvatarGalleryStatus) return;
-      homeAvatarGalleryStatus.textContent = message || '';
-      homeAvatarGalleryStatus.classList.toggle('posts-status-error', Boolean(isError));
-    };
-
     const closeHomeAvatarDropdown = () => {
       homeAvatarDropdown?.removeAttribute('open');
     };
 
-    const closeHomeAvatarGalleryModalPanel = () => {
-      homeAvatarGalleryModalOverlay?.classList.add('hidden');
-      homeAvatarGalleryModalOverlay?.setAttribute('aria-hidden', 'true');
-      setHomeAvatarGalleryStatus('');
-      if (homeAvatarGalleryGrid) homeAvatarGalleryGrid.innerHTML = '';
-    };
-
-    const handleHomeAvatarGalleryOverlayClick = (event) => {
-      if (event.target === homeAvatarGalleryModalOverlay) closeHomeAvatarGalleryModalPanel();
-    };
-
-    const fetchMyImageOptions = async (limit = 24) => {
-      const res = await apiFetch(`/media/mine/images?limit=${limit}`);
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || 'No se pudo cargar tu galería.');
-      }
-      const items = Array.isArray(data.items) ? data.items : [];
-      return items;
-    };
-
-    const refreshHomeAvatarMenuOptions = async () => {
+    const refreshHomeAvatarMenuOptions = () => {
       const hasProfilePhoto = Boolean(profilePhotoMediaId);
       homeAvatarViewBtn?.classList.toggle('hidden', !hasProfilePhoto);
-      if (!homeAvatarGalleryBtn) return;
-
-      try {
-        const items = await fetchMyImageOptions(1);
-        homeAvatarGalleryHasImages = items.length > 0;
-      } catch (error) {
-        homeAvatarGalleryHasImages = false;
-      }
-
-      homeAvatarGalleryBtn.classList.toggle('hidden', !homeAvatarGalleryHasImages);
     };
 
     const applyUsernameState = (state) => {
@@ -1979,7 +1931,6 @@
               ${albumMeta}
               ${post.text ? `<p class="post-text">${renderPostTextHtml(post)}</p>` : ''}
               ${mediaHtml}
-              <p class="post-warning">La donacion de estrella es irreversible.</p>
               <div class="post-actions">
                 <button class="post-btn" type="button" data-action="star-post" data-post-id="${post.id}" ${starDisabled}>${starLabel}</button>
                 <button class="post-btn" type="button" data-action="comment-post" data-post-id="${post.id}">💬 Comentar (${post.comment_count})</button>
@@ -2402,7 +2353,7 @@
 
     const handleHomeAvatarButtonClick = () => {
       if (!isViewingOwnProfile) return;
-      void refreshHomeAvatarMenuOptions();
+      refreshHomeAvatarMenuOptions();
     };
 
     const handleHomeAvatarViewClick = () => {
@@ -2441,68 +2392,6 @@
       } finally {
         homeAvatarProfilePhotoBusy = false;
         if (homeAvatarFile) homeAvatarFile.value = '';
-      }
-    };
-
-    const renderHomeAvatarGallery = (items) => {
-      if (!homeAvatarGalleryGrid) return;
-      if (!Array.isArray(items) || items.length === 0) {
-        homeAvatarGalleryGrid.innerHTML = '';
-        return;
-      }
-
-      homeAvatarGalleryGrid.innerHTML = items
-        .map(
-          (item) => `
-            <button class="avatar-gallery-option" type="button" data-media-id="${Number(item.media_id) || ''}" title="Usar como foto de perfil">
-              <img src="${escapeHtml(item.url)}" alt="Imagen de galería" loading="lazy" />
-            </button>
-          `
-        )
-        .join('');
-    };
-
-    const openHomeAvatarGalleryModalPanel = async () => {
-      if (!isViewingOwnProfile) return;
-      closeHomeAvatarDropdown();
-      homeAvatarGalleryModalOverlay?.classList.remove('hidden');
-      homeAvatarGalleryModalOverlay?.setAttribute('aria-hidden', 'false');
-      setHomeAvatarGalleryStatus('Cargando imágenes...');
-      if (homeAvatarGalleryGrid) homeAvatarGalleryGrid.innerHTML = '';
-
-      try {
-        const items = await fetchMyImageOptions(60);
-        if (items.length === 0) {
-          setHomeAvatarGalleryStatus('Aún no tienes imágenes en tu galería.', false);
-          renderHomeAvatarGallery([]);
-          return;
-        }
-        setHomeAvatarGalleryStatus('Selecciona una imagen para tu foto de perfil.');
-        renderHomeAvatarGallery(items);
-      } catch (error) {
-        setHomeAvatarGalleryStatus(error.message || 'No se pudo cargar tu galería.', true);
-      }
-    };
-
-    const handleHomeAvatarGalleryPick = async (event) => {
-      if (!isViewingOwnProfile) return;
-      const button = event.target?.closest?.('[data-media-id]');
-      if (!button) return;
-      const mediaId = Number(button.dataset.mediaId);
-      if (!Number.isFinite(mediaId) || mediaId <= 0) return;
-      if (homeAvatarProfilePhotoBusy) return;
-
-      homeAvatarProfilePhotoBusy = true;
-      setHomeAvatarGalleryStatus('Actualizando foto de perfil...');
-      try {
-        await setProfilePhotoFromMediaId(mediaId);
-        closeHomeAvatarGalleryModalPanel();
-        setPostsStatus('Foto de perfil actualizada.');
-        void ensureProfilePhotoPost().catch((error) => console.error(error));
-      } catch (error) {
-        setHomeAvatarGalleryStatus(error.message || 'No se pudo actualizar tu foto de perfil.', true);
-      } finally {
-        homeAvatarProfilePhotoBusy = false;
       }
     };
 
@@ -2611,11 +2500,22 @@
     };
 
     const donateStarToPost = async (postId, setStatus = setPostsStatus) => {
+      const post = Array.isArray(currentFeedPosts)
+        ? currentFeedPosts.find((item) => Number(item?.id) === Number(postId))
+        : null;
+      if (post?.is_mine) {
+        setStatus('No puedes donarte estrellas a ti mismo.', true);
+        return;
+      }
+      if (post?.starred_by_me) {
+        setStatus('Ya donaste una estrella a esta publicación.', true);
+        return;
+      }
       try {
         const res = await apiFetch(`/posts/${postId}/stars`, { method: 'POST' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'No se pudo donar la estrella.');
-        setStatus('Estrella donada. Esta accion es irreversible.');
+        setStatus('Estrella donada.');
         await Promise.all([loadFeed(), loadMyStats()]);
         if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
       } catch (error) {
@@ -2978,11 +2878,6 @@
     homeAvatarViewBtn?.addEventListener('click', handleHomeAvatarViewClick);
     homeAvatarUploadBtn?.addEventListener('click', handleHomeAvatarUploadClick);
     homeAvatarFile?.addEventListener('change', handleHomeAvatarFileChange);
-    homeAvatarGalleryBtn?.addEventListener('click', openHomeAvatarGalleryModalPanel);
-    closeHomeAvatarGalleryModal?.addEventListener('click', closeHomeAvatarGalleryModalPanel);
-    cancelHomeAvatarGalleryModal?.addEventListener('click', closeHomeAvatarGalleryModalPanel);
-    homeAvatarGalleryModalOverlay?.addEventListener('click', handleHomeAvatarGalleryOverlayClick);
-    homeAvatarGalleryGrid?.addEventListener('click', handleHomeAvatarGalleryPick);
     homeUsernameEditBtn?.addEventListener('click', openHomeUsernameModalPanel);
     homeUsernameReportBtn?.addEventListener('click', handleOpenProfileReportModal);
     closeHomeUsernameModal?.addEventListener('click', closeHomeUsernameModalPanel);
@@ -3113,11 +3008,6 @@
       homeAvatarViewBtn?.removeEventListener('click', handleHomeAvatarViewClick);
       homeAvatarUploadBtn?.removeEventListener('click', handleHomeAvatarUploadClick);
       homeAvatarFile?.removeEventListener('change', handleHomeAvatarFileChange);
-      homeAvatarGalleryBtn?.removeEventListener('click', openHomeAvatarGalleryModalPanel);
-      closeHomeAvatarGalleryModal?.removeEventListener('click', closeHomeAvatarGalleryModalPanel);
-      cancelHomeAvatarGalleryModal?.removeEventListener('click', closeHomeAvatarGalleryModalPanel);
-      homeAvatarGalleryModalOverlay?.removeEventListener('click', handleHomeAvatarGalleryOverlayClick);
-      homeAvatarGalleryGrid?.removeEventListener('click', handleHomeAvatarGalleryPick);
       homeUsernameEditBtn?.removeEventListener('click', openHomeUsernameModalPanel);
       homeUsernameReportBtn?.removeEventListener('click', handleOpenProfileReportModal);
       closeHomeUsernameModal?.removeEventListener('click', closeHomeUsernameModalPanel);
@@ -3311,9 +3201,6 @@
                   </button>
                   <button class="dropdown-action" id="homeAvatarUploadBtn" type="button" role="menuitem">
                     Subir imagen de perfil
-                  </button>
-                  <button class="dropdown-action hidden" id="homeAvatarGalleryBtn" type="button" role="menuitem">
-                    Elegir imagen de perfil
                   </button>
                 </div>
               </details>
@@ -3669,8 +3556,6 @@
             ›
           </button>
         </div>
-        <p class="profile-photo-nav-label hidden" id="profilePhotoNavLabel"></p>
-        <p class="post-warning">La donación de estrella es irreversible.</p>
         <div class="post-actions">
           <button class="post-btn" type="button" id="profilePhotoStarPost">⭐ Donar estrella (0)</button>
           <button class="post-btn" type="button" id="profilePhotoCommentPost">💬 Comentar (0)</button>
@@ -3681,23 +3566,6 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline btn-compact" type="button" id="cancelProfilePhotoPostModal">Cerrar</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay hidden" id="homeAvatarGalleryModalOverlay" aria-hidden="true">
-  <div class="modal modal-wide avatar-gallery-modal" role="dialog" aria-modal="true" aria-label="Seleccionar foto de perfil">
-    <div class="modal-head">
-      <h3>Elegir foto de perfil</h3>
-      <button class="modal-close" type="button" id="closeHomeAvatarGalleryModal">✕</button>
-    </div>
-    <div class="modal-body">
-      <p class="panel-muted">Selecciona una imagen de tu galería para usarla como foto de perfil.</p>
-      <p class="posts-status" id="homeAvatarGalleryStatus" aria-live="polite"></p>
-      <div class="avatar-gallery-grid" id="homeAvatarGalleryGrid"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelHomeAvatarGalleryModal">Cancelar</button>
     </div>
   </div>
 </div>

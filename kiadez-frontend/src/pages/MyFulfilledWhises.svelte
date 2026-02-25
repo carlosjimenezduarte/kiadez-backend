@@ -29,20 +29,33 @@
     "Vivencial": "/css/icons/Vivencial.webp"
   };
 
-  const personalCompletedSlots = Array.from({ length: FULFILLED_VISIBLE_SLOTS }, (_, index) => index + 1);
-  const cooperativeCompletedSlots = Array.from({ length: FULFILLED_VISIBLE_SLOTS }, (_, index) => index + 1);
+  let personalCompletedSlots = Array.from({ length: FULFILLED_VISIBLE_SLOTS }, (_, index) => index + 1);
+  let cooperativeCompletedSlots = Array.from({ length: FULFILLED_VISIBLE_SLOTS }, (_, index) => index + 1);
 
   let personalFulfilledItems = [];
   let personalCompletedView = personalCompletedSlots.map((slot) => ({ slot, wish: null }));
   let personalFulfilledTotal = 0;
   let personalFulfilledError = "";
   let personalFulfilledLoading = false;
+  let personalFulfilledPage = 1;
+  let personalFulfilledTotalPages = 1;
+  let personalFulfilledPageNumbers = [1];
+  let personalFulfilledRangeStart = 0;
+  let personalFulfilledRangeEnd = 0;
 
   let cooperativeFulfilledItems = [];
   let cooperativeCompletedView = cooperativeCompletedSlots.map((slot) => ({ slot, wish: null }));
   let cooperativeFulfilledTotal = 0;
   let cooperativeFulfilledError = "";
   let cooperativeFulfilledLoading = false;
+  let cooperativeFulfilledPage = 1;
+  let cooperativeFulfilledTotalPages = 1;
+  let cooperativeFulfilledPageNumbers = [1];
+  let cooperativeFulfilledRangeStart = 0;
+  let cooperativeFulfilledRangeEnd = 0;
+
+  let personalFulfilledRequestId = 0;
+  let cooperativeFulfilledRequestId = 0;
 
   const getAccessToken = () => localStorage.getItem("access_token") || "";
 
@@ -292,49 +305,125 @@
   const getLifePurposeIconSrc = (iconKey) => getPurposeIconSrc(iconKey) || DEFAULT_PURPOSE_ICON_SRC;
   const isFromLifePurpose = (wish) => Boolean(wish?.life_purpose_slot_number || wish?.life_purpose_icon_key);
 
-  const loadFulfilledPersonalWishes = async () => {
+  const buildFulfilledSlots = (pageNumber = 1) => {
+    const normalizedPage = Math.max(1, Math.trunc(Number(pageNumber || 1)));
+    const base = (normalizedPage - 1) * FULFILLED_VISIBLE_SLOTS;
+    return Array.from({ length: FULFILLED_VISIBLE_SLOTS }, (_, index) => base + index + 1);
+  };
+
+  const loadFulfilledPersonalWishes = async (page = personalFulfilledPage) => {
+    const requestId = (personalFulfilledRequestId += 1);
+    const requestedPage = Math.max(1, Math.trunc(Number(page || 1)));
+    const offset = (requestedPage - 1) * FULFILLED_VISIBLE_SLOTS;
+    personalFulfilledPage = requestedPage;
     personalFulfilledLoading = true;
     personalFulfilledError = "";
 
     try {
-      const data = await fetchFulfilledPersonalWishes();
-      personalFulfilledItems = Array.isArray(data?.items) ? data.items : [];
-      personalFulfilledTotal = Number(data?.total) || personalFulfilledItems.length;
+      const data = await fetchFulfilledPersonalWishes(FULFILLED_VISIBLE_SLOTS, offset);
+      if (requestId !== personalFulfilledRequestId) return;
+      const items = Array.isArray(data?.items) ? data.items : [];
+      personalFulfilledItems = items;
+      personalFulfilledTotal = Number(data?.total) || items.length;
     } catch (error) {
+      if (requestId !== personalFulfilledRequestId) return;
       personalFulfilledItems = [];
       personalFulfilledTotal = 0;
       personalFulfilledError = error instanceof Error
         ? error.message
         : "No se pudieron cargar tus deseos personales cumplidos.";
     } finally {
-      personalFulfilledLoading = false;
+      if (requestId === personalFulfilledRequestId) {
+        personalFulfilledLoading = false;
+      }
     }
   };
 
-  const loadFulfilledCooperativeWishes = async () => {
+  const loadFulfilledCooperativeWishes = async (page = cooperativeFulfilledPage) => {
+    const requestId = (cooperativeFulfilledRequestId += 1);
+    const requestedPage = Math.max(1, Math.trunc(Number(page || 1)));
+    const offset = (requestedPage - 1) * FULFILLED_VISIBLE_SLOTS;
+    cooperativeFulfilledPage = requestedPage;
     cooperativeFulfilledLoading = true;
     cooperativeFulfilledError = "";
 
     try {
-      const data = await fetchFulfilledCooperativeWishes();
-      cooperativeFulfilledItems = Array.isArray(data?.items) ? data.items : [];
-      cooperativeFulfilledTotal = Number(data?.total) || cooperativeFulfilledItems.length;
+      const data = await fetchFulfilledCooperativeWishes(FULFILLED_VISIBLE_SLOTS, offset);
+      if (requestId !== cooperativeFulfilledRequestId) return;
+      const items = Array.isArray(data?.items) ? data.items : [];
+      cooperativeFulfilledItems = items;
+      cooperativeFulfilledTotal = Number(data?.total) || items.length;
     } catch (error) {
+      if (requestId !== cooperativeFulfilledRequestId) return;
       cooperativeFulfilledItems = [];
       cooperativeFulfilledTotal = 0;
       cooperativeFulfilledError = error instanceof Error
         ? error.message
         : "No se pudieron cargar tus deseos cooperativos cumplidos.";
     } finally {
-      cooperativeFulfilledLoading = false;
+      if (requestId === cooperativeFulfilledRequestId) {
+        cooperativeFulfilledLoading = false;
+      }
     }
   };
 
+  const goToPersonalFulfilledPage = (page) => {
+    const next = Number(page);
+    if (!Number.isFinite(next)) return;
+    const clamped = Math.max(1, Math.min(Math.trunc(next), personalFulfilledTotalPages || 1));
+    if (clamped === personalFulfilledPage) return;
+    personalFulfilledPage = clamped;
+    void loadFulfilledPersonalWishes(clamped);
+  };
+
+  const goToCooperativeFulfilledPage = (page) => {
+    const next = Number(page);
+    if (!Number.isFinite(next)) return;
+    const clamped = Math.max(1, Math.min(Math.trunc(next), cooperativeFulfilledTotalPages || 1));
+    if (clamped === cooperativeFulfilledPage) return;
+    cooperativeFulfilledPage = clamped;
+    void loadFulfilledCooperativeWishes(clamped);
+  };
+
+  $: personalFulfilledTotalPages = Math.max(
+    1,
+    Math.ceil(personalFulfilledTotal / FULFILLED_VISIBLE_SLOTS)
+  );
+  $: personalFulfilledPage = Math.min(personalFulfilledPage, personalFulfilledTotalPages);
+  $: personalFulfilledPage = Math.max(personalFulfilledPage, 1);
+  $: personalFulfilledPageNumbers = Array.from(
+    { length: personalFulfilledTotalPages },
+    (_, index) => index + 1
+  );
+  $: personalFulfilledRangeStart = personalFulfilledTotal
+    ? (personalFulfilledPage - 1) * FULFILLED_VISIBLE_SLOTS + 1
+    : 0;
+  $: personalFulfilledRangeEnd = personalFulfilledTotal
+    ? Math.min(personalFulfilledPage * FULFILLED_VISIBLE_SLOTS, personalFulfilledTotal)
+    : 0;
+  $: personalCompletedSlots = buildFulfilledSlots(personalFulfilledPage);
   $: personalCompletedView = personalCompletedSlots.map((slot, index) => ({
     slot,
     wish: personalFulfilledItems[index] || null
   }));
 
+  $: cooperativeFulfilledTotalPages = Math.max(
+    1,
+    Math.ceil(cooperativeFulfilledTotal / FULFILLED_VISIBLE_SLOTS)
+  );
+  $: cooperativeFulfilledPage = Math.min(cooperativeFulfilledPage, cooperativeFulfilledTotalPages);
+  $: cooperativeFulfilledPage = Math.max(cooperativeFulfilledPage, 1);
+  $: cooperativeFulfilledPageNumbers = Array.from(
+    { length: cooperativeFulfilledTotalPages },
+    (_, index) => index + 1
+  );
+  $: cooperativeFulfilledRangeStart = cooperativeFulfilledTotal
+    ? (cooperativeFulfilledPage - 1) * FULFILLED_VISIBLE_SLOTS + 1
+    : 0;
+  $: cooperativeFulfilledRangeEnd = cooperativeFulfilledTotal
+    ? Math.min(cooperativeFulfilledPage * FULFILLED_VISIBLE_SLOTS, cooperativeFulfilledTotal)
+    : 0;
+  $: cooperativeCompletedSlots = buildFulfilledSlots(cooperativeFulfilledPage);
   $: cooperativeCompletedView = cooperativeCompletedSlots.map((slot, index) => ({
     slot,
     wish: cooperativeFulfilledItems[index] || null
@@ -346,17 +435,21 @@
     const onFulfilledChanged = (event) => {
       const scope = event?.detail?.scope;
       if (scope === "public") {
-        void loadFulfilledPersonalWishes();
+        personalFulfilledPage = 1;
+        void loadFulfilledPersonalWishes(1);
         return;
       }
       if (scope === "public-cooperative") {
-        void loadFulfilledCooperativeWishes();
+        cooperativeFulfilledPage = 1;
+        void loadFulfilledCooperativeWishes(1);
         return;
       }
       if (!scope) {
+        personalFulfilledPage = 1;
+        cooperativeFulfilledPage = 1;
         void Promise.all([
-          loadFulfilledPersonalWishes(),
-          loadFulfilledCooperativeWishes(),
+          loadFulfilledPersonalWishes(1),
+          loadFulfilledCooperativeWishes(1),
         ]);
       }
     };
@@ -367,9 +460,11 @@
       } catch (error) {
         console.error(error);
       } finally {
+        personalFulfilledPage = 1;
+        cooperativeFulfilledPage = 1;
         void Promise.all([
-          loadFulfilledPersonalWishes(),
-          loadFulfilledCooperativeWishes(),
+          loadFulfilledPersonalWishes(1),
+          loadFulfilledCooperativeWishes(1),
         ]);
       }
     })();
@@ -450,9 +545,6 @@
               Editar imagen de portada
             </summary>
             <div class="cover-menu-panel">
-              <button class="cover-menu-item" type="button" id="coverSelectExisting">
-                Seleccionar imagen
-              </button>
               <button class="cover-menu-item" type="button" id="coverUpload">
                 Subir imagen
               </button>
@@ -557,10 +649,14 @@
             <div class="panel-head">
               <h3 class="panel-title">Deseos personales cumplidos</h3>
               <span class="panel-badge">
-                {Math.min(personalFulfilledTotal, FULFILLED_VISIBLE_SLOTS)} / {FULFILLED_VISIBLE_SLOTS}
+                {personalFulfilledItems.length} / {FULFILLED_VISIBLE_SLOTS}
               </span>
             </div>
-            <ol class="wish-slot-list wish-slot-list-fulfilled" aria-label="Deseos personales cumplidos">
+            <ol
+              class="wish-slot-list wish-slot-list-fulfilled"
+              aria-label="Deseos personales cumplidos"
+              style={`counter-reset: wish ${Math.max(0, personalFulfilledRangeStart - 1)};`}
+            >
               {#each personalCompletedView as item}
                 <li class="wish-slot is-filled" data-slot={item.slot}>
                   {#if item.wish}
@@ -625,13 +721,45 @@
                 </li>
               {/each}
             </ol>
+            {#if personalFulfilledTotalPages > 1}
+              <nav class="wish-pagination" aria-label="Paginación de deseos personales cumplidos">
+                <button
+                  class="wish-page-btn is-arrow"
+                  type="button"
+                  aria-label="Página anterior"
+                  on:click={() => goToPersonalFulfilledPage(personalFulfilledPage - 1)}
+                  disabled={personalFulfilledPage <= 1}
+                >
+                  &lt;&lt;
+                </button>
+                {#each personalFulfilledPageNumbers as page}
+                  <button
+                    class={`wish-page-btn${page === personalFulfilledPage ? " is-active" : ""}`}
+                    type="button"
+                    aria-current={page === personalFulfilledPage ? "page" : undefined}
+                    on:click={() => goToPersonalFulfilledPage(page)}
+                  >
+                    {page}
+                  </button>
+                {/each}
+                <button
+                  class="wish-page-btn is-arrow"
+                  type="button"
+                  aria-label="Página siguiente"
+                  on:click={() => goToPersonalFulfilledPage(personalFulfilledPage + 1)}
+                  disabled={personalFulfilledPage >= personalFulfilledTotalPages}
+                >
+                  &gt;&gt;
+                </button>
+              </nav>
+            {/if}
             {#if personalFulfilledLoading}
               <p class="wish-fulfilled-status">Cargando deseos cumplidos...</p>
             {:else if personalFulfilledError}
               <p class="wish-fulfilled-status is-error">{personalFulfilledError}</p>
-            {:else if personalFulfilledTotal > FULFILLED_VISIBLE_SLOTS}
+            {:else if personalFulfilledTotalPages > 1}
               <p class="wish-fulfilled-status">
-                Mostrando los últimos {FULFILLED_VISIBLE_SLOTS} de {personalFulfilledTotal} deseos cumplidos.
+                Mostrando {personalFulfilledRangeStart}-{personalFulfilledRangeEnd} de {personalFulfilledTotal} deseos cumplidos.
               </p>
             {/if}
           </article>
@@ -640,10 +768,14 @@
             <div class="panel-head">
               <h3 class="panel-title">Deseos cooperativos cumplidos</h3>
               <span class="panel-badge">
-                {Math.min(cooperativeFulfilledTotal, FULFILLED_VISIBLE_SLOTS)} / {FULFILLED_VISIBLE_SLOTS}
+                {cooperativeFulfilledItems.length} / {FULFILLED_VISIBLE_SLOTS}
               </span>
             </div>
-            <ol class="wish-slot-list wish-slot-list-fulfilled" aria-label="Deseos cooperativos cumplidos">
+            <ol
+              class="wish-slot-list wish-slot-list-fulfilled"
+              aria-label="Deseos cooperativos cumplidos"
+              style={`counter-reset: wish ${Math.max(0, cooperativeFulfilledRangeStart - 1)};`}
+            >
               {#each cooperativeCompletedView as item}
                 <li class="wish-slot is-filled" data-slot={item.slot}>
                   {#if item.wish}
@@ -702,13 +834,45 @@
                 </li>
               {/each}
             </ol>
+            {#if cooperativeFulfilledTotalPages > 1}
+              <nav class="wish-pagination" aria-label="Paginación de deseos cooperativos cumplidos">
+                <button
+                  class="wish-page-btn is-arrow"
+                  type="button"
+                  aria-label="Página anterior"
+                  on:click={() => goToCooperativeFulfilledPage(cooperativeFulfilledPage - 1)}
+                  disabled={cooperativeFulfilledPage <= 1}
+                >
+                  &lt;&lt;
+                </button>
+                {#each cooperativeFulfilledPageNumbers as page}
+                  <button
+                    class={`wish-page-btn${page === cooperativeFulfilledPage ? " is-active" : ""}`}
+                    type="button"
+                    aria-current={page === cooperativeFulfilledPage ? "page" : undefined}
+                    on:click={() => goToCooperativeFulfilledPage(page)}
+                  >
+                    {page}
+                  </button>
+                {/each}
+                <button
+                  class="wish-page-btn is-arrow"
+                  type="button"
+                  aria-label="Página siguiente"
+                  on:click={() => goToCooperativeFulfilledPage(cooperativeFulfilledPage + 1)}
+                  disabled={cooperativeFulfilledPage >= cooperativeFulfilledTotalPages}
+                >
+                  &gt;&gt;
+                </button>
+              </nav>
+            {/if}
             {#if cooperativeFulfilledLoading}
               <p class="wish-fulfilled-status">Cargando deseos cumplidos...</p>
             {:else if cooperativeFulfilledError}
               <p class="wish-fulfilled-status is-error">{cooperativeFulfilledError}</p>
-            {:else if cooperativeFulfilledTotal > FULFILLED_VISIBLE_SLOTS}
+            {:else if cooperativeFulfilledTotalPages > 1}
               <p class="wish-fulfilled-status">
-                Mostrando los últimos {FULFILLED_VISIBLE_SLOTS} de {cooperativeFulfilledTotal} deseos cumplidos.
+                Mostrando {cooperativeFulfilledRangeStart}-{cooperativeFulfilledRangeEnd} de {cooperativeFulfilledTotal} deseos cumplidos.
               </p>
             {/if}
           </article>
@@ -716,4 +880,58 @@
       </section>
     </div>
   </main>
+
+  <footer class="kiadez-footer">
+    <div class="footer-main">
+      <div class="footer-column footer-origin">
+        <p class="footer-poem">
+          Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br>
+          No para dominar, sino para orientar.<br>
+          Su luz no deslumbra: acompaña.
+        </p>
+      </div>
+
+      <div class="footer-columns">
+        <div class="footer-column">
+          <h4>Sobre nuestra red social</h4>
+          <ul>
+            <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
+            <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
+            <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
+            <li><a href="/contact.html">Contacto</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h4>Idiomas</h4>
+          <ul>
+            <li><a href="/?lang=es">Español</a></li>
+            <li><a href="/?lang=en">English</a></li>
+            <li><a href="/?lang=fr">Français</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h4>Contacto</h4>
+          <ul>
+            <li>info@kiadez.com</li>
+            <li>+57 333 225 6078</li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h4>Información legal</h4>
+          <ul>
+            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
+            <li><a href="/terms.html">Términos y condiciones</a></li>
+            <li><a href="/privacy.html">Privacidad</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      © 2026 Kiadez — Una red social para cumplir deseos.
+    </div>
+  </footer>
 </div>

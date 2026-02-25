@@ -19,6 +19,7 @@
                 <form id="auth-form">
                     <input type="email" name="email" placeholder="Correo electrónico" required />
                     <input type="password" name="password" placeholder="Contraseña" required />
+                    <p id="auth-error" class="auth-form-error hidden" role="alert"></p>
 
                     <button type="submit" class="btn btn-primary">
                         Entrar a Kiadez
@@ -84,6 +85,14 @@
         const API = "http://127.0.0.1:8000";
 
         const form = document.getElementById("auth-form");
+        const authErrorEl = document.getElementById("auth-error");
+
+        function setAuthError(message) {
+            if (!authErrorEl) return;
+            const text = String(message || "");
+            authErrorEl.textContent = text;
+            authErrorEl.classList.toggle("hidden", !text);
+        }
 
         async function login(email, password) {
             const res = await fetch(`${API}/auth/login`, {
@@ -96,7 +105,9 @@
 
             const data = await res.json();
             if (!res.ok) {
-                throw new Error(data.detail || "Error al iniciar sesión");
+                const error = new Error(data.detail || "Error al iniciar sesión");
+                error.status = res.status;
+                throw error;
             }
 
             localStorage.setItem("access_token", data.access_token);
@@ -120,6 +131,7 @@
 
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
+            setAuthError("");
 
             const email = form.email.value;
             const password = form.password.value;
@@ -134,10 +146,20 @@
                     window.location.href = "create-private-key.html";
                 }
             } catch (err) {
-                alert(err.message);
+                const errorMessage = String(err?.message || "");
+                const invalidCredentials =
+                    Number(err?.status) === 401 || /credenciales/i.test(errorMessage);
+                if (invalidCredentials) {
+                    setAuthError("Correo electrónico o contraseña invalida");
+                } else {
+                    setAuthError(errorMessage || "No se pudo iniciar sesión.");
+                }
                 console.error(err);
             }
         });
+
+        form.email?.addEventListener("input", () => setAuthError(""));
+        form.password?.addEventListener("input", () => setAuthError(""));
 
         // Prefill email si viene por URL
         const params = new URLSearchParams(window.location.search);

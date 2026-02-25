@@ -2047,7 +2047,11 @@
                     {privateFulfilledItems.length} / {PRIVATE_FULFILLED_VISIBLE_SLOTS}
                   </span>
                 </div>
-                <ol class="wish-slot-list wish-slot-list-fulfilled" aria-label="Deseos privados cumplidos">
+                <ol
+                  class="wish-slot-list wish-slot-list-fulfilled"
+                  aria-label="Deseos privados cumplidos"
+                  style={`counter-reset: wish ${Math.max(0, privateFulfilledRangeStart - 1)};`}
+                >
                   {#each privateFulfilledView as item}
                     <li class="wish-slot is-filled" data-slot={item.slot}>
                       {#if item.wish}
@@ -2494,7 +2498,6 @@
       </div>
     </div>
 
-    <!-- FOOTER reutilizado -->
     <footer class="kiadez-footer">
       <div class="footer-main">
         <div class="footer-column footer-origin">
@@ -2509,28 +2512,36 @@
           <div class="footer-column">
             <h4>Sobre nuestra red social</h4>
             <ul>
-              <li><a href="#">Qué es Kiadez</a></li>
-              <li><a href="#">Rangos de Guardianes</a></li>
-              <li><a href="#">Ser Guardián</a></li>
-              <li><a href="#">Contacto</a></li>
+              <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
+              <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
+              <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
+              <li><a href="/contact.html">Contacto</a></li>
             </ul>
           </div>
 
           <div class="footer-column">
             <h4>Idiomas</h4>
             <ul>
-              <li><a href="#">Español</a></li>
-              <li><a href="#">English</a></li>
-              <li><a href="#">Français</a></li>
-              <li><a href="#">Português</a></li>
+              <li><a href="/?lang=es">Español</a></li>
+              <li><a href="/?lang=en">English</a></li>
+              <li><a href="/?lang=fr">Français</a></li>
+            </ul>
+          </div>
+
+          <div class="footer-column">
+            <h4>Contacto</h4>
+            <ul>
+              <li>info@kiadez.com</li>
+              <li>+57 333 225 6078</li>
             </ul>
           </div>
 
           <div class="footer-column">
             <h4>Información legal</h4>
             <ul>
-              <li><a href="#">Términos y condiciones</a></li>
-              <li><a href="#">Privacidad</a></li>
+              <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
+              <li><a href="/terms.html">Términos y condiciones</a></li>
+              <li><a href="/privacy.html">Privacidad</a></li>
             </ul>
           </div>
         </div>
