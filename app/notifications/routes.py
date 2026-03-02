@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import and_, desc, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.db.database import get_db
 from app.db.models.achievement_unlock_event import AchievementUnlockEvent
 from app.db.models.message_entry import MessageEntry
@@ -34,6 +35,21 @@ MAX_FEED_LIMIT = 160
 NOTIFICATION_SOURCE_LIMIT = 48
 GUARDIAN_MIN_RANK = 3
 ORACLE_COOLDOWN = timedelta(hours=72)
+
+
+def _locale(request: Request | None) -> str:
+    return locale_from_request(request, default="en")
+
+
+def _td(locale: str, en: str) -> str:
+    translations: dict[str, tuple[str, str]] = {
+        "User not found.": ("Usuario no encontrado.", "Utilisateur introuvable."),
+    }
+    pair = translations.get(en)
+    if not pair:
+        return en
+    es, fr = pair
+    return i18n_tr(locale, es=es, en=en, fr=fr)
 
 
 def _utcnow() -> datetime:
@@ -79,7 +95,7 @@ def _normalize_notification_id(value: str | None) -> str:
 
 def _display_name(*, first_name: str | None, last_name: str | None, user_id: int) -> str:
     full_name = f"{(first_name or '').strip()} {(last_name or '').strip()}".strip()
-    return full_name or f"Usuario {int(user_id)}"
+    return full_name or f"User {int(user_id)}"
 
 
 def _build_profile_url(*, user_id: int, username: str | None) -> str:
@@ -108,16 +124,16 @@ def _preferences_out(user: User) -> NotificationPreferencesOut:
     )
 
 
-def _load_current_user_or_404(*, db: Session, current: UserPublic) -> User:
+def _load_current_user_or_404(*, db: Session, current: UserPublic, locale: str) -> User:
     user = db.execute(
         select(User).where(User.id == int(current.user_number), User.is_active.is_(True))
     ).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
     return user
 
 
-def _collect_followers_notifications(*, db: Session, user_id: int) -> list[NotificationItemOut]:
+def _collect_followers_notifications(*, db: Session, user_id: int, locale: str) -> list[NotificationItemOut]:
     rows = db.execute(
         select(
             UserFollow.id,
@@ -146,8 +162,18 @@ def _collect_followers_notifications(*, db: Session, user_id: int) -> list[Notif
                 id=f"followers:{int(row.id)}",
                 kind="followers",
                 emoji="👥",
-                title="Nuevo seguidor",
-                message=f"{follower_name} empezó a seguirte.",
+                title=i18n_tr(
+                    locale,
+                    es="Nuevo seguidor",
+                    en="New follower",
+                    fr="Nouveau suiveur",
+                ),
+                message=i18n_tr(
+                    locale,
+                    es=f"{follower_name} comenzó a seguirte.",
+                    en=f"{follower_name} started following you.",
+                    fr=f"{follower_name} a commencé à vous suivre.",
+                ),
                 created_at=row.created_at,
                 href=_build_profile_url(user_id=follower_id, username=row.follower_username),
             )
@@ -155,7 +181,7 @@ def _collect_followers_notifications(*, db: Session, user_id: int) -> list[Notif
     return items
 
 
-def _collect_messages_notifications(*, db: Session, user_id: int) -> list[NotificationItemOut]:
+def _collect_messages_notifications(*, db: Session, user_id: int, locale: str) -> list[NotificationItemOut]:
     rows = db.execute(
         select(
             MessageEntry.id,
@@ -198,7 +224,12 @@ def _collect_messages_notifications(*, db: Session, user_id: int) -> list[Notifi
                 id=f"messages:{int(row.id)}",
                 kind="messages",
                 emoji="💬",
-                title="Nuevo mensaje de Guardián",
+                title=i18n_tr(
+                    locale,
+                    es="Nuevo mensaje de Guardián",
+                    en="New message from Guardian",
+                    fr="Nouveau message d'un Gardien",
+                ),
                 message=f"{sender_name} ({subject}): {body_preview}",
                 created_at=row.created_at,
                 href=f"/messages.html?thread={int(row.thread_id)}",
@@ -207,7 +238,7 @@ def _collect_messages_notifications(*, db: Session, user_id: int) -> list[Notifi
     return items
 
 
-def _collect_achievements_notifications(*, db: Session, user_id: int) -> list[NotificationItemOut]:
+def _collect_achievements_notifications(*, db: Session, user_id: int, locale: str) -> list[NotificationItemOut]:
     rows = db.execute(
         select(AchievementUnlockEvent)
         .where(
@@ -227,7 +258,12 @@ def _collect_achievements_notifications(*, db: Session, user_id: int) -> list[No
                 id=f"achievements:{int(event.id)}",
                 kind="achievements",
                 emoji="🏆",
-                title=f"Logro desbloqueado: {title}",
+                title=i18n_tr(
+                    locale,
+                    es=f"Logro desbloqueado: {title}",
+                    en=f"Achievement unlocked: {title}",
+                    fr=f"Succès débloqué : {title}",
+                ),
                 message=description,
                 created_at=event.unlocked_at,
                 href="/achievements.html",
@@ -236,7 +272,13 @@ def _collect_achievements_notifications(*, db: Session, user_id: int) -> list[No
     return items
 
 
-def _collect_calendar_notifications(*, db: Session, user: User, now_utc: datetime) -> list[NotificationItemOut]:
+def _collect_calendar_notifications(
+    *,
+    db: Session,
+    user: User,
+    now_utc: datetime,
+    locale: str,
+) -> list[NotificationItemOut]:
     user_id = int(user.id)
     items: list[NotificationItemOut] = []
 
@@ -258,7 +300,12 @@ def _collect_calendar_notifications(*, db: Session, user: User, now_utc: datetim
                 id=f"calendar-achievement:{int(event.id)}",
                 kind="calendar",
                 emoji="📆",
-                title=f"Logro de calendario: {title}",
+                title=i18n_tr(
+                    locale,
+                    es=f"Logro de calendario: {title}",
+                    en=f"Calendar achievement: {title}",
+                    fr=f"Succès de calendrier : {title}",
+                ),
                 message=description,
                 created_at=event.unlocked_at,
                 href="/calendar.html",
@@ -310,8 +357,18 @@ def _collect_calendar_notifications(*, db: Session, user: User, now_utc: datetim
             id=f"calendar-reminder:{today_start.date().isoformat()}",
             kind="calendar",
             emoji="📆",
-            title="Recordatorio de racha",
-            message=f"Aún no publicas hoy. Si no publicas, podrías perder tu racha actual de {streak} día(s).",
+            title=i18n_tr(
+                locale,
+                es="Recordatorio de racha",
+                en="Streak reminder",
+                fr="Rappel de série",
+            ),
+            message=i18n_tr(
+                locale,
+                es=f"Aún no has publicado hoy. Si no publicas, podrías perder tu racha actual de {streak} día(s).",
+                en=f"You have not posted today yet. If you do not post, you could lose your current streak of {streak} day(s).",
+                fr=f"Vous n'avez pas encore publié aujourd'hui. Si vous ne publiez pas, vous pourriez perdre votre série actuelle de {streak} jour(s).",
+            ),
             created_at=now_utc,
             href="/calendar.html",
         )
@@ -319,7 +376,13 @@ def _collect_calendar_notifications(*, db: Session, user: User, now_utc: datetim
     return items
 
 
-def _collect_oracle_notifications(*, db: Session, user_id: int, now_utc: datetime) -> list[NotificationItemOut]:
+def _collect_oracle_notifications(
+    *,
+    db: Session,
+    user_id: int,
+    now_utc: datetime,
+    locale: str,
+) -> list[NotificationItemOut]:
     state = db.execute(select(OracleUserState).where(OracleUserState.user_id == user_id)).scalar_one_or_none()
     if state is None or state.last_pick_at is None:
         return []
@@ -340,15 +403,25 @@ def _collect_oracle_notifications(*, db: Session, user_id: int, now_utc: datetim
             id=f"oracle-reminder:{available_at.date().isoformat()}",
             kind="oracle",
             emoji="🔮",
-            title="Oráculo disponible",
-            message="Ya puedes volver a abrir el Oráculo y revelar una nueva carta.",
+            title=i18n_tr(
+                locale,
+                es="Oráculo disponible",
+                en="Oracle available",
+                fr="Oracle disponible",
+            ),
+            message=i18n_tr(
+                locale,
+                es="Ya puedes abrir el Oráculo de nuevo y revelar una nueva carta.",
+                en="You can now open the Oracle again and reveal a new card.",
+                fr="Vous pouvez maintenant rouvrir l'Oracle et révéler une nouvelle carte.",
+            ),
             created_at=available_at,
             href="/oracle.html",
         )
     ]
 
 
-def _collect_mentions_notifications(*, db: Session, user_id: int) -> list[NotificationItemOut]:
+def _collect_mentions_notifications(*, db: Session, user_id: int, locale: str) -> list[NotificationItemOut]:
     author_follows_viewer = exists(
         select(UserFollow.id).where(
             UserFollow.follower_id == Post.author_id,
@@ -401,8 +474,18 @@ def _collect_mentions_notifications(*, db: Session, user_id: int) -> list[Notifi
                 id=f"mentions:{int(row.id)}",
                 kind="mentions",
                 emoji="🏷️",
-                title="Te etiquetaron en una publicación",
-                message=f"{author_name} te mencionó: {post_preview or 'Sin texto en la publicación.'}",
+                title=i18n_tr(
+                    locale,
+                    es="Te etiquetaron en una publicación",
+                    en="You were tagged in a post",
+                    fr="Vous avez été mentionné dans une publication",
+                ),
+                message=i18n_tr(
+                    locale,
+                    es=f"{author_name} te mencionó: {post_preview or 'La publicación no tiene texto.'}",
+                    en=f"{author_name} mentioned you: {post_preview or 'No text in the post.'}",
+                    fr=f"{author_name} vous a mentionné : {post_preview or 'Publication sans texte.'}",
+                ),
                 created_at=row.created_at,
                 href=f"{profile_url}{joiner}post={int(row.post_id)}",
             )
@@ -410,7 +493,7 @@ def _collect_mentions_notifications(*, db: Session, user_id: int) -> list[Notifi
     return items
 
 
-def _collect_stars_notifications(*, db: Session, user: User) -> list[NotificationItemOut]:
+def _collect_stars_notifications(*, db: Session, user: User, locale: str) -> list[NotificationItemOut]:
     user_id = int(user.id)
     home_url = _self_home_url(user)
     rows = db.execute(
@@ -447,8 +530,18 @@ def _collect_stars_notifications(*, db: Session, user: User) -> list[Notificatio
                 id=f"stars:{int(row.id)}",
                 kind="stars",
                 emoji="⭐",
-                title="Nueva estrella recibida",
-                message=f"{sender_name} te donó una estrella en una publicación.",
+                title=i18n_tr(
+                    locale,
+                    es="Nueva estrella recibida",
+                    en="New star received",
+                    fr="Nouvelle étoile reçue",
+                ),
+                message=i18n_tr(
+                    locale,
+                    es=f"{sender_name} donó una estrella a una de tus publicaciones.",
+                    en=f"{sender_name} donated a star to one of your posts.",
+                    fr=f"{sender_name} a donné une étoile à l'une de vos publications.",
+                ),
                 created_at=row.created_at,
                 href=f"{home_url}{joiner}post={int(row.post_id)}",
             )
@@ -458,20 +551,24 @@ def _collect_stars_notifications(*, db: Session, user: User) -> list[Notificatio
 
 @router.get("/preferences", response_model=NotificationPreferencesOut)
 def get_notification_preferences(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = _load_current_user_or_404(db=db, current=current)
+    locale = _locale(request)
+    user = _load_current_user_or_404(db=db, current=current, locale=locale)
     return _preferences_out(user)
 
 
 @router.put("/preferences", response_model=NotificationPreferencesOut)
 def update_notification_preferences(
+    request: Request,
     payload: NotificationPreferencesUpdateIn,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = _load_current_user_or_404(db=db, current=current)
+    locale = _locale(request)
+    user = _load_current_user_or_404(db=db, current=current, locale=locale)
 
     updates = {
         "notif_calendar_enabled": payload.calendar_enabled,
@@ -502,28 +599,30 @@ def update_notification_preferences(
 
 @router.get("/feed", response_model=NotificationFeedOut)
 def get_notifications_feed(
+    request: Request,
     limit: int = Query(default=DEFAULT_FEED_LIMIT, ge=1, le=MAX_FEED_LIMIT),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = _load_current_user_or_404(db=db, current=current)
+    locale = _locale(request)
+    user = _load_current_user_or_404(db=db, current=current, locale=locale)
     now_utc = _utcnow()
 
     all_items: list[NotificationItemOut] = []
     if user.notif_calendar_enabled:
-        all_items.extend(_collect_calendar_notifications(db=db, user=user, now_utc=now_utc))
+        all_items.extend(_collect_calendar_notifications(db=db, user=user, now_utc=now_utc, locale=locale))
     if user.notif_oracle_enabled:
-        all_items.extend(_collect_oracle_notifications(db=db, user_id=int(user.id), now_utc=now_utc))
+        all_items.extend(_collect_oracle_notifications(db=db, user_id=int(user.id), now_utc=now_utc, locale=locale))
     if user.notif_followers_enabled:
-        all_items.extend(_collect_followers_notifications(db=db, user_id=int(user.id)))
+        all_items.extend(_collect_followers_notifications(db=db, user_id=int(user.id), locale=locale))
     if user.notif_messages_enabled:
-        all_items.extend(_collect_messages_notifications(db=db, user_id=int(user.id)))
+        all_items.extend(_collect_messages_notifications(db=db, user_id=int(user.id), locale=locale))
     if user.notif_achievements_enabled:
-        all_items.extend(_collect_achievements_notifications(db=db, user_id=int(user.id)))
+        all_items.extend(_collect_achievements_notifications(db=db, user_id=int(user.id), locale=locale))
     if user.notif_mentions_enabled:
-        all_items.extend(_collect_mentions_notifications(db=db, user_id=int(user.id)))
+        all_items.extend(_collect_mentions_notifications(db=db, user_id=int(user.id), locale=locale))
     if user.notif_stars_enabled:
-        all_items.extend(_collect_stars_notifications(db=db, user=user))
+        all_items.extend(_collect_stars_notifications(db=db, user=user, locale=locale))
 
     sorted_items = sorted(
         all_items,
@@ -563,11 +662,13 @@ def get_notifications_feed(
 
 @router.post("/read", response_model=NotificationReadOut)
 def mark_notifications_read(
+    request: Request,
     payload: NotificationReadIn,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = _load_current_user_or_404(db=db, current=current)
+    locale = _locale(request)
+    user = _load_current_user_or_404(db=db, current=current, locale=locale)
     raw_ids = payload.notification_ids if isinstance(payload.notification_ids, list) else []
 
     unique_ids: list[str] = []

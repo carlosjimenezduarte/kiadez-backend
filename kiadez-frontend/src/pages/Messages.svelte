@@ -3,11 +3,17 @@
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
   import { logout } from "../lib/logout";
+  import AuthFooter from "../lib/AuthFooter.svelte";
+  import { getLocale } from "../lib/i18n";
 
   const API = "http://127.0.0.1:8000";
   const GUARDIAN_REQUIRED_RANK = 3;
   const SUBJECT_MAX_LENGTH = 180;
   const BODY_MAX_LENGTH = 10000;
+  const locale = getLocale();
+  const isEn = locale === "en";
+  const isFr = locale === "fr";
+  const tr = (es, en, fr = en) => (isEn ? en : isFr ? fr : es);
 
   let isLoading = true;
   let loadError = "";
@@ -48,7 +54,7 @@
     const token = getAccessToken();
     if (!token) {
       window.location.href = "/login.html";
-      throw new Error("No hay sesión activa.");
+      throw new Error(tr("No hay sesión activa.", "No active session.", "Aucune session active."));
     }
 
     const response = await fetch(`${API}${path}`, {
@@ -63,7 +69,7 @@
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       window.location.href = "/login.html";
-      throw new Error("Tu sesión expiró. Inicia sesión nuevamente.");
+      throw new Error(tr("Tu sesión expiró. Inicia sesión nuevamente.", "Your session expired. Sign in again.", "Ta session a expiré. Connecte-toi de nouveau."));
     }
 
     return response;
@@ -99,7 +105,7 @@
     if (!value) return "";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleString("es-CO", {
+    return date.toLocaleString(isEn ? "en-US" : isFr ? "fr-FR" : "es-CO", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -112,7 +118,7 @@
     if (!value) return "";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleDateString("es-CO", {
+    return date.toLocaleDateString(isEn ? "en-US" : isFr ? "fr-FR" : "es-CO", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -159,25 +165,25 @@
   const getThreadCounterpart = (thread) => {
     const myUserId = Number(viewerUserId || 0);
     if (!myUserId || !thread) {
-      return {
-        user_id: null,
-        name: "Usuario",
-        handle: "@usuario",
-      };
+        return {
+          user_id: null,
+          name: tr("Usuario", "User", "Utilisateur"),
+          handle: tr("@usuario", "@user", "@utilisateur"),
+        };
     }
 
     if (myUserId === Number(thread.guardian_user_id || 0)) {
       return {
         user_id: Number(thread.recipient_user_id || 0),
-        name: String(thread.recipient_name || "Usuario").trim() || "Usuario",
-        handle: String(thread.recipient_handle || "@usuario").trim() || "@usuario",
+        name: String(thread.recipient_name || tr("Usuario", "User", "Utilisateur")).trim() || tr("Usuario", "User", "Utilisateur"),
+        handle: String(thread.recipient_handle || tr("@usuario", "@user", "@utilisateur")).trim() || tr("@usuario", "@user", "@utilisateur"),
       };
     }
 
     return {
       user_id: Number(thread.guardian_user_id || 0),
-      name: String(thread.guardian_name || "Usuario").trim() || "Usuario",
-      handle: String(thread.guardian_handle || "@usuario").trim() || "@usuario",
+      name: String(thread.guardian_name || tr("Usuario", "User", "Utilisateur")).trim() || tr("Usuario", "User", "Utilisateur"),
+      handle: String(thread.guardian_handle || tr("@usuario", "@user", "@utilisateur")).trim() || tr("@usuario", "@user", "@utilisateur"),
     };
   };
 
@@ -192,12 +198,12 @@
     const meResponse = await apiFetch("/auth/me");
     const meData = await parseResponseJson(meResponse);
     if (!meResponse.ok) {
-      throw new Error(meData?.detail || "No se pudo cargar tu perfil.");
+      throw new Error(meData?.detail || tr("No se pudo cargar tu perfil.", "Could not load your profile.", "Impossible de charger ton profil."));
     }
 
     const myUserId = Number(meData?.user_number || 0);
     if (!myUserId) {
-      throw new Error("No se pudo identificar tu usuario.");
+      throw new Error(tr("No se pudo identificar tu usuario.", "Could not identify your user.", "Impossible d'identifier ton utilisateur."));
     }
 
     viewerUserId = myUserId;
@@ -209,7 +215,7 @@
     const response = await apiFetch("/messages/threads");
     const data = await parseResponseJson(response);
     if (!response.ok) {
-      throw new Error(data?.detail || "No se pudo cargar tu bandeja de mensajería.");
+      throw new Error(data?.detail || tr("No se pudo cargar tu bandeja de mensajería.", "Could not load your message inbox.", "Impossible de charger ta boîte de messages."));
     }
 
     const items = Array.isArray(data?.items) ? data.items : [];
@@ -241,19 +247,19 @@
     composeBodyError = !String(composeBody || "").trim();
 
     if (!isGuardian) {
-      setComposeError("Solo los Guardianes pueden iniciar mensajes.");
+      setComposeError(tr("Solo los Guardianes pueden iniciar mensajes.", "Only Guardians can start messages.", "Seuls les Gardiens peuvent démarrer des messages."));
       return;
     }
 
     if (composeToError || composeSubjectError || composeBodyError) {
-      setComposeError("Debes completar Para, Asunto y Mensaje.");
+      setComposeError(tr("Debes completar Para, Asunto y Mensaje.", "You must complete To, Subject and Message.", "Tu dois compléter À, Objet et Message."));
       return;
     }
 
     const recipient = parseRecipientInput(composeTo);
     if (!recipient.userId && !recipient.username) {
       composeToError = true;
-      setComposeError("Debes escribir un @id, @usuario o @allusers válido.");
+      setComposeError(tr("Debes escribir un @id, @usuario o @allusers válido.", "You must enter a valid @id, @user or @allusers.", "Tu dois saisir un @id, @utilisateur ou @allusers valide."));
       return;
     }
 
@@ -281,13 +287,13 @@
       });
       const data = await parseResponseJson(response);
       if (!response.ok) {
-        throw new Error(data?.detail || "No se pudo enviar el mensaje.");
+        throw new Error(data?.detail || tr("No se pudo enviar el mensaje.", "Could not send message.", "Impossible d'envoyer le message."));
       }
 
       await loadThreads({ preferredThreadId: String(data?.id || "") });
       closeComposeModal();
     } catch (error) {
-      setComposeError(error?.message || "No se pudo enviar el mensaje.");
+      setComposeError(error?.message || tr("No se pudo enviar el mensaje.", "Could not send message.", "Impossible d'envoyer le message."));
     } finally {
       composeLoading = false;
     }
@@ -298,18 +304,18 @@
 
     const active = visibleThreads.find((thread) => String(thread.id) === selectedThreadId) || null;
     if (!active) {
-      setReplyError("Selecciona una conversación para responder.");
+      setReplyError(tr("Selecciona una conversación para responder.", "Select a conversation to reply.", "Sélectionne une conversation pour répondre."));
       return;
     }
 
     if (!canReplyThread(active)) {
-      setReplyError("No tienes permisos para responder en esta conversación.");
+      setReplyError(tr("No tienes permisos para responder en esta conversación.", "You do not have permission to reply in this conversation.", "Tu n'as pas l'autorisation de répondre dans cette conversation."));
       return;
     }
 
     replyBodyError = !String(replyBody || "").trim();
     if (replyBodyError) {
-      setReplyError("Debes escribir una respuesta antes de enviar.");
+      setReplyError(tr("Debes escribir una respuesta antes de enviar.", "You must write a reply before sending.", "Tu dois écrire une réponse avant d'envoyer."));
       return;
     }
 
@@ -331,14 +337,14 @@
       );
       const data = await parseResponseJson(response);
       if (!response.ok) {
-        throw new Error(data?.detail || "No se pudo enviar la respuesta.");
+        throw new Error(data?.detail || tr("No se pudo enviar la respuesta.", "Could not send reply.", "Impossible d'envoyer la réponse."));
       }
 
       await loadThreads({ preferredThreadId: String(active.id) });
       replyBody = "";
       replyBodyError = false;
     } catch (error) {
-      setReplyError(error?.message || "No se pudo enviar la respuesta.");
+      setReplyError(error?.message || tr("No se pudo enviar la respuesta.", "Could not send reply.", "Impossible d'envoyer la réponse."));
     } finally {
       replyLoading = false;
     }
@@ -360,7 +366,7 @@
         await loadViewerContext();
         await loadThreads();
       } catch (error) {
-        loadError = error?.message || "No se pudo cargar la bandeja de mensajería.";
+        loadError = error?.message || tr("No se pudo cargar la bandeja de mensajería.", "Could not load message inbox.", "Impossible de charger la boîte de messages.");
       } finally {
         isLoading = false;
       }
@@ -375,7 +381,7 @@
 <svelte:head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kiadez — Mensajería</title>
+  <title>{tr("Kiadez — Mensajería", "Kiadez — Messaging", "Kiadez — Messagerie")}</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
@@ -386,46 +392,46 @@
         <img src="/css/logo-kiadez.webp" alt="Kiadez" />
       </a>
       <form class="topbar-search" role="search" on:submit|preventDefault>
-        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+        <input type="search" placeholder={tr("Buscar en Kiadez", "Search on Kiadez", "Rechercher sur Kiadez")} aria-label={tr("Buscar", "Search", "Rechercher")} />
       </form>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-center">
       <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
-      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-      <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
-      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+      <a class="topbar-btn" href="/gallery.html">🖼️ {tr("Galería", "Gallery", "Galerie")}</a>
+      <a class="topbar-btn" href="/my-public-whishes.html">🌐 {tr("Deseos públicos", "Public wishes", "Souhaits publics")}</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 {tr("Deseos privados", "Private wishes", "Souhaits privés")}</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ {tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis")}</a>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
       <details class="topbar-dropdown">
-        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-          <img src="/assets/avatar-default.jpg" alt="Perfil del usuario" />
+        <summary class="topbar-avatar-btn" aria-label={tr("Perfil del usuario", "User profile", "Profil utilisateur")}>
+          <img src="/assets/avatar-default.jpg" alt={tr("Foto de perfil del usuario", "User profile photo", "Photo de profil utilisateur")} />
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
-          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+          <a href="/privacy-and-settings.html" role="menuitem">{tr("Configuración y privacidad", "Settings and privacy", "Paramètres et confidentialité")}</a>
+          <button type="button" role="menuitem" on:click={logout}>{tr("Cerrar sesión", "Sign out", "Se déconnecter")}</button>
         </div>
       </details>
 
-      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+      <button class="topbar-icon" type="button" aria-label={tr("Notificaciones", "Notifications", "Alertes")}>
         🔔
         <span class="topbar-badge">3</span>
       </button>
 
       <details class="topbar-dropdown">
-        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+        <summary class="topbar-menu-btn" aria-label={tr("Abrir menú", "Open menu", "Ouvrir le menu")}>
           <span class="topbar-menu-icon" aria-hidden="true">☰</span>
-          <span class="topbar-menu-label">Menú</span>
+          <span class="topbar-menu-label">{tr("Menú", "Menu", "Navigation")}</span>
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/home_user.html" role="menuitem">Mi Home</a>
-          <a href="/achievements.html" role="menuitem">Logros recientes</a>
-          <a href="/gallery.html" role="menuitem">Galería</a>
-          <a href="/calendar.html" role="menuitem">Calendario</a>
-          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
-          <a href="/messages.html" role="menuitem">Mensajes</a>
+          <a href="/home_user.html" role="menuitem">{tr("Mi Home", "My Home", "Mon Home")}</a>
+          <a href="/achievements.html" role="menuitem">{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+          <a href="/gallery.html" role="menuitem">{tr("Galería", "Gallery", "Galerie")}</a>
+          <a href="/calendar.html" role="menuitem">{tr("Calendario", "Calendar", "Calendrier")}</a>
+          <a href="/my-biography.html" role="menuitem">{tr("Mi Biografía", "My Biography", "Ma biographie")}</a>
+          <a href="/messages.html" role="menuitem">{tr("Mensajes", "Messages", "Messagerie")}</a>
         </div>
       </details>
     </div>
@@ -434,65 +440,68 @@
   <main class="user-home">
     <section class="cover" id="cover">
       <div class="cover-media" id="coverMedia">
-        <img id="coverImg" class="cover-img" src="/assets/cover-default.jpg" alt="Portada" />
+        <img id="coverImg" class="cover-img" src="/assets/cover-default.jpg" alt={tr("Portada", "Cover", "Couverture")} />
 
         <div class="cover-actions">
-          <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
-            Cambiar portada
+          <button class="icon-btn" id="btnChangeCover" type="button" title={tr("Cambiar portada", "Change cover", "Changer la couverture")}>
+            {tr("Cambiar portada", "Change cover", "Changer la couverture")}
           </button>
-          <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title="Editar mi propósito de vida">
-            Editar mi propósito de vida
+          <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title={tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier mon objectif de vie")}>
+            {tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier mon objectif de vie")}
           </button>
 
           <input id="coverFile" type="file" accept="image/*" class="hidden" />
         </div>
 
-        <div class="purpose-triangle" aria-label="Deseos de propósito">
+        <div class="purpose-triangle" aria-label={tr("Deseos de propósito", "Purpose wishes", "Souhaits de finalité")}>
           <button class="purpose-pill purpose-top" type="button" id="purpose1">
-            Deseo #1: Secreto
+            {tr("Deseo #1: Secreto", "Wish #1: Secret", "Souhait #1 : Secret")}
           </button>
 
           <button class="purpose-pill purpose-left" type="button" id="purpose2">
-            Deseo construir el Reino de Combray
+            {tr("Deseo construir el Reino de Combray", "I wish to build the Kingdom of Combray", "Je souhaite construire le Royaume de Combray")}
           </button>
 
           <button class="purpose-pill purpose-right" type="button" id="purpose3">
-            Deseo estar unido a Jesús
+            {tr("Deseo estar unido a Jesús", "I wish to be united with Jesus", "Je souhaite être uni à Jésus")}
           </button>
         </div>
 
         <div class="cover-hint" id="coverHint">
-          Arrastra la portada para encuadrarla
+          {tr("Arrastra la portada para encuadrarla", "Drag the cover to frame it", "Fais glisser la couverture pour la cadrer")}
         </div>
       </div>
     </section>
 
     <div class="home-body messages-body">
-      <nav class="profile-nav" aria-label="Navegación de perfil">
-        <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
-        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+      <nav class="profile-nav" aria-label={tr("Navegación de perfil", "Profile navigation", "Navigation du profil")}>
+        <a class="nav-pill" href="/home_user.html" title={tr("Home", "Home", "Accueil")}>{tr("Home", "Home", "Accueil")}</a>
+        <a class="nav-pill" href="/star-pool-found.html" title={tr("Estrellas", "Stars", "Étoiles")}>
           <span class="nav-icon">⭐</span>
-          <span><strong id="messagesStarsTotal">0</strong> estrellas</span>
+          <span><strong id="messagesStarsTotal">0</strong> {tr("estrellas", "stars", "étoiles")}</span>
         </a>
-        <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-        <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
-        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
-        <a class="nav-pill is-active" href="/messages.html" title="Mensajes">Mensajes</a>
+        <a class="nav-pill" href="/followers.html" title={tr("Seguidores", "Followers", "Abonnés")}>{tr("Seguidores", "Followers", "Abonnés")}</a>
+        <a class="nav-pill" href="/achievements.html" title={tr("Logros recientes", "Recent achievements", "Réalisations récentes")}>{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+        <a class="nav-pill" href="/gallery.html" title={tr("Galería", "Gallery", "Galerie")}>{tr("Galería", "Gallery", "Galerie")}</a>
+        <a class="nav-pill" href="/calendar.html" title={tr("Calendario", "Calendar", "Calendrier")}>{tr("Calendario", "Calendar", "Calendrier")}</a>
+        <a class="nav-pill" href="/my-biography.html" title={tr("Mi biografía", "My biography", "Ma biographie")}>{tr("Mi biografía", "My biography", "Ma biographie")}</a>
+        <a class="nav-pill is-active" href="/messages.html" title={tr("Mensajes", "Messages", "Messagerie")}>{tr("Mensajes", "Messages", "Messagerie")}</a>
       </nav>
 
-      <section class="panel messages-shell" aria-label="Mensajería interna">
+      <section class="panel messages-shell" aria-label={tr("Mensajería interna", "Internal messaging", "Messagerie interne")}>
         <div class="panel-head messages-head">
           <div>
-            <h2 class="panel-title">Mensajería interna</h2>
+            <h2 class="panel-title">{tr("Mensajería interna", "Internal messaging", "Messagerie interne")}</h2>
             <p class="panel-muted messages-subtitle">
-              Solo los Guardianes pueden iniciar conversaciones. Los usuarios pueden responder dentro del hilo recibido.
+              {tr(
+                "Solo los Guardianes pueden iniciar conversaciones. Los usuarios pueden responder dentro del hilo recibido.",
+                "Only Guardians can start conversations. Users can reply inside the received thread."
+              )}
             </p>
           </div>
           {#if isGuardian}
             <button class="btn btn-primary btn-compact messages-compose-trigger" type="button" on:click={openComposeModal}>
-              💬 Nuevo mensaje
+              💬 {tr("Nuevo mensaje", "New message", "Nouveau message")}
             </button>
           {/if}
         </div>
@@ -500,25 +509,31 @@
         {#if loadError}
           <p class="messages-status is-error">{loadError}</p>
         {:else if isLoading}
-          <p class="messages-status">Cargando tu bandeja de mensajería...</p>
+          <p class="messages-status">{tr("Cargando tu bandeja de mensajería...", "Loading your message inbox...", "Chargement de ta boîte de messages...")}</p>
         {:else if !visibleThreads.length}
           <article class="messages-empty" aria-live="polite">
             {#if isGuardian}
               <p>
-                Tu bandeja está vacía. Cuando envíes un mensaje o recibas respuesta, la conversación aparecerá aquí.
+                {tr(
+                  "Tu bandeja está vacía. Cuando envíes un mensaje o recibas respuesta, la conversación aparecerá aquí.",
+                  "Your inbox is empty. When you send a message or receive a reply, the conversation will appear here."
+                )}
               </p>
               <button class="btn btn-outline btn-compact" type="button" on:click={openComposeModal}>
-                Abrir redactor
+                {tr("Abrir redactor", "Open composer", "Ouvrir le composeur")}
               </button>
             {:else}
               <p>
-                Estas en la zona de mensajería, si algún día algún Guardián decide comunicarse contigo, recibirás un mensaje aquí.
+                {tr(
+                  "Estas en la zona de mensajería, si algún día algún Guardián decide comunicarse contigo, recibirás un mensaje aquí.",
+                  "You are in the messaging area. If a Guardian decides to contact you someday, you will receive a message here."
+                )}
               </p>
             {/if}
           </article>
         {:else}
           <div class="messages-layout">
-            <aside class="messages-thread-list" aria-label="Conversaciones">
+            <aside class="messages-thread-list" aria-label={tr("Conversaciones", "Conversations", "Conversations")}>
               {#each visibleThreads as thread (thread.id)}
                 {@const counterpart = getThreadCounterpart(thread)}
                 {@const lastMessage = getLastMessage(thread)}
@@ -534,7 +549,7 @@
                   <div class="messages-thread-handle">{counterpart.handle}</div>
                   <div class="messages-thread-subject">{thread.subject}</div>
                   <div class="messages-thread-preview">
-                    {lastMessage ? lastMessage.body : "Sin mensajes"}
+                    {lastMessage ? lastMessage.body : tr("Sin mensajes", "No messages", "Aucun message")}
                   </div>
                 </button>
               {/each}
@@ -542,20 +557,20 @@
 
             {#if activeThread}
               {@const activeCounterpart = getThreadCounterpart(activeThread)}
-              <section class="messages-conversation" aria-label="Conversación seleccionada">
+              <section class="messages-conversation" aria-label={tr("Conversación seleccionada", "Selected conversation", "Conversation sélectionnée")}>
                 <header class="messages-conversation-head">
                   <div>
                     <h3 class="messages-conversation-title">{activeThread.subject}</h3>
                     <p class="messages-conversation-meta">
-                      Conversación con {activeCounterpart.name} <span>{activeCounterpart.handle}</span>
+                      {tr("Conversación con", "Conversation with", "Conversation avec")} {activeCounterpart.name} <span>{activeCounterpart.handle}</span>
                     </p>
                   </div>
                   {#if activeThread.is_guardian_center_origin}
-                    <span class="panel-badge">Centro del Guardián</span>
+                    <span class="panel-badge">{tr("Centro del Guardián", "Guardian Center", "Centre des Gardiens")}</span>
                   {:else if isGuardian}
-                    <span class="panel-badge">Guardián · Rango {guardianRank}</span>
+                    <span class="panel-badge">{tr("Guardián · Rango", "Guardian · Rank", "Gardien · Rang")} {guardianRank}</span>
                   {:else}
-                    <span class="panel-badge">Respuesta habilitada</span>
+                    <span class="panel-badge">{tr("Respuesta habilitada", "Reply enabled", "Réponse activée")}</span>
                   {/if}
                 </header>
 
@@ -564,7 +579,7 @@
                     {@const isMine = Number(message.sender_user_id || 0) === Number(viewerUserId || 0)}
                     <article class={`messages-bubble${isMine ? " is-mine" : ""}`}>
                       <div class="messages-bubble-meta">
-                        <span>{isMine ? "Tú" : `${message.sender_name} · ${message.sender_handle}`}</span>
+                        <span>{isMine ? tr("Tú", "You", "Toi") : `${message.sender_name} · ${message.sender_handle}`}</span>
                         <time>{formatDateTime(message.created_at)}</time>
                       </div>
                       <p class="messages-bubble-body">{message.body}</p>
@@ -577,7 +592,7 @@
                     class="messages-reply-form"
                     on:submit|preventDefault={submitReply}
                   >
-                    <label class="modal-label" for="messagesReplyBody">Responder</label>
+                    <label class="modal-label" for="messagesReplyBody">{tr("Responder", "Reply", "Répondre")}</label>
                     <textarea
                       id="messagesReplyBody"
                       class="modal-textarea messages-reply-input"
@@ -589,19 +604,19 @@
                         replyBodyError = false;
                         setReplyError("");
                       }}
-                      placeholder="Escribe tu respuesta"
+                      placeholder={tr("Escribe tu respuesta", "Write your reply", "Écris ta réponse")}
                     ></textarea>
                     {#if replyError}
                       <p class="messages-status is-error">{replyError}</p>
                     {/if}
                     <div class="messages-reply-actions">
                       <button class="btn btn-primary btn-compact" type="submit" disabled={replyLoading}>
-                        {replyLoading ? "Enviando..." : "Enviar respuesta"}
+                        {replyLoading ? tr("Enviando...", "Sending...", "Envoi...") : tr("Enviar respuesta", "Send reply", "Envoyer la réponse")}
                       </button>
                     </div>
                   </form>
                 {:else}
-                  <p class="messages-status">No tienes permisos para responder en esta conversación.</p>
+                  <p class="messages-status">{tr("No tienes permisos para responder en esta conversación.", "You do not have permission to reply in this conversation.", "Tu n'as pas l'autorisation de répondre dans cette conversation.")}</p>
                 {/if}
               </section>
             {/if}
@@ -610,60 +625,7 @@
       </section>
     </div>
   </main>
-
-  <footer class="kiadez-footer">
-    <div class="footer-main">
-      <div class="footer-column footer-origin">
-        <p class="footer-poem">
-          Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br>
-          No para dominar, sino para orientar.<br>
-          Su luz no deslumbra: acompaña.
-        </p>
-      </div>
-
-      <div class="footer-columns">
-        <div class="footer-column">
-          <h4>Sobre nuestra red social</h4>
-          <ul>
-            <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
-            <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
-            <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
-            <li><a href="/contact.html">Contacto</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Idiomas</h4>
-          <ul>
-            <li><a href="/?lang=es">Español</a></li>
-            <li><a href="/?lang=en">English</a></li>
-            <li><a href="/?lang=fr">Français</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Contacto</h4>
-          <ul>
-            <li>info@kiadez.com</li>
-            <li>+57 333 225 6078</li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Información legal</h4>
-          <ul>
-            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
-            <li><a href="/terms.html">Términos y condiciones</a></li>
-            <li><a href="/privacy.html">Privacidad</a></li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="footer-bottom">
-      © 2026 Kiadez — Una red social para cumplir deseos.
-    </div>
-  </footer>
+  <AuthFooter />
 
   <div
     class="modal-overlay guardian-center-modal-overlay"
@@ -673,12 +635,12 @@
       if (event.target === event.currentTarget && !composeLoading) closeComposeModal();
     }}
   >
-    <div class="modal wish-modal guardian-center-modal guardian-center-mail-modal messages-compose-modal" role="dialog" aria-modal="true" aria-label="Nuevo mensaje de Guardián">
+    <div class="modal wish-modal guardian-center-modal guardian-center-mail-modal messages-compose-modal" role="dialog" aria-modal="true" aria-label={tr("Nuevo mensaje de Guardián", "New Guardian message", "Nouveau message Gardien")}>
       <div class="modal-head guardian-center-modal-head">
-        <h3>Nuevo mensaje de Guardián</h3>
+        <h3>{tr("Nuevo mensaje de Guardián", "New Guardian message", "Nouveau message Gardien")}</h3>
       </div>
       <div class="modal-body">
-        <label class="modal-label" for="composeTo">Para</label>
+        <label class="modal-label" for="composeTo">{tr("Para", "To", "À")}</label>
         <input
           id="composeTo"
           class="modal-input"
@@ -686,17 +648,20 @@
           type="text"
           maxlength="120"
           bind:value={composeTo}
-          placeholder="@id123, @usuario o @allusers"
+          placeholder={tr("@id123, @usuario o @allusers", "@id123, @user or @allusers", "@id123, @utilisateur ou @allusers")}
           on:input={() => {
             composeToError = false;
             setComposeError("");
           }}
         />
         <p class="panel-muted">
-          Puedes usar <strong>@allusers</strong> para enviar un mensaje masivo (solo cuentas autorizadas).
+          {@html tr(
+            'Puedes usar <strong>@allusers</strong> para enviar un mensaje masivo (solo cuentas autorizadas).',
+            'You can use <strong>@allusers</strong> to send a mass message (authorized accounts only).'
+          )}
         </p>
 
-        <label class="modal-label" for="composeSubject">Asunto</label>
+        <label class="modal-label" for="composeSubject">{tr("Asunto", "Subject", "Objet")}</label>
         <input
           id="composeSubject"
           class="modal-input"
@@ -710,7 +675,7 @@
           }}
         />
 
-        <label class="modal-label" for="composeBody">Mensaje</label>
+        <label class="modal-label" for="composeBody">{tr("Mensaje", "Message", "Message")}</label>
         <textarea
           id="composeBody"
           class="modal-textarea guardian-center-mail-textarea"
@@ -730,10 +695,10 @@
       </div>
       <div class="modal-actions">
         <button class="btn btn-primary btn-compact" type="button" disabled={composeLoading} on:click={submitCompose}>
-          {composeLoading ? "Enviando..." : "Enviar mensaje"}
+          {composeLoading ? tr("Enviando...", "Sending...", "Envoi...") : tr("Enviar mensaje", "Send message", "Envoyer le message")}
         </button>
         <button class="btn btn-outline btn-compact" type="button" disabled={composeLoading} on:click={closeComposeModal}>
-          Cancelar
+          {tr("Cancelar", "Cancel", "Annuler")}
         </button>
       </div>
     </div>

@@ -29,10 +29,10 @@ MINOR_RELATIONSHIP_VALUES = {
     MINOR_RELATIONSHIP_RESPONSIBLE_ADULT,
 }
 MINOR_RELATIONSHIP_LABELS = {
-    MINOR_RELATIONSHIP_FATHER: "Padre",
-    MINOR_RELATIONSHIP_MOTHER: "Madre",
-    MINOR_RELATIONSHIP_LEGAL_GUARDIAN: "Tutor legal",
-    MINOR_RELATIONSHIP_RESPONSIBLE_ADULT: "Adulto responsable",
+    MINOR_RELATIONSHIP_FATHER: "Father",
+    MINOR_RELATIONSHIP_MOTHER: "Mother",
+    MINOR_RELATIONSHIP_LEGAL_GUARDIAN: "Legal guardian",
+    MINOR_RELATIONSHIP_RESPONSIBLE_ADULT: "Responsible adult",
 }
 
 MINOR_PRIVATE_PROFILE_FIELDS = (
@@ -79,7 +79,7 @@ def normalize_minor_relationship(raw_relationship: str | None) -> str:
 
 def minor_relationship_label(relationship: str | None) -> str:
     normalized = normalize_minor_relationship(relationship)
-    return MINOR_RELATIONSHIP_LABELS.get(normalized, "Adulto responsable")
+    return MINOR_RELATIONSHIP_LABELS.get(normalized, "Responsible adult")
 
 
 def resolve_minor_status(user: User, today: date | None = None) -> str:

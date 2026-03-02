@@ -880,6 +880,37 @@ body {
     border-top: 1px solid rgba(0, 0, 0, 0.12);
 }
 
+.download-app-card {
+    max-width: 980px;
+}
+
+.download-doc {
+    gap: 12px;
+}
+
+.download-cta {
+    margin-top: 6px;
+    margin-bottom: 2px;
+    display: grid;
+    gap: 10px;
+    justify-items: start;
+}
+
+.download-link-line {
+    margin: 0;
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    flex-wrap: wrap;
+}
+
+.download-link-line a {
+    color: #0b5f2a;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 /* Responsive fino */
 @media (max-width: 720px) {
     .content-card {

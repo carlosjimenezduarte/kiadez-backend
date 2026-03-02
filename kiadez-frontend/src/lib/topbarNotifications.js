@@ -4,7 +4,22 @@ const API_BASE_URL =
 
 const FEED_LIMIT = 16;
 const REFRESH_INTERVAL_MS = 60_000;
-const BELL_SELECTOR = '.topbar-icon[aria-label="Notificaciones"]';
+const BELL_SELECTOR =
+  '.topbar-icon[aria-label="Notificaciones"], .topbar-icon[aria-label="Notifications"]';
+
+const getUiLocale = () => {
+  const saved = String(localStorage.getItem("kiadez_locale") || "").toLowerCase();
+  if (saved === "es") return "es";
+  if (saved === "fr") return "fr";
+  return "en";
+};
+
+const tr = (es, en, fr = en) => {
+  const locale = getUiLocale();
+  if (locale === "es") return es;
+  if (locale === "fr") return fr;
+  return en;
+};
 
 const getAccessToken = () =>
   localStorage.getItem("access_token") ||
@@ -40,24 +55,31 @@ const formatRelativeLabel = (isoDate) => {
   const deltaMs = dateValue.getTime() - Date.now();
   const minutes = Math.round(deltaMs / 60000);
   const absMinutes = Math.abs(minutes);
-  if (absMinutes < 1) return "Ahora";
+  if (absMinutes < 1) return tr("Ahora", "Now", "Maintenant");
   if (absMinutes < 60) {
-    return minutes < 0 ? `Hace ${Math.abs(minutes)} min` : `En ${minutes} min`;
+    return minutes < 0
+      ? tr(`Hace ${Math.abs(minutes)} min`, `${Math.abs(minutes)} min ago`, `Il y a ${Math.abs(minutes)} min`)
+      : tr(`En ${minutes} min`, `In ${minutes} min`, `Dans ${minutes} min`);
   }
 
   const hours = Math.round(minutes / 60);
   const absHours = Math.abs(hours);
   if (absHours < 24) {
-    return hours < 0 ? `Hace ${Math.abs(hours)} h` : `En ${hours} h`;
+    return hours < 0
+      ? tr(`Hace ${Math.abs(hours)} h`, `${Math.abs(hours)} h ago`, `Il y a ${Math.abs(hours)} h`)
+      : tr(`En ${hours} h`, `In ${hours} h`, `Dans ${hours} h`);
   }
 
   const days = Math.round(hours / 24);
   const absDays = Math.abs(days);
   if (absDays < 7) {
-    return days < 0 ? `Hace ${Math.abs(days)} día(s)` : `En ${days} día(s)`;
+    return days < 0
+      ? tr(`Hace ${Math.abs(days)} día(s)`, `${Math.abs(days)} day(s) ago`, `Il y a ${Math.abs(days)} jour(s)`)
+      : tr(`En ${days} día(s)`, `In ${days} day(s)`, `Dans ${days} jour(s)`);
   }
 
-  return new Intl.DateTimeFormat("es-CO", {
+  const locale = getUiLocale() === "es" ? "es-CO" : getUiLocale() === "fr" ? "fr-FR" : "en-US";
+  return new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "short",
     hour: "2-digit",
@@ -110,7 +132,11 @@ const fetchNotificationFeed = async () => {
         total_count: 0,
         unread_count: 0,
         has_more: false,
-        error: data?.detail || "No se pudieron cargar las notificaciones.",
+        error: data?.detail || tr(
+          "No se pudieron cargar las notificaciones.",
+          "Could not load notifications.",
+          "Impossible de charger les notifications."
+        ),
       };
     }
     const normalizedData = data && typeof data === "object" ? data : {};
@@ -125,7 +151,11 @@ const fetchNotificationFeed = async () => {
       total_count: 0,
       unread_count: 0,
       has_more: false,
-      error: "No se pudieron cargar las notificaciones.",
+      error: tr(
+        "No se pudieron cargar las notificaciones.",
+        "Could not load notifications.",
+        "Impossible de charger les notifications."
+      ),
     };
   }
 };
@@ -162,17 +192,25 @@ const createPanelElements = () => {
   const panel = document.createElement("div");
   panel.className = "topbar-notifications-panel";
   panel.setAttribute("role", "dialog");
-  panel.setAttribute("aria-label", "Notificaciones");
+  panel.setAttribute("aria-label", tr("Notificaciones", "Notifications", "Notifications"));
   panel.hidden = true;
   panel.innerHTML = `
     <div class="topbar-notifications-head">
-      <strong>Notificaciones</strong>
+      <strong>${tr("Notificaciones", "Notifications", "Notifications")}</strong>
     </div>
     <div class="topbar-notifications-list" aria-live="polite">
-      <p class="topbar-notifications-status">Cargando notificaciones...</p>
+      <p class="topbar-notifications-status">${tr(
+        "Cargando notificaciones...",
+        "Loading notifications...",
+        "Chargement des notifications..."
+      )}</p>
     </div>
     <div class="topbar-notifications-foot">
-      <a class="topbar-notifications-more" href="/notifications.html">Ir al Centro de Notificaciones</a>
+      <a class="topbar-notifications-more" href="/notifications.html">${tr(
+        "Ir al Centro de Notificaciones",
+        "Go to Notification Center",
+        "Aller au centre de notifications"
+      )}</a>
     </div>
   `;
   return {
@@ -194,7 +232,11 @@ const renderNotificationList = (listNode, feed) => {
   if (!items.length) {
     listNode.innerHTML = `
       <p class="topbar-notifications-status">
-        Aún no tienes notificaciones activas.
+        ${tr(
+          "Aún no tienes notificaciones activas.",
+          "You do not have active notifications yet.",
+          "Vous n'avez pas encore de notifications actives."
+        )}
       </p>
     `;
     return;
@@ -204,7 +246,7 @@ const renderNotificationList = (listNode, feed) => {
     .map((item) => {
       const href = buildItemHref(item);
       const emoji = escapeHtml(item?.emoji || "🔔");
-      const title = escapeHtml(item?.title || "Notificación");
+      const title = escapeHtml(item?.title || tr("Notificación", "Notification", "Notification"));
       const message = escapeHtml(item?.message || "");
       const when = escapeHtml(formatRelativeLabel(item?.created_at));
       const itemId = String(item?.id || "").trim();

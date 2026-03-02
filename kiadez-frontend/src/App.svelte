@@ -3,6 +3,7 @@
   import { syncTopbarAvatar } from './lib/topbarAvatar';
   import { initTopbarNotifications } from './lib/topbarNotifications';
   import { initTopbarSearch } from './lib/topbarSearch';
+  import { bootstrapLocale } from './lib/i18n';
   import Landing from './pages/Landing.svelte';
   import StarPoolFound from './pages/StarPoolFound.svelte';
   import HomeUser from './pages/HomeUser.svelte';
@@ -26,6 +27,7 @@
   import Followers from './pages/Followers.svelte';
   import Gallery from './pages/Gallery.svelte';
   import Contact from './pages/Contact.svelte';
+  import DownloadApp from './pages/DownloadApp.svelte';
   import Terms from './pages/Terms.svelte';
   import Privacy from './pages/Privacy.svelte';
   import MyGameRules from './pages/MyGameRules.svelte';
@@ -41,6 +43,7 @@
 
   const path = typeof window !== 'undefined' ? window.location.pathname : '/';
   const route = path.replace(/\/+$/, '') || '/';
+  bootstrapLocale();
 
   const routes = {
     '/': Landing,
@@ -90,6 +93,8 @@
     '/gallery.html': Gallery,
     '/contact': Contact,
     '/contact.html': Contact,
+    '/downloadapp': DownloadApp,
+    '/downloadapp.html': DownloadApp,
     '/terms': Terms,
     '/terms.html': Terms,
     '/privacy': Privacy,

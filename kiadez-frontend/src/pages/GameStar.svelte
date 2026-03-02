@@ -3,10 +3,10 @@
 
   onMount(() => {
     /**
-         * MVP: "Una cosa a la vez"
-         * - Entrada 1: saca 5 y rompe -> quedan 3 -> FAIL
-         * - Entrada 2: saca 7 y rompe -> queda 1 -> FAIL
-         * - Entrada 3: saca 1 a 1 hasta 8 -> SUCCESS
+         * MVP: "One thing at a time"
+         * - Entry 1: takes out 5 and breaks -> 3 remain -> FAIL
+         * - Entry 2: takes out 7 and breaks -> 1 remains -> FAIL
+         * - Entry 3: takes out 1 by 1 until 8 -> SUCCESS
          */
     
         const TOTAL = 8;
@@ -75,8 +75,8 @@
           ballsGroup.innerHTML = "";
           state.balls = [];
     
-          // Posiciones internas (collar simple)
-          // (Puedes cambiar a un anillo perfecto después; por ahora es claro y limpio)
+          // Internal positions (simple necklace)
+          // (You can switch to a perfect ring later; for now this is clear and clean)
           const inner = [
             {x: 145, y: 170},
             {x: 175, y: 150},
@@ -88,10 +88,10 @@
             {x: 185, y: 225},
           ];
     
-          // Posiciones de salida (afuera de la caja) según entrada
-          // Entrada 1: sale hacia arriba/izquierda
-          // Entrada 2: sale hacia arriba/derecha
-          // Entrada 3: sale hacia derecha/abajo (pero una a una)
+          // Exit positions (outside the box) by entry
+          // Entry 1: exits up/left
+          // Entry 2: exits up/right
+          // Entry 3: exits right/down (one by one)
           const outByEntry = {
             1: inner.map((_, i) => ({x: 70 - i*18, y: 70})),
             2: inner.map((_, i) => ({x: 350 + i*18, y: 70})),
@@ -139,20 +139,19 @@
         function fail(remainingCount) {
           state.status = "fail";
           lockEntries(true);
-          setMessage("No funcionó", "Intenta otra forma.");
-          // Las restantes quedan dentro, no se mueven.
-          // (Ya están donde están)
+          setMessage("That did not work", "Try a different way.");
+          // Remaining balls stay inside and do not move.
         }
     
         function success() {
           state.status = "success";
           lockEntries(true);
     
-          // Transición: ocultar tablero, mostrar estrella
+          // Transition: hide board, show star
           setMessage("", "");
           controlsGame.classList.add("hidden");
     
-          // Fade conceptual: usamos hidden directo para MVP (simple)
+          // Conceptual fade: direct hidden toggle for MVP (simple)
           boardGroup.classList.add("hidden");
           starGroup.classList.remove("hidden");
           starUI.classList.remove("hidden");
@@ -165,15 +164,15 @@
           state.activeEntry = entry;
           lockEntries(true);
     
-          // Reglas:
+          // Rules:
           // entry 1: salen 5, quedan 3 -> fail
           // entry 2: salen 7, queda 1 -> fail
           // entry 3: salen 8 de 1 a 1 -> success
           const breakAt = (entry === 1) ? 5 : (entry === 2) ? 7 : 8;
     
           if (entry === 1 || entry === 2) {
-            // Salen "todas a la vez", pero rompemos en breakAt
-            // Animamos las primeras breakAt al punto de salida
+            // They come out "all at once", but we break at breakAt
+            // Animate the first breakAt to the exit point
             for (let i = 0; i < breakAt; i++) {
               const ball = state.balls[i];
               const target = ball.out[entry][i];
@@ -183,13 +182,13 @@
               }, 40));
             }
     
-            // Luego "rompe"
+            // Then it "breaks"
             state.timers.push(setTimeout(() => {
               const remaining = TOTAL - breakAt;
               fail(remaining);
             }, 380));
           } else {
-            // entry 3: una por una hasta 8
+            // entry 3: one by one until 8
             let delay = 0;
             for (let i = 0; i < TOTAL; i++) {
               const ball = state.balls[i];
@@ -199,7 +198,7 @@
                 ball.isOut = true;
                 state.extracted++;
                 if (state.extracted === TOTAL) {
-                  // pequeña pausa y victoria
+                  // short pause and victory
                   setTimeout(success, 260);
                 }
               }, delay));
@@ -208,7 +207,7 @@
           }
         }
     
-        // Hooks UI
+        // UI hooks
         entryEls.forEach(el => {
           el.addEventListener("click", () => {
             const entry = Number(el.dataset.entry);
@@ -219,27 +218,26 @@
         btnRestart.addEventListener("click", resetGame);
     
         btnExit.addEventListener("click", () => {
-          // TODO: aquí rediriges al artículo/landing dentro de Kiadez
-          // Por ahora: solo mensaje
-          alert("Salir: aquí volverías a Kiadez.com (landing del juego).");
+          // TODO: redirect to the game article/landing within Kiadez
+          alert("Exit: this would take you back to Kiadez.com (game landing).");
         });
-    
+
         btnStarExit.addEventListener("click", () => {
-          alert("Salir: aquí volverías a Kiadez.com (landing del juego).");
+          alert("Exit: this would take you back to Kiadez.com (game landing).");
         });
-    
+
         btnDonate.addEventListener("click", () => {
-          // TODO: integrar con backend (donación a Guardián 0)
-          // - si no hay sesión: modal (donación invitado vs login)
-          // - si hay sesión: POST /stars/donate (futuro)
-          alert("Donar estrella (MVP): aquí se registraría la donación al Guardián 0.");
+          // TODO: integrate with backend (donation to Guardian 0)
+          // - if no session: modal (guest donation vs login)
+          // - if session exists: POST /stars/donate (future)
+          alert("Donate star (MVP): donation to Guardian 0 would be recorded here.");
         });
-    
+
         btnSave.addEventListener("click", () => {
-          // TODO: integrar con backend
-          // - si no hay sesión: redirigir a login/registro y volver aquí
-          // - si hay sesión: POST /stars/save
-          alert("Guardar en mi perfil (MVP): aquí se acreditaría la estrella al usuario.");
+          // TODO: integrate with backend
+          // - if no session: redirect to login/register and return here
+          // - if session exists: POST /stars/save
+          alert("Save to my profile (MVP): the star would be credited to the user here.");
         });
     
         // Init
@@ -250,7 +248,7 @@
 <svelte:head>
 <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Una cosa a la vez — Kiadez</title>
+  <title>One thing at a time — Kiadez</title>
   <style>
     :root {
       --bg: #ffffff;
@@ -400,41 +398,41 @@
 
 <div class="wrap">
     <div class="title">
-      <h1>Una cosa a la vez</h1>
-      <p>Sin prisa. Sin pistas. Solo una decisión.</p>
+      <h1>One thing at a time</h1>
+      <p>No rush. No clues. Just one decision.</p>
     </div>
 
     <div class="panel">
       <!-- TABLERO -->
-      <svg viewBox="0 0 420 420" aria-label="Juego Una cosa a la vez">
-        <!-- Group: tablero -->
+      <svg viewBox="0 0 420 420" aria-label="One thing at a time game">
+        <!-- Group: board -->
         <g id="boardGroup">
-          <!-- Caja -->
+          <!-- Box -->
           <rect x="80" y="80" width="260" height="260" rx="6" fill="#FAFAFA" stroke="#CFCFCF" stroke-width="2"/>
 
-          <!-- Entradas (ranuras) -->
-          <!-- Entrada 1: top-left -->
+          <!-- Entries (slots) -->
+          <!-- Entry 1: top-left -->
           <g class="entry" id="entry1" data-entry="1">
             <rect class="slot" x="78" y="78" width="34" height="10" rx="4" fill="#CFCFCF" opacity="0.7"/>
           </g>
 
-          <!-- Entrada 2: top-right -->
+          <!-- Entry 2: top-right -->
           <g class="entry" id="entry2" data-entry="2">
             <rect class="slot" x="308" y="78" width="34" height="10" rx="4" fill="#CFCFCF" opacity="0.7"/>
           </g>
 
-          <!-- Entrada 3: bottom-right -->
+          <!-- Entry 3: bottom-right -->
           <g class="entry" id="entry3" data-entry="3">
             <rect class="slot" x="308" y="332" width="34" height="10" rx="4" fill="#CFCFCF" opacity="0.7"/>
           </g>
 
-          <!-- Esferas (8) -->
+          <!-- Spheres (8) -->
           <g id="ballsGroup"></g>
         </g>
 
-        <!-- Group: estrella -->
+        <!-- Group: star -->
         <g id="starGroup" class="hidden">
-          <!-- Estrella simple (puedes reemplazar por tu SVG luego) -->
+          <!-- Simple star (you can replace with your SVG later) -->
           <path d="M210 90
                    L240 170
                    L325 170
@@ -451,34 +449,34 @@
       </svg>
     </div>
 
-    <!-- MENSAJES -->
+    <!-- MESSAGES -->
     <div class="message" id="message">
       <p class="big" id="msgBig"></p>
       <p class="small" id="msgSmall"></p>
     </div>
 
-    <!-- CONTROLES -->
+    <!-- CONTROLS -->
     <div class="controls" id="controlsGame">
-      <button id="btnRestart">Reiniciar</button>
-      <button class="ghost" id="btnExit">Salir</button>
+      <button id="btnRestart">Restart</button>
+      <button class="ghost" id="btnExit">Exit</button>
     </div>
 
-    <!-- POST-VICTORIA -->
+    <!-- POST-VICTORY -->
     <div class="starCard hidden" id="starUI">
       <div class="title" style="margin-top:0;">
-        <h1 style="font-size:18px;">Ganaste una estrella</h1>
+        <h1 style="font-size:18px;">You won a star</h1>
         <p style="margin-top:2px; font-size:13px;">
-          <strong>Una cosa a la vez.</strong><br/>
-          La paciencia es poder.
+          <strong>One thing at a time.</strong><br/>
+          Patience is power.
         </p>
       </div>
 
       <div class="choice">
-        <p class="question">¿Qué quieres hacer con esta estrella?</p>
+        <p class="question">What do you want to do with this star?</p>
         <div class="row">
-          <button class="primary" id="btnDonate">Donar estrella</button>
-          <button id="btnSave">Guardar en mi perfil</button>
-          <button class="ghost" id="btnStarExit">Salir</button>
+          <button class="primary" id="btnDonate">Donate star</button>
+          <button id="btnSave">Save to my profile</button>
+          <button class="ghost" id="btnStarExit">Exit</button>
         </div>
       </div>
     </div>

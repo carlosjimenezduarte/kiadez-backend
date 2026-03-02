@@ -6,7 +6,7 @@
   const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
 
   let statusMessage = "";
-  let submitLabel = "Crear clave privada";
+  let submitLabel = "Create private key";
   let isSubmitting = false;
   let ppw = "";
   let ppw2 = "";
@@ -14,7 +14,7 @@
   let ppw2Visible = false;
 
   const PASSWORD_POLICY_MESSAGE =
-    "Debe incluir 8+ caracteres, 1 mayúscula, 1 número y 1 símbolo.";
+    "Must include 8+ characters, 1 uppercase letter, 1 number, and 1 symbol.";
 
   const passwordMeetsPolicy = (value) => {
     const password = String(value || "");
@@ -35,7 +35,7 @@
       passwordWarningText = PASSWORD_POLICY_MESSAGE;
     } else if (passwordMeetsPolicy(password) && confirm && password !== confirm) {
       if (confirm.length >= password.length) {
-        passwordWarningText = "Las claves privadas deben coincidir.";
+        passwordWarningText = "Private keys must match.";
       } else {
         passwordWarningText = "";
       }
@@ -45,12 +45,12 @@
   }
 
   let feedbackModalOpen = false;
-  let feedbackTitle = "Aviso";
+  let feedbackTitle = "Notice";
   let feedbackMessage = "";
-  let feedbackActionLabel = "Aceptar";
+  let feedbackActionLabel = "Accept";
   let feedbackNextUrl = null;
 
-  function openFeedbackModal({ title = "Aviso", message, actionLabel = "Aceptar", nextUrl = null }) {
+  function openFeedbackModal({ title = "Notice", message, actionLabel = "Accept", nextUrl = null }) {
     feedbackTitle = title;
     feedbackMessage = message;
     feedbackActionLabel = actionLabel;
@@ -118,7 +118,7 @@
   async function checkVaultStatus() {
     const token = getAccessToken();
     if (!token) {
-      showStatus("No hay sesión activa. Inicia sesión de nuevo.");
+      showStatus("There is no active session. Sign in again.");
       return { has_vault: false, ok: false };
     }
 
@@ -128,12 +128,12 @@
       });
       const data = await res.json();
       if (!res.ok) {
-        showStatus(data.detail || "No se pudo consultar el estado del vault.");
+        showStatus(data.detail || "Could not query vault status.");
         return { has_vault: false, ok: false };
       }
       return { has_vault: !!data.has_vault, ok: true };
     } catch (e) {
-      showStatus("No se pudo conectar con el servidor.");
+      showStatus("Could not connect to the server.");
       return { has_vault: false, ok: false };
     }
   }
@@ -150,7 +150,7 @@
       });
       const data = await res.json();
       if (!res.ok) {
-        showStatus(data.detail || "No se pudo consultar tu propósito de vida.");
+        showStatus(data.detail || "Could not query your life purpose.");
         return { configured: false, ok: false };
       }
 
@@ -162,7 +162,7 @@
       );
       return { configured: slotNumbers.size >= 3, ok: true };
     } catch (e) {
-      showStatus("No se pudo conectar con el servidor.");
+      showStatus("Could not connect to the server.");
       return { configured: false, ok: false };
     }
   }
@@ -192,7 +192,7 @@
 
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.detail || "No se pudo crear vault.");
+      throw new Error(data.detail || "Could not create vault.");
     }
 
     setDekSessionHex(bufToHex(dekRaw));
@@ -204,9 +204,9 @@
     const token = getAccessToken();
     if (!token) {
       openFeedbackModal({
-        title: "Sesión requerida",
-        message: "No hay sesión activa. Inicia sesión de nuevo.",
-        actionLabel: "Ir a login",
+        title: "Session required",
+        message: "There is no active session. Sign in again.",
+        actionLabel: "Go to login",
         nextUrl: "/login.html",
       });
       return;
@@ -221,7 +221,7 @@
 
     if (!passwordMeetsPolicy(ppw)) {
       openFeedbackModal({
-        title: "Clave inválida",
+        title: "Invalid key",
         message: PASSWORD_POLICY_MESSAGE,
       });
       return;
@@ -229,8 +229,8 @@
 
     if (ppw !== ppw2) {
       openFeedbackModal({
-        title: "Claves no coinciden",
-        message: "Verifica que ambas claves privadas sean exactamente iguales.",
+        title: "Keys do not match",
+        message: "Verify that both private keys are exactly the same.",
       });
       return;
     }
@@ -239,16 +239,16 @@
     try {
       await createVault(ppw);
       openFeedbackModal({
-        title: "Clave privada creada",
-        message: "Tu clave privada se configuró correctamente.",
-        actionLabel: "Continuar",
+        title: "Private key created",
+        message: "Your private key was set successfully.",
+        actionLabel: "Continue",
         nextUrl: "/life-proposal.html",
       });
     } catch (err) {
       console.error(err);
       openFeedbackModal({
-        title: "No se pudo guardar",
-        message: err.message || "No se pudo crear la clave privada.",
+        title: "Could not save",
+        message: err.message || "Could not create the private key.",
       });
     } finally {
       isSubmitting = false;
@@ -260,11 +260,11 @@
     if (st.ok && st.has_vault) {
       const purposeState = await checkLifePurposeConfigured();
       if (purposeState.configured) {
-        showStatus("Ya tienes clave privada y propósito configurados. Puedes continuar a tu Home.");
-        submitLabel = "Ir a mi Home";
+        showStatus("You already have a private key and configured life purpose. You can continue to your Home.");
+        submitLabel = "Go to my Home";
       } else {
-        showStatus("Ya tienes una clave privada configurada. Próximo paso: tu propósito de vida.");
-        submitLabel = "Continuar";
+        showStatus("You already have a configured private key. Next step: your life purpose.");
+        submitLabel = "Continue";
       }
     }
   });
@@ -273,27 +273,27 @@
 <svelte:head>
 <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Kiadez — Crea tu clave privada</title>
+    <title>Kiadez — Create your private key</title>
     <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
 <div class="page-backgroundcpp">
         <main class="auth-center">
             <div class="auth-card auth-card--wide">
-                <h2 class="auth-title">Crea tu clave privada personal</h2>
+                <h2 class="auth-title">Create your personal private key</h2>
 
                 <div class="auth-message">
                     <p>
-                        Esta clave protege tus <strong>deseos privados</strong> y tu <strong>propósito secreto</strong>.
+                        This key protects your <strong>private wishes</strong> and your <strong>secret purpose</strong>.
                     </p>
                     <br>
                     <br>
                     <p class="muted">
-                        Esta clave no pertenece a Kiadez: te pertenece a ti.<br>
-                        Más adelante podrás definir custodios o mecanismos de recuperación consciente.
+                        This key does not belong to Kiadez: it belongs to you.<br>
+                        Later you will be able to define guardians or recovery mechanisms.
                         <br>
                         <br>
-                        Por favor, guarda muy bien esta clave o memórizala como un tesoro personal.
+                        Please keep this key safe or memorize it like a personal treasure.
                     </p>
                     <br>
                     {#if statusMessage}
@@ -306,7 +306,7 @@
                       <input
                         type={ppwVisible ? "text" : "password"}
                         name="ppw"
-                        placeholder="Clave privada personal"
+                        placeholder="Personal private key"
                         bind:value={ppw}
                         required
                       />
@@ -314,9 +314,9 @@
                         class="password-toggle"
                         class:is-visible={ppwVisible}
                         type="button"
-                        aria-label={ppwVisible ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        aria-label={ppwVisible ? "Hide password" : "Show password"}
                         aria-pressed={ppwVisible ? "true" : "false"}
-                        title={ppwVisible ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        title={ppwVisible ? "Hide password" : "Show password"}
                         on:click={() => (ppwVisible = !ppwVisible)}
                       >
                         <svg class="password-toggle-icon password-toggle-icon-show" viewBox="0 0 24 24" aria-hidden="true">
@@ -335,7 +335,7 @@
                       <input
                         type={ppw2Visible ? "text" : "password"}
                         name="ppw2"
-                        placeholder="Confirmar clave privada"
+                        placeholder="Confirm private key"
                         bind:value={ppw2}
                         required
                       />
@@ -343,9 +343,9 @@
                         class="password-toggle"
                         class:is-visible={ppw2Visible}
                         type="button"
-                        aria-label={ppw2Visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        aria-label={ppw2Visible ? "Hide password" : "Show password"}
                         aria-pressed={ppw2Visible ? "true" : "false"}
-                        title={ppw2Visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        title={ppw2Visible ? "Hide password" : "Show password"}
                         on:click={() => (ppw2Visible = !ppw2Visible)}
                       >
                         <svg class="password-toggle-icon password-toggle-icon-show" viewBox="0 0 24 24" aria-hidden="true">
@@ -362,18 +362,18 @@
 
                     <p class={"form-warning" + (passwordWarningText ? "" : " is-hidden")} aria-live="polite">
                       <span class="form-warning-reserve">
-                        Debe incluir 8+ caracteres, 1 mayúscula, 1 número y 1 símbolo.
+                        Must include 8+ characters, 1 uppercase letter, 1 number, and 1 symbol.
                       </span>
                       <span class="form-warning-live">{passwordWarningText}</span>
                     </p>
 
 
                     <button type="submit" class="btn btn-primary" id="submit-btn" disabled={isSubmitting}>
-                        {isSubmitting ? "Creando..." : submitLabel}
+                        {isSubmitting ? "Creating..." : submitLabel}
                     </button>
 
                     <br><br>
-                    <a href="/login.html" class="btn btn-outline">Volver</a>
+                    <a href="/login.html" class="btn btn-outline">Back</a>
                 </form>
 
                 <div class="auth-brand">
@@ -384,7 +384,7 @@
         </main>
 
         <footer class="kiadez-footer">
-            <div class="footer-bottom">© 2026 Kiadez — Una red social para cumplir deseos.</div>
+            <div class="footer-bottom">© 2026 Kiadez — A social network to fulfill wishes.</div>
         </footer>
     </div>
 

@@ -3,32 +3,38 @@
   import { logout } from "../lib/logout";
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
+  import AuthFooter from "../lib/AuthFooter.svelte";
+  import { getLocale } from "../lib/i18n";
 
   const API = "http://127.0.0.1:8000";
   const MIN_YEAR = 2000;
   const MAX_YEAR = 2100;
+  const locale = getLocale();
+  const isEn = locale === "en";
+  const isFr = locale === "fr";
+  const tr = (es, en, fr = en) => (isEn ? en : isFr ? fr : es);
 
   const MONTH_LABELS = [
-    "Enero",
-    "Febrero",
-    "Marzo",
-    "Abril",
-    "Mayo",
-    "Junio",
-    "Julio",
-    "Agosto",
-    "Septiembre",
-    "Octubre",
-    "Noviembre",
-    "Diciembre",
+    tr("Enero", "January", "Janvier"),
+    tr("Febrero", "February", "Février"),
+    tr("Marzo", "March", "Mars"),
+    tr("Abril", "April", "Avril"),
+    tr("Mayo", "May", "Mai"),
+    tr("Junio", "June", "Juin"),
+    tr("Julio", "July", "Juillet"),
+    tr("Agosto", "August", "Août"),
+    tr("Septiembre", "September", "Septembre"),
+    tr("Octubre", "October", "Octobre"),
+    tr("Noviembre", "November", "Novembre"),
+    tr("Diciembre", "December", "Décembre"),
   ];
 
   const DAILY_METRIC_DEFINITIONS = [
-    { key: "stars_received", icon: "⭐", label: "Estrellas" },
-    { key: "fulfilled_wishes", icon: "✅", label: "Deseos cumplidos" },
-    { key: "public_wishes", icon: "🌟", label: "Deseos públicos" },
-    { key: "achievements", icon: "🏆", label: "Logros" },
-    { key: "posts", icon: "📝", label: "Publicaciones" },
+    { key: "stars_received", icon: "⭐", label: tr("Estrellas", "Stars", "Étoiles") },
+    { key: "fulfilled_wishes", icon: "✅", label: tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis") },
+    { key: "public_wishes", icon: "🌟", label: tr("Deseos públicos", "Public wishes", "Souhaits publics") },
+    { key: "achievements", icon: "🏆", label: tr("Logros", "Achievements", "Réalisations") },
+    { key: "posts", icon: "📝", label: tr("Publicaciones", "Posts", "Publications") },
   ];
 
   let isViewingOwnProfile = true;
@@ -38,8 +44,8 @@
   let activeProfileUsername = "";
   let activeProfileFullName = "";
 
-  let pageTitle = "Kiadez — Calendario";
-  let calendarTitle = "Calendario";
+  let pageTitle = tr("Kiadez — Calendario", "Kiadez — Calendar", "Kiadez — Calendrier");
+  let calendarTitle = tr("Calendario", "Calendar", "Calendrier");
   let calendarYear = new Date().getUTCFullYear();
 
   let calendarAllowed = true;
@@ -81,7 +87,7 @@
   const apiFetch = async (path, options = {}) => {
     const token = getAccessToken();
     if (!token) {
-      throw new Error("No hay sesión activa.");
+      throw new Error(tr("No hay sesión activa.", "No active session.", "Aucune session active."));
     }
 
     const headers = {
@@ -90,7 +96,7 @@
     };
     const res = await fetch(`${API}${path}`, { ...options, headers });
     if (res.status === 401) {
-      throw new Error("Sesión expirada. Inicia sesión nuevamente.");
+      throw new Error(tr("Sesión expirada. Inicia sesión nuevamente.", "Session expired. Sign in again.", "Session expirée. Connecte-toi à nouveau."));
     }
     return res;
   };
@@ -124,7 +130,7 @@
 
   const formatCount = (value) => {
     const safe = Number.isFinite(Number(value)) ? Number(value) : 0;
-    return safe.toLocaleString("es-CO");
+    return safe.toLocaleString(isEn ? "en-US" : isFr ? "fr-FR" : "es-CO");
   };
 
   const formatDateLabel = (isoDate) => {
@@ -132,7 +138,7 @@
     if (!normalized) return "";
     try {
       const dt = new Date(`${normalized}T00:00:00Z`);
-      return new Intl.DateTimeFormat("es-CO", {
+      return new Intl.DateTimeFormat(isEn ? "en-US" : isFr ? "fr-FR" : "es-CO", {
         weekday: "long",
         year: "numeric",
         month: "long",
@@ -148,7 +154,7 @@
     if (!value) return "";
     const dt = new Date(value);
     if (Number.isNaN(dt.getTime())) return "";
-    return new Intl.DateTimeFormat("es-CO", {
+    return new Intl.DateTimeFormat(isEn ? "en-US" : isFr ? "fr-FR" : "es-CO", {
       hour: "2-digit",
       minute: "2-digit",
       timeZone: "UTC",
@@ -189,7 +195,7 @@
     const res = await apiFetch("/auth/me");
     const data = await parseResponseJson(res);
     if (!res.ok) {
-      throw new Error(data.detail || "No se pudo cargar tu perfil.");
+      throw new Error(data.detail || tr("No se pudo cargar tu perfil.", "Could not load your profile.", "Impossible de charger ton profil."));
     }
     const userId = Number(data?.user_number);
     return {
@@ -204,16 +210,16 @@
     if (Number.isFinite(idValue) && idValue > 0) {
       const res = await apiFetch(`/follows/profile?user_id=${encodeURIComponent(String(idValue))}`);
       const data = await parseResponseJson(res);
-      if (!res.ok) throw new Error(data.detail || "No se pudo cargar el perfil.");
+      if (!res.ok) throw new Error(data.detail || tr("No se pudo cargar el perfil.", "Could not load profile.", "Impossible de charger le profil."));
       return data;
     }
     if (usernameValue) {
       const res = await apiFetch(`/follows/profile?username=${encodeURIComponent(usernameValue)}`);
       const data = await parseResponseJson(res);
-      if (!res.ok) throw new Error(data.detail || "No se pudo cargar el perfil.");
+      if (!res.ok) throw new Error(data.detail || tr("No se pudo cargar el perfil.", "Could not load profile.", "Impossible de charger le profil."));
       return data;
     }
-    throw new Error("Parámetros inválidos para cargar perfil.");
+    throw new Error(tr("Parámetros inválidos para cargar perfil.", "Invalid parameters to load profile.", "Paramètres invalides pour charger le profil."));
   };
 
   const buildViewerHomeUrl = () => {
@@ -277,11 +283,15 @@
 
   const applyCalendarHeader = () => {
     pageTitle = isViewingOwnProfile
-      ? "Kiadez — Calendario"
-      : `Kiadez — Calendario de ${activeProfileFullName || "usuario"}`;
+      ? tr("Kiadez — Calendario", "Kiadez — Calendar", "Kiadez — Calendrier")
+      : isEn
+        ? `Kiadez — ${activeProfileFullName || "user"}'s Calendar`
+        : `Kiadez — Calendario de ${activeProfileFullName || "usuario"}`;
     calendarTitle = isViewingOwnProfile
-      ? `Calendario ${calendarYear}`
-      : `Calendario de ${activeProfileFullName || "usuario"} · ${calendarYear}`;
+      ? tr(`Calendario ${calendarYear}`, `Calendar ${calendarYear}`, `Calendar ${calendarYear}`)
+      : isEn
+        ? `${activeProfileFullName || "user"}'s Calendar · ${calendarYear}`
+        : `Calendario de ${activeProfileFullName || "usuario"} · ${calendarYear}`;
   };
 
   const resolveProfileContext = async () => {
@@ -335,7 +345,7 @@
     const res = await apiFetch(endpoint);
     const data = await parseResponseJson(res);
     if (!res.ok) {
-      const detail = data?.detail || "No se pudo cargar el calendario.";
+      const detail = data?.detail || tr("No se pudo cargar el calendario.", "Could not load calendar.", "Impossible de charger le calendrier.");
       const err = new Error(detail);
       err.status = res.status;
       throw err;
@@ -388,12 +398,12 @@
       const status = Number(error?.status || 0);
       if (status === 403) {
         calendarAllowed = false;
-        calendarAccessError = error?.message || "Este calendario es privado.";
+        calendarAccessError = error?.message || tr("Este calendario es privado.", "This calendar is private.", "Ce calendrier est privé.");
         calendarItems = [];
         activeDaysTotal = 0;
         selectedDateUtc = "";
       } else {
-        calendarLoadError = error?.message || "No se pudo cargar el calendario.";
+        calendarLoadError = error?.message || tr("No se pudo cargar el calendario.", "Could not load calendar.", "Impossible de charger le calendrier.");
       }
     } finally {
       calendarLoading = false;
@@ -424,7 +434,10 @@
     if (!isViewingOwnProfile) {
       daySummaryData = buildPendingDaySummary(
         normalized,
-        "Este resumen detallado está disponible solo en tu propio calendario."
+        tr(
+          "Este resumen detallado está disponible solo en tu propio calendario.",
+          "This detailed summary is available only in your own calendar."
+        )
       );
       return;
     }
@@ -435,7 +448,9 @@
       const availableLabel = formatDateLabel(availableIso) || availableIso;
       daySummaryData = buildPendingDaySummary(
         normalized,
-        `El resumen de ${dayLabel} se habilita cuando ese día finaliza. Disponible desde ${availableLabel}.`
+        isEn
+          ? `Summary for ${dayLabel} becomes available when that day ends. Available from ${availableLabel}.`
+          : `El resumen de ${dayLabel} se habilita cuando ese día finaliza. Disponible desde ${availableLabel}.`
       );
       return;
     }
@@ -451,14 +466,14 @@
       const res = await apiFetch(`/calendar/mine/day-summary?date_utc=${encodeURIComponent(normalized)}`);
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data?.detail || "No se pudo cargar el resumen del día.");
+        throw new Error(data?.detail || tr("No se pudo cargar el resumen del día.", "Could not load day summary.", "Impossible de charger le résumé du jour."));
       }
       daySummaryData = data && typeof data === "object" ? data : null;
       if (daySummaryData) {
         daySummaryCache.set(normalized, daySummaryData);
       }
     } catch (error) {
-      daySummaryError = error?.message || "No se pudo cargar el resumen del día.";
+      daySummaryError = error?.message || tr("No se pudo cargar el resumen del día.", "Could not load day summary.", "Impossible de charger le résumé du jour.");
     } finally {
       daySummaryLoading = false;
     }
@@ -504,7 +519,9 @@
           total,
           isSelected: isoDate === selectedIsoDate,
           isToday: isoDate === todayIsoDate,
-          title: `${formatDateLabel(isoDate)} · ${hasActivity ? `${formatCount(total)} interacciones` : "Sin actividad"}`,
+          title: `${formatDateLabel(isoDate)} · ${
+            hasActivity ? tr(`${formatCount(total)} interacciones`, `${formatCount(total)} interactions`, `${formatCount(total)} interactions`) : tr("Sin actividad", "No activity", "Aucune activité")
+          }`,
         });
       }
 
@@ -573,7 +590,7 @@
         await resolveProfileContext();
       } catch (error) {
         console.error(error);
-        calendarLoadError = error?.message || "No se pudo resolver el perfil.";
+        calendarLoadError = error?.message || tr("No se pudo resolver el perfil.", "Could not resolve profile.", "Impossible de resolve profile.");
       }
       await loadCalendarYearActivity();
     })();
@@ -604,46 +621,46 @@
         <img src="/css/logo-kiadez.webp" alt="Kiadez" />
       </a>
       <form class="topbar-search" role="search" on:submit|preventDefault>
-        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+        <input type="search" placeholder={tr("Buscar en Kiadez", "Search on Kiadez", "Rechercher sur Kiadez")} aria-label={tr("Buscar", "Search", "Rechercher")} />
       </form>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-center">
       <a class="topbar-btn" href="/home_user.html" data-profile-module="home">🏠 Home</a>
-      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-      <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 Deseos públicos</a>
-      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-      <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ Deseos cumplidos</a>
+      <a class="topbar-btn" href="/gallery.html">🖼️ {tr("Galería", "Gallery", "Galerie")}</a>
+      <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 {tr("Deseos públicos", "Public wishes", "Souhaits publics")}</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 {tr("Deseos privados", "Private wishes", "Souhaits privés")}</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ {tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis")}</a>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
       <details class="topbar-dropdown">
-        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-          <img src="/assets/avatar-default.jpg" alt="Perfil" />
+        <summary class="topbar-avatar-btn" aria-label={tr("Perfil del usuario", "User profile", "Profil utilisateur")}>
+          <img src="/assets/avatar-default.jpg" alt={tr("Foto de perfil del usuario", "User profile photo", "Photo de profil de l'utilisateur")} />
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
-          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+          <a href="/privacy-and-settings.html" role="menuitem">{tr("Configuración y privacidad", "Settings and privacy", "Paramètres et confidentialité")}</a>
+          <button type="button" role="menuitem" on:click={logout}>{tr("Cerrar sesión", "Sign out", "Se déconnecter")}</button>
         </div>
       </details>
 
-      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+      <button class="topbar-icon" type="button" aria-label={tr("Notificaciones", "Notifications", "Alertes")}>
         🔔
         <span class="topbar-badge">3</span>
       </button>
 
       <details class="topbar-dropdown">
-        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+        <summary class="topbar-menu-btn" aria-label={tr("Abrir menú", "Open menu", "Ouvrir le menu")}>
           <span class="topbar-menu-icon" aria-hidden="true">☰</span>
-          <span class="topbar-menu-label">Menú</span>
+          <span class="topbar-menu-label">{tr("Menú", "Menu", "Navigation")}</span>
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/home_user.html" role="menuitem" data-my-home>Mi Home</a>
-          <a href="/achievements.html" role="menuitem">Logros recientes</a>
-          <a href="/gallery.html" role="menuitem">Galería</a>
-          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
-          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
-          <a href="/messages.html" role="menuitem">Mensajes</a>
+          <a href="/home_user.html" role="menuitem" data-my-home>{tr("Mi Home", "My Home", "Mon accueil")}</a>
+          <a href="/achievements.html" role="menuitem">{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+          <a href="/gallery.html" role="menuitem">{tr("Galería", "Gallery", "Galerie")}</a>
+          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">{tr("Calendario", "Calendar", "Calendrier")}</a>
+          <a href="/my-biography.html" role="menuitem">{tr("Mi Biografía", "My Biography", "Ma biographie")}</a>
+          <a href="/messages.html" role="menuitem">{tr("Mensajes", "Messages", "Messagerie")}</a>
         </div>
       </details>
     </div>
@@ -652,76 +669,76 @@
   <main class="user-home">
     <section class="cover" id="cover">
       <div class="cover-media" id="coverMedia">
-        <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
+        <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt={tr("Portada", "Cover", "Couverture")} />
 
         <div class="cover-actions">
-          <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
-            Cambiar portada
+          <button class="icon-btn" id="btnChangeCover" type="button" title={tr("Cambiar portada", "Change cover", "Changer la couverture")}>
+            {tr("Cambiar portada", "Change cover", "Changer la couverture")}
           </button>
-          <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title="Editar mi propósito de vida">
-            Editar mi propósito de vida
+          <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title={tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier ma mission de vie")}>
+            {tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier ma mission de vie")}
           </button>
 
           <input id="coverFile" type="file" accept="image/*" class="hidden" />
         </div>
 
-        <div class="purpose-triangle" aria-label="Deseos de propósito">
-          <button class="purpose-pill purpose-top" type="button" id="purpose1">Deseo #1: Secreto</button>
-          <button class="purpose-pill purpose-left" type="button" id="purpose2">Deseo construir el Reino de Combray</button>
-          <button class="purpose-pill purpose-right" type="button" id="purpose3">Deseo estar unido a Jesús</button>
+        <div class="purpose-triangle" aria-label={tr("Deseos de propósito", "Purpose wishes", "Souhaits de mission")}>
+          <button class="purpose-pill purpose-top" type="button" id="purpose1">{tr("Deseo #1: Secreto", "Wish #1: Secret", "Souhait n°1 : Secret")}</button>
+          <button class="purpose-pill purpose-left" type="button" id="purpose2">{tr("Deseo construir el Reino de Combray", "I wish to build the Kingdom of Combray", "Je souhaite construire le Royaume de Combray")}</button>
+          <button class="purpose-pill purpose-right" type="button" id="purpose3">{tr("Deseo estar unido a Jesús", "I wish to be united with Jesus", "Je souhaite être uni à Jésus")}</button>
         </div>
 
-        <div class="cover-hint" id="coverHint">Arrastra la portada para encuadrarla</div>
+        <div class="cover-hint" id="coverHint">{tr("Arrastra la portada para encuadrarla", "Drag the cover to frame it", "Déplace la couverture pour l'ajuster")}</div>
       </div>
     </section>
 
     <div class="calendar-body">
-      <nav class="profile-nav" aria-label="Navegación de perfil">
-        <a class="nav-pill" href="/home_user.html" title="Home" data-profile-module="home">Home</a>
-        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+      <nav class="profile-nav" aria-label={tr("Navegación de perfil", "Profile navigation", "Navigation du profil")}>
+        <a class="nav-pill" href="/home_user.html" title={tr("Home", "Home", "Accueil")} data-profile-module="home">{tr("Home", "Home", "Accueil")}</a>
+        <a class="nav-pill" href="/star-pool-found.html" title={tr("Estrellas", "Stars", "Étoiles")}>
           <span class="nav-icon">⭐</span>
-          <span><strong id="calendarStarsTotal">0</strong> estrellas</span>
+          <span><strong id="calendarStarsTotal">0</strong> {tr("estrellas", "stars", "étoiles")}</span>
         </a>
 
-        <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-        <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
-        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
-        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
+        <a class="nav-pill" href="/followers.html" title={tr("Seguidores", "Followers", "Abonnés")}>{tr("Seguidores", "Followers", "Abonnés")}</a>
+        <a class="nav-pill" href="/achievements.html" title={tr("Logros recientes", "Recent achievements", "Réalisations récentes")}>{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+        <a class="nav-pill" href="/gallery.html" title={tr("Galería", "Gallery", "Galerie")}>{tr("Galería", "Gallery", "Galerie")}</a>
+        <a class="nav-pill" href="/calendar.html" title={tr("Calendario", "Calendar", "Calendrier")} data-profile-module="calendar">{tr("Calendario", "Calendar", "Calendrier")}</a>
+        <a class="nav-pill" href="/my-biography.html" title={tr("Mi biografía", "My biography", "Ma biographie")}>{tr("Mi biografía", "My biography", "Ma biographie")}</a>
+        <a class="nav-pill" href="/messages.html" title={tr("Mensajes", "Messages", "Messagerie")}>{tr("Mensajes", "Messages", "Messagerie")}</a>
       </nav>
 
       {#if calendarAllowed}
-        <section class="calendar-shell" aria-label="Calendario anual">
+        <section class="calendar-shell" aria-label={tr("Calendario anual", "Yearly calendar", "Calendrier annuel")}>
           <div class="calendar-head">
             <h2 class="calendar-title">{calendarTitle}</h2>
             <div class="calendar-head-actions">
-              <button class="btn btn-outline btn-compact" type="button" on:click={() => void changeYear(-1)}>Año anterior</button>
+              <button class="btn btn-outline btn-compact" type="button" on:click={() => void changeYear(-1)}>{tr("Año anterior", "Previous year", "Année précédente")}</button>
               <span class="calendar-year-chip">{calendarYear}</span>
-              <button class="btn btn-outline btn-compact" type="button" on:click={() => void changeYear(1)}>Año siguiente</button>
+              <button class="btn btn-outline btn-compact" type="button" on:click={() => void changeYear(1)}>{tr("Año siguiente", "Next year", "Année suivante")}</button>
             </div>
           </div>
 
           <div class="calendar-legend">
-            <span><strong>Día activo</strong> en verde</span>
-            <span><strong>Sin actividad</strong> en blanco</span>
-            <span><strong>{formatCount(activeDaysTotal)}</strong> días activos en {calendarYear}</span>
+            <span><strong>{tr("Día activo", "Active day", "Jour actif")}</strong> {tr("en verde", "in green", "en vert")}</span>
+            <span><strong>{tr("Sin actividad", "No activity", "Aucune activité")}</strong> {tr("en blanco", "in white", "en blanc")}</span>
+            <span><strong>{formatCount(activeDaysTotal)}</strong> {tr("días activos en", "active days in", "jours actifs en")} {calendarYear}</span>
           </div>
 
           {#if calendarLoading}
-            <article class="calendar-current" aria-label="Carga de calendario">
-              <p class="panel-muted">Cargando actividad del calendario...</p>
+            <article class="calendar-current" aria-label={tr("Carga de calendario", "Calendar loading", "Chargement du calendrier")}>
+              <p class="panel-muted">{tr("Cargando actividad del calendario...", "Loading calendar activity...", "Chargement de l'activité du calendrier...")}</p>
             </article>
           {:else if calendarLoadError}
-            <article class="calendar-current" aria-label="Error de calendario">
+            <article class="calendar-current" aria-label={tr("Error de calendario", "Calendar error", "Erreur du calendrier")}>
               <p class="achievements-sync-error">{calendarLoadError}</p>
             </article>
           {:else}
-            <article class="calendar-current" aria-label="Interacciones diarias">
+            <article class="calendar-current" aria-label={tr("Interacciones diarias", "Daily interactions", "Interactions quotidiennes")}>
               <div class="current-head">
-                <h3 class="current-month">Interacciones del día</h3>
+                <h3 class="current-month">{tr("Interacciones del día", "Day interactions", "Interactions du jour")}</h3>
                 <div class="calendar-legend">
-                  <span>{selectedDateLabel || "Sin fecha seleccionada"}</span>
+                  <span>{selectedDateLabel || tr("Sin fecha seleccionada", "No selected date", "Aucune date sélectionnée")}</span>
                 </div>
               </div>
 
@@ -738,18 +755,18 @@
               </div>
 
               <p class="calendar-day-total">
-                Interacciones totales del día:
+                {tr("Interacciones totales del día:", "Total interactions for the day:", "Interactions totales du jour :")}
                 <strong>{formatCount(selectedDay?.total_interactions || 0)}</strong>
               </p>
 
               {#if !selectedDay?.has_activity}
-                <p class="panel-muted">No hay actividad registrada para este día.</p>
+                <p class="panel-muted">{tr("No hay actividad registrada para este día.", "There is no recorded activity for this day.", "Aucune activité enregistrée pour ce jour.")}</p>
               {/if}
             </article>
 
             <article class="calendar-year" aria-label={`Vista anual ${calendarYear}`}>
-              <h3 class="year-label">{calendarYear} · Enero a Diciembre</h3>
-              <p class="calendar-year-note">Pulsa un día para abrir el resumen diario (disponible al día siguiente).</p>
+              <h3 class="year-label">{calendarYear} · {tr("Enero a Diciembre", "January to December", "Janvier à décembre")}</h3>
+              <p class="calendar-year-note">{tr("Pulsa un día para abrir el resumen diario (disponible al día siguiente).", "Tap a day to open daily summary (available the next day).", "Appuie sur un jour pour ouvrir le résumé quotidien (disponible le lendemain).")}</p>
               <div class="month-grid">
                 {#each yearMonths as month}
                   <article class="month-card" aria-label={`Mes ${month.name}`}>
@@ -779,12 +796,12 @@
           {/if}
         </section>
       {:else}
-        <section class="panel calendar-shell" aria-label="Calendario privado">
+        <section class="panel calendar-shell" aria-label={tr("Calendario privado", "Private calendar", "Calendrier privé")}>
           <div class="panel-head">
-            <h2 class="panel-title">Calendario privado</h2>
+            <h2 class="panel-title">{tr("Calendario privado", "Private calendar", "Calendrier privé")}</h2>
             <span class="panel-badge">🔒</span>
           </div>
-          <p class="panel-muted">{calendarAccessError || "Este calendario es privado."}</p>
+          <p class="panel-muted">{calendarAccessError || tr("Este calendario es privado.", "This calendar is private.", "Ce calendrier est privé.")}</p>
         </section>
       {/if}
     </div>
@@ -801,30 +818,30 @@
       class="modal wish-modal calendar-day-summary-modal"
       role="dialog"
       aria-modal="true"
-      aria-label="Resumen diario del calendario"
+      aria-label={tr("Resumen diario del calendario", "Calendar daily summary", "Résumé quotidien du calendrier")}
       tabindex="-1"
     >
       <div class="modal-head">
-        <h3>Resumen diario</h3>
+        <h3>{tr("Resumen diario", "Daily summary", "Résumé quotidien")}</h3>
         <button class="modal-close" type="button" on:click={() => closeDaySummaryModal()}>✕</button>
       </div>
 
       <div class="modal-body">
         <div class="calendar-summary-meta">
-          <span class="calendar-summary-chip">{daySummaryDateLabel || "Sin fecha seleccionada"}</span>
+          <span class="calendar-summary-chip">{daySummaryDateLabel || tr("Sin fecha seleccionada", "No selected date", "Aucune date sélectionnée")}</span>
           <span class="calendar-summary-chip">
-            Disponible desde: {formatDateLabel(daySummaryData?.available_from_utc || addDaysIsoUtc(daySummaryDateUtc, 1))}
+            {tr("Disponible desde:", "Available from:", "Disponible à partir de :")} {formatDateLabel(daySummaryData?.available_from_utc || addDaysIsoUtc(daySummaryDateUtc, 1))}
           </span>
         </div>
 
         {#if daySummaryLoading}
-          <p class="panel-muted">Cargando resumen del día...</p>
+          <p class="panel-muted">{tr("Cargando resumen del día...", "Loading day summary...", "Chargement du résumé du jour...")}</p>
         {:else if daySummaryError}
           <p class="achievements-sync-error">{daySummaryError}</p>
         {:else if !daySummaryData}
-          <p class="panel-muted">Selecciona un día para ver su resumen.</p>
+          <p class="panel-muted">{tr("Selecciona un día para ver su resumen.", "Select a day to view its summary.", "Sélectionne un jour pour voir son résumé.")}</p>
         {:else if !daySummaryIsClosed}
-          <p class="calendar-summary-pending">{daySummaryMessage || "Este resumen estará disponible cuando el día finalice."}</p>
+          <p class="calendar-summary-pending">{daySummaryMessage || tr("Este resumen estará disponible cuando el día finalice.", "This summary will be available when the day ends.", "Ce résumé sera disponible à la fin de la journée.")}</p>
         {:else}
           <div class="calendar-daily-grid calendar-summary-daily-grid">
             {#each daySummaryMetrics as metric}
@@ -839,34 +856,34 @@
           </div>
 
           <p class="calendar-day-total">
-            Interacciones totales:
+            {tr("Interacciones totales:", "Total interactions:", "Interactions totales :")}
             <strong>{formatCount(daySummaryTotals?.total_interactions || 0)}</strong>
           </p>
 
-          <section class="calendar-summary-section" aria-label="Publicaciones del día">
+          <section class="calendar-summary-section" aria-label={tr("Publicaciones del día", "Posts of the day", "Publications du jour")}>
             <div class="calendar-summary-section-head">
-              <h4>Publicaciones del día</h4>
+              <h4>{tr("Publicaciones del día", "Posts of the day", "Publications du jour")}</h4>
               <span>{formatCount(daySummaryPosts.length)}</span>
             </div>
             {#if !daySummaryPosts.length}
-              <p class="panel-muted">No se registraron publicaciones para este día.</p>
+              <p class="panel-muted">{tr("No se registraron publicaciones para este día.", "No posts were recorded for this day.", "Aucune publication n'a été enregistrée pour ce jour.")}</p>
             {:else}
               <div class="calendar-summary-posts">
                 {#each daySummaryPosts as post}
-                  <article class="calendar-summary-post-card" aria-label={`Publicación ${post.id}`}>
+                  <article class="calendar-summary-post-card" aria-label={`${tr("Publicación", "Post", "Publication")} ${post.id}`}>
                     {#if post.media_url}
                       {#if post.media_kind === "video"}
                         <video class="calendar-summary-media" src={post.media_url} controls preload="metadata">
                           <track kind="captions" />
                         </video>
                       {:else}
-                        <img class="calendar-summary-media" src={post.media_url} alt="Publicación del día" />
+                        <img class="calendar-summary-media" src={post.media_url} alt={tr("Publicación del día", "Post of the day", "Publication du jour")} />
                       {/if}
                     {:else}
-                      <div class="calendar-summary-media calendar-summary-media-placeholder">Sin archivo visual</div>
+                      <div class="calendar-summary-media calendar-summary-media-placeholder">{tr("Sin archivo visual", "No visual file", "Aucun fichier visuel")}</div>
                     {/if}
                     <div class="calendar-summary-post-content">
-                      <p class="calendar-summary-post-text">{post.text || "Publicación sin texto."}</p>
+                      <p class="calendar-summary-post-text">{post.text || tr("Publicación sin texto.", "Post without text.", "Publication sans texte.")}</p>
                       <p class="calendar-summary-post-meta">
                         {formatTimeLabel(post.created_at)} UTC · ⭐ {formatCount(post.star_count || 0)} ·
                         💬 {formatCount(post.comment_count || 0)} · 🔁 {formatCount(post.share_count || 0)}
@@ -878,20 +895,20 @@
             {/if}
           </section>
 
-          <section class="calendar-summary-section" aria-label="Deseos cumplidos del día">
+          <section class="calendar-summary-section" aria-label={tr("Deseos cumplidos del día", "Fulfilled wishes of the day", "Souhaits accomplis du jour")}>
             <div class="calendar-summary-section-head">
-              <h4>Deseos cumplidos</h4>
+              <h4>{tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis")}</h4>
               <span>{formatCount(daySummaryFulfilledWishes.length)}</span>
             </div>
             {#if !daySummaryFulfilledWishes.length}
-              <p class="panel-muted">No se registraron deseos cumplidos para este día.</p>
+              <p class="panel-muted">{tr("No se registraron deseos cumplidos para este día.", "No fulfilled wishes were recorded for this day.", "Aucun souhait accompli n'a été enregistré pour ce jour.")}</p>
             {:else}
               <div class="calendar-summary-list">
                 {#each daySummaryFulfilledWishes as wish}
                   <article class="calendar-summary-list-item">
                     <p class="calendar-summary-list-title">{wish.wish_text}</p>
                     <p class="calendar-summary-list-meta">
-                      {wish.wish_type || "Deseo"} · {formatTimeLabel(wish.fulfilled_at)} UTC
+                      {wish.wish_type || tr("Deseo", "Wish", "Souhait")} · {formatTimeLabel(wish.fulfilled_at)} UTC
                     </p>
                   </article>
                 {/each}
@@ -899,13 +916,13 @@
             {/if}
           </section>
 
-          <section class="calendar-summary-section" aria-label="Logros del día">
+          <section class="calendar-summary-section" aria-label={tr("Logros del día", "Achievements of the day", "Réalisations du jour")}>
             <div class="calendar-summary-section-head">
-              <h4>Logros</h4>
+              <h4>{tr("Logros", "Achievements", "Réalisations")}</h4>
               <span>{formatCount(daySummaryAchievements.length)}</span>
             </div>
             {#if !daySummaryAchievements.length}
-              <p class="panel-muted">No hubo logros desbloqueados este día.</p>
+              <p class="panel-muted">{tr("No hubo logros desbloqueados este día.", "There were no achievements unlocked this day.", "Aucune réalisation n'a été débloquée ce jour-là.")}</p>
             {:else}
               <div class="calendar-summary-list">
                 {#each daySummaryAchievements as achievement}
@@ -927,63 +944,10 @@
 
       <div class="modal-actions">
         <button class="btn btn-outline btn-compact" type="button" on:click={() => closeDaySummaryModal()}>
-          Cerrar
+          {tr("Cerrar", "Close", "Fermer")}
         </button>
       </div>
     </div>
   </div>
-
-  <footer class="kiadez-footer">
-    <div class="footer-main">
-      <div class="footer-column footer-origin">
-        <p class="footer-poem">
-          Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br />
-          No para dominar, sino para orientar.<br />
-          Su luz no deslumbra: acompaña.
-        </p>
-      </div>
-
-      <div class="footer-columns">
-        <div class="footer-column">
-          <h4>Sobre nuestra red social</h4>
-          <ul>
-            <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
-            <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
-            <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
-            <li><a href="/contact.html">Contacto</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Idiomas</h4>
-          <ul>
-            <li><a href="/?lang=es">Español</a></li>
-            <li><a href="/?lang=en">English</a></li>
-            <li><a href="/?lang=fr">Français</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Contacto</h4>
-          <ul>
-            <li>info@kiadez.com</li>
-            <li>+57 333 225 6078</li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Información legal</h4>
-          <ul>
-            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
-            <li><a href="/terms.html">Términos y condiciones</a></li>
-            <li><a href="/privacy.html">Privacidad</a></li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="footer-bottom">
-      © 2026 Kiadez — Una red social para cumplir deseos.
-    </div>
-  </footer>
+  <AuthFooter />
 </div>

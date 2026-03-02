@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.auth.minor_accreditation import is_minor_protected
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.db.database import get_db
 from app.db.models.oracle import OracleResponse, OracleResponseType, OracleUserState
 from app.db.models.user import User
@@ -26,13 +27,29 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _parse_hex_bytes(value: str | None, *, field: str) -> bytes:
+def _parse_hex_bytes(value: str | None, *, field: str, locale: str) -> bytes:
     if not value:
-        raise HTTPException(status_code=400, detail=f"Campo requerido: {field}.")
+        raise HTTPException(
+            status_code=400,
+            detail=i18n_tr(
+                locale,
+                es=f"Campo obligatorio: {field}.",
+                en=f"Required field: {field}.",
+                fr=f"Champ obligatoire : {field}.",
+            ),
+        )
     try:
         return bytes.fromhex(value)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"{field} inválido (hex).") from exc
+        raise HTTPException(
+            status_code=400,
+            detail=i18n_tr(
+                locale,
+                es=f"{field} es inválido (hex).",
+                en=f"{field} is invalid (hex).",
+                fr=f"{field} est invalide (hex).",
+            ),
+        ) from exc
 
 
 def _cooldown_remaining_ms(last_pick_at: datetime | None, now: datetime) -> int:
@@ -120,6 +137,7 @@ def _build_state_payload(*, db: Session, user_id: int, state: OracleUserState, n
 
 @router.get("/state", response_model=OracleStateOut)
 def get_oracle_state(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -139,9 +157,11 @@ def get_oracle_state(
 @router.get("/public/{user_id}", response_model=OracleStateOut)
 def get_public_oracle_state(
     user_id: int,
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = locale_from_request(request, default="en")
     target = (
         db.query(User)
         .filter(
@@ -151,13 +171,22 @@ def get_public_oracle_state(
         .one_or_none()
     )
     if target is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=i18n_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable."),
+        )
 
     is_owner = int(current.user_number) == int(user_id)
     if not is_owner and is_minor_protected(target):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+        raise HTTPException(
+            status_code=403,
+            detail=i18n_tr(locale, es="Este módulo es privado.", en="This module is private.", fr="Ce module est privé."),
+        )
     if not is_owner and not bool(target.public_profile_show_oracle):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+        raise HTTPException(
+            status_code=403,
+            detail=i18n_tr(locale, es="Este módulo es privado.", en="This module is private.", fr="Ce module est privé."),
+        )
 
     responses = (
         db.query(OracleResponse)
@@ -188,9 +217,11 @@ def get_public_oracle_state(
 @router.post("/respond", response_model=OracleStateOut)
 def respond_oracle_card(
     payload: OracleRespondRequest,
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = locale_from_request(request, default="en")
     user_id = int(current.user_number)
     user = (
         db.query(User)
@@ -201,12 +232,20 @@ def respond_oracle_card(
         .one_or_none()
     )
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=i18n_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable."),
+        )
 
     if is_minor_protected(user) and payload.response_type == OracleResponseType.public:
         raise HTTPException(
             status_code=403,
-            detail="Tu cuenta está en modo protegido. Solo puedes registrar respuestas privadas por ahora.",
+            detail=i18n_tr(
+                locale,
+                es="Tu cuenta está en modo protegido. Por ahora solo puedes guardar respuestas privadas.",
+                en="Your account is in protected mode. You can only save private responses for now.",
+                fr="Votre compte est en mode protégé. Pour l'instant, vous ne pouvez enregistrer que des réponses privées.",
+            ),
         )
 
     state, _ = _get_or_create_state(db=db, user_id=user_id)
@@ -219,7 +258,12 @@ def respond_oracle_card(
         if not has_vault:
             raise HTTPException(
                 status_code=409,
-                detail="Debes crear y desbloquear tu clave privada para guardar respuestas secretas.",
+                detail=i18n_tr(
+                    locale,
+                    es="Debes crear y desbloquear tu clave privada para guardar respuestas secretas.",
+                    en="You must create and unlock your private key to save secret responses.",
+                    fr="Vous devez créer et déverrouiller votre clé privée pour enregistrer des réponses secrètes.",
+                ),
             )
 
     current_cycle_entries = (
@@ -240,7 +284,12 @@ def respond_oracle_card(
     if has_answered:
         raise HTTPException(
             status_code=409,
-            detail="Esta carta ya tiene una respuesta pública o secreta en este ciclo.",
+            detail=i18n_tr(
+                locale,
+                es="Esta carta ya tiene una respuesta pública o secreta en este ciclo.",
+                en="This card already has a public or secret response in this cycle.",
+                fr="Cette carte a déjà une réponse publique ou secrète dans ce cycle.",
+            ),
         )
 
     card_revealed = bool(current_cycle_entries)
@@ -249,9 +298,20 @@ def respond_oracle_card(
         if remaining_ms > 0:
             raise HTTPException(
                 status_code=409,
-                detail=(
-                    "Carta bloqueada temporalmente. "
-                    "Debes esperar a que termine el cooldown para elegir una nueva carta."
+                detail=i18n_tr(
+                    locale,
+                    es=(
+                        "Carta bloqueada temporalmente. "
+                        "Debes esperar a que termine el enfriamiento antes de elegir una nueva carta."
+                    ),
+                    en=(
+                        "Card temporarily locked. "
+                        "You must wait for the cooldown to end before choosing a new card."
+                    ),
+                    fr=(
+                        "Carte temporairement verrouillée. "
+                        "Vous devez attendre la fin du délai avant de choisir une nouvelle carte."
+                    ),
                 ),
             )
         state.last_pick_at = now
@@ -263,12 +323,28 @@ def respond_oracle_card(
     if payload.response_type == OracleResponseType.public:
         text_public = (payload.text_public or "").strip()
         if not text_public:
-            raise HTTPException(status_code=400, detail="La respuesta pública no puede estar vacía.")
+            raise HTTPException(
+                status_code=400,
+                detail=i18n_tr(
+                    locale,
+                    es="La respuesta pública no puede estar vacía.",
+                    en="Public response cannot be empty.",
+                    fr="La réponse publique ne peut pas être vide.",
+                ),
+            )
     elif payload.response_type == OracleResponseType.secret:
-        ciphertext = _parse_hex_bytes(payload.ciphertext_hex, field="ciphertext_hex")
-        nonce = _parse_hex_bytes(payload.nonce_hex, field="nonce_hex")
+        ciphertext = _parse_hex_bytes(payload.ciphertext_hex, field="ciphertext_hex", locale=locale)
+        nonce = _parse_hex_bytes(payload.nonce_hex, field="nonce_hex", locale=locale)
         if len(nonce) != 12:
-            raise HTTPException(status_code=400, detail="nonce_hex inválido (se esperan 12 bytes).")
+            raise HTTPException(
+                status_code=400,
+                detail=i18n_tr(
+                    locale,
+                    es="nonce_hex es inválido (se esperan 12 bytes).",
+                    en="nonce_hex is invalid (12 bytes expected).",
+                    fr="nonce_hex est invalide (12 octets attendus).",
+                ),
+            )
 
     response = OracleResponse(
         user_id=user_id,
@@ -289,9 +365,11 @@ def respond_oracle_card(
 @router.delete("/responses/{response_id}", response_model=OracleStateOut)
 def delete_oracle_response(
     response_id: int,
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = locale_from_request(request, default="en")
     user_id = int(current.user_number)
     state, _ = _get_or_create_state(db=db, user_id=user_id)
 
@@ -307,12 +385,20 @@ def delete_oracle_response(
         .one_or_none()
     )
     if response is None:
-        raise HTTPException(status_code=404, detail="Respuesta no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=i18n_tr(locale, es="Respuesta no encontrada.", en="Response not found.", fr="Réponse introuvable."),
+        )
 
     if int(response.cycle) >= int(state.cycle):
         raise HTTPException(
             status_code=409,
-            detail="Solo puedes borrar respuestas de ciclos pasados.",
+            detail=i18n_tr(
+                locale,
+                es="Solo puedes eliminar respuestas de ciclos pasados.",
+                en="You can only delete responses from past cycles.",
+                fr="Vous ne pouvez supprimer que des réponses de cycles passés.",
+            ),
         )
 
     db.delete(response)

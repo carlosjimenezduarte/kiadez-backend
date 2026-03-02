@@ -36,7 +36,7 @@ class PublicPersonalWishUpsertRequest(BaseModel):
     def normalize_fields(self):
         self.wish_text = self.wish_text.strip()
         if not self.wish_text:
-            raise ValueError("El deseo no puede estar vacío.")
+            raise ValueError("The wish cannot be empty.")
         return self
 
 
@@ -56,7 +56,7 @@ class PublicPersonalWishGuardianFulfillRequest(BaseModel):
     def normalize_fields(self):
         normalized_code = (self.commitment_code or "").strip().upper()
         if not normalized_code:
-            raise ValueError("Debes indicar el código de compromiso.")
+            raise ValueError("You must provide the commitment code.")
         self.commitment_code = normalized_code
         return self
 
@@ -70,10 +70,10 @@ class PublicPersonalWishUnfreezeRequest(BaseModel):
         text = (self.reason_text or "").strip()
         if self.reason_type == "unexpected":
             if not text:
-                raise ValueError("Debes describir el imprevisto para descongelar el deseo.")
+                raise ValueError("You must describe the unexpected issue to unfreeze the wish.")
             words = [word for word in text.split() if word]
             if len(words) > 100:
-                raise ValueError("La explicación no puede superar 100 palabras.")
+                raise ValueError("The explanation cannot exceed 100 words.")
             self.reason_text = text
             return self
 
@@ -138,14 +138,14 @@ class PublicCooperativeWishUpsertRequest(BaseModel):
     def normalize_fields(self):
         self.wish_text = self.wish_text.strip()
         if not self.wish_text:
-            raise ValueError("El deseo no puede estar vacío.")
+            raise ValueError("The wish cannot be empty.")
 
         normalized_template = (self.template_text or "").strip()
         self.template_text = normalized_template if normalized_template else None
 
         normalized_code = "".join(ch for ch in (self.security_code or "") if ch.isdigit())
         if len(normalized_code) != 6:
-            raise ValueError("El código de seguridad debe tener exactamente 6 dígitos.")
+            raise ValueError("Security code must contain exactly 6 digits.")
         self.security_code = normalized_code
         return self
 
@@ -159,14 +159,14 @@ class PublicCooperativeWishParticipationUpsertRequest(BaseModel):
         if self.security_code is not None:
             normalized_code = "".join(ch for ch in (self.security_code or "") if ch.isdigit())
             if len(normalized_code) != 6:
-                raise ValueError("El código de seguridad debe tener exactamente 6 dígitos.")
+                raise ValueError("Security code must contain exactly 6 digits.")
             self.security_code = normalized_code
         else:
             self.security_code = None
 
         normalized_text = (self.participation_text or "").strip()
         if not normalized_text:
-            raise ValueError("Debes describir tu participación.")
+            raise ValueError("You must describe your participation.")
         self.participation_text = normalized_text
         return self
 
@@ -178,7 +178,7 @@ class PublicCooperativeWishParticipationCompleteRequest(BaseModel):
     @model_validator(mode="after")
     def validate_oath(self):
         if self.oath_accepted is not True:
-            raise ValueError("Debes aceptar el juramento para registrar la evidencia.")
+            raise ValueError("You must accept the oath to register evidence.")
         return self
 
 
@@ -189,7 +189,7 @@ class PublicCooperativeWishFulfillRequest(BaseModel):
     @model_validator(mode="after")
     def validate_oath(self):
         if self.oath_accepted is not True:
-            raise ValueError("Debes aceptar el juramento para marcar este deseo como cumplido.")
+            raise ValueError("You must accept the oath to mark this wish as fulfilled.")
         return self
 
 

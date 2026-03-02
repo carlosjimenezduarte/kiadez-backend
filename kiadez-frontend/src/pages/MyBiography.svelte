@@ -1,8 +1,15 @@
 <script>
   import { onMount } from "svelte";
+  import AuthFooter from "../lib/AuthFooter.svelte";
+  import { getLocale } from "../lib/i18n";
   import { logout } from "../lib/logout";
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
+
+  const locale = getLocale();
+  const isEn = locale === "en";
+  const isFr = locale === "fr";
+  const tr = (es, en, fr = en) => (isEn ? en : isFr ? fr : es);
 
   onMount(() => {
     initPurposeCoverModule();
@@ -193,21 +200,25 @@
     const DISTINCTIONS_MAX_SLOTS = 10;
     const GUARDIAN_MIN_RANK = 3;
     const GUARDIAN_RANK_NAMES = Object.freeze({
-      0: "Sin rango",
-      1: "Aspirante",
-      2: "Aprendiz",
-      3: "Guardián",
-      4: "Guardián Consagrado",
-      5: "Guardián Mayor",
-      6: "Guardián del Logos",
-      7: "Guardián del Umbral",
-      8: "Guardián de Guardianes",
+      0: tr("Sin rango", "No rank", "Sans rang"),
+      1: tr("Aspirante", "Aspirant", "Aspirant"),
+      2: tr("Aprendiz", "Apprentice", "Apprenti"),
+      3: tr("Guardián", "Guardian", "Gardien"),
+      4: tr("Guardián Consagrado", "Consecrated Guardian", "Gardien Consacré"),
+      5: tr("Guardián Mayor", "Senior Guardian", "Gardien Majeur"),
+      6: tr("Guardián del Logos", "Guardian of the Logos", "Gardien du Logos"),
+      7: tr("Guardián del Umbral", "Guardian of the Threshold", "Gardien du Seuil"),
+      8: tr("Guardián de Guardianes", "Guardian of Guardians", "Gardien des Gardiens"),
     });
-    const defaultAboutDisplayName = (aboutDisplayNameValue?.textContent || infoName?.textContent || "Usuario Kiadez").trim();
-    const defaultDreamTitle = (dreamTitleValue?.textContent || "Sobre su mayor sueño").trim();
-    const defaultProAchievementsTitle = (proAchievementsTitleValue?.textContent || "Logros profesionales").trim();
-    const defaultLifeAchievementsTitle = (lifeAchievementsTitleValue?.textContent || "Logros alcanzados").trim();
-    const defaultQuotesTitle = (quotesTitleValue?.textContent || "Frases favoritas").trim();
+    const defaultAboutDisplayName = (aboutDisplayNameValue?.textContent || infoName?.textContent || tr("Usuario Kiadez", "Kiadez User", "Utilisateur Kiadez")).trim();
+    const defaultDreamTitle = (dreamTitleValue?.textContent || tr("Sobre su mayor sueño", "About their greatest dream", "À propos de son plus grand rêve")).trim();
+    const defaultProAchievementsTitle = (
+      proAchievementsTitleValue?.textContent || tr("Logros profesionales", "Professional achievements", "Réalisations professionnelles")
+    ).trim();
+    const defaultLifeAchievementsTitle = (
+      lifeAchievementsTitleValue?.textContent || tr("Logros alcanzados", "Life achievements", "Réalisations de vie")
+    ).trim();
+    const defaultQuotesTitle = (quotesTitleValue?.textContent || tr("Frases favoritas", "Favorite quotes", "Citations favorites")).trim();
     let currentPersonalInfo = null;
     let currentPhysicalTraits = null;
     let currentEducation = null;
@@ -243,14 +254,14 @@
 
     const apiFetch = async (path, options = {}) => {
       const token = getAccessToken();
-      if (!token) throw new Error("No hay sesión activa.");
+      if (!token) throw new Error(tr("No hay sesión activa.", "No active session.", "Aucune session active."));
       const headers = {
         ...(options.headers || {}),
         Authorization: `Bearer ${token}`,
       };
       const res = await fetch(`${API}${path}`, { ...options, headers });
       if (res.status === 401) {
-        throw new Error("Sesión expirada. Inicia sesión nuevamente.");
+        throw new Error(tr("Sesión expirada. Inicia sesión nuevamente.", "Session expired. Sign in again.", "Session expirée. Connecte-toi de nouveau."));
       }
       return res;
     };
@@ -347,7 +358,7 @@
       }
       const profileId = parsePositiveId(activeProfileUserId);
       if (!profileId) {
-        throw new Error("No se pudo identificar el perfil a editar.");
+        throw new Error(tr("No se pudo identificar el perfil a editar.", "Could not identify the profile to edit.", "Impossible d'identifier le profil à modifier."));
       }
       return `/biography/distinctions/${encodeURIComponent(String(profileId))}`;
     };
@@ -356,7 +367,7 @@
       const res = await apiFetch("/auth/me");
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cargar tu sesión.");
+        throw new Error(data.detail || tr("No se pudo cargar tu sesión.", "Could not load your session.", "Impossible de charger ta session."));
       }
       return data;
     };
@@ -371,7 +382,7 @@
       const res = await apiFetch(`/follows/profile?${query}`);
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cargar el perfil solicitado.");
+        throw new Error(data.detail || tr("No se pudo cargar el perfil solicitado.", "Could not load the requested profile.", "Impossible de charger le profil demandé."));
       }
       return data;
     };
@@ -386,7 +397,7 @@
 
     const applyInfoName = (value) => {
       if (!infoName) return;
-      const normalizedName = String(value || "").trim() || "Usuario Kiadez";
+      const normalizedName = String(value || "").trim() || tr("Usuario Kiadez", "Kiadez User", "Utilisateur Kiadez");
       infoName.textContent = normalizedName;
       infoName.classList.toggle("is-long", normalizedName.length > 26);
       infoName.classList.toggle("is-very-long", normalizedName.length > 36);
@@ -402,9 +413,9 @@
 
     const applyActivityRankToView = (rankValue) => {
       const rank = normalizeGuardianRank(rankValue);
-      const rankName = GUARDIAN_RANK_NAMES[rank] || `Rango ${rank}`;
+      const rankName = GUARDIAN_RANK_NAMES[rank] || tr(`Rango ${rank}`, `Rank ${rank}`, `Rank ${rank}`);
       if (activityRankValue) {
-        activityRankValue.textContent = rank > 0 ? `Rango ${rank} · ${rankName}` : "";
+        activityRankValue.textContent = rank > 0 ? tr(`Rango ${rank} · ${rankName}`, `Rank ${rank} · ${rankName}`, `Rank ${rank} · ${rankName}`) : "";
       }
       if (activityRankRow) {
         activityRankRow.classList.toggle("hidden", rank <= 0);
@@ -419,10 +430,10 @@
         const slotNumber = index + 1;
         return `
           <div class="distinction-slot-card">
-            <p class="distinction-slot-title">Distinción ${slotNumber}</p>
-            <label class="modal-label" for="distinctionTypeInput${slotNumber}">Tipo de distinción</label>
+            <p class="distinction-slot-title">${tr("Distinción", "Distinction", "Distinction")} ${slotNumber}</p>
+            <label class="modal-label" for="distinctionTypeInput${slotNumber}">${tr("Tipo de distinción", "Distinction type", "Type de distinction")}</label>
             <input class="modal-input" id="distinctionTypeInput${slotNumber}" type="text" maxlength="120" />
-            <label class="modal-label" for="distinctionDescriptionInput${slotNumber}">Descripción</label>
+            <label class="modal-label" for="distinctionDescriptionInput${slotNumber}">${tr("Descripción", "Description", "Description")}</label>
             <input class="modal-input" id="distinctionDescriptionInput${slotNumber}" type="text" maxlength="500" />
           </div>
         `;
@@ -572,7 +583,7 @@
       visibleSlots.forEach((slot) => {
         const row = document.createElement("tr");
         const header = document.createElement("th");
-        header.textContent = slot.distinction_type || `Distinción ${slot.slot_number}`;
+        header.textContent = slot.distinction_type || `${tr("Distinción", "Distinction", "Distinction")} ${slot.slot_number}`;
         const detail = document.createElement("td");
         detail.textContent = slot.description || "";
         row.appendChild(header);
@@ -1006,7 +1017,9 @@
       const res = await apiFetch("/biography/personal-info");
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cargar la información personal.");
+        throw new Error(
+          data.detail || tr("No se pudo cargar la información personal.", "Could not load personal information.", "Impossible de charger les informations personnelles.")
+        );
       }
       currentPersonalInfo = data;
       applyPersonalInfoToView(data);
@@ -1017,7 +1030,9 @@
       const res = await apiFetch("/biography/physical-traits");
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudieron cargar las características físicas.");
+        throw new Error(
+          data.detail || tr("No se pudieron cargar las características físicas.", "Could not load physical traits.", "Impossible de charger les caractéristiques physiques.")
+        );
       }
       currentPhysicalTraits = data;
       applyPhysicalTraitsToView(data);
@@ -1028,7 +1043,7 @@
       const res = await apiFetch("/biography/education");
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cargar Educación.");
+        throw new Error(data.detail || tr("No se pudo cargar Educación.", "Could not load education.", "Impossible de charger l'éducation."));
       }
       currentEducation = data;
       applyEducationToView(data);
@@ -1039,7 +1054,7 @@
       const res = await apiFetch("/biography/curiosities");
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudieron cargar las curiosidades.");
+        throw new Error(data.detail || tr("No se pudieron cargar las curiosidades.", "Could not load curiosities.", "Impossible de charger les curiosités."));
       }
       currentCuriosities = data;
       applyCuriositiesToView(data);
@@ -1050,7 +1065,9 @@
       const res = await apiFetch("/biography/professional-info");
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cargar la información profesional.");
+        throw new Error(
+          data.detail || tr("No se pudo cargar la información profesional.", "Could not load professional information.", "Impossible de charger les informations professionnelles.")
+        );
       }
       currentProfessionalInfo = data;
       applyProfessionalInfoToView(data);
@@ -1061,7 +1078,7 @@
       const res = await apiFetch("/biography/about");
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cargar tu biografía.");
+        throw new Error(data.detail || tr("No se pudo cargar tu biografía.", "Could not load your biography.", "Impossible de charger ta biographie."));
       }
       currentAbout = data;
       applyAboutToView(data);
@@ -1072,7 +1089,7 @@
       const res = await apiFetch("/biography/dream");
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cargar tu mayor sueño.");
+        throw new Error(data.detail || tr("No se pudo cargar tu mayor sueño.", "Could not load your greatest dream.", "Impossible de charger ton plus grand rêve."));
       }
       currentDream = data;
       applyDreamToView(data);
@@ -1083,7 +1100,7 @@
       const res = await apiFetch("/biography/professional-achievements");
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudieron cargar tus logros profesionales.");
+        throw new Error(data.detail || tr("No se pudieron cargar tus logros profesionales.", "Could not load your professional achievements.", "Impossible de charger tes réalisations professionnelles."));
       }
       currentProAchievements = data;
       applyProAchievementsToView(data);
@@ -1094,7 +1111,7 @@
       const res = await apiFetch("/biography/life-achievements");
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudieron cargar tus logros alcanzados.");
+        throw new Error(data.detail || tr("No se pudieron cargar tus logros alcanzados.", "Could not load your life achievements.", "Impossible de charger tes réalisations de vie."));
       }
       currentLifeAchievements = data;
       applyLifeAchievementsToView(data);
@@ -1105,7 +1122,7 @@
       const res = await apiFetch("/biography/favorite-quotes");
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudieron cargar tus frases favoritas.");
+        throw new Error(data.detail || tr("No se pudieron cargar tus frases favoritas.", "Could not load your favorite quotes.", "Impossible de charger tes citations favorites."));
       }
       currentFavoriteQuotes = data;
       applyQuotesToView(data);
@@ -1117,7 +1134,7 @@
       const res = await apiFetch(endpoint);
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudieron cargar las distinciones.");
+        throw new Error(data.detail || tr("No se pudieron cargar las distinciones.", "Could not load distinctions.", "Impossible de charger les distinctions."));
       }
       currentDistinctions = data;
       applyDistinctionsToView(data);
@@ -1130,7 +1147,7 @@
       const res = await apiFetch(`/biography/activity-stats${query}`);
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cargar la actividad de Kiadez.");
+        throw new Error(data.detail || tr("No se pudo cargar la actividad de Kiadez.", "Could not load Kiadez activity.", "Impossible de charger l'activité Kiadez."));
       }
       applyActivityStatsToView(data);
       return data;
@@ -1226,7 +1243,7 @@
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo asignar la foto de perfil.");
+        throw new Error(data.detail || tr("No se pudo asignar la foto de perfil.", "Could not assign the profile photo.", "Impossible d'assigner la photo de profil."));
       }
       if (profilePhoto && data.url) {
         profilePhoto.src = data.url;
@@ -1257,7 +1274,7 @@
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo asignar el emblema.");
+        throw new Error(data.detail || tr("No se pudo asignar el emblema.", "Could not assign the emblem.", "Impossible d'assigner l'emblème."));
       }
       if (emblemImage && data.url) {
         emblemImage.src = data.url;
@@ -1291,7 +1308,7 @@
       });
       const uploadData = await uploadRes.json();
       if (!uploadRes.ok) {
-        throw new Error(uploadData.detail || "No se pudo subir la imagen.");
+        throw new Error(uploadData.detail || tr("No se pudo subir la imagen.", "Could not upload the image.", "Impossible de téléverser l'image."));
       }
       return uploadData;
     };
@@ -1307,7 +1324,7 @@
       });
       const uploadData = await uploadRes.json();
       if (!uploadRes.ok) {
-        throw new Error(uploadData.detail || "No se pudo subir la imagen.");
+        throw new Error(uploadData.detail || tr("No se pudo subir la imagen.", "Could not upload the image.", "Impossible de téléverser l'image."));
       }
 
       await assignEmblem(uploadData.media_id);
@@ -1340,16 +1357,16 @@
       const file = event?.target?.files?.[0];
       if (!file) return;
       if (!file.type.startsWith("image/")) {
-        setBioPhotoStatus("Solo se permiten imágenes.", true);
+        setBioPhotoStatus(tr("Solo se permiten imágenes.", "Only images are allowed.", "Seules les images sont autorisées."), true);
         return;
       }
-      setBioPhotoStatus("Subiendo imagen...");
+      setBioPhotoStatus(tr("Subiendo imagen...", "Uploading image...", "Téléversement de l'image..."));
       try {
         const uploadData = await uploadProfilePhotoFromFile(file);
         await assignProfilePhoto(uploadData.media_id);
-        setBioPhotoStatus("Foto de perfil actualizada.");
+        setBioPhotoStatus(tr("Foto de perfil actualizada.", "Profile photo updated.", "Photo de profil mise à jour."));
       } catch (error) {
-        setBioPhotoStatus(error.message || "No se pudo subir la imagen.", true);
+        setBioPhotoStatus(error.message || tr("No se pudo subir la imagen.", "Could not upload the image.", "Impossible de téléverser l'image."), true);
       } finally {
         event.target.value = "";
       }
@@ -1364,15 +1381,15 @@
       const file = event?.target?.files?.[0];
       if (!file) return;
       if (!file.type.startsWith("image/")) {
-        setEmblemStatus("Solo se permiten imágenes.", true);
+        setEmblemStatus(tr("Solo se permiten imágenes.", "Only images are allowed.", "Seules les images sont autorisées."), true);
         return;
       }
-      setEmblemStatus("Subiendo imagen...");
+      setEmblemStatus(tr("Subiendo imagen...", "Uploading image...", "Téléversement de l'image..."));
       try {
         await uploadEmblemFromFile(file);
-        setEmblemStatus("Emblema actualizado.");
+        setEmblemStatus(tr("Emblema actualizado.", "Emblem updated.", "Emblème mis à jour."));
       } catch (error) {
-        setEmblemStatus(error.message || "No se pudo subir la imagen.", true);
+        setEmblemStatus(error.message || tr("No se pudo subir la imagen.", "Could not upload the image.", "Impossible de téléverser l'image."), true);
       } finally {
         event.target.value = "";
       }
@@ -1464,7 +1481,7 @@
     };
 
     const handleOpenPersonalInfoModal = async () => {
-      setPersonalInfoModalStatus("Cargando datos...");
+      setPersonalInfoModalStatus(tr("Cargando datos...", "Loading data...", "Chargement des données..."));
       try {
         if (!currentPersonalInfo) {
           await loadPersonalInfo();
@@ -1472,12 +1489,12 @@
         fillPersonalInfoForm(currentPersonalInfo);
         openPersonalInfoModal();
       } catch (error) {
-        setPersonalInfoModalStatus(error.message || "No se pudo cargar la información.", true);
+        setPersonalInfoModalStatus(error.message || tr("No se pudo cargar la información.", "Could not load information.", "Impossible de charger les informations."), true);
       }
     };
 
     const handleOpenPhysicalTraitsModal = async () => {
-      setPhysicalTraitsModalStatus("Cargando datos...");
+      setPhysicalTraitsModalStatus(tr("Cargando datos...", "Loading data...", "Chargement des données..."));
       try {
         if (!currentPhysicalTraits) {
           await loadPhysicalTraits();
@@ -1485,12 +1502,12 @@
         fillPhysicalTraitsForm(currentPhysicalTraits);
         openPhysicalTraitsModal();
       } catch (error) {
-        setPhysicalTraitsModalStatus(error.message || "No se pudieron cargar los datos.", true);
+        setPhysicalTraitsModalStatus(error.message || tr("No se pudieron cargar los datos.", "Could not load data.", "Impossible de charger les données."), true);
       }
     };
 
     const handleOpenEducationModal = async () => {
-      setEducationModalStatus("Cargando datos...");
+      setEducationModalStatus(tr("Cargando datos...", "Loading data...", "Chargement des données..."));
       try {
         if (!currentEducation) {
           await loadEducation();
@@ -1498,12 +1515,12 @@
         fillEducationForm(currentEducation);
         openEducationModal();
       } catch (error) {
-        setEducationModalStatus(error.message || "No se pudo cargar Educación.", true);
+        setEducationModalStatus(error.message || tr("No se pudo cargar Educación.", "Could not load education.", "Impossible de charger l'éducation."), true);
       }
     };
 
     const handleOpenCuriositiesModal = async () => {
-      setCuriositiesModalStatus("Cargando datos...");
+      setCuriositiesModalStatus(tr("Cargando datos...", "Loading data...", "Chargement des données..."));
       try {
         if (!currentCuriosities) {
           await loadCuriosities();
@@ -1511,12 +1528,12 @@
         fillCuriositiesForm(currentCuriosities);
         openCuriositiesModal();
       } catch (error) {
-        setCuriositiesModalStatus(error.message || "No se pudieron cargar las curiosidades.", true);
+        setCuriositiesModalStatus(error.message || tr("No se pudieron cargar las curiosidades.", "Could not load curiosities.", "Impossible de charger les curiosités."), true);
       }
     };
 
     const handleOpenProfessionalInfoModal = async () => {
-      setProfessionalInfoModalStatus("Cargando datos...");
+      setProfessionalInfoModalStatus(tr("Cargando datos...", "Loading data...", "Chargement des données..."));
       try {
         if (!currentProfessionalInfo) {
           await loadProfessionalInfo();
@@ -1524,12 +1541,15 @@
         fillProfessionalInfoForm(currentProfessionalInfo);
         openProfessionalInfoModal();
       } catch (error) {
-        setProfessionalInfoModalStatus(error.message || "No se pudo cargar la información profesional.", true);
+        setProfessionalInfoModalStatus(
+          error.message || tr("No se pudo cargar la información profesional.", "Could not load professional information.", "Impossible de charger les informations professionnelles."),
+          true
+        );
       }
     };
 
     const handleOpenAboutModal = async () => {
-      setAboutModalStatus("Cargando datos...");
+      setAboutModalStatus(tr("Cargando datos...", "Loading data...", "Chargement des données..."));
       try {
         if (!currentAbout) {
           await loadAbout();
@@ -1537,12 +1557,12 @@
         fillAboutForm(currentAbout);
         openAboutModal();
       } catch (error) {
-        setAboutModalStatus(error.message || "No se pudo cargar tu biografía.", true);
+        setAboutModalStatus(error.message || tr("No se pudo cargar tu biografía.", "Could not load your biography.", "Impossible de charger ta biographie."), true);
       }
     };
 
     const handleOpenDreamModal = async () => {
-      setDreamModalStatus("Cargando datos...");
+      setDreamModalStatus(tr("Cargando datos...", "Loading data...", "Chargement des données..."));
       try {
         if (!currentDream) {
           await loadDream();
@@ -1550,12 +1570,15 @@
         fillDreamForm(currentDream);
         openDreamModal();
       } catch (error) {
-        setDreamModalStatus(error.message || "No se pudo cargar tu mayor sueño.", true);
+        setDreamModalStatus(
+          error.message || tr("No se pudo cargar tu mayor sueño.", "Could not load your greatest dream.", "Impossible de charger ton plus grand rêve."),
+          true
+        );
       }
     };
 
     const handleOpenProAchievementsModal = async () => {
-      setProAchievementsModalStatus("Cargando datos...");
+      setProAchievementsModalStatus(tr("Cargando datos...", "Loading data...", "Chargement des données..."));
       try {
         if (!currentProAchievements) {
           await loadProAchievements();
@@ -1563,12 +1586,15 @@
         fillProAchievementsForm(currentProAchievements);
         openProAchievementsModal();
       } catch (error) {
-        setProAchievementsModalStatus(error.message || "No se pudieron cargar tus logros profesionales.", true);
+        setProAchievementsModalStatus(
+          error.message || tr("No se pudieron cargar tus logros profesionales.", "Could not load your professional achievements.", "Impossible de charger tes réalisations professionnelles."),
+          true
+        );
       }
     };
 
     const handleOpenLifeAchievementsModal = async () => {
-      setLifeAchievementsModalStatus("Cargando datos...");
+      setLifeAchievementsModalStatus(tr("Cargando datos...", "Loading data...", "Chargement des données..."));
       try {
         if (!currentLifeAchievements) {
           await loadLifeAchievements();
@@ -1576,12 +1602,15 @@
         fillLifeAchievementsForm(currentLifeAchievements);
         openLifeAchievementsModal();
       } catch (error) {
-        setLifeAchievementsModalStatus(error.message || "No se pudieron cargar tus logros alcanzados.", true);
+        setLifeAchievementsModalStatus(
+          error.message || tr("No se pudieron cargar tus logros alcanzados.", "Could not load your life achievements.", "Impossible de charger tes réalisations de vie."),
+          true
+        );
       }
     };
 
     const handleOpenQuotesModal = async () => {
-      setQuotesModalStatus("Cargando datos...");
+      setQuotesModalStatus(tr("Cargando datos...", "Loading data...", "Chargement des données..."));
       try {
         if (!currentFavoriteQuotes) {
           await loadFavoriteQuotes();
@@ -1589,17 +1618,26 @@
         fillQuotesForm(currentFavoriteQuotes);
         openQuotesModal();
       } catch (error) {
-        setQuotesModalStatus(error.message || "No se pudieron cargar tus frases favoritas.", true);
+        setQuotesModalStatus(
+          error.message || tr("No se pudieron cargar tus frases favoritas.", "Could not load your favorite quotes.", "Impossible de charger tes citations favorites."),
+          true
+        );
       }
     };
 
     const handleOpenDistinctionsModal = async () => {
       if (!isViewerGuardian()) {
-        setDistinctionsModalStatus("Esta sección solo puede ser actualizada por los Guardianes de Kiadez.com.", true);
+        setDistinctionsModalStatus(
+          tr(
+            "Esta sección solo puede ser actualizada por los Guardianes de Kiadez.com.",
+            "This section can only be updated by Kiadez.com Guardians."
+          ),
+          true
+        );
         return;
       }
 
-      setDistinctionsModalStatus("Cargando distinciones...");
+      setDistinctionsModalStatus(tr("Cargando distinciones...", "Loading distinctions...", "Chargement des distinctions..."));
       try {
         if (!currentDistinctions) {
           await loadDistinctions();
@@ -1607,12 +1645,12 @@
         fillDistinctionsForm(currentDistinctions);
         openDistinctionsModal();
       } catch (error) {
-        setDistinctionsModalStatus(error.message || "No se pudieron cargar las distinciones.", true);
+        setDistinctionsModalStatus(error.message || tr("No se pudieron cargar las distinciones.", "Could not load distinctions.", "Impossible de charger les distinctions."), true);
       }
     };
 
     const handleSavePersonalInfo = async () => {
-      setPersonalInfoModalStatus("Guardando...");
+      setPersonalInfoModalStatus(tr("Guardando...", "Saving...", "Enregistrement..."));
       try {
         const payload = buildPersonalInfoPayload();
         const res = await apiFetch("/biography/personal-info", {
@@ -1622,18 +1660,20 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudo guardar la información personal.");
+          throw new Error(
+            data.detail || tr("No se pudo guardar la información personal.", "Could not save personal information.", "Impossible d'enregistrer les informations personnelles.")
+          );
         }
         currentPersonalInfo = data;
         applyPersonalInfoToView(data);
         closePersonalInfoModalFn();
       } catch (error) {
-        setPersonalInfoModalStatus(error.message || "No se pudo guardar la información.", true);
+        setPersonalInfoModalStatus(error.message || tr("No se pudo guardar la información.", "Could not save information.", "Impossible d'enregistrer les informations."), true);
       }
     };
 
     const handleSavePhysicalTraits = async () => {
-      setPhysicalTraitsModalStatus("Guardando...");
+      setPhysicalTraitsModalStatus(tr("Guardando...", "Saving...", "Enregistrement..."));
       try {
         const payload = buildPhysicalTraitsPayload();
         const res = await apiFetch("/biography/physical-traits", {
@@ -1643,18 +1683,20 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudieron guardar las características físicas.");
+          throw new Error(
+            data.detail || tr("No se pudieron guardar las características físicas.", "Could not save physical traits.", "Impossible d'enregistrer les caractéristiques physiques.")
+          );
         }
         currentPhysicalTraits = data;
         applyPhysicalTraitsToView(data);
         closePhysicalTraitsModalFn();
       } catch (error) {
-        setPhysicalTraitsModalStatus(error.message || "No se pudieron guardar los datos.", true);
+        setPhysicalTraitsModalStatus(error.message || tr("No se pudieron guardar los datos.", "Could not save data.", "Impossible d'enregistrer les données."), true);
       }
     };
 
     const handleSaveEducation = async () => {
-      setEducationModalStatus("Guardando...");
+      setEducationModalStatus(tr("Guardando...", "Saving...", "Enregistrement..."));
       try {
         const payload = buildEducationPayload();
         const res = await apiFetch("/biography/education", {
@@ -1664,18 +1706,18 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudo guardar Educación.");
+          throw new Error(data.detail || tr("No se pudo guardar Educación.", "Could not save education.", "Impossible d'enregistrer l'éducation."));
         }
         currentEducation = data;
         applyEducationToView(data);
         closeEducationModalFn();
       } catch (error) {
-        setEducationModalStatus(error.message || "No se pudo guardar Educación.", true);
+        setEducationModalStatus(error.message || tr("No se pudo guardar Educación.", "Could not save education.", "Impossible d'enregistrer l'éducation."), true);
       }
     };
 
     const handleSaveCuriosities = async () => {
-      setCuriositiesModalStatus("Guardando...");
+      setCuriositiesModalStatus(tr("Guardando...", "Saving...", "Enregistrement..."));
       try {
         const payload = buildCuriositiesPayload();
         const res = await apiFetch("/biography/curiosities", {
@@ -1685,18 +1727,18 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudo guardar Curiosidades.");
+          throw new Error(data.detail || tr("No se pudo guardar Curiosidades.", "Could not save curiosities.", "Impossible d'enregistrer les curiosités."));
         }
         currentCuriosities = data;
         applyCuriositiesToView(data);
         closeCuriositiesModalFn();
       } catch (error) {
-        setCuriositiesModalStatus(error.message || "No se pudo guardar Curiosidades.", true);
+        setCuriositiesModalStatus(error.message || tr("No se pudo guardar Curiosidades.", "Could not save curiosities.", "Impossible d'enregistrer les curiosités."), true);
       }
     };
 
     const handleSaveProfessionalInfo = async () => {
-      setProfessionalInfoModalStatus("Guardando...");
+      setProfessionalInfoModalStatus(tr("Guardando...", "Saving...", "Enregistrement..."));
       try {
         const payload = buildProfessionalInfoPayload();
         const res = await apiFetch("/biography/professional-info", {
@@ -1706,13 +1748,18 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudo guardar la información profesional.");
+          throw new Error(
+            data.detail || tr("No se pudo guardar la información profesional.", "Could not save professional information.", "Impossible d'enregistrer les informations professionnelles.")
+          );
         }
         currentProfessionalInfo = data;
         applyProfessionalInfoToView(data);
         closeProfessionalInfoModalFn();
       } catch (error) {
-        setProfessionalInfoModalStatus(error.message || "No se pudo guardar la información profesional.", true);
+        setProfessionalInfoModalStatus(
+          error.message || tr("No se pudo guardar la información profesional.", "Could not save professional information.", "Impossible d'enregistrer les informations professionnelles."),
+          true
+        );
       }
     };
 
@@ -1755,11 +1802,17 @@
       updateAboutWordCounter();
       const totalWords = countWords(aboutTextInput?.value || "");
       if (totalWords > ABOUT_MAX_WORDS) {
-        setAboutModalStatus(`La biografía permite máximo ${ABOUT_MAX_WORDS} palabras.`, true);
+        setAboutModalStatus(
+          tr(
+            `La biografía permite máximo ${ABOUT_MAX_WORDS} palabras.`,
+            `Biography allows a maximum of ${ABOUT_MAX_WORDS} words.`
+          ),
+          true
+        );
         return;
       }
 
-      setAboutModalStatus("Guardando...");
+      setAboutModalStatus(tr("Guardando...", "Saving...", "Enregistrement..."));
       try {
         const payload = buildAboutPayload();
         const res = await apiFetch("/biography/about", {
@@ -1769,13 +1822,13 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudo guardar tu biografía.");
+          throw new Error(data.detail || tr("No se pudo guardar tu biografía.", "Could not save your biography.", "Impossible d'enregistrer ta biographie."));
         }
         currentAbout = data;
         applyAboutToView(data);
         closeAboutModalFn();
       } catch (error) {
-        setAboutModalStatus(error.message || "No se pudo guardar tu biografía.", true);
+        setAboutModalStatus(error.message || tr("No se pudo guardar tu biografía.", "Could not save your biography.", "Impossible d'enregistrer ta biographie."), true);
       }
     };
 
@@ -1783,11 +1836,17 @@
       updateDreamWordCounter();
       const totalWords = countWords(dreamTextInput?.value || "");
       if (totalWords > DREAM_MAX_WORDS) {
-        setDreamModalStatus(`El mayor sueño permite máximo ${DREAM_MAX_WORDS} palabras.`, true);
+        setDreamModalStatus(
+          tr(
+            `El mayor sueño permite máximo ${DREAM_MAX_WORDS} palabras.`,
+            `Greatest dream allows a maximum of ${DREAM_MAX_WORDS} words.`
+          ),
+          true
+        );
         return;
       }
 
-      setDreamModalStatus("Guardando...");
+      setDreamModalStatus(tr("Guardando...", "Saving...", "Enregistrement..."));
       try {
         const payload = buildDreamPayload();
         const res = await apiFetch("/biography/dream", {
@@ -1797,13 +1856,18 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudo guardar tu mayor sueño.");
+          throw new Error(
+            data.detail || tr("No se pudo guardar tu mayor sueño.", "Could not save your greatest dream.", "Impossible d'enregistrer ton plus grand rêve.")
+          );
         }
         currentDream = data;
         applyDreamToView(data);
         closeDreamModalFn();
       } catch (error) {
-        setDreamModalStatus(error.message || "No se pudo guardar tu mayor sueño.", true);
+        setDreamModalStatus(
+          error.message || tr("No se pudo guardar tu mayor sueño.", "Could not save your greatest dream.", "Impossible d'enregistrer ton plus grand rêve."),
+          true
+        );
       }
     };
 
@@ -1812,13 +1876,16 @@
       const totalWords = countWords(proAchievementsTextInput?.value || "");
       if (totalWords > PRO_ACHIEVEMENTS_MAX_WORDS) {
         setProAchievementsModalStatus(
-          `Los logros profesionales permiten máximo ${PRO_ACHIEVEMENTS_MAX_WORDS} palabras.`,
+          tr(
+            `Los logros profesionales permiten máximo ${PRO_ACHIEVEMENTS_MAX_WORDS} palabras.`,
+            `Professional achievements allow a maximum of ${PRO_ACHIEVEMENTS_MAX_WORDS} words.`
+          ),
           true
         );
         return;
       }
 
-      setProAchievementsModalStatus("Guardando...");
+      setProAchievementsModalStatus(tr("Guardando...", "Saving...", "Enregistrement..."));
       try {
         const payload = buildProAchievementsPayload();
         const res = await apiFetch("/biography/professional-achievements", {
@@ -1828,13 +1895,18 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudieron guardar tus logros profesionales.");
+          throw new Error(
+            data.detail || tr("No se pudieron guardar tus logros profesionales.", "Could not save your professional achievements.", "Impossible d'enregistrer tes réalisations professionnelles.")
+          );
         }
         currentProAchievements = data;
         applyProAchievementsToView(data);
         closeProAchievementsModalFn();
       } catch (error) {
-        setProAchievementsModalStatus(error.message || "No se pudieron guardar tus logros profesionales.", true);
+        setProAchievementsModalStatus(
+          error.message || tr("No se pudieron guardar tus logros profesionales.", "Could not save your professional achievements.", "Impossible d'enregistrer tes réalisations professionnelles."),
+          true
+        );
       }
     };
 
@@ -1843,13 +1915,16 @@
       const totalWords = countWords(lifeAchievementsTextInput?.value || "");
       if (totalWords > LIFE_ACHIEVEMENTS_MAX_WORDS) {
         setLifeAchievementsModalStatus(
-          `Los logros alcanzados permiten máximo ${LIFE_ACHIEVEMENTS_MAX_WORDS} palabras.`,
+          tr(
+            `Los logros alcanzados permiten máximo ${LIFE_ACHIEVEMENTS_MAX_WORDS} palabras.`,
+            `Life achievements allow a maximum of ${LIFE_ACHIEVEMENTS_MAX_WORDS} words.`
+          ),
           true
         );
         return;
       }
 
-      setLifeAchievementsModalStatus("Guardando...");
+      setLifeAchievementsModalStatus(tr("Guardando...", "Saving...", "Enregistrement..."));
       try {
         const payload = buildLifeAchievementsPayload();
         const res = await apiFetch("/biography/life-achievements", {
@@ -1859,13 +1934,18 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudieron guardar tus logros alcanzados.");
+          throw new Error(
+            data.detail || tr("No se pudieron guardar tus logros alcanzados.", "Could not save your life achievements.", "Impossible d'enregistrer tes réalisations de vie.")
+          );
         }
         currentLifeAchievements = data;
         applyLifeAchievementsToView(data);
         closeLifeAchievementsModalFn();
       } catch (error) {
-        setLifeAchievementsModalStatus(error.message || "No se pudieron guardar tus logros alcanzados.", true);
+        setLifeAchievementsModalStatus(
+          error.message || tr("No se pudieron guardar tus logros alcanzados.", "Could not save your life achievements.", "Impossible d'enregistrer tes réalisations de vie."),
+          true
+        );
       }
     };
 
@@ -1874,13 +1954,16 @@
       const totalWords = countWords(quotesTextInput?.value || "");
       if (totalWords > FAVORITE_QUOTES_MAX_WORDS) {
         setQuotesModalStatus(
-          `Las frases favoritas permiten máximo ${FAVORITE_QUOTES_MAX_WORDS} palabras.`,
+          tr(
+            `Las frases favoritas permiten máximo ${FAVORITE_QUOTES_MAX_WORDS} palabras.`,
+            `Favorite quotes allow a maximum of ${FAVORITE_QUOTES_MAX_WORDS} words.`
+          ),
           true
         );
         return;
       }
 
-      setQuotesModalStatus("Guardando...");
+      setQuotesModalStatus(tr("Guardando...", "Saving...", "Enregistrement..."));
       try {
         const payload = buildQuotesPayload();
         const res = await apiFetch("/biography/favorite-quotes", {
@@ -1890,23 +1973,32 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudieron guardar tus frases favoritas.");
+          throw new Error(data.detail || tr("No se pudieron guardar tus frases favoritas.", "Could not save your favorite quotes.", "Impossible d'enregistrer tes citations favorites."));
         }
         currentFavoriteQuotes = data;
         applyQuotesToView(data);
         closeQuotesModalFn();
       } catch (error) {
-        setQuotesModalStatus(error.message || "No se pudieron guardar tus frases favoritas.", true);
+        setQuotesModalStatus(
+          error.message || tr("No se pudieron guardar tus frases favoritas.", "Could not save your favorite quotes.", "Impossible d'enregistrer tes citations favorites."),
+          true
+        );
       }
     };
 
     const handleSaveDistinctions = async () => {
       if (!isViewerGuardian()) {
-        setDistinctionsModalStatus("Esta sección solo puede ser actualizada por los Guardianes de Kiadez.com.", true);
+        setDistinctionsModalStatus(
+          tr(
+            "Esta sección solo puede ser actualizada por los Guardianes de Kiadez.com.",
+            "This section can only be updated by Kiadez.com Guardians."
+          ),
+          true
+        );
         return;
       }
 
-      setDistinctionsModalStatus("Guardando...");
+      setDistinctionsModalStatus(tr("Guardando...", "Saving...", "Enregistrement..."));
       try {
         const payload = buildDistinctionsPayload();
         const endpoint = buildDistinctionsEndpoint({ includeTarget: true });
@@ -1917,13 +2009,13 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudieron guardar las distinciones.");
+          throw new Error(data.detail || tr("No se pudieron guardar las distinciones.", "Could not save distinctions.", "Impossible d'enregistrer les distinctions."));
         }
         currentDistinctions = data;
         applyDistinctionsToView(data);
         closeDistinctionsModalFn();
       } catch (error) {
-        setDistinctionsModalStatus(error.message || "No se pudieron guardar las distinciones.", true);
+        setDistinctionsModalStatus(error.message || tr("No se pudieron guardar las distinciones.", "Could not save distinctions.", "Impossible d'enregistrer les distinctions."), true);
       }
     };
 
@@ -2000,7 +2092,10 @@
     void loadCurrentProfilePhoto();
     void loadCurrentEmblem();
     void loadPersonalInfo().catch((error) => {
-      setPersonalInfoModalStatus(error.message || "No se pudo cargar la información personal.", true);
+      setPersonalInfoModalStatus(
+        error.message || tr("No se pudo cargar la información personal.", "Could not load personal information.", "Impossible de charger les informations personnelles."),
+        true
+      );
     });
     void loadPhysicalTraits().catch(() => {});
     void loadEducation().catch(() => {});
@@ -2015,12 +2110,18 @@
       try {
         await resolveBiographyProfileContext();
       } catch (error) {
-        setDistinctionsModalStatus(error?.message || "No se pudo cargar el contexto del perfil.", true);
+        setDistinctionsModalStatus(
+          error?.message || tr("No se pudo cargar el contexto del perfil.", "Could not load the profile context.", "Impossible de charger le contexte du profil."),
+          true
+        );
       }
       void loadActivityStats({ userId: activeProfileUserId }).catch(() => {});
       void loadDistinctions().catch((error) => {
         applyDistinctionsToView({ slots: [] });
-        setDistinctionsModalStatus(error?.message || "No se pudieron cargar las distinciones.", true);
+        setDistinctionsModalStatus(
+          error?.message || tr("No se pudieron cargar las distinciones.", "Could not load distinctions.", "Impossible de charger les distinctions."),
+          true
+        );
       });
     })();
 
@@ -2099,7 +2200,7 @@
 <svelte:head>
 <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kiadez — Mi biografía</title>
+  <title>{tr("Kiadez — Mi biografía", "Kiadez — My biography", "Kiadez — Ma biographie")}</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
@@ -2110,46 +2211,46 @@
           <img src="/css/logo-kiadez.webp" alt="Kiadez" />
         </a>
         <form class="topbar-search" role="search" on:submit|preventDefault>
-          <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+          <input type="search" placeholder={tr("Buscar en Kiadez", "Search on Kiadez", "Rechercher sur Kiadez")} aria-label={tr("Buscar", "Search", "Rechercher")} />
         </form>
       </div>
 
       <div class="feed-topbar-zone feed-topbar-center">
-        <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
-        <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-        <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
-      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-        <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+        <a class="topbar-btn" href="/home_user.html">🏠 {tr("Home", "Home", "Accueil")}</a>
+        <a class="topbar-btn" href="/gallery.html">🖼️ {tr("Galería", "Gallery", "Galerie")}</a>
+        <a class="topbar-btn" href="/my-public-whishes.html">🌐 {tr("Deseos públicos", "Public wishes", "Souhaits publics")}</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 {tr("Deseos privados", "Private wishes", "Souhaits privés")}</a>
+        <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ {tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis")}</a>
       </div>
 
       <div class="feed-topbar-zone feed-topbar-right">
         <details class="topbar-dropdown" id="biographyProfileDropdown">
-          <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-            <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+          <summary class="topbar-avatar-btn" aria-label={tr("Perfil del usuario", "User profile", "Profil utilisateur")}>
+            <img src="/assets/avatar-default.jpg" alt={tr("Perfil de Carlos Jiménez Duarte", "Carlos Jiménez Duarte profile", "Profil de Carlos Jiménez Duarte")} />
           </summary>
           <div class="dropdown-menu" role="menu">
-            <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
-            <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+            <a href="/privacy-and-settings.html" role="menuitem">{tr("Configuración y privacidad", "Settings and privacy", "Paramètres et confidentialité")}</a>
+            <button type="button" role="menuitem" on:click={logout}>{tr("Cerrar sesión", "Sign out", "Se déconnecter")}</button>
           </div>
         </details>
 
-        <button class="topbar-icon" type="button" aria-label="Notificaciones">
+        <button class="topbar-icon" type="button" aria-label={tr("Notificaciones", "Notifications", "Alertes")}>
           🔔
           <span class="topbar-badge">3</span>
         </button>
 
         <details class="topbar-dropdown" id="biographyMenuDropdown">
-          <summary class="topbar-menu-btn" aria-label="Abrir menú">
+          <summary class="topbar-menu-btn" aria-label={tr("Abrir menú", "Open menu", "Ouvrir le menu")}>
             <span class="topbar-menu-icon" aria-hidden="true">☰</span>
-            <span class="topbar-menu-label">Menú</span>
+            <span class="topbar-menu-label">{tr("Menú", "Menu", "Navigation")}</span>
           </summary>
           <div class="dropdown-menu" role="menu">
-            <a href="/home_user.html" role="menuitem">Mi Home</a>
-            <a href="/achievements.html" role="menuitem">Logros recientes</a>
-            <a href="/gallery.html" role="menuitem">Galería</a>
-            <a href="/calendar.html" role="menuitem">Calendario</a>
-            <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
-          <a href="/messages.html" role="menuitem">Mensajes</a>
+            <a href="/home_user.html" role="menuitem">{tr("Mi Home", "My Home", "Mon Home")}</a>
+            <a href="/achievements.html" role="menuitem">{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+            <a href="/gallery.html" role="menuitem">{tr("Galería", "Gallery", "Galerie")}</a>
+            <a href="/calendar.html" role="menuitem">{tr("Calendario", "Calendar", "Calendrier")}</a>
+            <a href="/my-biography.html" role="menuitem">{tr("Mi Biografía", "My Biography", "Ma biographie")}</a>
+          <a href="/messages.html" role="menuitem">{tr("Mensajes", "Messages", "Messagerie")}</a>
           </div>
         </details>
       </div>
@@ -2160,54 +2261,54 @@
       <!-- PORTADA (MISMA DE HOME) -->
       <section class="cover" id="cover">
         <div class="cover-media" id="coverMedia">
-          <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
+          <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt={tr("Portada", "Cover", "Couverture")} />
 
           <div class="cover-actions">
-            <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
-              Cambiar portada
+            <button class="icon-btn" id="btnChangeCover" type="button" title={tr("Cambiar portada", "Change cover", "Changer la couverture")}>
+              {tr("Cambiar portada", "Change cover", "Changer la couverture")}
             </button>
-            <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title="Editar mi propósito de vida">
-              Editar mi propósito de vida
+            <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title={tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier mon objectif de vie")}>
+              {tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier mon objectif de vie")}
             </button>
 
             <input id="coverFile" type="file" accept="image/*" class="hidden" />
           </div>
 
-          <div class="purpose-triangle" aria-label="Deseos de propósito">
+          <div class="purpose-triangle" aria-label={tr("Deseos de propósito", "Purpose wishes", "Souhaits de finalité")}>
             <button class="purpose-pill purpose-top" type="button" id="purpose1">
-              Deseo #1: Secreto
+              {tr("Deseo #1: Secreto", "Wish #1: Secret", "Souhait #1 : Secret")}
             </button>
 
             <button class="purpose-pill purpose-left" type="button" id="purpose2">
-              Deseo construir el Reino de Combray
+              {tr("Deseo construir el Reino de Combray", "I wish to build the Kingdom of Combray", "Je souhaite construire le Royaume de Combray")}
             </button>
 
             <button class="purpose-pill purpose-right" type="button" id="purpose3">
-              Deseo estar unido a Jesús
+              {tr("Deseo estar unido a Jesús", "I wish to be united with Jesus", "Je souhaite être uni à Jésus")}
             </button>
           </div>
 
           <div class="cover-hint" id="coverHint">
-            Arrastra la portada para encuadrarla
+            {tr("Arrastra la portada para encuadrarla", "Drag the cover to frame it", "Fais glisser la couverture pour la cadrer")}
           </div>
         </div>
       </section>
 
       <div class="biography-body">
       <!-- NAV (YA LO TIENES IGUAL) -->
-      <nav class="profile-nav" aria-label="Navegación de perfil">
-        <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
-        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+      <nav class="profile-nav" aria-label={tr("Navegación de perfil", "Profile navigation", "Navigation du profil")}>
+        <a class="nav-pill" href="/home_user.html" title={tr("Home", "Home", "Accueil")}>{tr("Home", "Home", "Accueil")}</a>
+        <a class="nav-pill" href="/star-pool-found.html" title={tr("Estrellas", "Stars", "Étoiles")}>
           <span class="nav-icon">⭐</span>
-          <span><strong id="biographyStarsTotal">0</strong> estrellas</span>
+          <span><strong id="biographyStarsTotal">0</strong> {tr("estrellas", "stars", "étoiles")}</span>
         </a>
 
-        <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-        <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
-        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
-        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
+        <a class="nav-pill" href="/followers.html" title={tr("Seguidores", "Followers", "Abonnés")}>{tr("Seguidores", "Followers", "Abonnés")}</a>
+        <a class="nav-pill" href="/achievements.html" title={tr("Logros recientes", "Recent achievements", "Réalisations récentes")}>{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+        <a class="nav-pill" href="/gallery.html" title={tr("Galería", "Gallery", "Galerie")}>{tr("Galería", "Gallery", "Galerie")}</a>
+        <a class="nav-pill" href="/calendar.html" title={tr("Calendario", "Calendar", "Calendrier")}>{tr("Calendario", "Calendar", "Calendrier")}</a>
+        <a class="nav-pill" href="/my-biography.html" title={tr("Mi biografía", "My biography", "Ma biographie")}>{tr("Mi biografía", "My biography", "Ma biographie")}</a>
+        <a class="nav-pill" href="/messages.html" title={tr("Mensajes", "Messages", "Messagerie")}>{tr("Mensajes", "Messages", "Messagerie")}</a>
       </nav>
       <!-- ======= CUERPO (3 columnas) ======= -->
       <section class="bio-shell">
@@ -2215,38 +2316,41 @@
         <section class="bio-grid">
 
           <!-- ========== IZQUIERDA: TOC ========== -->
-          <aside class="bio-card bio-toc" aria-label="Tabla de contenidos">
+          <aside class="bio-card bio-toc" aria-label={tr("Tabla de contenidos", "Table of contents", "Table des matières")}>
             <h2 class="bio-side-title" id="tocUserName">Carlos Jiménez Duarte</h2>
 
             <ol class="bio-toc-list" id="tocList">
               <li><a href="#sec-about" data-toc="about">Carlos Jiménez Duarte</a></li>
-              <li><a href="#sec-dream" data-toc="dream">Sobre su mayor sueño</a></li>
-              <li><a href="#sec-pro" data-toc="pro">Logros profesionales</a></li>
-              <li><a href="#sec-life" data-toc="life">Logros alcanzados</a></li>
-              <li><a href="#sec-quotes" data-toc="quotes">Frases favoritas</a></li>
+              <li><a href="#sec-dream" data-toc="dream">{tr("Sobre su mayor sueño", "About their greatest dream", "À propos de son plus grand rêve")}</a></li>
+              <li><a href="#sec-pro" data-toc="pro">{tr("Logros profesionales", "Professional achievements", "Réalisations professionnelles")}</a></li>
+              <li><a href="#sec-life" data-toc="life">{tr("Logros alcanzados", "Life achievements", "Réalisations de vie")}</a></li>
+              <li><a href="#sec-quotes" data-toc="quotes">{tr("Frases favoritas", "Favorite quotes", "Citations favorites")}</a></li>
             </ol>
 
             <p class="bio-side-note">
-              Esta tabla se sincroniza con tus títulos del centro.
+              {tr("Esta tabla se sincroniza con tus títulos del centro.", "This table syncs with your center titles.", "Cette table se synchronise avec tes titres au centre.")}
             </p>
           </aside>
 
           <!-- ========== CENTRO: CONTENIDO ========== -->
-          <section class="bio-center" aria-label="Biografía editable">
+          <section class="bio-center" aria-label={tr("Biografía editable", "Editable biography", "Biographie modifiable")}>
 
             <!-- Sección 1 -->
             <article class="bio-card bio-section bio-about-section" id="sec-about" data-section="about">
               <header class="bio-section-header">
                 <h2 class="bio-section-title" id="aboutDisplayNameValue">Carlos Jiménez Duarte</h2>
-                <button class="infobox-edit-btn bio-about-edit-btn" id="aboutEditBtn" type="button" title="Modificar biografía">
-                  <img src="/css/icons/iconedit.webp" alt="Modificar biografía" />
+                <button class="infobox-edit-btn bio-about-edit-btn" id="aboutEditBtn" type="button" title={tr("Modificar biografía", "Edit biography", "Modifier la biographie")}>
+                  <img src="/css/icons/iconedit.webp" alt={tr("Modificar biografía", "Edit biography", "Modifier la biographie")} />
                 </button>
               </header>
 
               <div class="bio-about-view">
                 <div id="aboutEmptyState">
                   <p class="bio-about-empty-message">
-                    Todavía no has redactado tu biografía. ¿Qué esperas para hacerlo ahora?
+                    {tr(
+                      "Todavía no has redactado tu biografía. ¿Qué esperas para hacerlo ahora?",
+                      "You have not written your biography yet. What are you waiting for?"
+                    )}
                   </p>
                 </div>
                 <p class="bio-about-text hidden" id="aboutTextValue"></p>
@@ -2256,16 +2360,19 @@
             <!-- Sección 2 -->
             <article class="bio-card bio-section bio-dream-section" id="sec-dream" data-section="dream">
               <header class="bio-section-header">
-                <h2 class="bio-section-title" id="dreamTitleValue">Sobre su mayor sueño</h2>
-                <button class="infobox-edit-btn bio-about-edit-btn" id="dreamEditBtn" type="button" title="Modificar mayor sueño">
-                  <img src="/css/icons/iconedit.webp" alt="Modificar mayor sueño" />
+                <h2 class="bio-section-title" id="dreamTitleValue">{tr("Sobre su mayor sueño", "About their greatest dream", "À propos de son plus grand rêve")}</h2>
+                <button class="infobox-edit-btn bio-about-edit-btn" id="dreamEditBtn" type="button" title={tr("Modificar mayor sueño", "Edit greatest dream", "Modifier le plus grand rêve")}>
+                  <img src="/css/icons/iconedit.webp" alt={tr("Modificar mayor sueño", "Edit greatest dream", "Modifier le plus grand rêve")} />
                 </button>
               </header>
 
               <div class="bio-about-view">
                 <div id="dreamEmptyState">
                   <p class="bio-about-empty-message">
-                    Todavía no has descrito tu mayor sueño. ¿Te gustaría compartir con el mundo que es lo que palpita en tu corazón?
+                    {tr(
+                      "Todavía no has descrito tu mayor sueño. ¿Te gustaría compartir con el mundo que es lo que palpita en tu corazón?",
+                      "You have not described your greatest dream yet. Would you like to share what beats in your heart with the world?"
+                    )}
                   </p>
                 </div>
                 <p class="bio-about-text hidden" id="dreamTextValue"></p>
@@ -2275,16 +2382,19 @@
             <!-- Sección 3 -->
             <article class="bio-card bio-section bio-pro-achievements-section" id="sec-pro" data-section="pro">
               <header class="bio-section-header">
-                <h2 class="bio-section-title" id="proAchievementsTitleValue">Logros profesionales</h2>
-                <button class="infobox-edit-btn bio-about-edit-btn" id="proAchievementsEditBtn" type="button" title="Modificar logros profesionales">
-                  <img src="/css/icons/iconedit.webp" alt="Modificar logros profesionales" />
+                <h2 class="bio-section-title" id="proAchievementsTitleValue">{tr("Logros profesionales", "Professional achievements", "Réalisations professionnelles")}</h2>
+                <button class="infobox-edit-btn bio-about-edit-btn" id="proAchievementsEditBtn" type="button" title={tr("Modificar logros profesionales", "Edit professional achievements", "Modifier les réalisations professionnelles")}>
+                  <img src="/css/icons/iconedit.webp" alt={tr("Modificar logros profesionales", "Edit professional achievements", "Modifier les réalisations professionnelles")} />
                 </button>
               </header>
 
               <div class="bio-about-view">
                 <div id="proAchievementsEmptyState">
                   <p class="bio-about-empty-message">
-                    ¿Cuáles son aquellos logros de los que más te han hecho sentir realizado en este mundo? Incluso lo más humilde es significativo.
+                    {tr(
+                      "¿Cuáles son aquellos logros de los que más te han hecho sentir realizado en este mundo? Incluso lo más humilde es significativo.",
+                      "Which achievements have made you feel most fulfilled in this world? Even the humblest ones are meaningful."
+                    )}
                   </p>
                 </div>
                 <p class="bio-about-text hidden" id="proAchievementsTextValue"></p>
@@ -2294,16 +2404,19 @@
             <!-- Sección 4 -->
             <article class="bio-card bio-section bio-life-achievements-section" id="sec-life" data-section="life">
               <header class="bio-section-header">
-                <h2 class="bio-section-title" id="lifeAchievementsTitleValue">Logros alcanzados</h2>
-                <button class="infobox-edit-btn bio-about-edit-btn" id="lifeAchievementsEditBtn" type="button" title="Modificar logros alcanzados">
-                  <img src="/css/icons/iconedit.webp" alt="Modificar logros alcanzados" />
+                <h2 class="bio-section-title" id="lifeAchievementsTitleValue">{tr("Logros alcanzados", "Life achievements", "Réalisations de vie")}</h2>
+                <button class="infobox-edit-btn bio-about-edit-btn" id="lifeAchievementsEditBtn" type="button" title={tr("Modificar logros alcanzados", "Edit life achievements", "Modifier les réalisations de vie")}>
+                  <img src="/css/icons/iconedit.webp" alt={tr("Modificar logros alcanzados", "Edit life achievements", "Modifier les réalisations de vie")} />
                 </button>
               </header>
 
               <div class="bio-about-view">
                 <div id="lifeAchievementsEmptyState">
                   <p class="bio-about-empty-message">
-                    ¿Qué es aquello tan significativo para ti cómo para ser considerado como parte de tu legado? ¿Cuáles son los meritos por los que te gustaría ser recordado? Deja tu constancia aquí.
+                    {tr(
+                      "¿Qué es aquello tan significativo para ti cómo para ser considerado como parte de tu legado? ¿Cuáles son los meritos por los que te gustaría ser recordado? Deja tu constancia aquí.",
+                      "What is so significant to you that it should be considered part of your legacy? Which merits would you like to be remembered for? Leave your record here."
+                    )}
                   </p>
                 </div>
                 <p class="bio-about-text hidden" id="lifeAchievementsTextValue"></p>
@@ -2313,16 +2426,19 @@
             <!-- Sección 5 -->
             <article class="bio-card bio-section bio-quotes-section" id="sec-quotes" data-section="quotes">
               <header class="bio-section-header">
-                <h2 class="bio-section-title" id="quotesTitleValue">Frases favoritas</h2>
-                <button class="infobox-edit-btn bio-about-edit-btn" id="quotesEditBtn" type="button" title="Modificar frases favoritas">
-                  <img src="/css/icons/iconedit.webp" alt="Modificar frases favoritas" />
+                <h2 class="bio-section-title" id="quotesTitleValue">{tr("Frases favoritas", "Favorite quotes", "Citations favorites")}</h2>
+                <button class="infobox-edit-btn bio-about-edit-btn" id="quotesEditBtn" type="button" title={tr("Modificar frases favoritas", "Edit favorite quotes", "Modifier les citations favorites")}>
+                  <img src="/css/icons/iconedit.webp" alt={tr("Modificar frases favoritas", "Edit favorite quotes", "Modifier les citations favorites")} />
                 </button>
               </header>
 
               <div class="bio-about-view">
                 <div id="quotesEmptyState">
                   <p class="bio-about-empty-message">
-                    ¡Esta es una oportunidad fantástica para dar constancia de tu filosofía de vida en las frases que más te gustan!
+                    {tr(
+                      "¡Esta es una oportunidad fantástica para dar constancia de tu filosofía de vida en las frases que más te gustan!",
+                      "This is a fantastic opportunity to record your life philosophy in the quotes you love most."
+                    )}
                   </p>
                 </div>
                 <p class="bio-about-text hidden" id="quotesTextValue"></p>
@@ -2332,7 +2448,7 @@
           </section>
 
           <!-- ========== DERECHA: INFOBOX ========== -->
-          <aside class="bio-card bio-infobox" aria-label="Ficha del usuario">
+          <aside class="bio-card bio-infobox" aria-label={tr("Ficha del usuario", "User profile card", "Fiche utilisateur")}>
 
             <div class="infobox-head">
               <h2 class="infobox-title" id="infoName">Carlos Jiménez Duarte</h2>
@@ -2341,12 +2457,12 @@
             <figure class="infobox-photo">
               <div class="infobox-photo-wrap">
                 <button class="infobox-photo-trigger" id="profilePhotoTrigger" type="button"
-                  title="Gestionar foto de perfil">
-                  <img id="profilePhoto" src="/css/logo-kiadez.webp" alt="Foto del usuario" />
+                  title={tr("Gestionar foto de perfil", "Manage profile photo", "Gérer la photo de profil")}>
+                  <img id="profilePhoto" src="/css/logo-kiadez.webp" alt={tr("Foto del usuario", "User photo", "Photo de l'utilisateur")} />
                 </button>
 
                 <div class="infobox-photo-menu hidden" id="profilePhotoMenu">
-                  <button type="button" id="bioPhotoUpload">Subir imagen</button>
+                  <button type="button" id="bioPhotoUpload">{tr("Subir imagen", "Upload image", "Téléverser une image")}</button>
                 </div>
 
                 <input id="bioPhotoFile" type="file" accept="image/*" class="hidden" />
@@ -2357,35 +2473,35 @@
             <!-- Sección -->
             <div class="infobox-section">
               <div class="infobox-section-title is-editable">
-                <span class="infobox-section-title-text">Información personal</span>
-                <button class="infobox-edit-btn" id="personalInfoEditBtn" type="button" title="Editar información personal">
-                  <img src="/css/icons/iconedit.webp" alt="Editar información personal" />
+                <span class="infobox-section-title-text">{tr("Información personal", "Personal information", "Informations personnelles")}</span>
+                <button class="infobox-edit-btn" id="personalInfoEditBtn" type="button" title={tr("Editar información personal", "Edit personal information", "Modifier les informations personnelles")}>
+                  <img src="/css/icons/iconedit.webp" alt={tr("Editar información personal", "Edit personal information", "Modifier les informations personnelles")} />
                 </button>
               </div>
               <table class="infobox-table">
                 <tbody>
                 <tr data-field="birthname">
-                  <th>Nombre de nacimiento</th>
+                  <th>{tr("Nombre de nacimiento", "Birth name", "Nom de naissance")}</th>
                   <td><span id="personalInfoBirthNameValue">Carlos Jiménez Duarte</span></td>
                 </tr>
                 <tr data-field="birth">
-                  <th>Nacimiento</th>
-                  <td><span id="personalInfoBirthValue">5 de mayo de 1986 (39 años); Barrancabermeja, Santander, Colombia</span></td>
+                  <th>{tr("Nacimiento", "Birth", "Naissance")}</th>
+                  <td><span id="personalInfoBirthValue">{tr("5 de mayo de 1986 (39 años); Barrancabermeja, Santander, Colombia", "May 5, 1986 (39 years old); Barrancabermeja, Santander, Colombia", "5 mai 1986 (39 ans) ; Barrancabermeja, Santander, Colombie")}</span></td>
                 </tr>
                 <tr data-field="residence">
-                  <th>Residencia</th>
-                  <td><span id="personalInfoResidenceValue">Medellín, Antioquia</span></td>
+                  <th>{tr("Residencia", "Residence", "Résidence")}</th>
+                  <td><span id="personalInfoResidenceValue">{tr("Medellín, Antioquia", "Medellin, Antioquia", "Medellín, Antioquia")}</span></td>
                 </tr>
                 <tr data-field="nationality">
-                  <th>Nacionalidad</th>
-                  <td><span id="personalInfoNationalityValue">Colombiana</span></td>
+                  <th>{tr("Nacionalidad", "Nationality", "Nationalité")}</th>
+                  <td><span id="personalInfoNationalityValue">{tr("Colombiana", "Colombian", "Colombienne")}</span></td>
                 </tr>
                 <tr data-field="lang">
-                  <th>Lengua materna</th>
-                  <td><span id="personalInfoNativeLanguageValue">Español</span></td>
+                  <th>{tr("Lengua materna", "Native language", "Langue maternelle")}</th>
+                  <td><span id="personalInfoNativeLanguageValue">{tr("Español", "Spanish", "Espagnol")}</span></td>
                 </tr>
                 <tr data-field="pseudonyms">
-                  <th>Seudónimos</th>
+                  <th>{tr("Seudónimos", "Pseudonyms", "Pseudonymes")}</th>
                   <td><span id="personalInfoPseudonymsValue">Melquíades, Kiadez, Saint Martin</span></td>
                 </tr>
                 </tbody>
@@ -2394,28 +2510,28 @@
 
             <div class="infobox-section">
               <div class="infobox-section-title is-editable">
-                <span class="infobox-section-title-text">Características físicas</span>
-                <button class="infobox-edit-btn" id="physicalTraitsEditBtn" type="button" title="Editar características físicas">
-                  <img src="/css/icons/iconedit.webp" alt="Editar características físicas" />
+                <span class="infobox-section-title-text">{tr("Características físicas", "Physical traits", "Caractéristiques physiques")}</span>
+                <button class="infobox-edit-btn" id="physicalTraitsEditBtn" type="button" title={tr("Editar características físicas", "Edit physical traits", "Modifier les caractéristiques physiques")}>
+                  <img src="/css/icons/iconedit.webp" alt={tr("Editar características físicas", "Edit physical traits", "Modifier les caractéristiques physiques")} />
                 </button>
               </div>
               <table class="infobox-table">
                 <tbody>
                 <tr data-field="height">
-                  <th>Altura</th>
+                  <th>{tr("Altura", "Height", "Taille")}</th>
                   <td><span id="physicalTraitsHeightValue">1,80 m</span></td>
                 </tr>
                 <tr data-field="weight">
-                  <th>Peso</th>
+                  <th>{tr("Peso", "Weight", "Poids")}</th>
                   <td><span id="physicalTraitsWeightValue">76 kg</span></td>
                 </tr>
                 <tr data-field="eyes">
-                  <th>Ojos</th>
-                  <td><span id="physicalTraitsEyesValue">Castaño</span></td>
+                  <th>{tr("Ojos", "Eyes", "Yeux")}</th>
+                  <td><span id="physicalTraitsEyesValue">{tr("Castaño", "Brown", "Marron")}</span></td>
                 </tr>
                 <tr data-field="hair">
-                  <th>Cabello</th>
-                  <td><span id="physicalTraitsHairValue">Castaño</span></td>
+                  <th>{tr("Cabello", "Hair", "Cheveux")}</th>
+                  <td><span id="physicalTraitsHairValue">{tr("Castaño", "Brown", "Marron")}</span></td>
                 </tr>
                 </tbody>
               </table>
@@ -2423,20 +2539,20 @@
 
             <div class="infobox-section">
               <div class="infobox-section-title is-editable">
-                <span class="infobox-section-title-text">Educación</span>
-                <button class="infobox-edit-btn" id="educationEditBtn" type="button" title="Editar educación">
-                  <img src="/css/icons/iconedit.webp" alt="Editar educación" />
+                <span class="infobox-section-title-text">{tr("Educación", "Education", "Éducation")}</span>
+                <button class="infobox-edit-btn" id="educationEditBtn" type="button" title={tr("Editar educación", "Edit education", "Modifier l'éducation")}>
+                  <img src="/css/icons/iconedit.webp" alt={tr("Editar educación", "Edit education", "Modifier l'éducation")} />
                 </button>
               </div>
               <table class="infobox-table">
                 <tbody>
                 <tr data-field="education">
-                  <th>Educado en</th>
+                  <th>{tr("Educado en", "Educated at", "Éduqué à")}</th>
                   <td>
                     <div class="education-slots">
-                      <div class="education-slot" id="educationSlot1Value">Colegio Calasanz</div>
-                      <div class="education-slot" id="educationSlot2Value">Universidad Pontificia Bolivariana</div>
-                      <div class="education-slot" id="educationSlot3Value">Politécnico Grancolombiano</div>
+                      <div class="education-slot" id="educationSlot1Value">{tr("Colegio Calasanz", "Calasanz School", "Collège Calasanz")}</div>
+                      <div class="education-slot" id="educationSlot2Value">{tr("Universidad Pontificia Bolivariana", "Pontifical Bolivarian University", "Université Pontificale Bolivarienne")}</div>
+                      <div class="education-slot" id="educationSlot3Value">{tr("Politécnico Grancolombiano", "Grancolombiano Polytechnic", "Polytechnique Grancolombiano")}</div>
                       <div class="education-slot" id="educationSlot4Value"></div>
                     </div>
                   </td>
@@ -2447,20 +2563,20 @@
 
             <div class="infobox-section">
               <div class="infobox-section-title is-editable">
-                <span class="infobox-section-title-text">Información profesional</span>
-                <button class="infobox-edit-btn" id="professionalInfoEditBtn" type="button" title="Editar información profesional">
-                  <img src="/css/icons/iconedit.webp" alt="Editar información profesional" />
+                <span class="infobox-section-title-text">{tr("Información profesional", "Professional information", "Informations professionnelles")}</span>
+                <button class="infobox-edit-btn" id="professionalInfoEditBtn" type="button" title={tr("Editar información profesional", "Edit professional information", "Modifier les informations professionnelles")}>
+                  <img src="/css/icons/iconedit.webp" alt={tr("Editar información profesional", "Edit professional information", "Modifier les informations professionnelles")} />
                 </button>
               </div>
               <table class="infobox-table">
                 <tbody>
                 <tr data-field="occupation">
-                  <th>Ocupación</th>
-                  <td><span id="professionalOccupationValue">Escritor, Ingeniero de Software, Artista Plástico Aficionado</span></td>
+                  <th>{tr("Ocupación", "Occupation", "Profession")}</th>
+                  <td><span id="professionalOccupationValue">{tr("Escritor, Ingeniero de Software, Artista Plástico Aficionado", "Writer, Software Engineer, Amateur Visual Artist", "Écrivain, Ingénieur logiciel, Artiste plastique amateur")}</span></td>
                 </tr>
                 <tr data-field="active">
-                  <th>Años activo</th>
-                  <td><span id="professionalActiveYearsValue">2003 — presente</span></td>
+                  <th>{tr("Años activo", "Active years", "Années d'activité")}</th>
+                  <td><span id="professionalActiveYearsValue">{tr("2003 — presente", "2003 — present", "2003 — présent")}</span></td>
                 </tr>
                 </tbody>
               </table>
@@ -2468,13 +2584,16 @@
 
             <div class="infobox-section">
               <div class="infobox-section-title is-editable">
-                <span class="infobox-section-title-text">Distinciones</span>
-                <button class="infobox-edit-btn hidden" id="distinctionsEditBtn" type="button" title="Editar distinciones">
-                  <img src="/css/icons/iconedit.webp" alt="Editar distinciones" />
+                <span class="infobox-section-title-text">{tr("Distinciones", "Distinctions", "Distinctions")}</span>
+                <button class="infobox-edit-btn hidden" id="distinctionsEditBtn" type="button" title={tr("Editar distinciones", "Edit distinctions", "Modifier les distinctions")}>
+                  <img src="/css/icons/iconedit.webp" alt={tr("Editar distinciones", "Edit distinctions", "Modifier les distinctions")} />
                 </button>
               </div>
               <p class="infobox-guardian-note">
-                Esta sección solo puede ser actualizada por los Guardianes de Kiadez.com.
+                {tr(
+                  "Esta sección solo puede ser actualizada por los Guardianes de Kiadez.com.",
+                  "This section can only be updated by Kiadez.com Guardians."
+                )}
               </p>
               <table class="infobox-table">
                 <tbody id="distinctionsRows"></tbody>
@@ -2483,86 +2602,81 @@
 
             <div class="infobox-section">
               <div class="infobox-section-title is-editable">
-                <span class="infobox-section-title-text">Curiosidades</span>
-                <button class="infobox-edit-btn" id="curiositiesEditBtn" type="button" title="Editar curiosidades">
-                  <img src="/css/icons/iconedit.webp" alt="Editar curiosidades" />
+                <span class="infobox-section-title-text">{tr("Curiosidades", "Curiosities", "Curiosités")}</span>
+                <button class="infobox-edit-btn" id="curiositiesEditBtn" type="button" title={tr("Editar curiosidades", "Edit curiosities", "Modifier les curiosités")}>
+                  <img src="/css/icons/iconedit.webp" alt={tr("Editar curiosidades", "Edit curiosities", "Modifier les curiosités")} />
                 </button>
               </div>
               <table class="infobox-table">
                 <tbody>
                 <tr data-field="hero">
-                  <th>Superhéroe favorito</th>
+                  <th>{tr("Superhéroe favorito", "Favorite superhero", "Super-héros préféré")}</th>
                   <td><span id="curiositiesHeroValue">Batman</span></td>
                 </tr>
                 <tr data-field="song">
-                  <th>Canción favorita</th>
+                  <th>{tr("Canción favorita", "Favorite song", "Chanson préférée")}</th>
                   <td><span id="curiositiesSongValue">Dreamer — Ozzy Osbourne</span></td>
                 </tr>
                 <tr data-field="food">
-                  <th>Comida favorita</th>
-                  <td><span id="curiositiesFoodValue">Comida mexicana</span></td>
+                  <th>{tr("Comida favorita", "Favorite food", "Nourriture préférée")}</th>
+                  <td><span id="curiositiesFoodValue">{tr("Comida mexicana", "Mexican food", "Cuisine mexicaine")}</span></td>
                 </tr>
                 <tr data-field="games">
-                  <th>Videojuegos</th>
+                  <th>{tr("Videojuegos", "Video games", "Jeux vidéo")}</th>
                   <td><span id="curiositiesGamesValue">Dofus, Prince of Persia 2, Batman Arkham Knight</span></td>
                 </tr>
                 <tr data-field="book">
-                  <th>Libro favorito</th>
-                  <td><span id="curiositiesBookValue">Las Mil y Una Noches</span></td>
+                  <th>{tr("Libro favorito", "Favorite book", "Livre préféré")}</th>
+                  <td><span id="curiositiesBookValue">{tr("Las Mil y Una Noches", "One Thousand and One Nights", "Les Mille et Une Nuits")}</span></td>
                 </tr>
                 <tr data-field="hobbies">
-                  <th>Otros pasatiempos</th>
-                  <td><span id="curiositiesHobbiesValue">Sacar a Willow a paseo, reír, ver series, soñar en grande</span></td>
+                  <th>{tr("Otros pasatiempos", "Other hobbies", "Autres passe-temps")}</th>
+                  <td><span id="curiositiesHobbiesValue">{tr("Sacar a Willow a paseo, reír, ver series, soñar en grande", "Walking Willow, laughing, watching shows, dreaming big", "Promener Willow, rire, regarder des séries, rêver en grand")}</span></td>
                 </tr>
                 <tr data-field="motto">
-                  <th>Lema</th>
-                  <td><span id="curiositiesMottoValue">A Dios sea la gloria</span></td>
+                  <th>{tr("Lema", "Motto", "Devise")}</th>
+                  <td><span id="curiositiesMottoValue">{tr("A Dios sea la gloria", "Glory be to God", "Gloire à Dieu")}</span></td>
                 </tr>
                 </tbody>
               </table>
             </div>
 
             <div class="infobox-section">
-              <div class="infobox-section-title">Actividad en Kiadez.com</div>
+              <div class="infobox-section-title">{tr("Actividad en Kiadez.com", "Activity on Kiadez.com", "Activité sur Kiadez.com")}</div>
               <table class="infobox-table">
                 <tbody>
                 <tr data-field="wishes_done">
-                  <th>Deseos cumplidos</th>
-                  <td><span id="wishesFulfilledValue" data-value>0</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
-                      decirlo</span>
+                  <th>{tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis")}</th>
+                  <td><span id="wishesFulfilledValue" data-value>0</span><span class="infobox-hidden" data-hidden hidden>{tr("Prefiero no decirlo", "I prefer not to say", "Je préfère ne pas le dire")}</span>
                   </td>
                 </tr>
                 <tr data-field="cooperative_wishes_done">
-                  <th>Deseos cooperativos cumplidos</th>
-                  <td><span id="cooperativeWishesFulfilledValue" data-value>0</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
-                      decirlo</span>
+                  <th>{tr("Deseos cooperativos cumplidos", "Fulfilled cooperative wishes", "Souhaits coopératifs accomplis")}</th>
+                  <td><span id="cooperativeWishesFulfilledValue" data-value>0</span><span class="infobox-hidden" data-hidden hidden>{tr("Prefiero no decirlo", "I prefer not to say", "Je préfère ne pas le dire")}</span>
                   </td>
                 </tr>
                 <tr data-field="wishes_granted">
-                  <th>Deseos concedidos</th>
-                  <td><span id="wishesGrantedValue" data-value>0</span><span class="infobox-hidden" data-hidden hidden>Prefiero no
-                      decirlo</span>
+                  <th>{tr("Deseos concedidos", "Granted wishes", "Souhaits accordés")}</th>
+                  <td><span id="wishesGrantedValue" data-value>0</span><span class="infobox-hidden" data-hidden hidden>{tr("Prefiero no decirlo", "I prefer not to say", "Je préfère ne pas le dire")}</span>
                   </td>
                 </tr>
                 <tr data-field="rank" id="activityRankRow" class="hidden">
-                  <th>Rango</th>
-                  <td><span id="activityRankValue" data-value></span><span class="infobox-hidden" data-hidden hidden>Prefiero
-                      no
-                      decirlo</span></td>
+                  <th>{tr("Rango", "Rank", "Rang")}</th>
+                  <td><span id="activityRankValue" data-value></span><span class="infobox-hidden" data-hidden hidden>{tr("Prefiero no decirlo", "I prefer not to say", "Je préfère ne pas le dire")}</span></td>
                 </tr>
                 </tbody>
               </table>
             </div>
 
             <div class="infobox-section">
-              <div class="infobox-section-title">Emblema</div>
+              <div class="infobox-section-title">{tr("Emblema", "Emblem", "Emblème")}</div>
               <div class="infobox-emblem">
                 <div class="infobox-photo-wrap infobox-emblem-wrap">
-                  <button class="infobox-photo-trigger infobox-emblem-trigger" id="emblemTrigger" type="button" title="Gestionar emblema">
-                    <img id="emblemImage" src="/css/logo-kiadez.webp" alt="Emblema" />
+                  <button class="infobox-photo-trigger infobox-emblem-trigger" id="emblemTrigger" type="button" title={tr("Gestionar emblema", "Manage emblem", "Gérer l'emblème")}>
+                    <img id="emblemImage" src="/css/logo-kiadez.webp" alt={tr("Emblema", "Emblem", "Emblème")} />
                   </button>
                   <div class="infobox-photo-menu hidden" id="emblemMenu">
-                    <button type="button" id="emblemUpload">Subir imagen</button>
+                    <button type="button" id="emblemUpload">{tr("Subir imagen", "Upload image", "Téléverser une image")}</button>
                   </div>
                   <input id="emblemFile" type="file" accept="image/*" class="hidden" />
                 </div>
@@ -2573,7 +2687,10 @@
             <!-- Panel de privacidad (aparece en modo edición) -->
             <div class="infobox-privacy-panel" id="privacyPanel" hidden>
               <p class="bio-side-note" style="margin:0 0 10px;">
-                Activa/desactiva qué campos aparecen públicos. Si lo apagas, se muestra “Prefiero no decirlo”.
+                {tr(
+                  "Activa/desactiva qué campos aparecen públicos. Si lo apagas, se muestra “Prefiero no decirlo”.",
+                  'Toggle which fields are public. If you disable them, “I prefer not to say” is shown.'
+                )}
               </p>
               <div class="privacy-grid" id="privacyGrid"></div>
             </div>
@@ -2588,173 +2705,184 @@
     </main>
 
     <div class="modal-overlay hidden" id="aboutModalOverlay" aria-hidden="true">
-      <div class="modal about-modal" role="dialog" aria-modal="true" aria-label="Editar biografía">
+      <div class="modal about-modal" role="dialog" aria-modal="true" aria-label={tr("Editar biografía", "Edit biography", "Modifier la biographie")}>
         <div class="modal-head">
-          <h3>Editar biografía</h3>
+          <h3>{tr("Editar biografía", "Edit biography", "Modifier la biographie")}</h3>
           <button class="modal-close" type="button" id="closeAboutModal">✕</button>
         </div>
         <div class="modal-body">
           <div class="about-modal-name">
-            <label class="modal-label" for="aboutDisplayNameInput">Nombre público</label>
+            <label class="modal-label" for="aboutDisplayNameInput">{tr("Nombre público", "Public name", "Nom public")}</label>
             <input class="modal-input about-modal-name-input" id="aboutDisplayNameInput" type="text" maxlength="200" />
           </div>
 
           <p class="bio-prompt about-modal-prompt">
-            Describe quién eres. Se sugiere hacerlo en tercera persona. Aprovecha este espacio: es tu Wikipedia personal.
-            Lo que escribas aquí será lo mismo que podrían leer tus seres queridos dentro de 100 años.
+            {tr(
+              "Describe quién eres. Se sugiere hacerlo en tercera persona. Aprovecha este espacio: es tu Wikipedia personal. Lo que escribas aquí será lo mismo que podrían leer tus seres queridos dentro de 100 años.",
+              "Describe who you are. It is recommended to write in the third person. Use this space well: it is your personal Wikipedia. What you write here could be read by your loved ones 100 years from now."
+            )}
           </p>
 
           <div class="about-modal-editor">
-            <textarea class="bio-textarea about-modal-textarea" id="aboutTextInput" placeholder="Escribe aquí..."></textarea>
+            <textarea class="bio-textarea about-modal-textarea" id="aboutTextInput" placeholder={tr("Escribe aquí...", "Write here...", "Écris ici...")}></textarea>
             <div class="bio-meta">
-              <span id="aboutWordCounter">0 / 1200 palabras</span>
+              <span id="aboutWordCounter">{tr("0 / 1200 palabras", "0 / 1200 words", "0 / 1200 mots")}</span>
             </div>
           </div>
 
           <p class="infobox-photo-status" id="aboutModalStatus" aria-live="polite"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="cancelAboutModal">Cancelar</button>
-          <button class="btn btn-primary btn-compact" type="button" id="saveAboutBtn">Guardar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="cancelAboutModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+          <button class="btn btn-primary btn-compact" type="button" id="saveAboutBtn">{tr("Guardar", "Save", "Enregistrer")}</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay hidden" id="dreamModalOverlay" aria-hidden="true">
-      <div class="modal about-modal dream-modal" role="dialog" aria-modal="true" aria-label="Editar mayor sueño">
+      <div class="modal about-modal dream-modal" role="dialog" aria-modal="true" aria-label={tr("Editar mayor sueño", "Edit greatest dream", "Modifier le plus grand rêve")}>
         <div class="modal-head">
-          <h3>Editar mayor sueño</h3>
+          <h3>{tr("Editar mayor sueño", "Edit greatest dream", "Modifier le plus grand rêve")}</h3>
           <button class="modal-close" type="button" id="closeDreamModal">✕</button>
         </div>
         <div class="modal-body">
           <div class="about-modal-name">
-            <label class="modal-label" for="dreamTitleInput">Título de sección</label>
+            <label class="modal-label" for="dreamTitleInput">{tr("Título de sección", "Section title", "Titre de section")}</label>
             <input class="modal-input about-modal-name-input" id="dreamTitleInput" type="text" maxlength="200" />
           </div>
 
           <p class="bio-prompt about-modal-prompt">
-            Describe aquí cuál es ese sueño que te gustaría ver realidad: aquello que, contra todo pronóstico, te gustaría ver realizado. O, si lo sientes, lo que te gustaría alcanzar en una nueva vida. Simplemente sueña y cree.
+            {tr(
+              "Describe aquí cuál es ese sueño que te gustaría ver realidad: aquello que, contra todo pronóstico, te gustaría ver realizado. O, si lo sientes, lo que te gustaría alcanzar en una nueva vida. Simplemente sueña y cree.",
+              "Describe here the dream you would most like to see become real: what, against all odds, you want fulfilled. Or, if you feel it, what you would like to reach in a new life. Simply dream and believe."
+            )}
           </p>
 
           <div class="about-modal-editor">
-            <textarea class="bio-textarea about-modal-textarea" id="dreamTextInput" placeholder="Escribe aquí..."></textarea>
+            <textarea class="bio-textarea about-modal-textarea" id="dreamTextInput" placeholder={tr("Escribe aquí...", "Write here...", "Écris ici...")}></textarea>
             <div class="bio-meta">
-              <span id="dreamWordCounter">0 / 1200 palabras</span>
+              <span id="dreamWordCounter">{tr("0 / 1200 palabras", "0 / 1200 words", "0 / 1200 mots")}</span>
             </div>
           </div>
 
           <p class="infobox-photo-status" id="dreamModalStatus" aria-live="polite"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="cancelDreamModal">Cancelar</button>
-          <button class="btn btn-primary btn-compact" type="button" id="saveDreamBtn">Guardar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="cancelDreamModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+          <button class="btn btn-primary btn-compact" type="button" id="saveDreamBtn">{tr("Guardar", "Save", "Enregistrer")}</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay hidden" id="proAchievementsModalOverlay" aria-hidden="true">
-      <div class="modal about-modal pro-achievements-modal" role="dialog" aria-modal="true" aria-label="Editar logros profesionales">
+      <div class="modal about-modal pro-achievements-modal" role="dialog" aria-modal="true" aria-label={tr("Editar logros profesionales", "Edit professional achievements", "Modifier les réalisations professionnelles")}>
         <div class="modal-head">
-          <h3>Editar logros profesionales</h3>
+          <h3>{tr("Editar logros profesionales", "Edit professional achievements", "Modifier les réalisations professionnelles")}</h3>
           <button class="modal-close" type="button" id="closeProAchievementsModal">✕</button>
         </div>
         <div class="modal-body">
           <div class="about-modal-name">
-            <label class="modal-label" for="proAchievementsTitleInput">Título de sección</label>
+            <label class="modal-label" for="proAchievementsTitleInput">{tr("Título de sección", "Section title", "Titre de section")}</label>
             <input class="modal-input about-modal-name-input" id="proAchievementsTitleInput" type="text" maxlength="200" />
           </div>
 
           <p class="bio-prompt about-modal-prompt">
-            Describe aquí los logros personales o académicos más importantes que consideras has conseguido hasta ahora.
-            Esto te servirá como tu propia versión de LinkedIn. (Recomendado en viñetas.)
+            {tr(
+              "Describe aquí los logros personales o académicos más importantes que consideras has conseguido hasta ahora. Esto te servirá como tu propia versión de LinkedIn. (Recomendado en viñetas.)",
+              "Describe here the most important personal or academic achievements you believe you have reached so far. This will serve as your own LinkedIn-style section. (Bullet points are recommended.)"
+            )}
           </p>
 
           <div class="about-modal-editor">
-            <textarea class="bio-textarea about-modal-textarea" id="proAchievementsTextInput" placeholder="Escribe aquí..."></textarea>
+            <textarea class="bio-textarea about-modal-textarea" id="proAchievementsTextInput" placeholder={tr("Escribe aquí...", "Write here...", "Écris ici...")}></textarea>
             <div class="bio-meta">
-              <span id="proAchievementsWordCounter">0 / 500 palabras</span>
+              <span id="proAchievementsWordCounter">{tr("0 / 500 palabras", "0 / 500 words", "0 / 500 mots")}</span>
             </div>
           </div>
 
           <p class="infobox-photo-status" id="proAchievementsModalStatus" aria-live="polite"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="cancelProAchievementsModal">Cancelar</button>
-          <button class="btn btn-primary btn-compact" type="button" id="saveProAchievementsBtn">Guardar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="cancelProAchievementsModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+          <button class="btn btn-primary btn-compact" type="button" id="saveProAchievementsBtn">{tr("Guardar", "Save", "Enregistrer")}</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay hidden" id="lifeAchievementsModalOverlay" aria-hidden="true">
-      <div class="modal about-modal life-achievements-modal" role="dialog" aria-modal="true" aria-label="Editar logros alcanzados">
+      <div class="modal about-modal life-achievements-modal" role="dialog" aria-modal="true" aria-label={tr("Editar logros alcanzados", "Edit life achievements", "Modifier les réalisations de vie")}>
         <div class="modal-head">
-          <h3>Editar logros alcanzados</h3>
+          <h3>{tr("Editar logros alcanzados", "Edit life achievements", "Modifier les réalisations de vie")}</h3>
           <button class="modal-close" type="button" id="closeLifeAchievementsModal">✕</button>
         </div>
         <div class="modal-body">
           <div class="about-modal-name">
-            <label class="modal-label" for="lifeAchievementsTitleInput">Título de sección</label>
+            <label class="modal-label" for="lifeAchievementsTitleInput">{tr("Título de sección", "Section title", "Titre de section")}</label>
             <input class="modal-input about-modal-name-input" id="lifeAchievementsTitleInput" type="text" maxlength="200" />
           </div>
 
           <p class="bio-prompt about-modal-prompt">
-            Describe aquí los logros personales que te hacen sentir orgulloso; aquello que sabes define tu existencia.
-            (Recomendado en viñetas.)
+            {tr(
+              "Describe aquí los logros personales que te hacen sentir orgulloso; aquello que sabes define tu existencia. (Recomendado en viñetas.)",
+              "Describe here the personal achievements that make you feel proud; what you know defines your existence. (Bullet points are recommended.)"
+            )}
           </p>
 
           <div class="about-modal-editor">
-            <textarea class="bio-textarea about-modal-textarea" id="lifeAchievementsTextInput" placeholder="Escribe aquí..."></textarea>
+            <textarea class="bio-textarea about-modal-textarea" id="lifeAchievementsTextInput" placeholder={tr("Escribe aquí...", "Write here...", "Écris ici...")}></textarea>
             <div class="bio-meta">
-              <span id="lifeAchievementsWordCounter">0 / 500 palabras</span>
+              <span id="lifeAchievementsWordCounter">{tr("0 / 500 palabras", "0 / 500 words", "0 / 500 mots")}</span>
             </div>
           </div>
 
           <p class="infobox-photo-status" id="lifeAchievementsModalStatus" aria-live="polite"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="cancelLifeAchievementsModal">Cancelar</button>
-          <button class="btn btn-primary btn-compact" type="button" id="saveLifeAchievementsBtn">Guardar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="cancelLifeAchievementsModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+          <button class="btn btn-primary btn-compact" type="button" id="saveLifeAchievementsBtn">{tr("Guardar", "Save", "Enregistrer")}</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay hidden" id="quotesModalOverlay" aria-hidden="true">
-      <div class="modal about-modal quotes-modal" role="dialog" aria-modal="true" aria-label="Editar frases favoritas">
+      <div class="modal about-modal quotes-modal" role="dialog" aria-modal="true" aria-label={tr("Editar frases favoritas", "Edit favorite quotes", "Modifier les citations favorites")}>
         <div class="modal-head">
-          <h3>Editar frases favoritas</h3>
+          <h3>{tr("Editar frases favoritas", "Edit favorite quotes", "Modifier les citations favorites")}</h3>
           <button class="modal-close" type="button" id="closeQuotesModal">✕</button>
         </div>
         <div class="modal-body">
           <div class="about-modal-name">
-            <label class="modal-label" for="quotesTitleInput">Título de sección</label>
+            <label class="modal-label" for="quotesTitleInput">{tr("Título de sección", "Section title", "Titre de section")}</label>
             <input class="modal-input about-modal-name-input" id="quotesTitleInput" type="text" maxlength="200" />
           </div>
 
           <p class="bio-prompt about-modal-prompt">
-            Describe tu filosofía de vida en 3 o 4 frases. Cuando ya no estés en este mundo, las personas
-            podrían recordarte por estas banderas personales.
+            {tr(
+              "Describe tu filosofía de vida en 3 o 4 frases. Cuando ya no estés en este mundo, las personas podrían recordarte por estas banderas personales.",
+              "Describe your life philosophy in 3 or 4 quotes. When you are no longer in this world, people may remember you through these personal banners."
+            )}
           </p>
 
           <div class="about-modal-editor">
-            <textarea class="bio-textarea about-modal-textarea" id="quotesTextInput" placeholder="Escribe aquí..."></textarea>
+            <textarea class="bio-textarea about-modal-textarea" id="quotesTextInput" placeholder={tr("Escribe aquí...", "Write here...", "Écris ici...")}></textarea>
             <div class="bio-meta">
-              <span id="quotesWordCounter">0 / 500 palabras</span>
+              <span id="quotesWordCounter">{tr("0 / 500 palabras", "0 / 500 words", "0 / 500 mots")}</span>
             </div>
           </div>
 
           <p class="infobox-photo-status" id="quotesModalStatus" aria-live="polite"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="cancelQuotesModal">Cancelar</button>
-          <button class="btn btn-primary btn-compact" type="button" id="saveQuotesBtn">Guardar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="cancelQuotesModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+          <button class="btn btn-primary btn-compact" type="button" id="saveQuotesBtn">{tr("Guardar", "Save", "Enregistrer")}</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay hidden" id="distinctionsModalOverlay" aria-hidden="true">
-      <div class="modal about-modal distinctions-modal" role="dialog" aria-modal="true" aria-label="Editar distinciones">
+      <div class="modal about-modal distinctions-modal" role="dialog" aria-modal="true" aria-label={tr("Editar distinciones", "Edit distinctions", "Modifier les distinctions")}>
         <div class="modal-head">
-          <h3>Editar distinciones</h3>
+          <h3>{tr("Editar distinciones", "Edit distinctions", "Modifier les distinctions")}</h3>
           <button class="modal-close" type="button" id="closeDistinctionsModal">✕</button>
         </div>
         <div class="modal-body">
@@ -2762,65 +2890,65 @@
           <p class="infobox-photo-status" id="distinctionsModalStatus" aria-live="polite"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="cancelDistinctionsModal">Cancelar</button>
-          <button class="btn btn-primary btn-compact" type="button" id="saveDistinctionsBtn">Guardar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="cancelDistinctionsModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+          <button class="btn btn-primary btn-compact" type="button" id="saveDistinctionsBtn">{tr("Guardar", "Save", "Enregistrer")}</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay hidden" id="personalInfoModalOverlay" aria-hidden="true">
-      <div class="modal personal-info-modal" role="dialog" aria-modal="true" aria-label="Editar información personal">
+      <div class="modal personal-info-modal" role="dialog" aria-modal="true" aria-label={tr("Editar información personal", "Edit personal information", "Modifier les informations personnelles")}>
         <div class="modal-head">
-          <h3>Editar información personal</h3>
+          <h3>{tr("Editar información personal", "Edit personal information", "Modifier les informations personnelles")}</h3>
           <button class="modal-close" type="button" id="closePersonalInfoModal">✕</button>
         </div>
         <div class="modal-body">
           <div class="personal-info-grid">
             <div class="personal-info-col">
               <div class="personal-info-field">
-                <label class="modal-label" for="personalBirthNameInput">Nombre de nacimiento</label>
+                <label class="modal-label" for="personalBirthNameInput">{tr("Nombre de nacimiento", "Birth name", "Nom de naissance")}</label>
                 <input class="modal-input" id="personalBirthNameInput" type="text" maxlength="200" />
               </div>
 
               <div class="personal-info-field">
-                <label class="modal-label" for="personalBirthDateInput">Nacimiento</label>
+                <label class="modal-label" for="personalBirthDateInput">{tr("Nacimiento", "Birth", "Naissance")}</label>
                 <input class="modal-input" id="personalBirthDateInput" type="date" />
               </div>
 
               <div class="personal-info-field">
-                <label class="modal-label" for="personalBirthCityInput">Ciudad de nacimiento</label>
+                <label class="modal-label" for="personalBirthCityInput">{tr("Ciudad de nacimiento", "Birth city", "Ville de naissance")}</label>
                 <input class="modal-input" id="personalBirthCityInput" type="text" maxlength="120" />
               </div>
 
               <div class="personal-info-field">
-                <label class="modal-label" for="personalBirthRegionInput">Región / Estado de nacimiento</label>
+                <label class="modal-label" for="personalBirthRegionInput">{tr("Región / Estado de nacimiento", "Birth region / state", "Région / État de naissance")}</label>
                 <input class="modal-input" id="personalBirthRegionInput" type="text" maxlength="120" />
               </div>
 
               <div class="personal-info-field">
-                <label class="modal-label" for="personalBirthCountryInput">País de nacimiento</label>
+                <label class="modal-label" for="personalBirthCountryInput">{tr("País de nacimiento", "Birth country", "Pays de naissance")}</label>
                 <input class="modal-input" id="personalBirthCountryInput" type="text" maxlength="120" />
               </div>
             </div>
 
             <div class="personal-info-col">
               <div class="personal-info-field">
-                <label class="modal-label" for="personalResidenceInput">Residencia</label>
+                <label class="modal-label" for="personalResidenceInput">{tr("Residencia", "Residence", "Résidence")}</label>
                 <input class="modal-input" id="personalResidenceInput" type="text" maxlength="255" />
               </div>
 
               <div class="personal-info-field">
-                <label class="modal-label" for="personalNationalityInput">Nacionalidad</label>
+                <label class="modal-label" for="personalNationalityInput">{tr("Nacionalidad", "Nationality", "Nationalité")}</label>
                 <input class="modal-input" id="personalNationalityInput" type="text" maxlength="120" />
               </div>
 
               <div class="personal-info-field">
-                <label class="modal-label" for="personalNativeLanguageInput">Lengua materna</label>
+                <label class="modal-label" for="personalNativeLanguageInput">{tr("Lengua materna", "Native language", "Langue maternelle")}</label>
                 <input class="modal-input" id="personalNativeLanguageInput" type="text" maxlength="120" />
               </div>
 
               <div class="personal-info-field">
-                <label class="modal-label" for="personalPseudonymsInput">Seudónimos</label>
+                <label class="modal-label" for="personalPseudonymsInput">{tr("Seudónimos", "Pseudonyms", "Pseudonymes")}</label>
                 <input class="modal-input" id="personalPseudonymsInput" type="text" maxlength="300" />
               </div>
             </div>
@@ -2829,41 +2957,41 @@
           <p class="infobox-photo-status" id="personalInfoModalStatus" aria-live="polite"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="cancelPersonalInfoModal">Cancelar</button>
-          <button class="btn btn-primary btn-compact" type="button" id="savePersonalInfoBtn">Guardar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="cancelPersonalInfoModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+          <button class="btn btn-primary btn-compact" type="button" id="savePersonalInfoBtn">{tr("Guardar", "Save", "Enregistrer")}</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay hidden" id="physicalTraitsModalOverlay" aria-hidden="true">
-      <div class="modal physical-traits-modal" role="dialog" aria-modal="true" aria-label="Editar características físicas">
+      <div class="modal physical-traits-modal" role="dialog" aria-modal="true" aria-label={tr("Editar características físicas", "Edit physical traits", "Modifier les caractéristiques physiques")}>
         <div class="modal-head">
-          <h3>Editar características físicas</h3>
+          <h3>{tr("Editar características físicas", "Edit physical traits", "Modifier les caractéristiques physiques")}</h3>
           <button class="modal-close" type="button" id="closePhysicalTraitsModal">✕</button>
         </div>
         <div class="modal-body">
           <div class="physical-traits-grid">
             <div class="physical-traits-col">
               <div class="physical-traits-field">
-                <label class="modal-label" for="physicalHeightInput">Altura</label>
-                <input class="modal-input" id="physicalHeightInput" type="text" maxlength="40" placeholder="Ej: 1,80 m" />
+                <label class="modal-label" for="physicalHeightInput">{tr("Altura", "Height", "Taille")}</label>
+                <input class="modal-input" id="physicalHeightInput" type="text" maxlength="40" placeholder={tr("Ej: 1,80 m", "Ex: 5'11\\\"", "Ex : 5'11\\\"")} />
               </div>
 
               <div class="physical-traits-field">
-                <label class="modal-label" for="physicalWeightInput">Peso</label>
-                <input class="modal-input" id="physicalWeightInput" type="text" maxlength="40" placeholder="Ej: 76 kg" />
+                <label class="modal-label" for="physicalWeightInput">{tr("Peso", "Weight", "Poids")}</label>
+                <input class="modal-input" id="physicalWeightInput" type="text" maxlength="40" placeholder={tr("Ej: 76 kg", "Ex: 168 lb", "Ex : 168 lb")} />
               </div>
             </div>
 
             <div class="physical-traits-col">
               <div class="physical-traits-field">
-                <label class="modal-label" for="physicalEyesInput">Ojos</label>
-                <input class="modal-input" id="physicalEyesInput" type="text" maxlength="80" placeholder="Ej: Castaño" />
+                <label class="modal-label" for="physicalEyesInput">{tr("Ojos", "Eyes", "Yeux")}</label>
+                <input class="modal-input" id="physicalEyesInput" type="text" maxlength="80" placeholder={tr("Ej: Castaño", "Ex: Brown", "Ex : Marron")} />
               </div>
 
               <div class="physical-traits-field">
-                <label class="modal-label" for="physicalHairInput">Cabello</label>
-                <input class="modal-input" id="physicalHairInput" type="text" maxlength="80" placeholder="Ej: Castaño" />
+                <label class="modal-label" for="physicalHairInput">{tr("Cabello", "Hair", "Cheveux")}</label>
+                <input class="modal-input" id="physicalHairInput" type="text" maxlength="80" placeholder={tr("Ej: Castaño", "Ex: Brown", "Ex : Marron")} />
               </div>
             </div>
           </div>
@@ -2871,38 +2999,38 @@
           <p class="infobox-photo-status" id="physicalTraitsModalStatus" aria-live="polite"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="cancelPhysicalTraitsModal">Cancelar</button>
-          <button class="btn btn-primary btn-compact" type="button" id="savePhysicalTraitsBtn">Guardar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="cancelPhysicalTraitsModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+          <button class="btn btn-primary btn-compact" type="button" id="savePhysicalTraitsBtn">{tr("Guardar", "Save", "Enregistrer")}</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay hidden" id="educationModalOverlay" aria-hidden="true">
-      <div class="modal education-modal" role="dialog" aria-modal="true" aria-label="Editar educación">
+      <div class="modal education-modal" role="dialog" aria-modal="true" aria-label={tr("Editar educación", "Edit education", "Modifier l'éducation")}>
         <div class="modal-head">
-          <h3>Editar educación</h3>
+          <h3>{tr("Editar educación", "Edit education", "Modifier l'éducation")}</h3>
           <button class="modal-close" type="button" id="closeEducationModal">✕</button>
         </div>
         <div class="modal-body">
           <div class="education-grid">
             <div class="education-col">
               <div class="education-field">
-                <label class="modal-label" for="educationSlot1Input">Institución académica 1</label>
-                <input class="modal-input" id="educationSlot1Input" type="text" maxlength="255" placeholder="Ej: Colegio..." />
+                <label class="modal-label" for="educationSlot1Input">{tr("Institución académica 1", "Academic institution 1", "Institution académique 1")}</label>
+                <input class="modal-input" id="educationSlot1Input" type="text" maxlength="255" placeholder={tr("Ej: Colegio...", "Ex: School...", "Ex : École...")} />
               </div>
               <div class="education-field">
-                <label class="modal-label" for="educationSlot2Input">Institución académica 2</label>
-                <input class="modal-input" id="educationSlot2Input" type="text" maxlength="255" placeholder="Ej: Universidad..." />
+                <label class="modal-label" for="educationSlot2Input">{tr("Institución académica 2", "Academic institution 2", "Institution académique 2")}</label>
+                <input class="modal-input" id="educationSlot2Input" type="text" maxlength="255" placeholder={tr("Ej: Universidad...", "Ex: University...", "Ex : Université...")} />
               </div>
             </div>
             <div class="education-col">
               <div class="education-field">
-                <label class="modal-label" for="educationSlot3Input">Institución académica 3</label>
-                <input class="modal-input" id="educationSlot3Input" type="text" maxlength="255" placeholder="Ej: Instituto..." />
+                <label class="modal-label" for="educationSlot3Input">{tr("Institución académica 3", "Academic institution 3", "Institution académique 3")}</label>
+                <input class="modal-input" id="educationSlot3Input" type="text" maxlength="255" placeholder={tr("Ej: Instituto...", "Ex: Institute...", "Ex : Institut...")} />
               </div>
               <div class="education-field">
-                <label class="modal-label" for="educationSlot4Input">Institución académica 4</label>
-                <input class="modal-input" id="educationSlot4Input" type="text" maxlength="255" placeholder="Ej: Academia..." />
+                <label class="modal-label" for="educationSlot4Input">{tr("Institución académica 4", "Academic institution 4", "Institution académique 4")}</label>
+                <input class="modal-input" id="educationSlot4Input" type="text" maxlength="255" placeholder={tr("Ej: Academia...", "Ex: Academy...", "Ex : Académie...")} />
               </div>
             </div>
           </div>
@@ -2910,49 +3038,49 @@
           <p class="infobox-photo-status" id="educationModalStatus" aria-live="polite"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="cancelEducationModal">Cancelar</button>
-          <button class="btn btn-primary btn-compact" type="button" id="saveEducationBtn">Guardar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="cancelEducationModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+          <button class="btn btn-primary btn-compact" type="button" id="saveEducationBtn">{tr("Guardar", "Save", "Enregistrer")}</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay hidden" id="curiositiesModalOverlay" aria-hidden="true">
-      <div class="modal curiosities-modal" role="dialog" aria-modal="true" aria-label="Editar curiosidades">
+      <div class="modal curiosities-modal" role="dialog" aria-modal="true" aria-label={tr("Editar curiosidades", "Edit curiosities", "Modifier les curiosités")}>
         <div class="modal-head">
-          <h3>Editar curiosidades</h3>
+          <h3>{tr("Editar curiosidades", "Edit curiosities", "Modifier les curiosités")}</h3>
           <button class="modal-close" type="button" id="closeCuriositiesModal">✕</button>
         </div>
         <div class="modal-body">
           <div class="curiosities-grid">
             <div class="curiosities-col">
               <div class="curiosities-field">
-                <label class="modal-label" for="curiosityHeroInput">Superhéroe favorito</label>
+                <label class="modal-label" for="curiosityHeroInput">{tr("Superhéroe favorito", "Favorite superhero", "Super-héros préféré")}</label>
                 <input class="modal-input" id="curiosityHeroInput" type="text" maxlength="120" />
               </div>
               <div class="curiosities-field">
-                <label class="modal-label" for="curiositySongInput">Canción favorita</label>
+                <label class="modal-label" for="curiositySongInput">{tr("Canción favorita", "Favorite song", "Chanson préférée")}</label>
                 <input class="modal-input" id="curiositySongInput" type="text" maxlength="255" />
               </div>
               <div class="curiosities-field">
-                <label class="modal-label" for="curiosityFoodInput">Comida favorita</label>
+                <label class="modal-label" for="curiosityFoodInput">{tr("Comida favorita", "Favorite food", "Nourriture préférée")}</label>
                 <input class="modal-input" id="curiosityFoodInput" type="text" maxlength="160" />
               </div>
               <div class="curiosities-field">
-                <label class="modal-label" for="curiosityGamesInput">Videojuegos</label>
+                <label class="modal-label" for="curiosityGamesInput">{tr("Videojuegos", "Video games", "Jeux vidéo")}</label>
                 <input class="modal-input" id="curiosityGamesInput" type="text" maxlength="500" />
               </div>
             </div>
             <div class="curiosities-col">
               <div class="curiosities-field">
-                <label class="modal-label" for="curiosityBookInput">Libro favorito</label>
+                <label class="modal-label" for="curiosityBookInput">{tr("Libro favorito", "Favorite book", "Livre préféré")}</label>
                 <input class="modal-input" id="curiosityBookInput" type="text" maxlength="255" />
               </div>
               <div class="curiosities-field">
-                <label class="modal-label" for="curiosityHobbiesInput">Otros pasatiempos</label>
+                <label class="modal-label" for="curiosityHobbiesInput">{tr("Otros pasatiempos", "Other hobbies", "Autres passe-temps")}</label>
                 <input class="modal-input" id="curiosityHobbiesInput" type="text" maxlength="500" />
               </div>
               <div class="curiosities-field">
-                <label class="modal-label" for="curiosityMottoInput">Lema</label>
+                <label class="modal-label" for="curiosityMottoInput">{tr("Lema", "Motto", "Devise")}</label>
                 <input class="modal-input" id="curiosityMottoInput" type="text" maxlength="255" />
               </div>
             </div>
@@ -2960,94 +3088,39 @@
           <p class="infobox-photo-status" id="curiositiesModalStatus" aria-live="polite"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="cancelCuriositiesModal">Cancelar</button>
-          <button class="btn btn-primary btn-compact" type="button" id="saveCuriositiesBtn">Guardar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="cancelCuriositiesModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+          <button class="btn btn-primary btn-compact" type="button" id="saveCuriositiesBtn">{tr("Guardar", "Save", "Enregistrer")}</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay hidden" id="professionalInfoModalOverlay" aria-hidden="true">
-      <div class="modal professional-info-modal" role="dialog" aria-modal="true" aria-label="Editar información profesional">
+      <div class="modal professional-info-modal" role="dialog" aria-modal="true" aria-label={tr("Editar información profesional", "Edit professional information", "Modifier les informations professionnelles")}>
         <div class="modal-head">
-          <h3>Editar información profesional</h3>
+          <h3>{tr("Editar información profesional", "Edit professional information", "Modifier les informations professionnelles")}</h3>
           <button class="modal-close" type="button" id="closeProfessionalInfoModal">✕</button>
         </div>
         <div class="modal-body">
           <div class="professional-info-grid">
             <div class="professional-info-field">
-              <label class="modal-label" for="professionalOccupationInput">Ocupación</label>
+              <label class="modal-label" for="professionalOccupationInput">{tr("Ocupación", "Occupation", "Profession")}</label>
               <input class="modal-input" id="professionalOccupationInput" type="text" maxlength="500" />
             </div>
             <div class="professional-info-field">
-              <label class="modal-label" for="professionalActiveYearsInput">Años activo</label>
+              <label class="modal-label" for="professionalActiveYearsInput">{tr("Años activo", "Active years", "Années d'activité")}</label>
               <input class="modal-input" id="professionalActiveYearsInput" type="text" maxlength="120" />
             </div>
           </div>
           <p class="infobox-photo-status" id="professionalInfoModalStatus" aria-live="polite"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="cancelProfessionalInfoModal">Cancelar</button>
-          <button class="btn btn-primary btn-compact" type="button" id="saveProfessionalInfoBtn">Guardar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="cancelProfessionalInfoModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+          <button class="btn btn-primary btn-compact" type="button" id="saveProfessionalInfoBtn">{tr("Guardar", "Save", "Enregistrer")}</button>
         </div>
       </div>
     </div>
 
-      <!-- FOOTER reutilizado -->
-      <footer class="kiadez-footer">
-        <div class="footer-main">
-
-          <div class="footer-column footer-origin">
-            <p class="footer-poem">
-              Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br>
-              No para dominar, sino para orientar.<br>
-              Su luz no deslumbra: acompaña.
-            </p>
-          </div>
-
-          <div class="footer-columns">
-            <div class="footer-column">
-              <h4>Sobre nuestra red social</h4>
-              <ul>
-                <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
-                <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
-                <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
-                <li><a href="/contact.html">Contacto</a></li>
-              </ul>
-            </div>
-
-            <div class="footer-column">
-              <h4>Idiomas</h4>
-              <ul>
-                <li><a href="/?lang=es">Español</a></li>
-                <li><a href="/?lang=en">English</a></li>
-                <li><a href="/?lang=fr">Français</a></li>
-              </ul>
-            </div>
-
-            <div class="footer-column">
-              <h4>Contacto</h4>
-              <ul>
-                <li>info@kiadez.com</li>
-                <li>+57 333 225 6078</li>
-              </ul>
-            </div>
-
-            <div class="footer-column">
-              <h4>Información legal</h4>
-              <ul>
-                <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
-                <li><a href="/terms.html">Términos y condiciones</a></li>
-                <li><a href="/privacy.html">Privacidad</a></li>
-              </ul>
-            </div>
-          </div>
-
-        </div>
-
-        <div class="footer-bottom">
-          © 2026 Kiadez — Una red social para cumplir deseos.
-        </div>
-      </footer>
+      <AuthFooter />
 
 
   </div>

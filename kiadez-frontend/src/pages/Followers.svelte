@@ -4,10 +4,16 @@
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
   import { followApi } from "../lib/api";
+  import AuthFooter from "../lib/AuthFooter.svelte";
+  import { getLocale } from "../lib/i18n";
 
   const PAGE_SIZE = 25;
   const PAGE_WINDOW = 7;
   const DEFAULT_AVATAR_SRC = "/assets/avatar-default.jpg";
+  const locale = getLocale();
+  const isEn = locale === "en";
+  const isFr = locale === "fr";
+  const tr = (es, en, fr = en) => (isEn ? en : isFr ? fr : es);
 
   const createSectionState = () => ({
     items: [],
@@ -30,16 +36,16 @@
 
   const parseErrorMessage = (error) => {
     const message = String(error?.message || "").trim();
-    return message || "No se pudo completar la solicitud.";
+    return message || tr("No se pudo completar la solicitud.", "Could not complete the request.", "Impossible de complete the request.");
   };
 
-  const formatCount = (value) => Number(value || 0).toLocaleString("es-CO");
+  const formatCount = (value) => Number(value || 0).toLocaleString(isEn ? "en-US" : isFr ? "fr-FR" : "es-CO");
 
   const getDisplayName = (item) => {
     const fullName = String(item?.full_name || "").trim();
     if (fullName) return fullName;
     const userId = Number(item?.user_id || 0);
-    return userId > 0 ? `Usuario ${userId}` : "Usuario";
+    return userId > 0 ? tr(`Usuario ${userId}`, `User ${userId}`, `User ${userId}`) : tr("Usuario", "User", "Utilisateur");
   };
 
   const getHandle = (item) => {
@@ -48,7 +54,7 @@
     const username = String(item?.username || "").trim();
     if (username) return `@${username}`;
     const userId = Number(item?.user_id || 0);
-    return userId > 0 ? `@id${userId}` : "@usuario";
+    return userId > 0 ? `@id${userId}` : tr("@usuario", "@user", "@utilisateur");
   };
 
   const getProfileHref = (item) => {
@@ -200,7 +206,7 @@
 <svelte:head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kiadez — Seguidores</title>
+  <title>{tr("Kiadez — Seguidores", "Kiadez — Followers", "Kiadez — Abonnés")}</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
@@ -211,46 +217,46 @@
         <img src="/css/logo-kiadez.webp" alt="Kiadez" />
       </a>
       <form class="topbar-search" role="search" on:submit|preventDefault>
-        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+        <input type="search" placeholder={tr("Buscar en Kiadez", "Search on Kiadez", "Rechercher sur Kiadez")} aria-label={tr("Buscar", "Search", "Rechercher")} />
       </form>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-center">
       <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
-      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-      <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
-      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+      <a class="topbar-btn" href="/gallery.html">🖼️ {tr("Galería", "Gallery", "Galerie")}</a>
+      <a class="topbar-btn" href="/my-public-whishes.html">🌐 {tr("Deseos públicos", "Public wishes", "Souhaits publics")}</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 {tr("Deseos privados", "Private wishes", "Souhaits privés")}</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ {tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis")}</a>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
       <details class="topbar-dropdown">
-        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-          <img src="/assets/avatar-default.jpg" alt="Perfil del usuario" />
+        <summary class="topbar-avatar-btn" aria-label={tr("Perfil del usuario", "User profile", "Profil utilisateur")}>
+          <img src="/assets/avatar-default.jpg" alt={tr("Foto de perfil del usuario", "User profile photo", "Photo de profil de l'utilisateur")} />
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
-          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+          <a href="/privacy-and-settings.html" role="menuitem">{tr("Configuración y privacidad", "Settings and privacy", "Paramètres et confidentialité")}</a>
+          <button type="button" role="menuitem" on:click={logout}>{tr("Cerrar sesión", "Sign out", "Se déconnecter")}</button>
         </div>
       </details>
 
-      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+      <button class="topbar-icon" type="button" aria-label={tr("Notificaciones", "Notifications", "Alertes")}>
         🔔
         <span class="topbar-badge">3</span>
       </button>
 
       <details class="topbar-dropdown">
-        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+        <summary class="topbar-menu-btn" aria-label={tr("Abrir menú", "Open menu", "Ouvrir le menu")}>
           <span class="topbar-menu-icon" aria-hidden="true">☰</span>
-          <span class="topbar-menu-label">Menú</span>
+          <span class="topbar-menu-label">{tr("Menú", "Menu", "Navigation")}</span>
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/home_user.html" role="menuitem">Mi Home</a>
-          <a href="/achievements.html" role="menuitem">Logros recientes</a>
-          <a href="/gallery.html" role="menuitem">Galería</a>
-          <a href="/calendar.html" role="menuitem">Calendario</a>
-          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
-          <a href="/messages.html" role="menuitem">Mensajes</a>
+          <a href="/home_user.html" role="menuitem">{tr("Mi Home", "My Home", "Mon accueil")}</a>
+          <a href="/achievements.html" role="menuitem">{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+          <a href="/gallery.html" role="menuitem">{tr("Galería", "Gallery", "Galerie")}</a>
+          <a href="/calendar.html" role="menuitem">{tr("Calendario", "Calendar", "Calendrier")}</a>
+          <a href="/my-biography.html" role="menuitem">{tr("Mi Biografía", "My Biography", "Ma biographie")}</a>
+          <a href="/messages.html" role="menuitem">{tr("Mensajes", "Messages", "Messagerie")}</a>
         </div>
       </details>
     </div>
@@ -259,52 +265,52 @@
   <main class="user-home">
     <section class="cover" id="cover">
       <div class="cover-media" id="coverMedia">
-        <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
+        <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt={tr("Portada", "Cover", "Couverture")} />
 
         <div class="cover-actions">
-          <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
-            Cambiar portada
+          <button class="icon-btn" id="btnChangeCover" type="button" title={tr("Cambiar portada", "Change cover", "Changer la couverture")}>
+            {tr("Cambiar portada", "Change cover", "Changer la couverture")}
           </button>
-          <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title="Editar mi propósito de vida">
-            Editar mi propósito de vida
+          <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title={tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier ma mission de vie")}>
+            {tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier ma mission de vie")}
           </button>
 
           <input id="coverFile" type="file" accept="image/*" class="hidden" />
         </div>
 
-        <div class="purpose-triangle" aria-label="Deseos de propósito">
+        <div class="purpose-triangle" aria-label={tr("Deseos de propósito", "Purpose wishes", "Souhaits de mission")}>
           <button class="purpose-pill purpose-top" type="button" id="purpose1">
-            Deseo #1: Secreto
+            {tr("Deseo #1: Secreto", "Wish #1: Secret", "Souhait n°1 : Secret")}
           </button>
 
           <button class="purpose-pill purpose-left" type="button" id="purpose2">
-            Deseo construir el Reino de Combray
+            {tr("Deseo construir el Reino de Combray", "I wish to build the Kingdom of Combray", "Je souhaite construire le Royaume de Combray")}
           </button>
 
           <button class="purpose-pill purpose-right" type="button" id="purpose3">
-            Deseo estar unido a Jesús
+            {tr("Deseo estar unido a Jesús", "I wish to be united with Jesus", "Je souhaite être uni à Jésus")}
           </button>
         </div>
 
         <div class="cover-hint" id="coverHint">
-          Arrastra la portada para encuadrarla
+          {tr("Arrastra la portada para encuadrarla", "Drag the cover to frame it", "Déplace la couverture pour l'ajuster")}
         </div>
       </div>
     </section>
 
     <div class="home-body">
-      <nav class="profile-nav" aria-label="Navegación de perfil">
-        <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
-        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+      <nav class="profile-nav" aria-label={tr("Navegación de perfil", "Profile navigation", "Navigation du profil")}>
+        <a class="nav-pill" href="/home_user.html" title={tr("Home", "Home", "Accueil")}>{tr("Home", "Home", "Accueil")}</a>
+        <a class="nav-pill" href="/star-pool-found.html" title={tr("Estrellas", "Stars", "Étoiles")}>
           <span class="nav-icon">⭐</span>
-          <span><strong id="followersStarsTotal">0</strong> estrellas</span>
+          <span><strong id="followersStarsTotal">0</strong> {tr("estrellas", "stars", "étoiles")}</span>
         </a>
-        <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-        <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
-        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
-        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
+        <a class="nav-pill" href="/followers.html" title={tr("Seguidores", "Followers", "Abonnés")}>{tr("Seguidores", "Followers", "Abonnés")}</a>
+        <a class="nav-pill" href="/achievements.html" title={tr("Logros recientes", "Recent achievements", "Réalisations récentes")}>{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+        <a class="nav-pill" href="/gallery.html" title={tr("Galería", "Gallery", "Galerie")}>{tr("Galería", "Gallery", "Galerie")}</a>
+        <a class="nav-pill" href="/calendar.html" title={tr("Calendario", "Calendar", "Calendrier")}>{tr("Calendario", "Calendar", "Calendrier")}</a>
+        <a class="nav-pill" href="/my-biography.html" title={tr("Mi biografía", "My biography", "Ma biographie")}>{tr("Mi biografía", "My biography", "Ma biographie")}</a>
+        <a class="nav-pill" href="/messages.html" title={tr("Mensajes", "Messages", "Messagerie")}>{tr("Mensajes", "Messages", "Messagerie")}</a>
       </nav>
 
       {#if followActionError}
@@ -313,31 +319,34 @@
         </section>
       {/if}
 
-      <section class="panel followers-section" aria-label="Sugerencias de usuarios a seguir">
+      <section class="panel followers-section" aria-label={tr("Sugerencias de usuarios a seguir", "Suggested users to follow", "Utilisateurs suggérés à suivre")}>
         <div class="panel-head">
-          <h2 class="panel-title">Sugerencias de usuarios a seguir</h2>
-          <span class="panel-badge">{formatCount(suggestions.total)} sugerencias</span>
+          <h2 class="panel-title">{tr("Sugerencias de usuarios a seguir", "Suggested users to follow", "Utilisateurs suggérés à suivre")}</h2>
+          <span class="panel-badge">{formatCount(suggestions.total)} {tr("sugerencias", "suggestions", "recommandations")}</span>
         </div>
         <p class="panel-muted">
-          Modelos a seguir priorizados por guardianes, usuarios recientes y perfiles destacados.
+          {tr(
+            "Modelos a seguir priorizados por guardianes, usuarios recientes y perfiles destacados.",
+            "Profiles to follow prioritized by guardians, recent users, and featured accounts."
+          )}
         </p>
 
         {#if suggestions.error}
           <p class="followers-status is-error">{suggestions.error}</p>
         {:else if suggestions.loading}
-          <p class="followers-status">Cargando sugerencias...</p>
+          <p class="followers-status">{tr("Cargando sugerencias...", "Loading suggestions...", "Chargement des suggestions...")}</p>
         {:else if suggestions.items.length === 0}
-          <p class="followers-status">No hay sugerencias disponibles por ahora.</p>
+          <p class="followers-status">{tr("No hay sugerencias disponibles por ahora.", "No suggestions available right now.", "Aucune suggestion disponible pour le moment.")}</p>
         {:else}
           <div class="followers-grid">
             {#each suggestions.items as item (item.user_id)}
               <article class="follower-card">
-                <a class="follower-avatar-link" href={getProfileHref(item)} aria-label={`Ver perfil de ${getDisplayName(item)}`}>
-                  <img class="follower-avatar" src={getAvatarSrc(item)} alt={`Foto de perfil de ${getDisplayName(item)}`} loading="lazy" />
+                <a class="follower-avatar-link" href={getProfileHref(item)} aria-label={`${tr("Ver perfil de", "View profile of", "Voir le profil de")} ${getDisplayName(item)}`}>
+                  <img class="follower-avatar" src={getAvatarSrc(item)} alt={`${tr("Foto de perfil de", "Profile photo of", "Photo de profil de")} ${getDisplayName(item)}`} loading="lazy" />
                 </a>
                 <h3 class="follower-name">{getDisplayName(item)}</h3>
                 <p class="follower-handle">{getHandle(item)}</p>
-                <p class="follower-count">{formatCount(item.followers_count)} seguidores</p>
+                <p class="follower-count">{formatCount(item.followers_count)} {tr("seguidores", "followers", "abonnés")}</p>
                 <div class="follower-actions">
                   <button
                     class={`btn btn-compact${item.is_following ? " btn-outline" : " btn-primary"}`}
@@ -346,14 +355,14 @@
                     on:click={() => toggleFollow(item)}
                   >
                     {#if isFollowPending(item.user_id)}
-                      Procesando...
+                      {tr("Procesando...", "Processing...", "Traitement...")}
                     {:else if item.is_following}
-                      Dejar de seguir
+                      {tr("Dejar de seguir", "Unfollow", "Ne plus suivre")}
                     {:else}
-                      Seguir
+                      {tr("Seguir", "Follow", "Suivre")}
                     {/if}
                   </button>
-                  <a class="btn btn-outline btn-compact" href={getProfileHref(item)}>Ver perfil</a>
+                  <a class="btn btn-outline btn-compact" href={getProfileHref(item)}>{tr("Ver perfil", "View profile", "Voir le profil")}</a>
                 </div>
               </article>
             {/each}
@@ -361,11 +370,11 @@
         {/if}
 
         {#if suggestions.total_pages > 1}
-          <nav class="followers-pagination" aria-label="Paginación de sugerencias">
+          <nav class="followers-pagination" aria-label={tr("Paginación de sugerencias", "Suggestions pagination", "Pagination des suggestions")}>
             <button
               class="followers-page-btn is-arrow"
               type="button"
-              aria-label="Página anterior"
+              aria-label={tr("Página anterior", "Previous page", "Page précédente")}
               on:click={() => goToPage("suggestions", suggestions.page - 1)}
               disabled={suggestions.page <= 1}
             >
@@ -384,7 +393,7 @@
             <button
               class="followers-page-btn is-arrow"
               type="button"
-              aria-label="Página siguiente"
+              aria-label={tr("Página siguiente", "Next page", "Page suivante")}
               on:click={() => goToPage("suggestions", suggestions.page + 1)}
               disabled={suggestions.page >= suggestions.total_pages}
             >
@@ -395,36 +404,36 @@
 
         {#if !suggestions.loading && !suggestions.error && suggestions.total > 0}
           <p class="followers-range">
-            Mostrando {suggestions.range_start}-{suggestions.range_end} de {formatCount(suggestions.total)} sugerencias.
+            {tr("Mostrando", "Showing", "Affichage")} {suggestions.range_start}-{suggestions.range_end} {tr("de", "of", "de")} {formatCount(suggestions.total)} {tr("sugerencias", "suggestions", "recommandations")}.
           </p>
         {/if}
       </section>
 
-      <section class="panel followers-section" aria-label="Seguidores">
+      <section class="panel followers-section" aria-label={tr("Seguidores", "Followers", "Abonnés")}>
         <div class="panel-head">
-          <h2 class="panel-title">Seguidores</h2>
-          <span class="panel-badge">{formatCount(followers.total)} seguidores</span>
+          <h2 class="panel-title">{tr("Seguidores", "Followers", "Abonnés")}</h2>
+          <span class="panel-badge">{formatCount(followers.total)} {tr("seguidores", "followers", "abonnés")}</span>
         </div>
         <p class="panel-muted">
-          Personas que siguen tu camino y celebran tus logros.
+          {tr("Personas que siguen tu camino y celebran tus logros.", "People who follow your path and celebrate your achievements.", "Personnes qui suivent ton chemin et célèbrent tes réalisations.")}
         </p>
 
         {#if followers.error}
           <p class="followers-status is-error">{followers.error}</p>
         {:else if followers.loading}
-          <p class="followers-status">Cargando seguidores...</p>
+          <p class="followers-status">{tr("Cargando seguidores...", "Loading followers...", "Chargement des abonnés...")}</p>
         {:else if followers.items.length === 0}
-          <p class="followers-status">Aún no tienes seguidores registrados.</p>
+          <p class="followers-status">{tr("Aún no tienes seguidores registrados.", "You do not have registered followers yet.", "Tu n'as pas encore d'abonnés enregistrés.")}</p>
         {:else}
           <div class="followers-grid">
             {#each followers.items as item (item.user_id)}
               <article class="follower-card">
-                <a class="follower-avatar-link" href={getProfileHref(item)} aria-label={`Ver perfil de ${getDisplayName(item)}`}>
-                  <img class="follower-avatar" src={getAvatarSrc(item)} alt={`Foto de perfil de ${getDisplayName(item)}`} loading="lazy" />
+                <a class="follower-avatar-link" href={getProfileHref(item)} aria-label={`${tr("Ver perfil de", "View profile of", "Voir le profil de")} ${getDisplayName(item)}`}>
+                  <img class="follower-avatar" src={getAvatarSrc(item)} alt={`${tr("Foto de perfil de", "Profile photo of", "Photo de profil de")} ${getDisplayName(item)}`} loading="lazy" />
                 </a>
                 <h3 class="follower-name">{getDisplayName(item)}</h3>
                 <p class="follower-handle">{getHandle(item)}</p>
-                <p class="follower-count">{formatCount(item.followers_count)} seguidores</p>
+                <p class="follower-count">{formatCount(item.followers_count)} {tr("seguidores", "followers", "abonnés")}</p>
                 <div class="follower-actions">
                   <button
                     class={`btn btn-compact${item.is_following ? " btn-outline" : " btn-primary"}`}
@@ -433,14 +442,14 @@
                     on:click={() => toggleFollow(item)}
                   >
                     {#if isFollowPending(item.user_id)}
-                      Procesando...
+                      {tr("Procesando...", "Processing...", "Traitement...")}
                     {:else if item.is_following}
-                      Dejar de seguir
+                      {tr("Dejar de seguir", "Unfollow", "Ne plus suivre")}
                     {:else}
-                      Seguir
+                      {tr("Seguir", "Follow", "Suivre")}
                     {/if}
                   </button>
-                  <a class="btn btn-outline btn-compact" href={getProfileHref(item)}>Ver perfil</a>
+                  <a class="btn btn-outline btn-compact" href={getProfileHref(item)}>{tr("Ver perfil", "View profile", "Voir le profil")}</a>
                 </div>
               </article>
             {/each}
@@ -448,11 +457,11 @@
         {/if}
 
         {#if followers.total_pages > 1}
-          <nav class="followers-pagination" aria-label="Paginación de seguidores">
+          <nav class="followers-pagination" aria-label={tr("Paginación de seguidores", "Followers pagination", "Pagination des abonnés")}>
             <button
               class="followers-page-btn is-arrow"
               type="button"
-              aria-label="Página anterior"
+              aria-label={tr("Página anterior", "Previous page", "Page précédente")}
               on:click={() => goToPage("followers", followers.page - 1)}
               disabled={followers.page <= 1}
             >
@@ -471,7 +480,7 @@
             <button
               class="followers-page-btn is-arrow"
               type="button"
-              aria-label="Página siguiente"
+              aria-label={tr("Página siguiente", "Next page", "Page suivante")}
               on:click={() => goToPage("followers", followers.page + 1)}
               disabled={followers.page >= followers.total_pages}
             >
@@ -482,36 +491,36 @@
 
         {#if !followers.loading && !followers.error && followers.total > 0}
           <p class="followers-range">
-            Mostrando {followers.range_start}-{followers.range_end} de {formatCount(followers.total)} seguidores.
+            {tr("Mostrando", "Showing", "Affichage")} {followers.range_start}-{followers.range_end} {tr("de", "of", "de")} {formatCount(followers.total)} {tr("seguidores", "followers", "abonnés")}.
           </p>
         {/if}
       </section>
 
-      <section class="panel followers-section" aria-label="Siguiendo">
+      <section class="panel followers-section" aria-label={tr("Siguiendo", "Following", "Abonnements")}>
         <div class="panel-head">
-          <h2 class="panel-title">Siguiendo</h2>
-          <span class="panel-badge">{formatCount(following.total)} siguiendo</span>
+          <h2 class="panel-title">{tr("Siguiendo", "Following", "Abonnements")}</h2>
+          <span class="panel-badge">{formatCount(following.total)} {tr("siguiendo", "following", "abonnements")}</span>
         </div>
         <p class="panel-muted">
-          Usuarios a quienes sigues actualmente.
+          {tr("Usuarios a quienes sigues actualmente.", "Users you currently follow.", "Utilisateurs que tu suis actuellement.")}
         </p>
 
         {#if following.error}
           <p class="followers-status is-error">{following.error}</p>
         {:else if following.loading}
-          <p class="followers-status">Cargando usuarios seguidos...</p>
+          <p class="followers-status">{tr("Cargando usuarios seguidos...", "Loading followed users...", "Chargement des utilisateurs suivis...")}</p>
         {:else if following.items.length === 0}
-          <p class="followers-status">Aún no sigues a ningún usuario.</p>
+          <p class="followers-status">{tr("Aún no sigues a ningún usuario.", "You are not following any users yet.", "Tu ne suis encore aucun utilisateur.")}</p>
         {:else}
           <div class="followers-grid">
             {#each following.items as item (item.user_id)}
               <article class="follower-card">
-                <a class="follower-avatar-link" href={getProfileHref(item)} aria-label={`Ver perfil de ${getDisplayName(item)}`}>
-                  <img class="follower-avatar" src={getAvatarSrc(item)} alt={`Foto de perfil de ${getDisplayName(item)}`} loading="lazy" />
+                <a class="follower-avatar-link" href={getProfileHref(item)} aria-label={`${tr("Ver perfil de", "View profile of", "Voir le profil de")} ${getDisplayName(item)}`}>
+                  <img class="follower-avatar" src={getAvatarSrc(item)} alt={`${tr("Foto de perfil de", "Profile photo of", "Photo de profil de")} ${getDisplayName(item)}`} loading="lazy" />
                 </a>
                 <h3 class="follower-name">{getDisplayName(item)}</h3>
                 <p class="follower-handle">{getHandle(item)}</p>
-                <p class="follower-count">{formatCount(item.followers_count)} seguidores</p>
+                <p class="follower-count">{formatCount(item.followers_count)} {tr("seguidores", "followers", "abonnés")}</p>
                 <div class="follower-actions">
                   <button
                     class={`btn btn-compact${item.is_following ? " btn-outline" : " btn-primary"}`}
@@ -520,14 +529,14 @@
                     on:click={() => toggleFollow(item)}
                   >
                     {#if isFollowPending(item.user_id)}
-                      Procesando...
+                      {tr("Procesando...", "Processing...", "Traitement...")}
                     {:else if item.is_following}
-                      Dejar de seguir
+                      {tr("Dejar de seguir", "Unfollow", "Ne plus suivre")}
                     {:else}
-                      Seguir
+                      {tr("Seguir", "Follow", "Suivre")}
                     {/if}
                   </button>
-                  <a class="btn btn-outline btn-compact" href={getProfileHref(item)}>Ver perfil</a>
+                  <a class="btn btn-outline btn-compact" href={getProfileHref(item)}>{tr("Ver perfil", "View profile", "Voir le profil")}</a>
                 </div>
               </article>
             {/each}
@@ -535,11 +544,11 @@
         {/if}
 
         {#if following.total_pages > 1}
-          <nav class="followers-pagination" aria-label="Paginación de siguiendo">
+          <nav class="followers-pagination" aria-label={tr("Paginación de siguiendo", "Following pagination", "Pagination des abonnements")}>
             <button
               class="followers-page-btn is-arrow"
               type="button"
-              aria-label="Página anterior"
+              aria-label={tr("Página anterior", "Previous page", "Page précédente")}
               on:click={() => goToPage("following", following.page - 1)}
               disabled={following.page <= 1}
             >
@@ -558,7 +567,7 @@
             <button
               class="followers-page-btn is-arrow"
               type="button"
-              aria-label="Página siguiente"
+              aria-label={tr("Página siguiente", "Next page", "Page suivante")}
               on:click={() => goToPage("following", following.page + 1)}
               disabled={following.page >= following.total_pages}
             >
@@ -569,65 +578,11 @@
 
         {#if !following.loading && !following.error && following.total > 0}
           <p class="followers-range">
-            Mostrando {following.range_start}-{following.range_end} de {formatCount(following.total)} seguidos.
+            {tr("Mostrando", "Showing", "Affichage")} {following.range_start}-{following.range_end} {tr("de", "of", "de")} {formatCount(following.total)} {tr("seguidos", "followed", "suivis")}.
           </p>
         {/if}
       </section>
     </div>
   </main>
-
-  <footer class="kiadez-footer">
-    <div class="footer-main">
-      <div class="footer-column footer-origin">
-        <p class="footer-poem">
-          Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br />
-          No para dominar, sino para orientar.<br />
-          Su luz no deslumbra: acompaña.
-        </p>
-      </div>
-
-      <div class="footer-columns">
-        <div class="footer-column">
-          <h4>Sobre nuestra red social</h4>
-          <ul>
-            <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
-            <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
-            <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
-            <li><a href="/contact.html">Contacto</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Idiomas</h4>
-          <ul>
-            <li><a href="/?lang=es">Español</a></li>
-            <li><a href="/?lang=en">English</a></li>
-            <li><a href="/?lang=fr">Français</a></li>
-            <li><a href="/?lang=pt">Português</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Contacto</h4>
-          <ul>
-            <li>info@kiadez.com</li>
-            <li>+57 333 225 6078</li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Información legal</h4>
-          <ul>
-            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
-            <li><a href="/terms.html">Términos y condiciones</a></li>
-            <li><a href="/privacy.html">Privacidad</a></li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="footer-bottom">
-      © 2026 Kiadez — Una red social para cumplir deseos.
-    </div>
-  </footer>
+  <AuthFooter />
 </div>

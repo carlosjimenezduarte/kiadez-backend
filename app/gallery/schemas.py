@@ -21,7 +21,7 @@ class GalleryFolderCreateInput(BaseModel):
     def validate_name(cls, value: str) -> str:
         normalized = _normalize_folder_name(value)
         if not normalized:
-            raise ValueError("Debes escribir el nombre de la carpeta.")
+            raise ValueError("You must provide a folder name.")
         return normalized
 
     @field_validator("visibility")
@@ -29,7 +29,7 @@ class GalleryFolderCreateInput(BaseModel):
     def validate_visibility(cls, value: str) -> str:
         normalized = str(value or "").strip().lower()
         if normalized not in {"public", "private"}:
-            raise ValueError("La visibilidad debe ser public o private.")
+            raise ValueError("Visibility must be public or private.")
         return normalized
 
 
@@ -41,7 +41,7 @@ class GalleryFolderUpdateInput(BaseModel):
     def validate_name(cls, value: str) -> str:
         normalized = _normalize_folder_name(value)
         if not normalized:
-            raise ValueError("Debes escribir el nombre de la carpeta.")
+            raise ValueError("You must provide a folder name.")
         return normalized
 
 
@@ -57,14 +57,14 @@ class GalleryFolderAssignImagesInput(BaseModel):
         for raw in values:
             media_id = int(raw or 0)
             if media_id <= 0:
-                raise ValueError("Todos los media_ids deben ser mayores a 0.")
+                raise ValueError("All media_ids must be greater than 0.")
             if media_id in seen:
                 continue
             seen.add(media_id)
             deduped.append(media_id)
 
         if not deduped:
-            raise ValueError("Debes enviar al menos una imagen.")
+            raise ValueError("You must send at least one image.")
 
         return deduped
 
@@ -124,7 +124,7 @@ class GalleryAlbumPublishInput(BaseModel):
     def validate_album_name(cls, value: str) -> str:
         normalized = _normalize_folder_name(value)
         if not normalized:
-            raise ValueError("Debes escribir el nombre del álbum.")
+            raise ValueError("You must provide an album name.")
         return normalized
 
     @field_validator("visibility")
@@ -132,7 +132,7 @@ class GalleryAlbumPublishInput(BaseModel):
     def validate_album_visibility(cls, value: str) -> str:
         normalized = str(value or "").strip().lower()
         if normalized not in {"public", "private"}:
-            raise ValueError("La visibilidad debe ser public o private.")
+            raise ValueError("Visibility must be public or private.")
         return normalized
 
     @field_validator("media_ids")
@@ -144,14 +144,14 @@ class GalleryAlbumPublishInput(BaseModel):
         for raw in values:
             media_id = int(raw or 0)
             if media_id <= 0:
-                raise ValueError("Todos los media_ids deben ser mayores a 0.")
+                raise ValueError("All media_ids must be greater than 0.")
             if media_id in seen:
                 continue
             seen.add(media_id)
             deduped.append(media_id)
 
         if not deduped:
-            raise ValueError("Debes adjuntar al menos una imagen o video.")
+            raise ValueError("You must attach at least one image or video.")
 
         return deduped
 

@@ -45,7 +45,7 @@ class ProfileReportCreateRequest(BaseModel):
     @model_validator(mode="after")
     def validate_other_reason(self):
         if self.reason == ProfileReportReason.other and not (self.other_reason or "").strip():
-            raise ValueError("Debes describir la otra razón del reporte.")
+            raise ValueError("You must describe the other report reason.")
         if self.reason != ProfileReportReason.other:
             self.other_reason = None
         return self

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.core.config import settings
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.db.database import get_db
 from app.db.models.guardian_wish_message import GuardianWishMessage
 from app.db.models.message_entry import MessageEntry
@@ -28,6 +29,51 @@ GUARDIANS_MIN_RANK = 3
 BROADCAST_ALL_USERS_KEYWORD = "allusers"
 
 
+def _locale(request: Request | None) -> str:
+    return locale_from_request(request, default="en")
+
+
+def _td(locale: str, en: str) -> str:
+    translations: dict[str, tuple[str, str]] = {
+        "Only Guardians can start conversations.": (
+            "Solo los Guardianes pueden iniciar conversaciones.",
+            "Seuls les Gardiens peuvent démarrer des conversations.",
+        ),
+        "Sending to @allusers is restricted to authorized accounts.": (
+            "El envío a @allusers está restringido a cuentas autorizadas.",
+            "L'envoi à @allusers est réservé aux comptes autorisés.",
+        ),
+        "Recipient not found.": ("Destinatario no encontrado.", "Destinataire introuvable."),
+        "Invalid recipient.": ("Destinatario inválido.", "Destinataire invalide."),
+        "Conversation not found.": ("Conversación no encontrada.", "Conversation introuvable."),
+        "You do not have access to this conversation.": (
+            "No tienes acceso a esta conversación.",
+            "Vous n'avez pas accès à cette conversation.",
+        ),
+        "There are no active users available to send with @allusers.": (
+            "No hay usuarios activos disponibles para enviar con @allusers.",
+            "Aucun utilisateur actif n'est disponible pour l'envoi avec @allusers.",
+        ),
+        "You cannot send messages to yourself.": (
+            "No puedes enviarte mensajes a ti mismo.",
+            "Vous ne pouvez pas vous envoyer des messages à vous-même.",
+        ),
+        "You do not have permission to reply in this conversation.": (
+            "No tienes permiso para responder en esta conversación.",
+            "Vous n'avez pas la permission de répondre dans cette conversation.",
+        ),
+        "This conversation no longer accepts replies.": (
+            "Esta conversación ya no acepta respuestas.",
+            "Cette conversation n'accepte plus de réponses.",
+        ),
+    }
+    pair = translations.get(en)
+    if not pair:
+        return en
+    es, fr = pair
+    return i18n_tr(locale, es=es, en=en, fr=fr)
+
+
 def _parse_csv_set(value: str | None) -> set[str]:
     raw = (value or "").strip()
     if not raw:
@@ -43,11 +89,11 @@ def _is_guardian(current: UserPublic) -> bool:
     return int(current.guardian_rank or 0) >= GUARDIANS_MIN_RANK
 
 
-def _require_guardian(current: UserPublic) -> None:
+def _require_guardian(current: UserPublic, *, locale: str) -> None:
     if not _is_guardian(current):
         raise HTTPException(
             status_code=403,
-            detail="Solo los Guardianes pueden iniciar conversaciones.",
+            detail=_td(locale, "Only Guardians can start conversations."),
         )
 
 
@@ -73,12 +119,12 @@ def _can_use_all_users_broadcast(current: UserPublic) -> bool:
     )
 
 
-def _require_all_users_broadcast_access(current: UserPublic) -> None:
+def _require_all_users_broadcast_access(current: UserPublic, *, locale: str) -> None:
     if _can_use_all_users_broadcast(current):
         return
     raise HTTPException(
         status_code=403,
-        detail="El envío a @allusers es exclusivo para cuentas autorizadas.",
+        detail=_td(locale, "Sending to @allusers is restricted to authorized accounts."),
     )
 
 
@@ -89,7 +135,7 @@ def _build_handle(*, username: str | None, user_id: int | None) -> str:
     normalized_id = int(user_id or 0)
     if normalized_id > 0:
         return f"@id{normalized_id}"
-    return "@usuario"
+    return "@user"
 
 
 def _build_full_name(user: User | None, *, fallback_user_id: int | None) -> str:
@@ -99,11 +145,11 @@ def _build_full_name(user: User | None, *, fallback_user_id: int | None) -> str:
         full_name = f"{first_name} {last_name}".strip()
         if full_name:
             return full_name
-        return f"Usuario {int(user.id)}"
+        return f"User {int(user.id)}"
     fallback = int(fallback_user_id or 0)
     if fallback > 0:
-        return f"Usuario {fallback}"
-    return "Usuario"
+        return f"User {fallback}"
+    return "User"
 
 
 def _load_users_map(*, db: Session, user_ids: set[int]) -> dict[int, User]:
@@ -292,24 +338,24 @@ def _build_threads_out(
     ]
 
 
-def _resolve_recipient_for_create(*, db: Session, payload: MessageThreadCreateInput) -> User:
+def _resolve_recipient_for_create(*, db: Session, payload: MessageThreadCreateInput, locale: str) -> User:
     if payload.to_user_id is not None:
         user = db.execute(
             select(User).where(User.id == payload.to_user_id, User.is_active.is_(True))
         ).scalar_one_or_none()
         if user is None:
-            raise HTTPException(status_code=404, detail="Destinatario no encontrado.")
+            raise HTTPException(status_code=404, detail=_td(locale, "Recipient not found."))
         return user
 
     username = _normalize_username(payload.to_username)
     if not username:
-        raise HTTPException(status_code=400, detail="Destinatario inválido.")
+        raise HTTPException(status_code=400, detail=_td(locale, "Invalid recipient."))
 
     user = db.execute(
         select(User).where(User.username == username, User.is_active.is_(True))
     ).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Destinatario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Recipient not found."))
     return user
 
 
@@ -329,18 +375,19 @@ def _resolve_thread_for_participant(
     db: Session,
     thread_id: int,
     current_user_id: int,
+    locale: str,
 ) -> MessageThread:
     thread = db.execute(
         select(MessageThread).where(MessageThread.id == thread_id)
     ).scalar_one_or_none()
     if thread is None:
-        raise HTTPException(status_code=404, detail="Conversación no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Conversation not found."))
 
     guardian_user_id = int(thread.guardian_user_id) if thread.guardian_user_id else None
     recipient_user_id = int(thread.recipient_user_id)
 
     if guardian_user_id != current_user_id and recipient_user_id != current_user_id:
-        raise HTTPException(status_code=403, detail="No tienes acceso a esta conversación.")
+        raise HTTPException(status_code=403, detail=_td(locale, "You do not have access to this conversation."))
 
     return thread
 
@@ -357,20 +404,22 @@ def list_threads(
 
 @router.post("/threads", response_model=MessageThreadOut)
 def create_thread(
+    request: Request,
     payload: MessageThreadCreateInput,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale=locale)
     sender_user_id = int(current.user_number)
 
     if _is_all_users_broadcast(payload):
-        _require_all_users_broadcast_access(current)
+        _require_all_users_broadcast_access(current, locale=locale)
         recipients = _resolve_all_users_recipients(db=db, sender_user_id=sender_user_id)
         if not recipients:
             raise HTTPException(
                 status_code=409,
-                detail="No hay usuarios activos disponibles para enviar con @allusers.",
+                detail=_td(locale, "There are no active users available to send with @allusers."),
             )
 
         created_threads: list[MessageThread] = []
@@ -402,10 +451,10 @@ def create_thread(
         items = _build_threads_out(db=db, threads=[last_created_thread], current=current)
         return items[0]
 
-    recipient = _resolve_recipient_for_create(db=db, payload=payload)
+    recipient = _resolve_recipient_for_create(db=db, payload=payload, locale=locale)
 
     if int(recipient.id) == sender_user_id:
-        raise HTTPException(status_code=400, detail="No puedes enviarte mensajes a ti mismo.")
+        raise HTTPException(status_code=400, detail=_td(locale, "You cannot send messages to yourself."))
 
     thread = MessageThread(
         guardian_user_id=sender_user_id,
@@ -435,28 +484,31 @@ def create_thread(
 
 @router.post("/threads/{thread_id}/reply", response_model=MessageThreadOut)
 def reply_thread(
+    request: Request,
     thread_id: int,
     payload: MessageReplyInput,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     current_user_id = int(current.user_number)
     thread = _resolve_thread_for_participant(
         db=db,
         thread_id=thread_id,
         current_user_id=current_user_id,
+        locale=locale,
     )
 
     if not _can_reply_thread(thread=thread, current=current):
         raise HTTPException(
             status_code=403,
-            detail="No tienes permisos para responder en esta conversación.",
+            detail=_td(locale, "You do not have permission to reply in this conversation."),
         )
 
     if thread.guardian_user_id is None and not _is_guardian(current):
         raise HTTPException(
             status_code=409,
-            detail="Esta conversación ya no acepta respuestas.",
+            detail=_td(locale, "This conversation no longer accepts replies."),
         )
 
     entry = MessageEntry(

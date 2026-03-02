@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from app.auth.minor_accreditation import is_minor_protected
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.core.config import settings
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.core.storage import (
     S3NotConfiguredError,
     ensure_s3_configured,
@@ -38,13 +39,63 @@ from app.gallery.schemas import (
 router = APIRouter(prefix="/gallery", tags=["gallery"])
 
 
-def _ensure_media_storage_ready() -> None:
+def _locale(request: Request | None) -> str:
+    return locale_from_request(request, default="en")
+
+
+def _td(locale: str, en: str, **fmt: object) -> str:
+    translations: dict[str, tuple[str, str]] = {
+        "Storage de media no configurado ({error}).": (
+            "Almacenamiento de media no configurado ({error}).",
+            "Stockage média non configuré ({error}).",
+        ),
+        "Folder not found.": ("Carpeta no encontrada.", "Dossier introuvable."),
+        "User not found.": ("Usuario no encontrado.", "Utilisateur introuvable."),
+        "You already have a folder with that name.": (
+            "Ya tienes una carpeta con ese nombre.",
+            "Vous avez déjà un dossier avec ce nom.",
+        ),
+        "Some images are not valid for this folder: {items}.": (
+            "Algunas imágenes no son válidas para esta carpeta: {items}.",
+            "Certaines images ne sont pas valides pour ce dossier : {items}.",
+        ),
+        "The image does not belong to this folder.": (
+            "La imagen no pertenece a esta carpeta.",
+            "L'image n'appartient pas à ce dossier.",
+        ),
+        "You already have an album with that name.": (
+            "Ya tienes un álbum con ese nombre.",
+            "Vous avez déjà un album avec ce nom.",
+        ),
+        "Some media items are not valid for this album: {items}.": (
+            "Algunos elementos de media no son válidos para este álbum: {items}.",
+            "Certains éléments média ne sont pas valides pour cet album : {items}.",
+        ),
+        "You must attach at least one image or video ready to publish.": (
+            "Debes adjuntar al menos una imagen o video listo para publicar.",
+            "Vous devez joindre au moins une image ou vidéo prête à publier.",
+        ),
+    }
+    english = en.format(**fmt) if fmt else en
+    pair = translations.get(en)
+    if not pair:
+        return english
+    es, fr = pair
+    return i18n_tr(
+        locale,
+        es=(es.format(**fmt) if fmt else es),
+        en=english,
+        fr=(fr.format(**fmt) if fmt else fr),
+    )
+
+
+def _ensure_media_storage_ready(*, locale: str) -> None:
     try:
         ensure_s3_configured()
     except S3NotConfiguredError as exc:
         raise HTTPException(
             status_code=503,
-            detail=f"Storage de media no configurado ({exc}).",
+            detail=_td(locale, "Storage de media no configurado ({error}).", error=str(exc)),
         ) from exc
 
 
@@ -130,6 +181,7 @@ def _load_folder(
     db: Session,
     owner_id: int,
     folder_id: int,
+    locale: str,
 ) -> GalleryFolder:
     folder = db.execute(
         select(GalleryFolder).where(
@@ -138,7 +190,7 @@ def _load_folder(
         )
     ).scalar_one_or_none()
     if folder is None:
-        raise HTTPException(status_code=404, detail="Carpeta no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Folder not found."))
     return folder
 
 
@@ -222,11 +274,13 @@ def _post_media_kind_from_mime(mime_type: str | None) -> PostMediaKind | None:
 
 @router.get("/mine", response_model=GalleryMineOut)
 def get_my_gallery(
+    request: Request,
     recent_limit: int = Query(default=20, ge=1, le=40),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale=locale)
 
     owner_id = int(current.user_number)
     expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
@@ -268,25 +322,27 @@ def get_my_gallery(
     status_code=status.HTTP_201_CREATED,
 )
 def create_folder(
+    request: Request,
     payload: GalleryFolderCreateInput,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale=locale)
 
     owner_id = int(current.user_number)
     owner = db.execute(
         select(User).where(User.id == owner_id, User.is_active.is_(True))
     ).scalar_one_or_none()
     if owner is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     if _find_duplicate_folder_name(
         db=db,
         owner_id=owner_id,
         folder_name=payload.name,
     ):
-        raise HTTPException(status_code=409, detail="Ya tienes una carpeta con ese nombre.")
+        raise HTTPException(status_code=409, detail=_td(locale, "You already have a folder with that name."))
 
     effective_visibility = "private" if is_minor_protected(owner) else payload.visibility
 
@@ -310,15 +366,17 @@ def create_folder(
 
 @router.patch("/mine/folders/{folder_id}", response_model=GalleryFolderSummaryOut)
 def rename_folder(
+    request: Request,
     folder_id: int,
     payload: GalleryFolderUpdateInput,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale=locale)
 
     owner_id = int(current.user_number)
-    folder = _load_folder(db=db, owner_id=owner_id, folder_id=folder_id)
+    folder = _load_folder(db=db, owner_id=owner_id, folder_id=folder_id, locale=locale)
 
     if _find_duplicate_folder_name(
         db=db,
@@ -326,7 +384,7 @@ def rename_folder(
         folder_name=payload.name,
         exclude_folder_id=int(folder.id),
     ):
-        raise HTTPException(status_code=409, detail="Ya tienes una carpeta con ese nombre.")
+        raise HTTPException(status_code=409, detail=_td(locale, "You already have a folder with that name."))
 
     folder.name = payload.name
     folder.updated_at = datetime.now(timezone.utc)
@@ -345,12 +403,14 @@ def rename_folder(
 
 @router.delete("/mine/folders/{folder_id}", response_model=GalleryOperationStatusOut)
 def delete_folder(
+    request: Request,
     folder_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     owner_id = int(current.user_number)
-    folder = _load_folder(db=db, owner_id=owner_id, folder_id=folder_id)
+    folder = _load_folder(db=db, owner_id=owner_id, folder_id=folder_id, locale=locale)
     db.delete(folder)
     db.commit()
     return GalleryOperationStatusOut(deleted=True)
@@ -358,14 +418,16 @@ def delete_folder(
 
 @router.get("/mine/folders/{folder_id}", response_model=GalleryFolderDetailOut)
 def get_folder_detail(
+    request: Request,
     folder_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale=locale)
 
     owner_id = int(current.user_number)
-    folder = _load_folder(db=db, owner_id=owner_id, folder_id=folder_id)
+    folder = _load_folder(db=db, owner_id=owner_id, folder_id=folder_id, locale=locale)
 
     expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
     return _folder_to_detail(
@@ -378,15 +440,17 @@ def get_folder_detail(
 
 @router.post("/mine/folders/{folder_id}/items", response_model=GalleryFolderDetailOut)
 def add_images_to_folder(
+    request: Request,
     folder_id: int,
     payload: GalleryFolderAssignImagesInput,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale=locale)
 
     owner_id = int(current.user_number)
-    folder = _load_folder(db=db, owner_id=owner_id, folder_id=folder_id)
+    folder = _load_folder(db=db, owner_id=owner_id, folder_id=folder_id, locale=locale)
 
     medias = db.execute(
         select(Media)
@@ -407,7 +471,7 @@ def add_images_to_folder(
         invalid_list = ", ".join(str(media_id) for media_id in invalid_media_ids[:12])
         raise HTTPException(
             status_code=400,
-            detail=f"Algunas imágenes no son válidas para esta carpeta: {invalid_list}.",
+            detail=_td(locale, "Some images are not valid for this folder: {items}.", items=invalid_list),
         )
 
     existing_ids = set(
@@ -446,13 +510,15 @@ def add_images_to_folder(
     response_model=GalleryOperationStatusOut,
 )
 def remove_image_from_folder(
+    request: Request,
     folder_id: int,
     media_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     owner_id = int(current.user_number)
-    folder = _load_folder(db=db, owner_id=owner_id, folder_id=folder_id)
+    folder = _load_folder(db=db, owner_id=owner_id, folder_id=folder_id, locale=locale)
 
     item = db.execute(
         select(GalleryFolderItem).where(
@@ -463,7 +529,7 @@ def remove_image_from_folder(
     if item is None:
         raise HTTPException(
             status_code=404,
-            detail="La imagen no pertenece a esta carpeta.",
+            detail=_td(locale, "The image does not belong to this folder."),
         )
 
     db.delete(item)
@@ -478,25 +544,27 @@ def remove_image_from_folder(
     status_code=status.HTTP_201_CREATED,
 )
 def publish_album(
+    request: Request,
     payload: GalleryAlbumPublishInput,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale=locale)
 
     owner_id = int(current.user_number)
     owner = db.execute(
         select(User).where(User.id == owner_id, User.is_active.is_(True))
     ).scalar_one_or_none()
     if owner is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     if _find_duplicate_folder_name(
         db=db,
         owner_id=owner_id,
         folder_name=payload.name,
     ):
-        raise HTTPException(status_code=409, detail="Ya tienes un álbum con ese nombre.")
+        raise HTTPException(status_code=409, detail=_td(locale, "You already have an album with that name."))
 
     medias = db.execute(
         select(Media)
@@ -517,14 +585,14 @@ def publish_album(
         invalid_list = ", ".join(str(media_id) for media_id in invalid_media_ids[:12])
         raise HTTPException(
             status_code=400,
-            detail=f"Algunas media no son válidas para este álbum: {invalid_list}.",
+            detail=_td(locale, "Some media items are not valid for this album: {items}.", items=invalid_list),
         )
 
     ordered_medias = [media_map[media_id] for media_id in payload.media_ids if media_id in media_map]
     if not ordered_medias:
         raise HTTPException(
             status_code=400,
-            detail="Debes adjuntar al menos una imagen o video listo para publicar.",
+            detail=_td(locale, "You must attach at least one image or video ready to publish."),
         )
 
     effective_visibility = "private" if is_minor_protected(owner) else payload.visibility

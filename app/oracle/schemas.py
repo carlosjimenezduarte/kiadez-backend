@@ -29,10 +29,10 @@ class OracleRespondRequest(BaseModel):
         if self.response_type == OracleResponseType.public:
             text = (self.text_public or "").strip()
             if not text:
-                raise ValueError("text_public es requerido si la respuesta es pública.")
+                raise ValueError("text_public is required when the response is public.")
             words = _count_words(text)
             if words > MAX_PUBLIC_RESPONSE_WORDS:
-                raise ValueError(f"La respuesta pública supera el máximo de {MAX_PUBLIC_RESPONSE_WORDS} palabras.")
+                raise ValueError(f"Public response exceeds the maximum of {MAX_PUBLIC_RESPONSE_WORDS} words.")
             self.text_public = text
             self.ciphertext_hex = None
             self.nonce_hex = None
@@ -40,7 +40,7 @@ class OracleRespondRequest(BaseModel):
 
         if self.response_type == OracleResponseType.secret:
             if not self.ciphertext_hex or not self.nonce_hex:
-                raise ValueError("ciphertext_hex y nonce_hex son requeridos si la respuesta es secreta.")
+                raise ValueError("ciphertext_hex and nonce_hex are required when the response is secret.")
             self.text_public = None
             return self
 

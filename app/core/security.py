@@ -19,13 +19,13 @@ SPECIAL_RE = re.compile(r"[^a-zA-Z0-9]")  # símbolo (no letra / no número)
 
 def validate_password_policy(password: str) -> None:
     if len(password) < 8:
-        raise ValueError("La contraseña debe tener al menos 8 caracteres.")
+        raise ValueError("Password must be at least 8 characters long.")
     if not UPPERCASE_RE.search(password):
-        raise ValueError("La contraseña debe contener al menos 1 mayúscula.")
+        raise ValueError("Password must contain at least 1 uppercase letter.")
     if not DIGIT_RE.search(password):
-        raise ValueError("La contraseña debe contener al menos 1 número.")
+        raise ValueError("Password must contain at least 1 number.")
     if not SPECIAL_RE.search(password):
-        raise ValueError("La contraseña debe contener al menos 1 caracter especial.")
+        raise ValueError("Password must contain at least 1 special character.")
 
 
 # =========================
@@ -37,7 +37,7 @@ def hash_password(password: str) -> str:
 
     # bcrypt solo acepta hasta 72 bytes
     if len(pw) > 72:
-        raise ValueError("La contraseña es demasiado larga (máximo 72 bytes).")
+        raise ValueError("Password is too long (maximum 72 bytes).")
 
     hashed = bcrypt.hashpw(pw, bcrypt.gensalt())
     return hashed.decode("utf-8")
@@ -112,7 +112,7 @@ def decode_token(token: str) -> Dict[str, Any]:
             issuer=settings.JWT_ISSUER,
         )
     except JWTError as e:
-        raise ValueError("Token inválido o expirado.") from e
+        raise ValueError("Invalid or expired token.") from e
 
 def create_2fa_temp_token(sub: int) -> str:
     now = datetime.now(timezone.utc)

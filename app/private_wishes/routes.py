@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.core.config import settings
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.core.storage import S3NotConfiguredError, generate_presigned_get_url
 from app.db.database import get_db
 from app.db.models.media import Media
@@ -26,6 +27,41 @@ from app.private_wishes.schemas import (
 router = APIRouter(prefix="/private-wishes", tags=["private-wishes"])
 
 PERSONAL_ACTIVE_LIMIT = 50
+
+
+def _locale(request: Request | None) -> str:
+    return locale_from_request(request, default="en")
+
+
+def _td(locale: str, en: str, **fmt: object) -> str:
+    translations: dict[str, tuple[str, str]] = {
+        "Media not found.": ("Medio no encontrado.", "Média introuvable."),
+        "Not authorized to use this media.": ("No autorizado para usar este medio.", "Non autorisé à utiliser ce média."),
+        "Media not available yet.": ("El medio aún no está disponible.", "Le média n'est pas encore disponible."),
+        "Required field: {field}.": ("Campo requerido: {field}.", "Champ requis : {field}."),
+        "Invalid {field} (hex).": ("{field} inválido (hex).", "{field} invalide (hex)."),
+        "User not found.": ("Usuario no encontrado.", "Utilisateur introuvable."),
+        "You already reached the maximum of {limit} active private wishes.": (
+            "Ya alcanzaste el máximo de {limit} deseos privados activos.",
+            "Vous avez déjà atteint le maximum de {limit} souhaits privés actifs.",
+        ),
+        "Invalid nonce_hex (expected 12 bytes).": (
+            "nonce_hex inválido (se esperaban 12 bytes).",
+            "nonce_hex invalide (12 octets attendus).",
+        ),
+        "Private wish not found.": ("Deseo privado no encontrado.", "Souhait privé introuvable."),
+    }
+    english = en.format(**fmt) if fmt else en
+    pair = translations.get(en)
+    if not pair:
+        return english
+    es, fr = pair
+    return i18n_tr(
+        locale,
+        es=(es.format(**fmt) if fmt else es),
+        en=english,
+        fr=(fr.format(**fmt) if fmt else fr),
+    )
 
 
 def _build_media_url(media: Media | None) -> str | None:
@@ -60,37 +96,39 @@ def _wish_out(*, wish: PrivatePersonalWish, media_map: dict[int, Media]) -> Priv
     )
 
 
-def _resolve_owned_media(*, db: Session, media_id: int | None, user_id: int) -> Media | None:
+def _resolve_owned_media(*, db: Session, media_id: int | None, user_id: int, locale: str) -> Media | None:
     if media_id is None:
         return None
 
     media = db.execute(select(Media).where(Media.id == media_id)).scalar_one_or_none()
     if media is None:
-        raise HTTPException(status_code=404, detail="Media no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Media not found."))
     if media.owner_id != user_id:
-        raise HTTPException(status_code=403, detail="No autorizado para usar esta media.")
+        raise HTTPException(status_code=403, detail=_td(locale, "Not authorized to use this media."))
     if media.status != "ready":
-        raise HTTPException(status_code=409, detail="Media aún no disponible.")
+        raise HTTPException(status_code=409, detail=_td(locale, "Media not available yet."))
     return media
 
 
-def _parse_hex_bytes(value: str | None, *, field: str) -> bytes:
+def _parse_hex_bytes(value: str | None, *, field: str, locale: str) -> bytes:
     if not value:
-        raise HTTPException(status_code=400, detail=f"Campo requerido: {field}.")
+        raise HTTPException(status_code=400, detail=_td(locale, "Required field: {field}.", field=field))
     try:
         return bytes.fromhex(value)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"{field} inválido (hex).")
+        raise HTTPException(status_code=400, detail=_td(locale, "Invalid {field} (hex).", field=field))
 
 
 @router.get("/personal", response_model=PrivatePersonalWishListOut)
 def list_personal_private_wishes(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     wishes = db.execute(
         select(PrivatePersonalWish)
@@ -126,14 +164,16 @@ def list_personal_private_wishes(
 
 @router.get("/personal/fulfilled", response_model=PrivatePersonalWishFulfilledListOut)
 def list_fulfilled_personal_private_wishes(
+    request: Request,
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     total = db.execute(
         select(func.count(PrivatePersonalWish.id))
@@ -171,13 +211,15 @@ def list_fulfilled_personal_private_wishes(
 
 @router.post("/personal", response_model=PrivatePersonalWishOut)
 def create_personal_private_wish(
+    request: Request,
     payload: PrivatePersonalWishUpsertRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     active_count = db.execute(
         select(func.count(PrivatePersonalWish.id))
@@ -187,15 +229,19 @@ def create_personal_private_wish(
     if active_count >= PERSONAL_ACTIVE_LIMIT:
         raise HTTPException(
             status_code=409,
-            detail=f"Ya alcanzaste el máximo de {PERSONAL_ACTIVE_LIMIT} deseos privados activos.",
+            detail=_td(
+                locale,
+                "You already reached the maximum of {limit} active private wishes.",
+                limit=PERSONAL_ACTIVE_LIMIT,
+            ),
         )
 
-    ciphertext = _parse_hex_bytes(payload.ciphertext_hex, field="ciphertext_hex")
-    nonce = _parse_hex_bytes(payload.nonce_hex, field="nonce_hex")
+    ciphertext = _parse_hex_bytes(payload.ciphertext_hex, field="ciphertext_hex", locale=locale)
+    nonce = _parse_hex_bytes(payload.nonce_hex, field="nonce_hex", locale=locale)
     if len(nonce) != 12:
-        raise HTTPException(status_code=400, detail="nonce_hex inválido (se esperan 12 bytes).")
+        raise HTTPException(status_code=400, detail=_td(locale, "Invalid nonce_hex (expected 12 bytes)."))
 
-    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number)
+    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number, locale=locale)
 
     wish = PrivatePersonalWish(
         user_id=current.user_number,
@@ -216,14 +262,16 @@ def create_personal_private_wish(
 
 @router.put("/personal/{wish_id}", response_model=PrivatePersonalWishOut)
 def update_personal_private_wish(
+    request: Request,
     wish_id: int,
     payload: PrivatePersonalWishUpsertRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     wish = db.execute(
         select(PrivatePersonalWish)
@@ -232,14 +280,14 @@ def update_personal_private_wish(
         .where(PrivatePersonalWish.status == PrivatePersonalWishStatus.active)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo privado no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Private wish not found."))
 
-    ciphertext = _parse_hex_bytes(payload.ciphertext_hex, field="ciphertext_hex")
-    nonce = _parse_hex_bytes(payload.nonce_hex, field="nonce_hex")
+    ciphertext = _parse_hex_bytes(payload.ciphertext_hex, field="ciphertext_hex", locale=locale)
+    nonce = _parse_hex_bytes(payload.nonce_hex, field="nonce_hex", locale=locale)
     if len(nonce) != 12:
-        raise HTTPException(status_code=400, detail="nonce_hex inválido (se esperan 12 bytes).")
+        raise HTTPException(status_code=400, detail=_td(locale, "Invalid nonce_hex (expected 12 bytes)."))
 
-    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number)
+    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number, locale=locale)
 
     wish.ciphertext = ciphertext
     wish.nonce = nonce
@@ -254,10 +302,12 @@ def update_personal_private_wish(
 
 @router.delete("/personal/{wish_id}", response_model=PrivatePersonalWishDeleteResponse)
 def delete_personal_private_wish(
+    request: Request,
     wish_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     wish = db.execute(
         select(PrivatePersonalWish)
         .where(PrivatePersonalWish.id == wish_id)
@@ -265,7 +315,7 @@ def delete_personal_private_wish(
         .where(PrivatePersonalWish.status == PrivatePersonalWishStatus.active)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo privado no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Private wish not found."))
 
     db.delete(wish)
     db.commit()
@@ -274,11 +324,13 @@ def delete_personal_private_wish(
 
 @router.post("/personal/{wish_id}/fulfill", response_model=PrivatePersonalWishOut)
 def fulfill_personal_private_wish(
+    request: Request,
     wish_id: int,
     payload: PrivatePersonalWishFulfillRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     wish = db.execute(
         select(PrivatePersonalWish)
         .where(PrivatePersonalWish.id == wish_id)
@@ -286,12 +338,13 @@ def fulfill_personal_private_wish(
         .where(PrivatePersonalWish.status == PrivatePersonalWishStatus.active)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo privado no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Private wish not found."))
 
     evidence_media = _resolve_owned_media(
         db=db,
         media_id=payload.evidence_media_id,
         user_id=current.user_number,
+        locale=locale,
     )
 
     wish.status = PrivatePersonalWishStatus.fulfilled
@@ -309,4 +362,3 @@ def fulfill_personal_private_wish(
     if evidence_media:
         media_map[evidence_media.id] = evidence_media
     return _wish_out(wish=wish, media_map=media_map)
-

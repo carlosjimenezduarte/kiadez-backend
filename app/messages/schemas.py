@@ -20,16 +20,16 @@ class MessageThreadCreateInput(BaseModel):
             username = username[1:]
 
         if bool(self.to_user_id) == bool(username):
-            raise ValueError("Debes enviar exactamente uno: to_user_id o to_username.")
+            raise ValueError("You must send exactly one: to_user_id or to_username.")
 
         self.to_username = username or None
         self.subject = (self.subject or "").strip()
         self.body = (self.body or "").strip()
 
         if not self.subject:
-            raise ValueError("Debes escribir el asunto.")
+            raise ValueError("You must write the subject.")
         if not self.body:
-            raise ValueError("Debes escribir el mensaje.")
+            raise ValueError("You must write the message.")
 
         return self
 
@@ -41,7 +41,7 @@ class MessageReplyInput(BaseModel):
     def normalize(self):
         self.body = (self.body or "").strip()
         if not self.body:
-            raise ValueError("Debes escribir el mensaje.")
+            raise ValueError("You must write the message.")
         return self
 
 

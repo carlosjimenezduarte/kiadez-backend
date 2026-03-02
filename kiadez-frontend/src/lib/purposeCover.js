@@ -1,20 +1,323 @@
 import { clearDekSession, getDekSessionHex, setDekSessionHex } from "./dekSession";
+import { getLocale } from "./i18n";
 
 const API = "http://127.0.0.1:8000";
 const AAD_PURPOSE = new TextEncoder().encode("kiadez-life-purpose-v1");
 const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
 const AAD_PRIVATE_WISH = new TextEncoder().encode("kiadez-private-wish-v1");
 const PRIVATE_MEDIA_AAD_PREFIX = "kiadez-private-media-v1:";
-const PURPOSE_PREFIX = "Deseo ";
-const PURPOSE_SECRET_TEXT = "Deseo marcado como secreto";
-const PURPOSE_UNDEFINED_TEXT = "Deseo de propósito sin definir";
-const PURPOSE_REVEAL_PREFIX = "Este deseo será revelado";
+
+const normalizeLocaleCode = (value) => {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return null;
+  if (raw.startsWith("es")) return "es";
+  if (raw.startsWith("en")) return "en";
+  if (raw.startsWith("fr")) return "fr";
+  return null;
+};
+
+const localeFromUrl = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return normalizeLocaleCode(params.get("lang"));
+  } catch {
+    return null;
+  }
+};
+
+const localeFromStorage = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    return normalizeLocaleCode(window.localStorage.getItem("kiadez_locale"));
+  } catch {
+    return null;
+  }
+};
+
+const resolvePurposeLocale = () => {
+  const urlLocale = localeFromUrl();
+  if (urlLocale) return urlLocale;
+
+  const storageLocale = localeFromStorage();
+  if (storageLocale === "es" || storageLocale === "fr") return storageLocale;
+
+  const i18nLocale = normalizeLocaleCode(getLocale());
+  if (i18nLocale === "es" || i18nLocale === "fr") return i18nLocale;
+  return "es";
+};
+
+const locale = resolvePurposeLocale();
+const isEn = locale === "en";
+const isFr = locale === "fr";
+const tr = (es, en, fr = en) => (isEn ? en : isFr ? fr : es);
+const PURPOSE_PREFIX = tr("Deseo ", "Wish ", "Souhait ");
+const LEGACY_PURPOSE_PREFIXES = ["Wish ", "Deseo ", "Souhait "];
+const PURPOSE_SECRET_TEXT = tr(
+  "Deseo marcado como secreto",
+  "Wish marked as secret",
+  "Souhait marqué comme secret",
+);
+const PURPOSE_UNDEFINED_TEXT = tr(
+  "Deseo de propósito sin definir",
+  "Undefined purpose wish",
+  "Souhait de finalité non défini",
+);
+const PURPOSE_REVEAL_PREFIX = tr(
+  "Este deseo se revelará",
+  "This wish will be revealed",
+  "Ce souhait sera révélé",
+);
 const COVER_DEFAULT_IMAGE = "/assets/cover-default.jpg";
+const TXT_EDIT_COVER = tr(
+  "Editar imagen de portada",
+  "Edit cover image",
+  "Modifier l'image de couverture",
+);
+const TXT_UPLOAD_IMAGE = tr("Subir imagen", "Upload image", "Téléverser une image");
+const TXT_MOVE_IMAGE = tr("Mover imagen", "Move image", "Déplacer l'image");
+const TXT_SAVE_CHANGES = tr("Guardar cambios", "Save changes", "Enregistrer les modifications");
+const TXT_CANCEL = tr("Cancelar", "Cancel", "Annuler");
+const TXT_EDIT_LIFE_PURPOSE = tr(
+  "Editar mi propósito de vida",
+  "Edit my life purpose",
+  "Modifier mon objectif de vie",
+);
+const TXT_PURPOSE_WISHES = tr(
+  "Deseos de propósito",
+  "Purpose wishes",
+  "Souhaits de finalité",
+);
+const TXT_MARK_FULFILLED = tr(
+  "Marcar deseo {slot} como cumplido",
+  "Mark wish {slot} as fulfilled",
+  "Marquer le souhait {slot} comme accompli",
+);
+const TXT_UNLOCK_WISH = tr(
+  "Desbloquear deseo {slot}",
+  "Unlock wish {slot}",
+  "Déverrouiller le souhait {slot}",
+);
+const TXT_DEFINE_FIRST = tr(
+  "Define primero este deseo antes de marcarlo como cumplido.",
+  "Define this purpose first before marking it as fulfilled.",
+  "Définis d'abord ce souhait avant de le marquer comme accompli.",
+);
+const TXT_PURPOSE_FULFILLED_HINT = tr(
+  "Deseo cumplido. Define uno nuevo desde Editar mi propósito de vida.",
+  "Purpose fulfilled. Define a new one from Edit my life purpose.",
+  "Souhait accompli. Définis-en un nouveau depuis Modifier mon objectif de vie.",
+);
+const TXT_STATUS_PUBLIC_DEFAULT = tr(
+  "Estado: público por defecto.",
+  "Status: public by default.",
+  "Statut : public par défaut.",
+);
+const TXT_STATUS_SECRET = tr(
+  "Estado: marcado como secreto.",
+  "Status: marked as secret.",
+  "Statut : marqué comme secret.",
+);
+const TXT_STATUS_CONFIRMED_PUBLIC = tr(
+  "Estado: confirmado (público).",
+  "Status: confirmed (public).",
+  "Statut : confirmé (public).",
+);
+const TXT_STATUS_ICON_ASSOCIATED = tr(
+  "Estado: ícono asociado: {label}.",
+  "Status: icon associated: {label}.",
+  "Statut : icône associée : {label}.",
+);
+const TXT_ICON_SELECTED = tr(
+  "Ícono: {label}",
+  "Icon: {label}",
+  "Icône : {label}",
+);
+const TXT_STATUS_REVEAL_ON = tr(
+  "Estado: se revelará el {date}.",
+  "Status: will be revealed on {date}.",
+  "Statut : sera révélé le {date}.",
+);
+const TXT_COMPLETE_BEFORE_SAVING = tr(
+  "Completa este propósito antes de guardar.",
+  "Complete this purpose before saving.",
+  "Complète cet objectif avant d'enregistrer.",
+);
+const TXT_SAVE_PURPOSE = tr(
+  "Guardar propósito",
+  "Save purpose",
+  "Enregistrer l'objectif",
+);
+const TXT_BACK = tr("Volver", "Back", "Retour");
+const TXT_CONFIRM = tr("Confirmar", "Confirm", "Confirmer");
+const TXT_UNLOCK = tr("Desbloquear", "Unlock", "Déverrouiller");
+const TXT_PRIVATE = tr("Privado", "Private", "Privé");
+const TXT_PUBLIC = tr("Público", "Public", "Public");
+const TXT_UPLOAD_VISUAL_EVIDENCE = tr(
+  "Sube evidencia visual.",
+  "Upload visual evidence.",
+  "Téléverse une preuve visuelle.",
+);
+const TXT_CHOOSE_ICON = tr("Elegir ícono", "Choose icon", "Choisir l'icône");
+const TXT_MARK_FULFILLED_WISH = tr(
+  "Marcar deseo cumplido",
+  "Mark fulfilled wish",
+  "Marquer le souhait comme accompli",
+);
+const TXT_UNLOCK_SECRET_WISH = tr(
+  "Desbloquear deseo secreto",
+  "Unlock secret wish",
+  "Déverrouiller le souhait secret",
+);
+const TXT_SELECTED_EVIDENCE = tr(
+  "Evidencia seleccionada",
+  "Selected evidence",
+  "Preuve sélectionnée",
+);
+const TXT_PNG_TYPES = "PNG, WEBP, JPEG, etc.";
+const TXT_ERR_NO_ACTIVE_SESSION = tr(
+  "No hay sesión activa.",
+  "There is no active session.",
+  "Aucune session active.",
+);
+const TXT_ERR_SESSION_EXPIRED = tr(
+  "Sesión expirada. Inicia sesión de nuevo.",
+  "Session expired. Sign in again.",
+  "Session expirée. Connecte-toi de nouveau.",
+);
+const TXT_ERR_COULD_NOT_UPLOAD_COVER = tr(
+  "No se pudo subir la portada.",
+  "Could not upload the cover.",
+  "Impossible de téléverser la couverture.",
+);
+const TXT_ERR_COULD_NOT_SAVE_COVER = tr(
+  "No se pudo guardar la portada.",
+  "Could not save the cover.",
+  "Impossible d'enregistrer la couverture.",
+);
+const TXT_ERR_COULD_NOT_READ_VAULT = tr(
+  "No se pudo leer la bóveda.",
+  "Could not read the vault.",
+  "Impossible de lire le coffre.",
+);
+const TXT_ERR_ENTER_PRIVATE_KEY = tr(
+  "Debes ingresar tu clave privada personal.",
+  "You must enter your personal private key.",
+  "Tu dois saisir ta clé privée personnelle.",
+);
+const TXT_ERR_INVALID_PRIVATE_KEY = tr(
+  "Clave privada incorrecta. Intenta nuevamente.",
+  "Incorrect password. Try again.",
+  "Mot de passe incorrect. Réessaie.",
+);
+const TXT_ERR_NO_ENCRYPTED_DATA = tr(
+  "No hay datos cifrados para este deseo.",
+  "There is no encrypted data for this wish.",
+  "Il n'y a pas de données chiffrées pour ce souhait.",
+);
+const TXT_ERR_COULD_NOT_REVEAL_WISH = tr(
+  "No se pudo revelar el deseo.",
+  "Could not reveal the wish.",
+  "Impossible de révéler le souhait.",
+);
+const TXT_ERR_COULD_NOT_UNLOCK_WISH = tr(
+  "No se pudo desbloquear el deseo.",
+  "Could not unlock the wish.",
+  "Impossible de déverrouiller le souhait.",
+);
+const TXT_ERR_PURPOSE_NOT_FOUND = tr(
+  "No se encontró el propósito. Intenta recargar la página.",
+  "Purpose not found. Try reloading the page.",
+  "Objectif introuvable. Essaie de recharger la page.",
+);
+const TXT_ERR_DEFINE_TEXT_FIRST = tr(
+  "Define primero el texto de este propósito antes de publicarlo.",
+  "Define this purpose text first before publishing it.",
+  "Définis d'abord le texte de cet objectif avant de le publier.",
+);
+const TXT_ERR_COULD_NOT_PUBLISH_WISH = tr(
+  "No se pudo publicar el deseo.",
+  "Could not publish the wish.",
+  "Impossible de publier le souhait.",
+);
+const TXT_ERR_COULD_NOT_VERIFY_VAULT = tr(
+  "No se pudo verificar el estado de tu clave privada.",
+  "Could not verify your private key status.",
+  "Impossible de vérifier l'état de ta clé privée.",
+);
+const TXT_ERR_COULD_NOT_VALIDATE_PRIVATE_KEY = tr(
+  "No se pudo validar la clave privada personal.",
+  "Could not validate the personal private key.",
+  "Impossible de valider la clé privée personnelle.",
+);
+const TXT_ERR_CONFIRM_WORD_REQUIRED = tr(
+  "Debes escribir la palabra de confirmación.",
+  "You must write the confirmation word.",
+  "Tu dois écrire le mot de confirmation.",
+);
+const TXT_ERR_CONFIRM_WORD_MISMATCH = tr(
+  "La palabra de confirmación no coincide.",
+  "Confirmation word does not match.",
+  "Le mot de confirmation ne correspond pas.",
+);
+const TXT_ERR_COULD_NOT_RESTORE_PRIVATE_KEY = tr(
+  "No se pudo restaurar tu clave privada.",
+  "Could not restore your private key.",
+  "Impossible de restaurer ta clé privée.",
+);
+const TXT_ERR_COULD_NOT_CHANGE_PRIVATE_PASSWORD = tr(
+  "No se pudo cambiar la clave privada.",
+  "Could not change the private password.",
+  "Impossible de changer le mot de passe privé.",
+);
+const TXT_ERR_CURRENT_PRIVATE_REQUIRED = tr(
+  "Debes ingresar tu clave privada actual.",
+  "You must enter your current private password.",
+  "Tu dois saisir ton mot de passe privé actuel.",
+);
+const TXT_ERR_NEW_PRIVATE_MIN = tr(
+  "Tu nueva clave debe tener al menos 8 caracteres.",
+  "Your new key must be at least 8 characters long.",
+  "Ta nouvelle clé doit contenir au moins 8 caractères.",
+);
+const TXT_ERR_NEW_PRIVATE_CONFIRM = tr(
+  "La confirmación no coincide con tu nueva clave.",
+  "Confirmation does not match your new key.",
+  "La confirmation ne correspond pas à ta nouvelle clé.",
+);
+const TXT_ERR_COULD_NOT_UPDATE_PRIVATE_KEY = tr(
+  "No se pudo actualizar tu clave privada.",
+  "Could not update your private key.",
+  "Impossible de mettre à jour ta clé privée.",
+);
+const TXT_ERR_COULD_NOT_UNLOCK_VAULT = tr(
+  "No se pudo desbloquear tu clave privada personal.",
+  "Could not unlock your personal private key.",
+  "Impossible de déverrouiller ta clé privée personnelle.",
+);
+const TXT_ERR_COULD_NOT_UNLOCK_VAULT_GENERIC = tr(
+  "No se pudo desbloquear la bóveda.",
+  "Could not unlock the vault.",
+  "Impossible de déverrouiller le coffre.",
+);
+const TXT_ERR_COULD_NOT_SAVE_PURPOSES = tr(
+  "No se pudieron guardar los propósitos.",
+  "Could not save purposes.",
+  "Impossible d'enregistrer les objectifs.",
+);
 
 const DEFAULT_PURPOSE_TEXT = {
-  1: "Deseo #1: Secreto",
-  2: "Deseo construir el Reino de Combray",
-  3: "Deseo estar unido a Jesús"
+  1: tr("Deseo #1: Secreto", "Wish #1: Secret", "Souhait n°1 : Secret"),
+  2: tr(
+    "Deseo construir el Reino de Combray",
+    "I wish to build the Kingdom of Combray",
+    "Je souhaite construire le Royaume de Combray",
+  ),
+  3: tr(
+    "Deseo estar unido a Jesús",
+    "I wish to be united with Jesus",
+    "Je souhaite être uni à Jésus",
+  ),
 };
 
 const getAccessToken = () =>
@@ -63,19 +366,22 @@ const normalizePurposeText = (value) => {
   const trimmed = (value || "").trim();
   if (!trimmed) return "";
   if (trimmed === PURPOSE_PREFIX.trim()) return "";
-  if (trimmed.startsWith(PURPOSE_PREFIX)) {
-    const rest = trimmed.slice(PURPOSE_PREFIX.length).trim();
+  const legacyPrefix = LEGACY_PURPOSE_PREFIXES.find((prefix) =>
+    trimmed.startsWith(prefix),
+  );
+  if (legacyPrefix) {
+    const rest = trimmed.slice(legacyPrefix.length).trim();
     return rest ? `${PURPOSE_PREFIX}${rest}` : "";
   }
   return `${PURPOSE_PREFIX}${trimmed}`;
 };
 
 const getIconLabel = (iconKey) => {
-  if (iconKey === "air") return "Aire";
-  if (iconKey === "earth") return "Tierra";
-  if (iconKey === "water") return "Agua";
-  if (iconKey === "fire") return "Fuego";
-  return "Icono";
+  if (iconKey === "air") return tr("Aire", "Air", "Air");
+  if (iconKey === "earth") return tr("Tierra", "Earth", "Terre");
+  if (iconKey === "water") return tr("Agua", "Water", "Eau");
+  if (iconKey === "fire") return tr("Fuego", "Fire", "Feu");
+  return tr("Icono", "Icon", "Icône");
 };
 
 const getIconSrc = (iconKey) => `assets/${iconKey}.png`;
@@ -162,10 +468,10 @@ const ensureCoverLayout = () => {
     const menuEl = document.createElement("details");
     menuEl.className = "cover-menu";
     menuEl.innerHTML = `
-      <summary class="icon-btn" id="btnChangeCover" title="Editar imagen de portada">Editar imagen de portada</summary>
+      <summary class="icon-btn" id="btnChangeCover" title="${TXT_EDIT_COVER}">${TXT_EDIT_COVER}</summary>
       <div class="cover-menu-panel">
-        <button class="cover-menu-item" type="button" id="coverUpload">Subir imagen</button>
-        <button class="cover-menu-item" type="button" id="coverMove">Mover imagen</button>
+        <button class="cover-menu-item" type="button" id="coverUpload">${TXT_UPLOAD_IMAGE}</button>
+        <button class="cover-menu-item" type="button" id="coverMove">${TXT_MOVE_IMAGE}</button>
       </div>
     `;
     if (legacyBtn) {
@@ -178,8 +484,8 @@ const ensureCoverLayout = () => {
 
   const coverSummary = coverMenu.querySelector("#btnChangeCover");
   if (coverSummary) {
-    coverSummary.textContent = "Editar imagen de portada";
-    coverSummary.title = "Editar imagen de portada";
+    coverSummary.textContent = TXT_EDIT_COVER;
+    coverSummary.title = TXT_EDIT_COVER;
   }
 
   const coverSelectExisting = coverMenu.querySelector("#coverSelectExisting");
@@ -189,13 +495,13 @@ const ensureCoverLayout = () => {
   if (!coverMenu.querySelector("#coverUpload")) {
     const panel = coverMenu.querySelector(".cover-menu-panel");
     panel?.insertAdjacentHTML("beforeend", `
-      <button class="cover-menu-item" type="button" id="coverUpload">Subir imagen</button>
+      <button class="cover-menu-item" type="button" id="coverUpload">${TXT_UPLOAD_IMAGE}</button>
     `);
   }
   if (!coverMenu.querySelector("#coverMove")) {
     const panel = coverMenu.querySelector(".cover-menu-panel");
     panel?.insertAdjacentHTML("beforeend", `
-      <button class="cover-menu-item" type="button" id="coverMove">Mover imagen</button>
+      <button class="cover-menu-item" type="button" id="coverMove">${TXT_MOVE_IMAGE}</button>
     `);
   }
 
@@ -215,8 +521,8 @@ const ensureCoverLayout = () => {
     coverSaveActions.id = "coverSaveActions";
     coverSaveActions.className = "cover-save-actions hidden";
     coverSaveActions.innerHTML = `
-      <button class="btn btn-primary btn-compact" type="button" id="coverSaveBtn">Guardar cambios</button>
-      <button class="btn btn-outline btn-compact" type="button" id="coverCancelBtn">Cancelar</button>
+      <button class="btn btn-primary btn-compact" type="button" id="coverSaveBtn">${TXT_SAVE_CHANGES}</button>
+      <button class="btn btn-outline btn-compact" type="button" id="coverCancelBtn">${TXT_CANCEL}</button>
     `;
     coverMedia.appendChild(coverSaveActions);
   }
@@ -335,7 +641,7 @@ const initCoverEditor = () => {
 
   const uploadCoverImageFile = async (file) => {
     const token = getAccessToken();
-    if (!token) throw new Error("No hay sesión activa.");
+    if (!token) throw new Error(TXT_ERR_NO_ACTIVE_SESSION);
 
     const formData = new FormData();
     formData.append("visibility", "public");
@@ -350,11 +656,11 @@ const initCoverEditor = () => {
     });
     const data = await parseResponseJson(response);
     if (!response.ok) {
-      throw new Error(data?.detail || "No se pudo subir la portada.");
+      throw new Error(data?.detail || TXT_ERR_COULD_NOT_UPLOAD_COVER);
     }
     const mediaId = Number(data?.media_id || 0) || null;
     if (!mediaId) {
-      throw new Error("No se recibió media_id para la portada.");
+      throw new Error("No media_id was received for the cover.");
     }
     return {
       media_id: mediaId,
@@ -426,7 +732,7 @@ const initCoverEditor = () => {
       });
       const data = await parseResponseJson(response);
       if (!response.ok) {
-        throw new Error(data?.detail || "No se pudo guardar la portada.");
+        throw new Error(data?.detail || TXT_ERR_COULD_NOT_SAVE_COVER);
       }
 
       coverSavedMediaId = Number(data?.media_id || 0) || null;
@@ -447,7 +753,7 @@ const initCoverEditor = () => {
       updateCoverTransform(coverOffsetX, coverOffsetY);
       window.dispatchEvent(new CustomEvent("kiadez:cover-photo-updated", { detail: data }));
     } catch (error) {
-      window.alert(error?.message || "No se pudo guardar la portada.");
+      window.alert(error?.message || TXT_ERR_COULD_NOT_SAVE_COVER);
     } finally {
       coverSaving = false;
       if (coverSaveBtn) coverSaveBtn.disabled = false;
@@ -549,102 +855,54 @@ const ensurePurposeModals = () => {
   if (!document.getElementById("lifeProposalOverlay")) {
     document.body.insertAdjacentHTML("beforeend", `
       <div class="modal-overlay hidden" id="lifeProposalOverlay" aria-hidden="true">
-        <div class="modal modal-wide life-proposal-modal" role="dialog" aria-modal="true" aria-label="Propósito de vida">
+        <div class="modal modal-wide life-proposal-modal" role="dialog" aria-modal="true" aria-label="${tr("Propósito de vida", "Life purpose", "Objectif de vie")}">
           <div class="modal-head">
-            <h3>Propósito de vida</h3>
+            <h3>${tr("Propósito de vida", "Life purpose", "Objectif de vie")}</h3>
             <button class="modal-close" type="button" id="lifeProposalClose">✕</button>
           </div>
           <div class="modal-body life-proposal-body">
             <div class="auth-card auth-card--wide auth-card--life life-proposal-card">
-              <h2 class="auth-title">Tu propósito de vida</h2>
+              <h2 class="auth-title">${tr("Tu propósito de vida", "Your life purpose", "Ton objectif de vie")}</h2>
               <div class="auth-message">
                 <p>
-                  Escribe tres deseos que orienten tu camino.
+                  ${tr("Escribe tres deseos que orienten tu camino.", "Write three wishes that guide your path.", "Écris trois souhaits qui orientent ton chemin.")}
                   <br>
-                  Son brújula, no presión.
+                  ${tr("Son una brújula, no una presión.", "They are a compass, not pressure.", "Ils sont une boussole, pas une pression.")}
                 </p>
                 <p class="muted">
-                  Estos propósitos se guardan cifrados con tu clave privada personal.
+                  ${tr("Estos propósitos se almacenan cifrados con tu clave privada personal.", "These purposes are stored encrypted with your personal private key.", "Ces objectifs sont stockés chiffrés avec ta clé privée personnelle.")}
                 </p>
               </div>
               <form id="life-form">
-                <div class="purpose-group" data-purpose="1">
-                  <textarea id="p1" class="wish-prefix-input" data-prefix="Deseo " rows="1" maxlength="80" placeholder="Deseo 1" required>Deseo </textarea>
-                  <div class="purpose-actions" role="group" aria-label="Acciones para propósito 1">
-                    <button type="button" class="purpose-action" data-action="confirm" title="Confirmar deseo de propósito" aria-label="Confirmar deseo de propósito">
-                      <img src="/css/icons/iconsave.webp" alt="Guardar propósito">
-                    </button>
-                    <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto" aria-label="Convertir en secreto">
-                      <img src="/css/icons/iconkey.webp" alt="Marcar como secreto">
-                    </button>
-                    <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha" aria-label="Revelar en fecha">
-                      <img src="/css/icons/iconcalendar.webp" alt="Programar fecha">
-                    </button>
-                    <button type="button" class="purpose-action" data-action="icon" title="Elegir icono" aria-label="Elegir icono">
-                      <img src="/css/icons/iconelemental.webp" alt="Elegir icono">
-                    </button>
+                ${[1, 2, 3].map((slot) => `
+                  <div class="purpose-group" data-purpose="${slot}">
+                    <textarea id="p${slot}" class="wish-prefix-input" data-prefix="${PURPOSE_PREFIX}" rows="1" maxlength="80" placeholder="${tr("Deseo " + slot, "Wish " + slot, "Souhait " + slot)}" required>${PURPOSE_PREFIX}</textarea>
+                    <div class="purpose-actions" role="group" aria-label="${tr("Acciones para el propósito " + slot, "Actions for purpose " + slot, "Actions pour l'objectif " + slot)}">
+                      <button type="button" class="purpose-action" data-action="confirm" title="${tr("Confirmar deseo de propósito", "Confirm purpose wish", "Confirmer le souhait")}" aria-label="${tr("Confirmar deseo de propósito", "Confirm purpose wish", "Confirmer le souhait")}">
+                        <img src="/css/icons/iconsave.webp" alt="${tr("Guardar propósito", "Save purpose", "Enregistrer l'objectif")}">
+                      </button>
+                      <button type="button" class="purpose-action" data-action="secret" title="${tr("Marcar como secreto", "Mark as secret", "Marquer comme secret")}" aria-label="${tr("Marcar como secreto", "Mark as secret", "Marquer comme secret")}">
+                        <img src="/css/icons/iconkey.webp" alt="${tr("Marcar como secreto", "Mark as secret", "Marquer comme secret")}">
+                      </button>
+                      <button type="button" class="purpose-action" data-action="reveal" title="${tr("Revelar en fecha", "Reveal on date", "Révéler à la date")}" aria-label="${tr("Revelar en fecha", "Reveal on date", "Révéler à la date")}">
+                        <img src="/css/icons/iconcalendar.webp" alt="${tr("Programar fecha", "Schedule date", "Planifier la date")}">
+                      </button>
+                      <button type="button" class="purpose-action" data-action="icon" title="${tr("Elegir ícono", "Choose icon", "Choisir l'icône")}" aria-label="${tr("Elegir ícono", "Choose icon", "Choisir l'icône")}">
+                        <img src="/css/icons/iconelemental.webp" alt="${tr("Elegir ícono", "Choose icon", "Choisir l'icône")}">
+                      </button>
+                    </div>
+                    <input type="date" class="purpose-date" aria-label="${tr("Fecha de revelación para propósito " + slot, "Reveal date for purpose " + slot, "Date de révélation pour l'objectif " + slot)}">
+                    <div class="purpose-icon-panel" aria-label="${tr("Selector de íconos", "Icon selector", "Sélecteur d'icônes")}">
+                      <button type="button" class="purpose-icon" data-icon="air" title="${tr("Aire", "Air", "Air")}"><img src="assets/air.png" alt="${tr("Aire", "Air", "Air")}"></button>
+                      <button type="button" class="purpose-icon" data-icon="earth" title="${tr("Tierra", "Earth", "Terre")}"><img src="assets/earth.png" alt="${tr("Tierra", "Earth", "Terre")}"></button>
+                      <button type="button" class="purpose-icon" data-icon="water" title="${tr("Agua", "Water", "Eau")}"><img src="assets/water.png" alt="${tr("Agua", "Water", "Eau")}"></button>
+                      <button type="button" class="purpose-icon" data-icon="fire" title="${tr("Fuego", "Fire", "Feu")}"><img src="assets/fire.png" alt="${tr("Fuego", "Fire", "Feu")}"></button>
+                    </div>
+                    <div class="purpose-status" aria-live="polite">${TXT_STATUS_PUBLIC_DEFAULT}</div>
                   </div>
-                  <input type="date" class="purpose-date" aria-label="Fecha de revelacion para proposito 1">
-                  <div class="purpose-icon-panel" aria-label="Selector de iconos">
-                    <button type="button" class="purpose-icon" data-icon="air" title="Aire"><img src="assets/air.png" alt="Aire"></button>
-                    <button type="button" class="purpose-icon" data-icon="earth" title="Tierra"><img src="assets/earth.png" alt="Tierra"></button>
-                    <button type="button" class="purpose-icon" data-icon="water" title="Agua"><img src="assets/water.png" alt="Agua"></button>
-                    <button type="button" class="purpose-icon" data-icon="fire" title="Fuego"><img src="assets/fire.png" alt="Fuego"></button>
-                  </div>
-                  <div class="purpose-status" aria-live="polite">Estado: público por defecto.</div>
-                </div>
-                <div class="purpose-group" data-purpose="2">
-                  <textarea id="p2" class="wish-prefix-input" data-prefix="Deseo " rows="1" maxlength="80" placeholder="Deseo 2" required>Deseo </textarea>
-                  <div class="purpose-actions" role="group" aria-label="Acciones para propósito 2">
-                    <button type="button" class="purpose-action" data-action="confirm" title="Confirmar deseo de propósito" aria-label="Confirmar deseo de propósito">
-                      <img src="/css/icons/iconsave.webp" alt="Guardar propósito">
-                    </button>
-                    <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto" aria-label="Convertir en secreto">
-                      <img src="/css/icons/iconkey.webp" alt="Marcar como secreto">
-                    </button>
-                    <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha" aria-label="Revelar en fecha">
-                      <img src="/css/icons/iconcalendar.webp" alt="Programar fecha">
-                    </button>
-                    <button type="button" class="purpose-action" data-action="icon" title="Elegir icono" aria-label="Elegir icono">
-                      <img src="/css/icons/iconelemental.webp" alt="Elegir icono">
-                    </button>
-                  </div>
-                  <input type="date" class="purpose-date" aria-label="Fecha de revelacion para proposito 2">
-                  <div class="purpose-icon-panel" aria-label="Selector de iconos">
-                    <button type="button" class="purpose-icon" data-icon="air" title="Aire"><img src="assets/air.png" alt="Aire"></button>
-                    <button type="button" class="purpose-icon" data-icon="earth" title="Tierra"><img src="assets/earth.png" alt="Tierra"></button>
-                    <button type="button" class="purpose-icon" data-icon="water" title="Agua"><img src="assets/water.png" alt="Agua"></button>
-                    <button type="button" class="purpose-icon" data-icon="fire" title="Fuego"><img src="assets/fire.png" alt="Fuego"></button>
-                  </div>
-                  <div class="purpose-status" aria-live="polite">Estado: público por defecto.</div>
-                </div>
-                <div class="purpose-group" data-purpose="3">
-                  <textarea id="p3" class="wish-prefix-input" data-prefix="Deseo " rows="1" maxlength="80" placeholder="Deseo 3" required>Deseo </textarea>
-                  <div class="purpose-actions" role="group" aria-label="Acciones para propósito 3">
-                    <button type="button" class="purpose-action" data-action="confirm" title="Confirmar deseo de propósito" aria-label="Confirmar deseo de propósito">
-                      <img src="/css/icons/iconsave.webp" alt="Guardar propósito">
-                    </button>
-                    <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto" aria-label="Convertir en secreto">
-                      <img src="/css/icons/iconkey.webp" alt="Marcar como secreto">
-                    </button>
-                    <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha" aria-label="Revelar en fecha">
-                      <img src="/css/icons/iconcalendar.webp" alt="Programar fecha">
-                    </button>
-                    <button type="button" class="purpose-action" data-action="icon" title="Elegir icono" aria-label="Elegir icono">
-                      <img src="/css/icons/iconelemental.webp" alt="Elegir icono">
-                    </button>
-                  </div>
-                  <input type="date" class="purpose-date" aria-label="Fecha de revelacion para proposito 3">
-                  <div class="purpose-icon-panel" aria-label="Selector de iconos">
-                    <button type="button" class="purpose-icon" data-icon="air" title="Aire"><img src="assets/air.png" alt="Aire"></button>
-                    <button type="button" class="purpose-icon" data-icon="earth" title="Tierra"><img src="assets/earth.png" alt="Tierra"></button>
-                    <button type="button" class="purpose-icon" data-icon="water" title="Agua"><img src="assets/water.png" alt="Agua"></button>
-                    <button type="button" class="purpose-icon" data-icon="fire" title="Fuego"><img src="assets/fire.png" alt="Fuego"></button>
-                  </div>
-                  <div class="purpose-status" aria-live="polite">Estado: público por defecto.</div>
-                </div>
-                <button type="submit" class="btn btn-primary">Guardar propósito</button>
-                <button type="button" class="btn btn-outline" id="lifeProposalCloseFooter">Volver</button>
+                `).join("")}
+                <button type="submit" class="btn btn-primary">${TXT_SAVE_PURPOSE}</button>
+                <button type="button" class="btn btn-outline" id="lifeProposalCloseFooter">${TXT_BACK}</button>
               </form>
             </div>
           </div>
@@ -656,18 +914,18 @@ const ensurePurposeModals = () => {
   if (!document.getElementById("lifeConfirmOverlay")) {
     document.body.insertAdjacentHTML("beforeend", `
       <div class="modal-overlay hidden" id="lifeConfirmOverlay" aria-hidden="true">
-        <div class="modal" role="dialog" aria-modal="true" aria-label="Confirmar propósito público">
+        <div class="modal" role="dialog" aria-modal="true" aria-label="${tr("Confirmar propósito público", "Confirm public purpose", "Confirmer l'objectif public")}">
           <div class="modal-head">
-            <h3>Confirmar propósito</h3>
+            <h3>${tr("Confirmar propósito", "Confirm purpose", "Confirmer l'objectif")}</h3>
             <button class="modal-close" type="button" id="lifeConfirmClose">✕</button>
           </div>
           <div class="modal-body">
-            <p class="modal-label-center" id="lifeConfirmText">¿Confirmar este deseo como público?</p>
-            <p class="modal-label-center muted">Se guardará como público.</p>
+            <p class="modal-label-center" id="lifeConfirmText">${tr("¿Confirmas este deseo como público?", "Confirm this wish as public?", "Confirmer ce souhait comme public ?")}</p>
+            <p class="modal-label-center muted">${tr("Se guardará como público.", "It will be saved as public.", "Il sera enregistré comme public.")}</p>
           </div>
           <div class="modal-actions">
-            <button class="btn btn-outline btn-compact" type="button" id="lifeConfirmCancel">Cancelar</button>
-            <button class="btn btn-primary btn-compact" type="button" id="lifeConfirmOk">Confirmar</button>
+            <button class="btn btn-outline btn-compact" type="button" id="lifeConfirmCancel">${TXT_CANCEL}</button>
+            <button class="btn btn-primary btn-compact" type="button" id="lifeConfirmOk">${TXT_CONFIRM}</button>
           </div>
         </div>
       </div>
@@ -677,20 +935,20 @@ const ensurePurposeModals = () => {
   if (!document.getElementById("purposeUnlockOverlay")) {
     document.body.insertAdjacentHTML("beforeend", `
       <div class="modal-overlay hidden" id="purposeUnlockOverlay" aria-hidden="true">
-        <div class="modal wish-modal purpose-unlock-modal" role="dialog" aria-modal="true" aria-label="Desbloquear deseo secreto">
+        <div class="modal wish-modal purpose-unlock-modal" role="dialog" aria-modal="true" aria-label="${tr("Desbloquear deseo secreto", "Unlock secret wish", "Déverrouiller le souhait secret")}">
           <div class="modal-head">
-            <h3>Desbloquear deseo secreto</h3>
+            <h3>${tr("Desbloquear deseo secreto", "Unlock secret wish", "Déverrouiller le souhait secret")}</h3>
             <button class="modal-close" type="button" id="purposeUnlockClose">✕</button>
           </div>
           <div class="modal-body">
-            <p class="modal-label-center" id="purposeUnlockText">Si confirmas tu clave privada, este deseo se volverá público.</p>
-            <label class="modal-label hidden" for="purposeUnlockPassword">Clave privada personal</label>
-            <input class="modal-input" id="purposeUnlockPassword" type="password" autocomplete="off" placeholder="Clave privada personal" />
+            <p class="modal-label-center" id="purposeUnlockText">${tr("Si confirmas tu clave privada, este deseo se volverá público.", "If you confirm your private key, this wish will become public.", "Si tu confirmes ta clé privée, ce souhait deviendra public.")}</p>
+            <label class="modal-label hidden" for="purposeUnlockPassword">${tr("Clave privada personal", "Personal private key", "Clé privée personnelle")}</label>
+            <input class="modal-input" id="purposeUnlockPassword" type="password" autocomplete="off" placeholder="${tr("Clave privada personal", "Personal private key", "Clé privée personnelle")}" />
             <p class="purpose-unlock-error" id="purposeUnlockError" aria-live="polite"></p>
           </div>
           <div class="modal-actions">
-            <button class="btn btn-outline btn-compact" type="button" id="purposeUnlockCancel">Cancelar</button>
-            <button class="btn btn-primary btn-compact" type="button" id="purposeUnlockConfirm">Desbloquear</button>
+            <button class="btn btn-outline btn-compact" type="button" id="purposeUnlockCancel">${TXT_CANCEL}</button>
+            <button class="btn btn-primary btn-compact" type="button" id="purposeUnlockConfirm">${TXT_UNLOCK}</button>
           </div>
         </div>
       </div>
@@ -700,53 +958,53 @@ const ensurePurposeModals = () => {
   if (!document.getElementById("purposeFulfillOverlay")) {
     document.body.insertAdjacentHTML("beforeend", `
       <div class="modal-overlay hidden" id="purposeFulfillOverlay" aria-hidden="true">
-        <div class="modal wish-modal fulfill-wish-modal purpose-fulfill-modal" role="dialog" aria-modal="true" aria-label="Subir evidencia">
+        <div class="modal wish-modal fulfill-wish-modal purpose-fulfill-modal" role="dialog" aria-modal="true" aria-label="${tr("Subir evidencia", "Upload evidence", "Téléverser une preuve")}">
           <div class="modal-head">
-            <h3>¡Sube la evidencia!</h3>
+            <h3>${tr("¡Sube evidencia!", "Upload evidence!", "Téléverse une preuve !")}</h3>
             <button class="modal-close" type="button" id="purposeFulfillClose">✕</button>
           </div>
           <div class="modal-body">
-            <p class="panel-muted"><strong>¿Dónde quieres publicarlo?</strong></p>
-            <div class="purpose-publish-choice" role="group" aria-label="Seleccionar dónde publicar">
+            <p class="panel-muted"><strong>${tr("¿Dónde quieres publicarlo?", "Where do you want to publish it?", "Où veux-tu le publier ?")}</strong></p>
+            <div class="purpose-publish-choice" role="group" aria-label="${tr("Selecciona dónde publicar", "Select where to publish", "Sélectionne où publier")}">
               <button class="purpose-publish-btn is-selected" type="button" data-publish="private" aria-pressed="true">
                 <span class="purpose-publish-emoji" aria-hidden="true">🔒</span>
-                <span>Privado</span>
+                <span>${TXT_PRIVATE}</span>
               </button>
               <button class="purpose-publish-btn" type="button" data-publish="public" aria-pressed="false">
                 <span class="purpose-publish-emoji" aria-hidden="true">🌐</span>
-                <span>Público</span>
+                <span>${TXT_PUBLIC}</span>
               </button>
             </div>
 
             <div class="purpose-private-key" id="purposeFulfillKeyRow">
-              <label class="modal-label" for="purposeFulfillPassword">Clave privada personal</label>
-              <input class="modal-input" id="purposeFulfillPassword" type="password" autocomplete="off" placeholder="Clave privada personal" />
+              <label class="modal-label" for="purposeFulfillPassword">${tr("Clave privada personal", "Personal private key", "Clé privée personnelle")}</label>
+              <input class="modal-input" id="purposeFulfillPassword" type="password" autocomplete="off" placeholder="${tr("Clave privada personal", "Personal private key", "Clé privée personnelle")}" />
               <p class="panel-muted purpose-private-key-note">
-                Digita tu clave privada personal para confirmar tu decisión.
+                ${tr("Ingresa tu clave privada personal para confirmar tu decisión.", "Enter your personal private key to confirm your decision.", "Saisis ta clé privée personnelle pour confirmer ta décision.")}
               </p>
             </div>
 
             <input id="purposeFulfillEvidence" type="file" accept="image/*" class="hidden" />
             <div class="wish-image-preview" id="purposeFulfillEvidencePreview" aria-live="polite">
-              <label class="wish-image-btn" for="purposeFulfillEvidence" aria-label="Sube la evidencia visual">+</label>
+              <label class="wish-image-btn" for="purposeFulfillEvidence" aria-label="${TXT_UPLOAD_VISUAL_EVIDENCE}">+</label>
               <div class="wish-preview-content">
-                <span class="wish-preview-placeholder">Sube la evidencia visual.</span>
-                <span class="wish-preview-name">PNG, WEBP, JPEG, etc.</span>
+                <span class="wish-preview-placeholder">${TXT_UPLOAD_VISUAL_EVIDENCE}</span>
+                <span class="wish-preview-name">${TXT_PNG_TYPES}</span>
               </div>
             </div>
 
             <p class="panel-muted">
-              <strong>¿Declaras bajo verdad de juramento que este deseo se ha cumplido?</strong>
+              <strong>${tr("¿Juras bajo juramento que este deseo ha sido cumplido?", "Do you swear under oath that this wish has been fulfilled?", "Jures-tu sous serment que ce souhait a été accompli ?")}</strong>
             </p>
             <p class="purpose-fulfill-error" id="purposeFulfillError" aria-live="polite"></p>
           </div>
           <div class="modal-actions">
             <button class="btn btn-primary btn-compact" type="button" id="purposeFulfillConfirm">
-              Juro bajo verdad de juramento que este deseo se ha cumplido
+              ${tr("Juro bajo juramento que este deseo ha sido cumplido", "I swear under oath that this wish has been fulfilled", "Je jure sous serment que ce souhait a été accompli")}
             </button>
           </div>
           <div class="modal-actions">
-            <button class="btn btn-outline btn-compact" type="button" id="purposeFulfillCancel">Cancelar</button>
+            <button class="btn btn-outline btn-compact" type="button" id="purposeFulfillCancel">${TXT_CANCEL}</button>
           </div>
         </div>
       </div>
@@ -756,40 +1014,43 @@ const ensurePurposeModals = () => {
   if (!document.getElementById("purposeVaultOverlay")) {
     document.body.insertAdjacentHTML("beforeend", `
       <div class="modal-overlay hidden" id="purposeVaultOverlay" aria-hidden="true">
-        <div class="modal wish-modal purpose-vault-modal" role="dialog" aria-modal="true" aria-label="Desbloquear clave privada">
+        <div class="modal wish-modal purpose-vault-modal" role="dialog" aria-modal="true" aria-label="${tr("Desbloquear clave privada", "Unlock private key", "Déverrouiller la clé privée")}">
           <div class="modal-body">
-            <img class="private-security-hero" src="/css/cpp-key.webp" alt="Clave privada" />
-            <h2 class="private-security-title">Digita tu contraseña privada personal:</h2>
+            <img class="private-security-hero" src="/css/cpp-key.webp" alt="${tr("Clave privada personal", "Personal private key", "Clé privée personnelle")}" />
+            <h2 class="private-security-title">${tr("Ingresa tu clave privada personal:", "Enter your personal private password:", "Saisis ton mot de passe privé personnel :")}</h2>
 
             <div class="private-security-input-row">
-              <label class="modal-label hidden" for="purposeVaultPassword">Contraseña privada</label>
+              <label class="modal-label hidden" for="purposeVaultPassword">${tr("Clave privada personal", "Private password", "Mot de passe privé")}</label>
               <input class="modal-input private-security-input" id="purposeVaultPassword" type="password" autocomplete="off" inputmode="text" placeholder="••••••••••••••" />
-              <button class="private-security-btn private-security-unlock" type="button" id="purposeVaultUnlock" aria-label="Ingresar" title="Ingresar">
-                <img src="/css/icons/icondoor.webp" alt="Ingresar" />
+              <button class="private-security-btn private-security-unlock" type="button" id="purposeVaultUnlock" aria-label="${tr("Ingresar", "Enter", "Entrer")}" title="${tr("Ingresar", "Enter", "Entrer")}">
+                <img src="/css/icons/icondoor.webp" alt="${tr("Ingresar", "Enter", "Entrer")}" />
               </button>
             </div>
 
             <p class="private-security-error" id="purposeVaultError" role="alert"></p>
 
             <div class="private-security-actions">
-              <button class="private-security-btn" type="button" aria-label="Modificar contraseña privada personal"
-                id="purposeVaultChangePassword" title="Modificar contraseña privada personal">
-                <img src="/css/icons/iconedit.webp" alt="Cambiar contraseña" />
+              <button class="private-security-btn" type="button" aria-label="${tr("Cambiar clave privada personal", "Change personal private password", "Changer le mot de passe privé personnel")}"
+                id="purposeVaultChangePassword" title="${tr("Cambiar clave privada personal", "Change personal private password", "Changer le mot de passe privé personnel")}">
+                <img src="/css/icons/iconedit.webp" alt="${tr("Cambiar contraseña", "Change password", "Changer le mot de passe")}" />
               </button>
-              <button class="private-security-btn" type="button" aria-label="Reiniciar contraseña"
-                id="purposeVaultResetPassword" title="Reiniciar contraseña">
-                <img src="/css/icons/icondelete.webp" alt="Reiniciar contraseña" />
+              <button class="private-security-btn" type="button" aria-label="${tr("Restablecer clave privada", "Reset password", "Réinitialiser le mot de passe")}"
+                id="purposeVaultResetPassword" title="${tr("Restablecer clave privada", "Reset password", "Réinitialiser le mot de passe")}">
+                <img src="/css/icons/icondelete.webp" alt="${tr("Restablecer contraseña", "Reset password", "Réinitialiser le mot de passe")}" />
               </button>
             </div>
 
             <p class="private-security-note">
-              Tu clave secreta personal protege toda la información privada que declares en esta red social: deseos,
-              propósitos y datos confidenciales. Sin esta clave, no se habilitan cambios en tu propósito de vida.
+              ${tr(
+                "Tu clave secreta personal protege toda la información privada que declares en esta red social: deseos, propósitos y datos confidenciales. Sin esta clave, no se habilitan cambios de tu propósito de vida.",
+                "Your personal secret key protects all private information you declare in this social network: wishes, purposes, and confidential data. Without this key, changes to your life purpose are not enabled.",
+                "Ta clé secrète personnelle protège toutes les informations privées que tu déclares dans ce réseau social : souhaits, objectifs et données confidentielles. Sans cette clé, les changements de ton objectif de vie ne sont pas activés."
+              )}
             </p>
           </div>
 
           <div class="modal-actions purpose-vault-actions">
-            <button class="btn btn-outline btn-compact" type="button" id="purposeVaultCancel">Cancelar</button>
+            <button class="btn btn-outline btn-compact" type="button" id="purposeVaultCancel">${TXT_CANCEL}</button>
           </div>
         </div>
       </div>
@@ -799,26 +1060,26 @@ const ensurePurposeModals = () => {
   if (!document.getElementById("purposeVaultChangePasswordModal")) {
     document.body.insertAdjacentHTML("beforeend", `
       <div class="modal-overlay hidden" id="purposeVaultChangePasswordModal" aria-hidden="true">
-        <div class="modal wish-modal private-change-password-modal" role="dialog" aria-modal="true" aria-label="Modificar contraseña privada personal">
+        <div class="modal wish-modal private-change-password-modal" role="dialog" aria-modal="true" aria-label="${tr("Cambiar clave privada personal", "Change personal private password", "Changer le mot de passe privé personnel")}">
           <div class="modal-head">
-            <h3>Modificar contraseña privada personal</h3>
+            <h3>${tr("Cambiar clave privada personal", "Change personal private password", "Changer le mot de passe privé personnel")}</h3>
             <button class="modal-close" type="button" id="purposeVaultChangePasswordCancel">✕</button>
           </div>
           <div class="modal-body">
-            <label class="modal-label" for="purposeVaultCurrentPassword">Digita tu actual contraseña privada personal</label>
+            <label class="modal-label" for="purposeVaultCurrentPassword">${tr("Ingresa tu clave privada personal actual", "Enter your current personal private password", "Saisis ton mot de passe privé personnel actuel")}</label>
             <input class="modal-input" id="purposeVaultCurrentPassword" type="password" autocomplete="off" />
 
-            <label class="modal-label" for="purposeVaultNewPassword">Digita tu nueva contraseña privada personal</label>
+            <label class="modal-label" for="purposeVaultNewPassword">${tr("Ingresa tu nueva clave privada personal", "Enter your new personal private password", "Saisis ton nouveau mot de passe privé personnel")}</label>
             <input class="modal-input" id="purposeVaultNewPassword" type="password" autocomplete="off" />
 
-            <label class="modal-label" for="purposeVaultConfirmPassword">Confirma tu nueva contraseña privada actual</label>
+            <label class="modal-label" for="purposeVaultConfirmPassword">${tr("Confirma tu nueva clave privada personal", "Confirm your new personal private password", "Confirme ton nouveau mot de passe privé personnel")}</label>
             <input class="modal-input" id="purposeVaultConfirmPassword" type="password" autocomplete="off" />
 
             <p class="private-security-error" id="purposeVaultChangePasswordError" role="alert"></p>
           </div>
           <div class="modal-actions">
-            <button class="btn btn-primary btn-compact" type="button" id="purposeVaultChangePasswordConfirm">Confirmar</button>
-            <button class="btn btn-outline btn-compact" type="button" id="purposeVaultChangePasswordCancelFooter">Cancelar</button>
+            <button class="btn btn-primary btn-compact" type="button" id="purposeVaultChangePasswordConfirm">${TXT_CONFIRM}</button>
+            <button class="btn btn-outline btn-compact" type="button" id="purposeVaultChangePasswordCancelFooter">${TXT_CANCEL}</button>
           </div>
         </div>
       </div>
@@ -828,25 +1089,25 @@ const ensurePurposeModals = () => {
   if (!document.getElementById("purposeVaultResetPasswordModal")) {
     document.body.insertAdjacentHTML("beforeend", `
       <div class="modal-overlay hidden" id="purposeVaultResetPasswordModal" aria-hidden="true">
-        <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label="Restaurar contraseña privada personal">
+        <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label="${tr("Restaurar clave privada personal", "Restore personal private password", "Restaurer le mot de passe privé personnel")}">
           <div class="modal-head">
-            <h3>Restaurar contraseña privada personal</h3>
+            <h3>${tr("Restaurar clave privada personal", "Restore personal private password", "Restaurer le mot de passe privé personnel")}</h3>
             <button class="modal-close" type="button" id="purposeVaultResetPasswordCancel">✕</button>
           </div>
           <div class="modal-body">
             <p class="private-reset-text">
-              Estás a punto de reiniciar tu clave secreta personal porque la has olvidado.
+              ${tr("Estás a punto de restablecer tu clave secreta personal porque la olvidaste.", "You are about to reset your personal secret key because you forgot it.", "Tu es sur le point de réinitialiser ta clé secrète personnelle parce que tu l'as oubliée.")}
             </p>
             <p class="private-reset-text">
-              Esta acción eliminará de forma permanente todos tus deseos privados y tu información cifrada.
+              ${tr("Esta acción eliminará de forma permanente todos tus deseos privados y la información cifrada.", "This action will permanently delete all your private wishes and encrypted information.", "Cette action supprimera définitivement tous tes souhaits privés et les informations chiffrées.")}
             </p>
             <p class="private-reset-text private-reset-question">
-              ¿Estás seguro de que deseas continuar?
+              ${tr("¿Seguro que deseas continuar?", "Are you sure you want to continue?", "Es-tu sûr de vouloir continuer ?")}
             </p>
           </div>
           <div class="modal-actions">
-            <button class="btn btn-primary btn-compact" type="button" id="purposeVaultResetPasswordConfirm">Sí, continuar</button>
-            <button class="btn btn-outline btn-compact" type="button" id="purposeVaultResetPasswordCancelFooter">Cancelar</button>
+            <button class="btn btn-primary btn-compact" type="button" id="purposeVaultResetPasswordConfirm">${tr("Sí, continuar", "Yes, continue", "Oui, continuer")}</button>
+            <button class="btn btn-outline btn-compact" type="button" id="purposeVaultResetPasswordCancelFooter">${TXT_CANCEL}</button>
           </div>
         </div>
       </div>
@@ -856,23 +1117,23 @@ const ensurePurposeModals = () => {
   if (!document.getElementById("purposeVaultResetPasswordFinalModal")) {
     document.body.insertAdjacentHTML("beforeend", `
       <div class="modal-overlay hidden" id="purposeVaultResetPasswordFinalModal" aria-hidden="true">
-        <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label="Confirmación final de eliminación">
+        <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label="${tr("Confirmación final de eliminación", "Final deletion confirmation", "Confirmation finale de suppression")}">
           <div class="modal-head">
-            <h3>Confirmación final</h3>
+            <h3>${tr("Confirmación final", "Final confirmation", "Confirmation finale")}</h3>
             <button class="modal-close" type="button" id="purposeVaultResetPasswordFinalCancel">✕</button>
           </div>
           <div class="modal-body">
             <p class="private-reset-text">
-              Para confirmar la eliminación de tu clave secreta personal, escribe la siguiente palabra exactamente como se muestra:
+              ${tr("Para confirmar la eliminación de tu clave secreta personal, escribe la siguiente palabra exactamente como aparece:", "To confirm deletion of your personal secret key, type the following word exactly as shown:", "Pour confirmer la suppression de ta clé secrète personnelle, écris le mot suivant exactement comme affiché :")}
             </p>
-            <p class="private-reset-text private-reset-keyword" id="purposeVaultResetKeywordLabel">ELIMINAR</p>
+            <p class="private-reset-text private-reset-keyword" id="purposeVaultResetKeywordLabel">${tr("ELIMINAR", "DELETE", "SUPPRIMER")}</p>
             <input class="modal-input" id="purposeVaultResetPasswordKeyword" type="text" autocomplete="off" />
 
             <p class="private-security-error" id="purposeVaultResetPasswordError" role="alert"></p>
           </div>
           <div class="modal-actions">
-            <button class="btn btn-primary btn-compact" type="button" id="purposeVaultResetPasswordFinalConfirm">Eliminar clave</button>
-            <button class="btn btn-outline btn-compact" type="button" id="purposeVaultResetPasswordFinalCancelFooter">Cancelar</button>
+            <button class="btn btn-primary btn-compact" type="button" id="purposeVaultResetPasswordFinalConfirm">${tr("Eliminar clave", "Delete key", "Supprimer la clé")}</button>
+            <button class="btn btn-outline btn-compact" type="button" id="purposeVaultResetPasswordFinalCancelFooter">${TXT_CANCEL}</button>
           </div>
         </div>
       </div>
@@ -883,7 +1144,7 @@ const ensurePurposeModals = () => {
 const enhancePrefixInputs = (scopeEl) => {
   const inputs = scopeEl.querySelectorAll(".wish-prefix-input");
   inputs.forEach((input) => {
-    const prefix = input.dataset.prefix || "Deseo ";
+    const prefix = input.dataset.prefix || PURPOSE_PREFIX;
     const maxLength = input.maxLength > 0 ? input.maxLength : null;
     const clampToMax = () => {
       if (maxLength && input.value.length > maxLength) {
@@ -924,8 +1185,8 @@ const ensurePurposeLayout = () => {
   if (coverActions && btnEditPurposes) {
     coverActions.classList.add("cover-actions-purpose");
     btnEditPurposes.classList.add("cover-purpose-btn");
-    btnEditPurposes.textContent = "Editar mi propósito de vida";
-    btnEditPurposes.title = "Editar mi propósito de vida";
+    btnEditPurposes.textContent = TXT_EDIT_LIFE_PURPOSE;
+    btnEditPurposes.title = TXT_EDIT_LIFE_PURPOSE;
   }
 
   let root = coverMedia.querySelector(".purpose-stack-modern");
@@ -942,17 +1203,17 @@ const ensurePurposeLayout = () => {
 
     const stack = document.createElement("div");
     stack.className = "purpose-stack purpose-stack-modern";
-    stack.setAttribute("aria-label", "Deseos de propósito");
+    stack.setAttribute("aria-label", TXT_PURPOSE_WISHES);
     stack.innerHTML = `
       <div class="purpose-list">
         ${[1, 2, 3].map((slot) => `
           <div class="purpose-pill-row">
-            <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="${slot}" title="Marcar deseo ${slot} como cumplido">
-              <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+            <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="${slot}" title="${TXT_MARK_FULFILLED.replace("{slot}", String(slot))}">
+              <img src="/css/icons/iconfulfill.webp" alt="${TXT_MARK_FULFILLED_WISH}" />
             </button>
             <button class="purpose-pill" type="button" id="purpose${slot}">${currentText[slot]}</button>
-            <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock${slot}" data-slot="${slot}" title="Desbloquear deseo ${slot}">
-              <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+            <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock${slot}" data-slot="${slot}" title="${TXT_UNLOCK_WISH.replace("{slot}", String(slot))}">
+              <img src="/css/icons/iconkey.webp" alt="${TXT_UNLOCK_SECRET_WISH}" />
             </button>
           </div>
         `).join("")}
@@ -1107,7 +1368,7 @@ export const initPurposeCoverModule = () => {
           fulfillBtn.classList.remove("is-marked");
           fulfillBtn.classList.remove("is-vanished");
           fulfillBtn.disabled = true;
-          fulfillBtn.setAttribute("title", "Primero define este propósito para poder marcarlo como cumplido.");
+          fulfillBtn.setAttribute("title", TXT_DEFINE_FIRST);
         }
         return;
       }
@@ -1124,11 +1385,11 @@ export const initPurposeCoverModule = () => {
         fulfillBtn.classList.toggle("is-vanished", isFulfilled);
         fulfillBtn.disabled = !hasContent || isFulfilled;
         if (isFulfilled) {
-          fulfillBtn.setAttribute("title", "Propósito cumplido. Define uno nuevo desde 'Editar mi propósito de vida'.");
+          fulfillBtn.setAttribute("title", TXT_PURPOSE_FULFILLED_HINT);
         } else if (!hasContent) {
-          fulfillBtn.setAttribute("title", "Primero define este propósito para poder marcarlo como cumplido.");
+          fulfillBtn.setAttribute("title", TXT_DEFINE_FIRST);
         } else {
-          fulfillBtn.setAttribute("title", `Marcar deseo ${slotNumber} como cumplido`);
+          fulfillBtn.setAttribute("title", TXT_MARK_FULFILLED.replace("{slot}", String(slotNumber)));
         }
       }
     });
@@ -1145,7 +1406,7 @@ export const initPurposeCoverModule = () => {
   const apiFetch = async (path, options = {}) => {
     const token = getAccessToken();
     if (!token) {
-      throw new Error("No hay sesión activa.");
+      throw new Error(TXT_ERR_NO_ACTIVE_SESSION);
     }
 
     const headers = {
@@ -1154,7 +1415,7 @@ export const initPurposeCoverModule = () => {
     };
     const res = await fetch(`${API}${path}`, { ...options, headers });
     if (res.status === 401) {
-      throw new Error("Sesión expirada. Inicia sesión nuevamente.");
+      throw new Error(TXT_ERR_SESSION_EXPIRED);
     }
     return res;
   };
@@ -1211,26 +1472,29 @@ export const initPurposeCoverModule = () => {
       if (iconKey) {
         const iconLabel = getIconLabel(iconKey);
         iconActionBtn.innerHTML = `<img src="${getIconSrc(iconKey)}" alt="${iconLabel}">`;
-        iconActionBtn.title = `Icono: ${iconLabel}`;
+        iconActionBtn.title = TXT_ICON_SELECTED.replace("{label}", iconLabel);
       } else {
-        iconActionBtn.innerHTML = "<img src=\"/css/icons/iconelemental.webp\" alt=\"Elegir icono\">";
-        iconActionBtn.title = "Elegir icono";
+        iconActionBtn.innerHTML = `<img src="/css/icons/iconelemental.webp" alt="${TXT_CHOOSE_ICON}">`;
+        iconActionBtn.title = TXT_CHOOSE_ICON;
       }
     }
 
     if (!slotData) {
-      setPurposeStatus(groupEl, "Estado: público por defecto.");
+      setPurposeStatus(groupEl, TXT_STATUS_PUBLIC_DEFAULT);
       return;
     }
     if (slotData.reveal_at && isRevealPending(slotData.reveal_at)) {
-      setPurposeStatus(groupEl, `Estado: se revelará el día ${formatRevealDate(slotData.reveal_at)}.`);
+      setPurposeStatus(
+        groupEl,
+        TXT_STATUS_REVEAL_ON.replace("{date}", formatRevealDate(slotData.reveal_at)),
+      );
       return;
     }
     if (isPrivate) {
-      setPurposeStatus(groupEl, "Estado: marcado como secreto.");
+      setPurposeStatus(groupEl, TXT_STATUS_SECRET);
       return;
     }
-    setPurposeStatus(groupEl, "Estado: confirmado (publico).");
+    setPurposeStatus(groupEl, TXT_STATUS_CONFIRMED_PUBLIC);
   };
 
   const openLifeProposalModal = () => {
@@ -1272,8 +1536,16 @@ export const initPurposeCoverModule = () => {
     pendingConfirmGroup = groupEl;
     const number = groupEl?.dataset?.purpose;
     lifeConfirmText.textContent = number
-      ? `¿Confirmar el propósito ${number} como público?`
-      : "¿Confirmar este deseo como público?";
+      ? tr(
+          `¿Confirmas el propósito ${number} como público?`,
+          `Confirm purpose ${number} as public?`,
+          `Confirmer l'objectif ${number} comme public ?`,
+        )
+      : tr(
+          "¿Confirmas este deseo como público?",
+          "Confirm this wish as public?",
+          "Confirmer ce souhait comme public ?",
+        );
     lifeConfirmOverlay.classList.remove("hidden");
     lifeConfirmOverlay.setAttribute("aria-hidden", "false");
     updateModalScrollLock();
@@ -1407,15 +1679,15 @@ export const initPurposeCoverModule = () => {
     setPurposeVaultChangePasswordError("");
 
     if (!current.trim()) {
-      setPurposeVaultChangePasswordError("Debes digitar tu contraseña privada actual.");
+      setPurposeVaultChangePasswordError(TXT_ERR_CURRENT_PRIVATE_REQUIRED);
       return;
     }
     if (!next.trim() || next.length < 8) {
-      setPurposeVaultChangePasswordError("Tu nueva clave debe tener al menos 8 caracteres.");
+      setPurposeVaultChangePasswordError(TXT_ERR_NEW_PRIVATE_MIN);
       return;
     }
     if (next !== next2) {
-      setPurposeVaultChangePasswordError("La confirmación no coincide con tu nueva clave.");
+      setPurposeVaultChangePasswordError(TXT_ERR_NEW_PRIVATE_CONFIRM);
       return;
     }
 
@@ -1451,7 +1723,7 @@ export const initPurposeCoverModule = () => {
       });
       const rewrapData = await parseResponseJson(rewrapRes);
       if (!rewrapRes.ok) {
-        throw new Error(rewrapData.detail || "No se pudo actualizar tu clave privada.");
+        throw new Error(rewrapData.detail || TXT_ERR_COULD_NOT_UPDATE_PRIVATE_KEY);
       }
 
       closePurposeVaultChangePasswordModal();
@@ -1459,7 +1731,7 @@ export const initPurposeCoverModule = () => {
       openLifeProposalModal();
     } catch (err) {
       setPurposeVaultChangePasswordError(
-        err?.message || "No se pudo modificar la contraseña privada."
+        err?.message || TXT_ERR_COULD_NOT_CHANGE_PRIVATE_PASSWORD
       );
     }
   };
@@ -1468,7 +1740,7 @@ export const initPurposeCoverModule = () => {
     setPurposeVaultResetPasswordError("");
     const typed = (purposeVaultResetPasswordKeyword?.value || "").trim();
     if (!typed) {
-      setPurposeVaultResetPasswordError("Debes escribir la palabra de confirmación.");
+      setPurposeVaultResetPasswordError(TXT_ERR_CONFIRM_WORD_REQUIRED);
       return;
     }
 
@@ -1477,7 +1749,7 @@ export const initPurposeCoverModule = () => {
       : ["ELIMINAR", "DELETE", "SUPPRIMER"];
 
     if (!allowed.includes(typed.toUpperCase())) {
-      setPurposeVaultResetPasswordError("La palabra de confirmación no coincide.");
+      setPurposeVaultResetPasswordError(TXT_ERR_CONFIRM_WORD_MISMATCH);
       return;
     }
 
@@ -1489,7 +1761,7 @@ export const initPurposeCoverModule = () => {
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo restaurar tu clave privada.");
+        throw new Error(data.detail || TXT_ERR_COULD_NOT_RESTORE_PRIVATE_KEY);
       }
 
       clearDekSession();
@@ -1500,7 +1772,7 @@ export const initPurposeCoverModule = () => {
       window.location.href = "/create-private-key.html";
     } catch (err) {
       setPurposeVaultResetPasswordError(
-        err?.message || "No se pudo restaurar tu clave privada."
+        err?.message || TXT_ERR_COULD_NOT_RESTORE_PRIVATE_KEY
       );
     }
   };
@@ -1522,7 +1794,7 @@ export const initPurposeCoverModule = () => {
     });
     const statusData = await parseResponseJson(statusRes);
     if (!statusRes.ok) {
-      throw new Error(statusData.detail || "No se pudo verificar el estado de tu clave privada.");
+      throw new Error(statusData.detail || TXT_ERR_COULD_NOT_VERIFY_VAULT);
     }
     if (!statusData?.has_vault) {
       window.location.href = "/create-private-key.html";
@@ -1536,7 +1808,7 @@ export const initPurposeCoverModule = () => {
   const unlockVaultForPurposeEditor = async () => {
     const password = (purposeVaultPassword?.value || "").trim();
     if (!password) {
-      setPurposeVaultError("Debes digitar tu clave privada personal.");
+      setPurposeVaultError(TXT_ERR_ENTER_PRIVATE_KEY);
       return;
     }
 
@@ -1553,9 +1825,9 @@ export const initPurposeCoverModule = () => {
       openLifeProposalModal();
     } catch (err) {
       if (err?.name === "OperationError" || String(err?.message || "").includes("OperationError")) {
-        setPurposeVaultError("Contraseña incorrecta. Inténtalo de nuevo.");
+        setPurposeVaultError(TXT_ERR_INVALID_PRIVATE_KEY);
       } else {
-        setPurposeVaultError(err?.message || "No se pudo desbloquear tu clave privada personal.");
+        setPurposeVaultError(err?.message || TXT_ERR_COULD_NOT_UNLOCK_VAULT);
       }
     }
   };
@@ -1565,7 +1837,7 @@ export const initPurposeCoverModule = () => {
       const ready = await ensureVaultReadyForPurposeEditor();
       if (ready) openLifeProposalModal();
     } catch (err) {
-      openPurposeVaultModal(err?.message || "No se pudo validar la clave privada personal.");
+      openPurposeVaultModal(err?.message || TXT_ERR_COULD_NOT_VALIDATE_PRIVATE_KEY);
     }
   };
 
@@ -1574,7 +1846,11 @@ export const initPurposeCoverModule = () => {
     const slotData = slotMap.get(slotNumber);
     if (!slotData || !slotData.is_private || isRevealPending(slotData.reveal_at)) return;
     activePurposeUnlockSlot = slotNumber;
-    purposeUnlockText.textContent = `Si confirmas tu clave privada, el deseo ${slotNumber} se volverá público.`;
+    purposeUnlockText.textContent = tr(
+      `Si confirmas tu clave privada, el deseo ${slotNumber} se volverá público.`,
+      `If you confirm your private key, wish ${slotNumber} will become public.`,
+      `Si tu confirmes ta clé privée, le souhait ${slotNumber} deviendra public.`,
+    );
     purposeUnlockError.textContent = "";
     purposeUnlockError.classList.remove("is-visible");
     purposeUnlockPassword.value = "";
@@ -1625,8 +1901,8 @@ export const initPurposeCoverModule = () => {
       purposeFulfillEvidencePreview.classList.remove("has-image");
       const placeholder = purposeFulfillEvidencePreview.querySelector(".wish-preview-placeholder");
       const nameEl = purposeFulfillEvidencePreview.querySelector(".wish-preview-name");
-      if (placeholder) placeholder.textContent = "Sube la evidencia visual.";
-      if (nameEl) nameEl.textContent = "PNG, WEBP, JPEG, etc.";
+      if (placeholder) placeholder.textContent = TXT_UPLOAD_VISUAL_EVIDENCE;
+      if (nameEl) nameEl.textContent = TXT_PNG_TYPES;
     }
     updateModalScrollLock();
   };
@@ -1636,7 +1912,7 @@ export const initPurposeCoverModule = () => {
     const slotMap = getPurposeSlotMap(purposeSlots);
     const slotData = slotMap.get(slotNumber);
     if (!slotData) {
-      window.alert("Primero define este propósito antes de marcarlo como cumplido.");
+      window.alert(TXT_DEFINE_FIRST);
       return;
     }
     if (String(slotData.status || "active") === "fulfilled") return;
@@ -1660,8 +1936,8 @@ export const initPurposeCoverModule = () => {
       purposeFulfillEvidencePreview.classList.remove("has-image");
       const placeholder = purposeFulfillEvidencePreview.querySelector(".wish-preview-placeholder");
       const nameEl = purposeFulfillEvidencePreview.querySelector(".wish-preview-name");
-      if (placeholder) placeholder.textContent = "Sube la evidencia visual.";
-      if (nameEl) nameEl.textContent = "PNG, WEBP, JPEG, etc.";
+      if (placeholder) placeholder.textContent = TXT_UPLOAD_VISUAL_EVIDENCE;
+      if (nameEl) nameEl.textContent = TXT_PNG_TYPES;
     }
 
     purposeFulfillOverlay.classList.remove("hidden");
@@ -1693,7 +1969,7 @@ export const initPurposeCoverModule = () => {
     });
     const vaultData = await vaultRes.json();
     if (!vaultRes.ok) {
-      throw new Error(vaultData.detail || "No se pudo leer el vault.");
+      throw new Error(vaultData.detail || TXT_ERR_COULD_NOT_READ_VAULT);
     }
     const kdfSalt = hexToBuf(vaultData.kdf_salt_b64 || "");
     const wrappedDekNonce = new Uint8Array(hexToBuf(vaultData.wrapped_dek_nonce_b64 || ""));
@@ -1717,7 +1993,7 @@ export const initPurposeCoverModule = () => {
   const importDekFromSession = async () => {
     const dekHex = getDekSessionHex();
     if (!dekHex) {
-      throw new Error("Digita tu clave privada personal para confirmar tu decisión.");
+      throw new Error(TXT_ERR_ENTER_PRIVATE_KEY);
     }
     const dekRaw = hexToBuf(dekHex);
     return crypto.subtle.importKey("raw", dekRaw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
@@ -1746,7 +2022,7 @@ export const initPurposeCoverModule = () => {
     if (!activePurposeUnlockSlot) return;
     const password = purposeUnlockPassword?.value || "";
     if (!password.trim()) {
-      purposeUnlockError.textContent = "Debes digitar tu clave privada personal.";
+      purposeUnlockError.textContent = TXT_ERR_ENTER_PRIVATE_KEY;
       purposeUnlockError.classList.add("is-visible");
       return;
     }
@@ -1754,14 +2030,14 @@ export const initPurposeCoverModule = () => {
     const slotMap = getPurposeSlotMap(purposeSlots);
     const slotData = slotMap.get(activePurposeUnlockSlot);
     if (!slotData?.ciphertext_hex || !slotData?.nonce_hex) {
-      purposeUnlockError.textContent = "No hay datos cifrados para este deseo.";
+      purposeUnlockError.textContent = TXT_ERR_NO_ENCRYPTED_DATA;
       purposeUnlockError.classList.add("is-visible");
       return;
     }
 
     const token = getAccessToken();
     if (!token) {
-      purposeUnlockError.textContent = "No hay sesión activa.";
+      purposeUnlockError.textContent = TXT_ERR_NO_ACTIVE_SESSION;
       purposeUnlockError.classList.add("is-visible");
       return;
     }
@@ -1787,7 +2063,7 @@ export const initPurposeCoverModule = () => {
       });
       const revealData = await revealRes.json().catch(() => ({}));
       if (!revealRes.ok) {
-        throw new Error(revealData.detail || "No se pudo revelar el deseo.");
+        throw new Error(revealData.detail || TXT_ERR_COULD_NOT_REVEAL_WISH);
       }
 
       purposeSlots = purposeSlots.map((slot) => {
@@ -1805,7 +2081,7 @@ export const initPurposeCoverModule = () => {
       renderPurposeSlots(purposeSlots);
       closePurposeUnlockModal();
     } catch (err) {
-      purposeUnlockError.textContent = err?.message || "No se pudo desbloquear el deseo.";
+      purposeUnlockError.textContent = err?.message || TXT_ERR_COULD_NOT_UNLOCK_WISH;
       purposeUnlockError.classList.add("is-visible");
     }
   };
@@ -1842,7 +2118,14 @@ export const initPurposeCoverModule = () => {
     });
     const data = await parseResponseJson(res);
     if (!res.ok) {
-      throw new Error(data.detail || "No se pudo preparar la carga cifrada.");
+      throw new Error(
+        data.detail ||
+          tr(
+            "No se pudo preparar la carga cifrada.",
+            "Could not prepare encrypted payload.",
+            "Impossible de préparer la charge chiffrée.",
+          ),
+      );
     }
     return { ...data, contentType };
   };
@@ -1854,7 +2137,13 @@ export const initPurposeCoverModule = () => {
     const presign = await presignEncryptedUpload(file);
     const mediaId = Number(presign.media_id || 0);
     if (!Number.isFinite(mediaId) || mediaId <= 0) {
-      throw new Error("No se pudo preparar la carga (media_id inválido).");
+      throw new Error(
+        tr(
+          "No se pudo preparar la carga (media_id inválido).",
+          "Could not prepare payload (invalid media_id).",
+          "Impossible de préparer la charge (media_id invalide).",
+        ),
+      );
     }
 
     const aad = new TextEncoder().encode(`${PRIVATE_MEDIA_AAD_PREFIX}${mediaId}`);
@@ -1884,7 +2173,14 @@ export const initPurposeCoverModule = () => {
     });
     const uploadData = await parseResponseJson(uploadRes);
     if (!uploadRes.ok) {
-      throw new Error(uploadData.detail || "No se pudo subir la imagen cifrada.");
+      throw new Error(
+        uploadData.detail ||
+          tr(
+            "No se pudo subir la imagen cifrada.",
+            "Could not upload encrypted image.",
+            "Impossible de téléverser l'image chiffrée.",
+          ),
+      );
     }
 
     return {
@@ -1905,7 +2201,14 @@ export const initPurposeCoverModule = () => {
     });
     const data = await parseResponseJson(res);
     if (!res.ok) {
-      throw new Error(data.detail || "No se pudo subir la imagen.");
+      throw new Error(
+        data.detail ||
+          tr(
+            "No se pudo subir la imagen.",
+            "Could not upload image.",
+            "Impossible de téléverser l'image.",
+          ),
+      );
     }
     return data;
   };
@@ -1927,8 +2230,8 @@ export const initPurposeCoverModule = () => {
         purposeFulfillEvidenceImage.remove();
         purposeFulfillEvidenceImage = null;
       }
-      if (previewPlaceholder) previewPlaceholder.textContent = "Sube la evidencia visual.";
-      if (previewName) previewName.textContent = "PNG, WEBP, JPEG, etc.";
+      if (previewPlaceholder) previewPlaceholder.textContent = TXT_UPLOAD_VISUAL_EVIDENCE;
+      if (previewName) previewName.textContent = TXT_PNG_TYPES;
       return;
     }
 
@@ -1937,7 +2240,7 @@ export const initPurposeCoverModule = () => {
     if (!purposeFulfillEvidenceImage) {
       purposeFulfillEvidenceImage = document.createElement("img");
       purposeFulfillEvidenceImage.className = "wish-preview-image";
-      purposeFulfillEvidenceImage.alt = "Evidencia seleccionada";
+      purposeFulfillEvidenceImage.alt = TXT_SELECTED_EVIDENCE;
       purposeFulfillEvidencePreview.insertBefore(
         purposeFulfillEvidenceImage,
         purposeFulfillEvidencePreview.firstChild
@@ -1945,7 +2248,7 @@ export const initPurposeCoverModule = () => {
     }
     purposeFulfillEvidenceImage.src = purposeFulfillEvidenceUrl;
     if (previewPlaceholder) previewPlaceholder.textContent = "";
-    if (previewName) previewName.textContent = file.name || "Evidencia seleccionada";
+    if (previewName) previewName.textContent = file.name || TXT_SELECTED_EVIDENCE;
   };
 
   const resolvePurposePlainText = async (slotData) => {
@@ -1972,7 +2275,7 @@ export const initPurposeCoverModule = () => {
     const slotMap = getPurposeSlotMap(purposeSlots);
     const slotData = slotMap.get(slotNumber);
     if (!slotData) {
-      setPurposeFulfillError("No se encontró el propósito. Intenta recargar la página.");
+      setPurposeFulfillError(TXT_ERR_PURPOSE_NOT_FOUND);
       return;
     }
 
@@ -1985,11 +2288,11 @@ export const initPurposeCoverModule = () => {
       if (purposePublishTo === "private") {
         const password = (purposeFulfillPassword?.value || "").trim();
         if (!password) {
-          throw new Error("Digita tu clave privada personal para confirmar tu decisión.");
+          throw new Error(TXT_ERR_ENTER_PRIVATE_KEY);
         }
         const token = getAccessToken();
         if (!token) {
-          throw new Error("No hay sesión activa.");
+          throw new Error(TXT_ERR_NO_ACTIVE_SESSION);
         }
         try {
           dekKey = await decryptDekFromPassword(password, token);
@@ -2004,7 +2307,7 @@ export const initPurposeCoverModule = () => {
 
       const wishText = (await resolvePurposePlainText(slotData)).trim();
       if (!wishText) {
-        throw new Error("Primero define el texto de este propósito para poder publicarlo.");
+        throw new Error(TXT_ERR_DEFINE_TEXT_FIRST);
       }
 
       const file = purposeFulfillEvidence && purposeFulfillEvidence.files ? purposeFulfillEvidence.files[0] : null;
@@ -2027,7 +2330,7 @@ export const initPurposeCoverModule = () => {
         });
         const data = await parseResponseJson(res);
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudo publicar el deseo.");
+          throw new Error(data.detail || TXT_ERR_COULD_NOT_PUBLISH_WISH);
         }
 
         purposeSlots = purposeSlots.map((slot) => {
@@ -2072,7 +2375,7 @@ export const initPurposeCoverModule = () => {
         });
         const data = await parseResponseJson(res);
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudo publicar el deseo.");
+          throw new Error(data.detail || TXT_ERR_COULD_NOT_PUBLISH_WISH);
         }
 
         purposeSlots = purposeSlots.map((slot) => {
@@ -2099,7 +2402,7 @@ export const initPurposeCoverModule = () => {
         detail: { scope: publishedScope }
       }));
     } catch (err) {
-      setPurposeFulfillError(err?.message || "No se pudo publicar el deseo.");
+      setPurposeFulfillError(err?.message || TXT_ERR_COULD_NOT_PUBLISH_WISH);
     } finally {
       purposeFulfillBusy = false;
       purposeFulfillConfirm.disabled = false;
@@ -2116,7 +2419,7 @@ export const initPurposeCoverModule = () => {
   lifeConfirmOk?.addEventListener("click", () => {
     if (!pendingConfirmGroup) return closeConfirmModal();
     pendingConfirmGroup.dataset.isPrivate = "false";
-    setPurposeStatus(pendingConfirmGroup, "Estado: confirmado (publico).");
+    setPurposeStatus(pendingConfirmGroup, TXT_STATUS_CONFIRMED_PUBLIC);
     closeConfirmModal();
   });
 
@@ -2134,7 +2437,7 @@ export const initPurposeCoverModule = () => {
       if (action === "confirm") return openConfirmModal(groupEl);
       if (action === "secret") {
         groupEl.dataset.isPrivate = "true";
-        setPurposeStatus(groupEl, "Estado: marcado como secreto.");
+        setPurposeStatus(groupEl, TXT_STATUS_SECRET);
         return;
       }
       if (action === "reveal") {
@@ -2170,9 +2473,12 @@ export const initPurposeCoverModule = () => {
       const actionBtn = groupEl.querySelector(".purpose-action[data-action=\"icon\"]");
       if (actionBtn) {
         actionBtn.innerHTML = `<img src="${getIconSrc(iconKey)}" alt="${label}">`;
-        actionBtn.title = `Icono: ${label}`;
+        actionBtn.title = tr(`Ícono: ${label}`, `Icon: ${label}`, `Icône : ${label}`);
       }
-      setPurposeStatus(groupEl, `Estado: icono asociado: ${label}.`);
+      setPurposeStatus(
+        groupEl,
+        TXT_STATUS_ICON_ASSOCIATED.replace("{label}", label),
+      );
       panel.classList.remove("is-open");
     });
   });
@@ -2182,7 +2488,10 @@ export const initPurposeCoverModule = () => {
       const groupEl = dateInput.closest(".purpose-group");
       groupEl.dataset.revealAt = dateInput.value || "";
       if (!dateInput.value) return;
-      setPurposeStatus(groupEl, `Estado: se revelará el día ${formatRevealDate(dateInput.value)}.`);
+      setPurposeStatus(
+        groupEl,
+        TXT_STATUS_REVEAL_ON.replace("{date}", formatRevealDate(dateInput.value)),
+      );
     });
   });
 
@@ -2195,7 +2504,7 @@ export const initPurposeCoverModule = () => {
     });
     if (values.some((value) => !value)) {
       groups.forEach((groupEl, index) => {
-        if (!values[index]) setPurposeStatus(groupEl, "Completa este propósito antes de guardar.");
+        if (!values[index]) setPurposeStatus(groupEl, TXT_COMPLETE_BEFORE_SAVING);
       });
       return;
     }
@@ -2208,7 +2517,7 @@ export const initPurposeCoverModule = () => {
       } catch (err) {
         groups.forEach((groupEl) => {
           if (groupEl.dataset.isPrivate === "true") {
-            setPurposeStatus(groupEl, err.message || "No se pudo desbloquear el vault.");
+            setPurposeStatus(groupEl, err.message || TXT_ERR_COULD_NOT_UNLOCK_VAULT_GENERIC);
           }
         });
         return;
@@ -2284,7 +2593,7 @@ export const initPurposeCoverModule = () => {
       });
       const payload = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(payload?.detail || "No se pudieron guardar los propósitos.");
+        throw new Error(payload?.detail || TXT_ERR_COULD_NOT_SAVE_PURPOSES);
       }
 
       purposeSlots = localSlots
@@ -2293,9 +2602,9 @@ export const initPurposeCoverModule = () => {
       renderPurposeSlots(purposeSlots);
       closeLifeProposalModal();
     } catch (err) {
-      const message = err?.message || "No se pudieron guardar los propósitos.";
+      const localizedMessage = err?.message || TXT_ERR_COULD_NOT_SAVE_PURPOSES;
       groups.forEach((groupEl) => {
-        setPurposeStatus(groupEl, message);
+        setPurposeStatus(groupEl, localizedMessage);
       });
     }
   });

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.achievements.service import compute_achievements_state, sync_achievement_unlock_events
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.calendar.schemas import (
     CalendarDayActivityOut,
     CalendarDaySummaryAchievementOut,
@@ -33,6 +34,22 @@ from app.db.models.user import User
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
 DEFAULT_YEAR = datetime.now(timezone.utc).year
+
+
+def _locale(request: Request | None) -> str:
+    return locale_from_request(request, default="en")
+
+
+def _td(locale: str, en: str) -> str:
+    translations: dict[str, tuple[str, str]] = {
+        "User not found.": ("Usuario no encontrado.", "Utilisateur introuvable."),
+        "This calendar is private.": ("Este calendario es privado.", "Ce calendrier est privé."),
+    }
+    pair = translations.get(en)
+    if not pair:
+        return en
+    es, fr = pair
+    return i18n_tr(locale, es=es, en=en, fr=fr)
 
 
 def _utc_today() -> date:
@@ -132,19 +149,19 @@ def _sync_unlock_events_for_user(*, db: Session, user: User) -> None:
         db.rollback()
 
 
-def _load_current_user_or_404(*, db: Session, current: UserPublic) -> User:
+def _load_current_user_or_404(*, db: Session, current: UserPublic, locale: str) -> User:
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
     return user
 
 
-def _load_target_user_or_404(*, db: Session, user_id: int) -> User:
+def _load_target_user_or_404(*, db: Session, user_id: int, locale: str) -> User:
     user = db.execute(
         select(User).where(User.id == user_id, User.is_active.is_(True))
     ).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
     return user
 
 
@@ -285,8 +302,8 @@ def _build_day_summary(
             available_from_utc=available_from_utc,
             is_day_closed=False,
             message=(
-                "El resumen de este día se habilita cuando el día se cierra en UTC "
-                f"(desde {available_from_utc.isoformat()})."
+                "The summary for this day is enabled when the day closes in UTC "
+                f"(from {available_from_utc.isoformat()})."
             ),
             totals=_empty_day_summary_totals(),
             posts_items=[],
@@ -455,38 +472,44 @@ def _build_day_summary(
 
 @router.get("/mine", response_model=CalendarYearActivityOut)
 def my_calendar_activity(
+    request: Request,
     year: int = Query(default=DEFAULT_YEAR, ge=2000, le=2100),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = _load_current_user_or_404(db=db, current=current)
+    locale = _locale(request)
+    user = _load_current_user_or_404(db=db, current=current, locale=locale)
     _sync_unlock_events_for_user(db=db, user=user)
     return _build_year_activity(db=db, user_id=int(user.id), year=year)
 
 
 @router.get("/mine/day-summary", response_model=CalendarDaySummaryOut)
 def my_calendar_day_summary(
-    date_utc: date = Query(..., description="Día en UTC con formato YYYY-MM-DD."),
+    request: Request,
+    date_utc: date = Query(..., description="UTC day in YYYY-MM-DD format."),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = _load_current_user_or_404(db=db, current=current)
+    locale = _locale(request)
+    user = _load_current_user_or_404(db=db, current=current, locale=locale)
     _sync_unlock_events_for_user(db=db, user=user)
     return _build_day_summary(db=db, user_id=int(user.id), day_utc=date_utc)
 
 
 @router.get("/user/{user_id}", response_model=CalendarYearActivityOut)
 def user_calendar_activity(
+    request: Request,
     user_id: int,
     year: int = Query(default=DEFAULT_YEAR, ge=2000, le=2100),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    target = _load_target_user_or_404(db=db, user_id=user_id)
+    locale = _locale(request)
+    target = _load_target_user_or_404(db=db, user_id=user_id, locale=locale)
 
     is_owner = int(current.user_number) == int(target.id)
     if not is_owner and not bool(target.public_profile_show_calendar):
-        raise HTTPException(status_code=403, detail="Este calendario es privado.")
+        raise HTTPException(status_code=403, detail=_td(locale, "This calendar is private."))
 
     if is_owner:
         _sync_unlock_events_for_user(db=db, user=target)

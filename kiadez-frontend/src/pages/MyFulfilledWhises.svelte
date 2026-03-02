@@ -3,10 +3,19 @@
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
   import { logout } from "../lib/logout";
+  import AuthFooter from "../lib/AuthFooter.svelte";
+  import { getLocale } from "../lib/i18n";
 
   const API = "http://127.0.0.1:8000";
   const FULFILLED_VISIBLE_SLOTS = 10;
-  const PLACEHOLDER_FULFILLED_MESSAGE = "Aquí se publicará tu deseo cuando lo marques como cumplido.";
+  const locale = getLocale();
+  const isEn = locale === "en";
+  const isFr = locale === "fr";
+  const tr = (es, en, fr = en) => (isEn ? en : isFr ? fr : es);
+  const PLACEHOLDER_FULFILLED_MESSAGE = tr(
+    "Aqui se publicara tu deseo cuando lo marques como cumplido.",
+    "Your wish will appear here when you mark it as fulfilled."
+  );
 
   let isViewingOwnProfile = true;
   let viewerUserId = null;
@@ -15,9 +24,12 @@
   let activeProfileUsername = "";
   let activeProfileFullName = "";
 
-  let pageTitle = "Kiadez — Mis deseos cumplidos";
-  let headerTitle = "Mis deseos cumplidos";
-  let headerSubtitle = "Este espacio mostrará los deseos que marques como cumplidos.";
+  let pageTitle = tr("Kiadez — Mis deseos cumplidos", "Kiadez — My fulfilled wishes", "Kiadez — Mes souhaits accomplis");
+  let headerTitle = tr("Mis deseos cumplidos", "My fulfilled wishes", "Mes souhaits accomplis");
+  let headerSubtitle = tr(
+    "Este espacio mostrara los deseos que marques como cumplidos.",
+    "This space will display the wishes you mark as fulfilled."
+  );
 
   const personalTypeIconMap = {
     "Espiritual": "/css/icons/Espiritual.webp",
@@ -70,7 +82,7 @@
   const apiFetch = async (path, options = {}) => {
     const token = getAccessToken();
     if (!token) {
-      throw new Error("No hay sesión activa.");
+      throw new Error(tr("No hay sesion activa.", "No active session.", "Aucune session active."));
     }
 
     const headers = {
@@ -79,7 +91,7 @@
     };
     const res = await fetch(`${API}${path}`, { ...options, headers });
     if (res.status === 401) {
-      throw new Error("Sesión expirada. Inicia sesión nuevamente.");
+      throw new Error(tr("Sesion expirada. Inicia sesion nuevamente.", "Session expired. Sign in again.", "Session expirée. Connecte-toi à nouveau."));
     }
     return res;
   };
@@ -94,7 +106,7 @@
     const res = await apiFetch("/auth/me");
     const data = await parseResponseJson(res);
     if (!res.ok) {
-      throw new Error(data.detail || "No se pudo cargar tu perfil.");
+      throw new Error(data.detail || tr("No se pudo cargar tu perfil.", "Could not load your profile.", "Impossible de charger ton profil."));
     }
     const userId = Number(data?.user_number);
     return {
@@ -109,16 +121,16 @@
     if (Number.isFinite(idValue) && idValue > 0) {
       const res = await apiFetch(`/follows/profile?user_id=${encodeURIComponent(String(idValue))}`);
       const data = await parseResponseJson(res);
-      if (!res.ok) throw new Error(data.detail || "No se pudo cargar el perfil.");
+      if (!res.ok) throw new Error(data.detail || tr("No se pudo cargar el perfil.", "Could not load profile.", "Impossible de charger le profil."));
       return data;
     }
     if (usernameValue) {
       const res = await apiFetch(`/follows/profile?username=${encodeURIComponent(usernameValue)}`);
       const data = await parseResponseJson(res);
-      if (!res.ok) throw new Error(data.detail || "No se pudo cargar el perfil.");
+      if (!res.ok) throw new Error(data.detail || tr("No se pudo cargar el perfil.", "Could not load profile.", "Impossible de charger le profil."));
       return data;
     }
-    throw new Error("Parámetros inválidos para cargar perfil.");
+    throw new Error(tr("Parametros invalidos para cargar perfil.", "Invalid parameters to load profile.", "Paramètres invalides pour charger le profil."));
   };
 
   const buildViewerHomeUrl = () => {
@@ -183,14 +195,26 @@
 
   const applyProfileHeader = () => {
     headerTitle = isViewingOwnProfile
-      ? "Mis deseos cumplidos"
-      : `Deseos cumplidos de ${activeProfileFullName || "usuario"}`;
+      ? tr("Mis deseos cumplidos", "My fulfilled wishes", "Mes souhaits accomplis")
+      : tr(
+        `Deseos cumplidos de ${activeProfileFullName || "usuario"}`,
+        `Fulfilled wishes of ${activeProfileFullName || "user"}`
+      );
     headerSubtitle = isViewingOwnProfile
-      ? "Este espacio mostrará los deseos que marques como cumplidos."
-      : "Este espacio muestra los deseos que esta persona marcó como cumplidos.";
+      ? tr(
+        "Este espacio mostrara los deseos que marques como cumplidos.",
+        "This space will display the wishes you mark as fulfilled."
+      )
+      : tr(
+        "Este espacio muestra los deseos que esta persona marco como cumplidos.",
+        "This space shows the wishes this person marked as fulfilled."
+      );
     pageTitle = isViewingOwnProfile
-      ? "Kiadez — Mis deseos cumplidos"
-      : `Kiadez — Deseos cumplidos de ${activeProfileFullName || "usuario"}`;
+      ? tr("Kiadez — Mis deseos cumplidos", "Kiadez — My fulfilled wishes", "Kiadez — Mes souhaits accomplis")
+      : tr(
+        `Kiadez — Deseos cumplidos de ${activeProfileFullName || "usuario"}`,
+        `Kiadez — Fulfilled wishes of ${activeProfileFullName || "user"}`
+      );
   };
 
   const resolveProfileContext = async () => {
@@ -244,7 +268,9 @@
     const res = await apiFetch(endpoint);
     const data = await parseResponseJson(res);
     if (!res.ok) {
-      throw new Error(data.detail || "No se pudieron cargar los deseos personales cumplidos.");
+      throw new Error(
+        data.detail || tr("No se pudieron cargar los deseos personales cumplidos.", "Could not load fulfilled personal wishes.", "Impossible de load fulfilled personal wishes.")
+      );
     }
     return data;
   };
@@ -258,7 +284,9 @@
     const res = await apiFetch(endpoint);
     const data = await parseResponseJson(res);
     if (!res.ok) {
-      throw new Error(data.detail || "No se pudieron cargar los deseos cooperativos cumplidos.");
+      throw new Error(
+        data.detail || tr("No se pudieron cargar los deseos cooperativos cumplidos.", "Could not load fulfilled cooperative wishes.", "Impossible de load fulfilled cooperative wishes.")
+      );
     }
     return data;
   };
@@ -267,7 +295,7 @@
     if (!value) return "";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleDateString("es-CO", {
+    return date.toLocaleDateString(isEn ? "en-US" : isFr ? "fr-FR" : "es-CO", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric"
@@ -276,13 +304,27 @@
 
   const getTypeIconSrc = (wishType) => personalTypeIconMap[wishType] || personalTypeIconMap["Espiritual"];
 
-  const getWishTypeHint = (wishType) => {
-    const normalized = String(wishType || "").trim();
-    if (!normalized) return "Deseo personal";
-    return `Deseo ${normalized.toLowerCase()}`;
+  const wishTypeLabelMap = {
+    Espiritual: tr("espiritual", "spiritual", "spirituel"),
+    Material: tr("material", "material", "matériel"),
+    Monetario: tr("monetario", "monetary", "monétaire"),
+    Profesional: tr("profesional", "professional", "professionnel"),
+    "Salud y cuerpo": tr("salud y cuerpo", "health and body", "santé et corps"),
+    Relacional: tr("relacional", "relational", "relationnel"),
+    Vivencial: tr("vivencial", "experiential", "expérientiel")
   };
 
-  const PURPOSE_ORIGIN_HINT = "Este deseo fue alguna vez un deseo de propósito de vida";
+  const getWishTypeHint = (wishType) => {
+    const normalized = String(wishType || "").trim();
+    if (!normalized) return tr("Deseo personal", "Personal wish", "Souhait personnel");
+    const mapped = wishTypeLabelMap[normalized] || normalized.toLowerCase();
+    return tr(`Deseo ${mapped}`, `Wish ${mapped}`, `Wish ${mapped}`);
+  };
+
+  const PURPOSE_ORIGIN_HINT = tr(
+    "Este deseo fue alguna vez un deseo de proposito de vida",
+    "This wish was once a life purpose wish"
+  );
 
   const DEFAULT_PURPOSE_ICON_SRC = "/css/icons/iconelemental.webp";
 
@@ -294,11 +336,11 @@
   };
 
   const getPurposeIconLabel = (iconKey) => {
-    if (iconKey === "air") return "Aire";
-    if (iconKey === "earth") return "Tierra";
-    if (iconKey === "water") return "Agua";
-    if (iconKey === "fire") return "Fuego";
-    return "Propósito";
+    if (iconKey === "air") return tr("Aire", "Air", "Air");
+    if (iconKey === "earth") return tr("Tierra", "Earth", "Terre");
+    if (iconKey === "water") return tr("Agua", "Water", "Eau");
+    if (iconKey === "fire") return tr("Fuego", "Fire", "Feu");
+    return tr("Proposito", "Purpose", "Mission");
   };
 
   const getPurposeIconSrc = (iconKey) => purposeIconMap[String(iconKey || "")] || "";
@@ -331,7 +373,10 @@
       personalFulfilledTotal = 0;
       personalFulfilledError = error instanceof Error
         ? error.message
-        : "No se pudieron cargar tus deseos personales cumplidos.";
+        : tr(
+          "No se pudieron cargar tus deseos personales cumplidos.",
+          "Could not load your fulfilled personal wishes."
+        );
     } finally {
       if (requestId === personalFulfilledRequestId) {
         personalFulfilledLoading = false;
@@ -359,7 +404,10 @@
       cooperativeFulfilledTotal = 0;
       cooperativeFulfilledError = error instanceof Error
         ? error.message
-        : "No se pudieron cargar tus deseos cooperativos cumplidos.";
+        : tr(
+          "No se pudieron cargar tus deseos cooperativos cumplidos.",
+          "Could not load your fulfilled cooperative wishes."
+        );
     } finally {
       if (requestId === cooperativeFulfilledRequestId) {
         cooperativeFulfilledLoading = false;
@@ -489,46 +537,50 @@
         <img src="/css/logo-kiadez.webp" alt="Kiadez" />
       </a>
       <form class="topbar-search" role="search" on:submit|preventDefault>
-        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+        <input
+          type="search"
+          placeholder={tr("Buscar en Kiadez", "Search on Kiadez", "Rechercher sur Kiadez")}
+          aria-label={tr("Buscar", "Search", "Rechercher")}
+        />
       </form>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-center">
       <a class="topbar-btn" href="/home_user.html" data-profile-module="home">🏠 Home</a>
-      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-      <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 Deseos públicos</a>
-      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-      <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ Deseos cumplidos</a>
+      <a class="topbar-btn" href="/gallery.html">🖼️ {tr("Galería", "Gallery", "Galerie")}</a>
+      <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 {tr("Deseos públicos", "Public wishes", "Souhaits publics")}</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 {tr("Deseos privados", "Private wishes", "Souhaits privés")}</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ {tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis")}</a>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
       <details class="topbar-dropdown">
-        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+        <summary class="topbar-avatar-btn" aria-label={tr("Perfil del usuario", "User profile", "Profil utilisateur")}>
+          <img src="/assets/avatar-default.jpg" alt={tr("Foto de perfil del usuario", "User profile photo", "Photo de profil de l'utilisateur")} />
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
-          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+          <a href="/privacy-and-settings.html" role="menuitem">{tr("Configuración y privacidad", "Settings and privacy", "Paramètres et confidentialité")}</a>
+          <button type="button" role="menuitem" on:click={logout}>{tr("Cerrar sesión", "Sign out", "Se déconnecter")}</button>
         </div>
       </details>
 
-      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+      <button class="topbar-icon" type="button" aria-label={tr("Notificaciones", "Notifications", "Alertes")}>
         🔔
         <span class="topbar-badge">3</span>
       </button>
 
       <details class="topbar-dropdown">
-        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+        <summary class="topbar-menu-btn" aria-label={tr("Abrir menú", "Open menu", "Ouvrir le menu")}>
           <span class="topbar-menu-icon" aria-hidden="true">☰</span>
-          <span class="topbar-menu-label">Menú</span>
+          <span class="topbar-menu-label">{tr("Menú", "Menu", "Navigation")}</span>
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/home_user.html" role="menuitem" data-my-home>Mi Home</a>
-          <a href="/achievements.html" role="menuitem">Logros recientes</a>
-          <a href="/gallery.html" role="menuitem">Galería</a>
-          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
-          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
-          <a href="/messages.html" role="menuitem">Mensajes</a>
+          <a href="/home_user.html" role="menuitem" data-my-home>{tr("Mi Home", "My Home", "Mon accueil")}</a>
+          <a href="/achievements.html" role="menuitem">{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+          <a href="/gallery.html" role="menuitem">{tr("Galería", "Gallery", "Galerie")}</a>
+          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">{tr("Calendario", "Calendar", "Calendrier")}</a>
+          <a href="/my-biography.html" role="menuitem">{tr("Mi Biografía", "My Biography", "Ma biographie")}</a>
+          <a href="/messages.html" role="menuitem">{tr("Mensajes", "Messages", "Messagerie")}</a>
         </div>
       </details>
     </div>
@@ -537,26 +589,26 @@
   <main class="user-home">
     <section class="cover" id="cover">
       <div class="cover-media" id="coverMedia">
-        <img id="coverImg" class="cover-img" src="/assets/cover-default.jpg" alt="Portada" />
+        <img id="coverImg" class="cover-img" src="/assets/cover-default.jpg" alt={tr("Portada", "Cover", "Couverture")} />
 
         <div class="cover-actions">
           <details class="cover-menu">
-            <summary class="icon-btn" id="btnChangeCover" title="Editar imagen de portada">
-              Editar imagen de portada
+            <summary class="icon-btn" id="btnChangeCover" title={tr("Editar imagen de portada", "Edit cover image", "Modifier l'image de couverture")}>
+              {tr("Editar imagen de portada", "Edit cover image", "Modifier l'image de couverture")}
             </summary>
             <div class="cover-menu-panel">
               <button class="cover-menu-item" type="button" id="coverUpload">
-                Subir imagen
+                {tr("Subir imagen", "Upload image", "Téléverser une image")}
               </button>
               <button class="cover-menu-item" type="button" id="coverMove">
-                Mover imagen
+                {tr("Mover imagen", "Move image", "Déplacer l'image")}
               </button>
             </div>
           </details>
 
           <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button"
-            title="Editar mi propósito de vida">
-            Editar mi propósito de vida
+            title={tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier ma mission de vie")}>
+            {tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier ma mission de vie")}
           </button>
 
           <input id="coverFile" type="file" accept="image/*" class="hidden" />
@@ -564,54 +616,54 @@
 
         <div class="cover-save-actions hidden" id="coverSaveActions">
           <button class="btn btn-primary btn-compact" type="button" id="coverSaveBtn">
-            Guardar cambios
+            {tr("Guardar cambios", "Save changes", "Enregistrer les modifications")}
           </button>
           <button class="btn btn-outline btn-compact" type="button" id="coverCancelBtn">
-            Cancelar
+            {tr("Cancelar", "Cancel", "Annuler")}
           </button>
         </div>
 
-        <div class="purpose-stack" aria-label="Deseos de propósito">
+        <div class="purpose-stack" aria-label={tr("Deseos de propósito", "Purpose wishes", "Souhaits de mission")}>
           <div class="purpose-list">
             <div class="purpose-pill-row">
               <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="1"
-                title="Marcar deseo 1 como cumplido">
-                <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+                title={tr("Marcar deseo 1 como cumplido", "Mark wish 1 as fulfilled", "Marquer le souhait 1 comme accompli")}>
+                <img src="/css/icons/iconfulfill.webp" alt={tr("Marcar deseo cumplido", "Mark wish as fulfilled", "Marquer le souhait comme accompli")} />
               </button>
               <button class="purpose-pill" type="button" id="purpose1">
-                Deseo #1: Secreto
+                {tr("Deseo #1: Secreto", "Wish #1: Secret", "Souhait n°1 : Secret")}
               </button>
               <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock1"
-                data-slot="1" title="Desbloquear deseo 1">
-                <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+                data-slot="1" title={tr("Desbloquear deseo 1", "Unlock wish 1", "Déverrouiller le souhait 1")}>
+                <img src="/css/icons/iconkey.webp" alt={tr("Desbloquear deseo secreto", "Unlock secret wish", "Déverrouiller le souhait secret")} />
               </button>
             </div>
 
             <div class="purpose-pill-row">
               <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="2"
-                title="Marcar deseo 2 como cumplido">
-                <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+                title={tr("Marcar deseo 2 como cumplido", "Mark wish 2 as fulfilled", "Marquer le souhait 2 comme accompli")}>
+                <img src="/css/icons/iconfulfill.webp" alt={tr("Marcar deseo cumplido", "Mark wish as fulfilled", "Marquer le souhait comme accompli")} />
               </button>
               <button class="purpose-pill" type="button" id="purpose2">
-                Deseo construir el Reino de Combray
+                {tr("Deseo construir el Reino de Combray", "I wish to build the Kingdom of Combray", "Je souhaite construire le Royaume de Combray")}
               </button>
               <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock2"
-                data-slot="2" title="Desbloquear deseo 2">
-                <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+                data-slot="2" title={tr("Desbloquear deseo 2", "Unlock wish 2", "Déverrouiller le souhait 2")}>
+                <img src="/css/icons/iconkey.webp" alt={tr("Desbloquear deseo secreto", "Unlock secret wish", "Déverrouiller le souhait secret")} />
               </button>
             </div>
 
             <div class="purpose-pill-row">
               <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="3"
-                title="Marcar deseo 3 como cumplido">
-                <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+                title={tr("Marcar deseo 3 como cumplido", "Mark wish 3 as fulfilled", "Marquer le souhait 3 comme accompli")}>
+                <img src="/css/icons/iconfulfill.webp" alt={tr("Marcar deseo cumplido", "Mark wish as fulfilled", "Marquer le souhait comme accompli")} />
               </button>
               <button class="purpose-pill" type="button" id="purpose3">
-                Deseo estar unido a Jesús
+                {tr("Deseo estar unido a Jesús", "I wish to be united with Jesus", "Je souhaite être uni à Jésus")}
               </button>
               <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock3"
-                data-slot="3" title="Desbloquear deseo 3">
-                <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+                data-slot="3" title={tr("Desbloquear deseo 3", "Unlock wish 3", "Déverrouiller le souhait 3")}>
+                <img src="/css/icons/iconkey.webp" alt={tr("Desbloquear deseo secreto", "Unlock secret wish", "Déverrouiller le souhait secret")} />
               </button>
             </div>
           </div>
@@ -620,21 +672,21 @@
     </section>
 
     <div class="public-wishes-body">
-      <nav class="profile-nav" aria-label="Navegación de perfil">
-        <a class="nav-pill" href="/home_user.html" title="Home" data-profile-module="home">Home</a>
-        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+      <nav class="profile-nav" aria-label={tr("Navegación de perfil", "Profile navigation", "Navigation du profil")}>
+        <a class="nav-pill" href="/home_user.html" title={tr("Home", "Home", "Accueil")} data-profile-module="home">{tr("Home", "Home", "Accueil")}</a>
+        <a class="nav-pill" href="/star-pool-found.html" title={tr("Estrellas", "Stars", "Étoiles")}>
           <span class="nav-icon">⭐</span>
-          <span><strong id="fulfilledWishesStarsTotal">0</strong> estrellas</span>
+          <span><strong id="fulfilledWishesStarsTotal">0</strong> {tr("estrellas", "stars", "étoiles")}</span>
         </a>
-        <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-        <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
-        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
-        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
+        <a class="nav-pill" href="/followers.html" title={tr("Seguidores", "Followers", "Abonnés")}>{tr("Seguidores", "Followers", "Abonnés")}</a>
+        <a class="nav-pill" href="/achievements.html" title={tr("Logros recientes", "Recent achievements", "Réalisations récentes")}>{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+        <a class="nav-pill" href="/gallery.html" title={tr("Galería", "Gallery", "Galerie")}>{tr("Galería", "Gallery", "Galerie")}</a>
+        <a class="nav-pill" href="/calendar.html" title={tr("Calendario", "Calendar", "Calendrier")} data-profile-module="calendar">{tr("Calendario", "Calendar", "Calendrier")}</a>
+        <a class="nav-pill" href="/my-biography.html" title={tr("Mi biografía", "My biography", "Ma biographie")}>{tr("Mi biografía", "My biography", "Ma biographie")}</a>
+        <a class="nav-pill" href="/messages.html" title={tr("Mensajes", "Messages", "Messagerie")}>{tr("Mensajes", "Messages", "Messagerie")}</a>
       </nav>
 
-      <section class="public-wishes-shell" aria-label="Mis deseos cumplidos">
+      <section class="public-wishes-shell" aria-label={tr("Mis deseos cumplidos", "My fulfilled wishes", "Mes souhaits accomplis")}>
         <header class="public-wishes-head">
           <div>
             <h2 class="public-wishes-title">{headerTitle}</h2>
@@ -644,17 +696,17 @@
           </div>
         </header>
 
-        <section class="wish-lists-grid" aria-label="Listas de deseos cumplidos">
+        <section class="wish-lists-grid" aria-label={tr("Listas de deseos cumplidos", "Fulfilled wishes lists", "Listes de souhaits accomplis")}>
           <article class="panel wish-list-panel">
             <div class="panel-head">
-              <h3 class="panel-title">Deseos personales cumplidos</h3>
+              <h3 class="panel-title">{tr("Deseos personales cumplidos", "Fulfilled personal wishes", "Souhaits personnels accomplis")}</h3>
               <span class="panel-badge">
                 {personalFulfilledItems.length} / {FULFILLED_VISIBLE_SLOTS}
               </span>
             </div>
             <ol
               class="wish-slot-list wish-slot-list-fulfilled"
-              aria-label="Deseos personales cumplidos"
+              aria-label={tr("Deseos personales cumplidos", "Fulfilled personal wishes", "Souhaits personnels accomplis")}
               style={`counter-reset: wish ${Math.max(0, personalFulfilledRangeStart - 1)};`}
             >
               {#each personalCompletedView as item}
@@ -683,7 +735,7 @@
                             <div class="wish-slot-meta wish-slot-meta-fulfilled">
                               {#if item.wish.fulfilled_at}
                                 <span class="wish-type-pill wish-fulfilled-date-pill">
-                                  Cumplido el {formatFulfilledDate(item.wish.fulfilled_at)}
+                                  {tr("Cumplido el", "Fulfilled on", "Accompli le")} {formatFulfilledDate(item.wish.fulfilled_at)}
                                 </span>
                               {/if}
                             </div>
@@ -706,7 +758,7 @@
                             <img
                               class="wish-slot-image wish-slot-image-fulfilled"
                               src={fulfilledImageUrl}
-                              alt="Evidencia del deseo cumplido"
+                              alt={tr("Evidencia del deseo cumplido", "Fulfilled wish evidence", "Preuve du souhait accompli")}
                               loading="lazy"
                             />
                           </div>
@@ -722,11 +774,11 @@
               {/each}
             </ol>
             {#if personalFulfilledTotalPages > 1}
-              <nav class="wish-pagination" aria-label="Paginación de deseos personales cumplidos">
+              <nav class="wish-pagination" aria-label={tr("Paginación de deseos personales cumplidos", "Fulfilled personal wishes pagination", "Pagination des souhaits personnels accomplis")}>
                 <button
                   class="wish-page-btn is-arrow"
                   type="button"
-                  aria-label="Página anterior"
+                  aria-label={tr("Página anterior", "Previous page", "Page précédente")}
                   on:click={() => goToPersonalFulfilledPage(personalFulfilledPage - 1)}
                   disabled={personalFulfilledPage <= 1}
                 >
@@ -745,7 +797,7 @@
                 <button
                   class="wish-page-btn is-arrow"
                   type="button"
-                  aria-label="Página siguiente"
+                  aria-label={tr("Página siguiente", "Next page", "Page suivante")}
                   on:click={() => goToPersonalFulfilledPage(personalFulfilledPage + 1)}
                   disabled={personalFulfilledPage >= personalFulfilledTotalPages}
                 >
@@ -754,26 +806,26 @@
               </nav>
             {/if}
             {#if personalFulfilledLoading}
-              <p class="wish-fulfilled-status">Cargando deseos cumplidos...</p>
+              <p class="wish-fulfilled-status">{tr("Cargando deseos cumplidos...", "Loading fulfilled wishes...", "Chargement des souhaits accomplis...")}</p>
             {:else if personalFulfilledError}
               <p class="wish-fulfilled-status is-error">{personalFulfilledError}</p>
             {:else if personalFulfilledTotalPages > 1}
               <p class="wish-fulfilled-status">
-                Mostrando {personalFulfilledRangeStart}-{personalFulfilledRangeEnd} de {personalFulfilledTotal} deseos cumplidos.
+                {tr("Mostrando", "Showing", "Affichage")} {personalFulfilledRangeStart}-{personalFulfilledRangeEnd} {tr("de", "of", "de")} {personalFulfilledTotal} {tr("deseos cumplidos.", "fulfilled wishes.", "souhaits accomplis.")}
               </p>
             {/if}
           </article>
 
           <article class="panel wish-list-panel">
             <div class="panel-head">
-              <h3 class="panel-title">Deseos cooperativos cumplidos</h3>
+              <h3 class="panel-title">{tr("Deseos cooperativos cumplidos", "Fulfilled cooperative wishes", "Souhaits coopératifs accomplis")}</h3>
               <span class="panel-badge">
                 {cooperativeFulfilledItems.length} / {FULFILLED_VISIBLE_SLOTS}
               </span>
             </div>
             <ol
               class="wish-slot-list wish-slot-list-fulfilled"
-              aria-label="Deseos cooperativos cumplidos"
+              aria-label={tr("Deseos cooperativos cumplidos", "Fulfilled cooperative wishes", "Souhaits coopératifs accomplis")}
               style={`counter-reset: wish ${Math.max(0, cooperativeFulfilledRangeStart - 1)};`}
             >
               {#each cooperativeCompletedView as item}
@@ -802,11 +854,11 @@
                             <div class="wish-slot-meta wish-slot-meta-fulfilled">
                               {#if item.wish.fulfilled_at}
                                 <span class="wish-type-pill wish-fulfilled-date-pill">
-                                  Cumplido el {formatFulfilledDate(item.wish.fulfilled_at)}
+                                  {tr("Cumplido el", "Fulfilled on", "Accompli le")} {formatFulfilledDate(item.wish.fulfilled_at)}
                                 </span>
                               {/if}
                               <span class="wish-type-pill">
-                                Equipo validado: {Number(item.wish.participants_current || 0)} / {Number(item.wish.participants_goal || 0)}
+                                {tr("Equipo validado:", "Validated team:", "Équipe validée :")} {Number(item.wish.participants_current || 0)} / {Number(item.wish.participants_goal || 0)}
                               </span>
                             </div>
                           </div>
@@ -817,7 +869,7 @@
                             <img
                               class="wish-slot-image wish-slot-image-fulfilled"
                               src={fulfilledImageUrl}
-                              alt="Evidencia del deseo cooperativo cumplido"
+                              alt={tr("Evidencia del deseo cooperativo cumplido", "Fulfilled cooperative wish evidence", "Preuve du souhait coopératif accompli")}
                               loading="lazy"
                             />
                           </div>
@@ -835,11 +887,11 @@
               {/each}
             </ol>
             {#if cooperativeFulfilledTotalPages > 1}
-              <nav class="wish-pagination" aria-label="Paginación de deseos cooperativos cumplidos">
+              <nav class="wish-pagination" aria-label={tr("Paginación de deseos cooperativos cumplidos", "Fulfilled cooperative wishes pagination", "Pagination des souhaits coopératifs accomplis")}>
                 <button
                   class="wish-page-btn is-arrow"
                   type="button"
-                  aria-label="Página anterior"
+                  aria-label={tr("Página anterior", "Previous page", "Page précédente")}
                   on:click={() => goToCooperativeFulfilledPage(cooperativeFulfilledPage - 1)}
                   disabled={cooperativeFulfilledPage <= 1}
                 >
@@ -858,7 +910,7 @@
                 <button
                   class="wish-page-btn is-arrow"
                   type="button"
-                  aria-label="Página siguiente"
+                  aria-label={tr("Página siguiente", "Next page", "Page suivante")}
                   on:click={() => goToCooperativeFulfilledPage(cooperativeFulfilledPage + 1)}
                   disabled={cooperativeFulfilledPage >= cooperativeFulfilledTotalPages}
                 >
@@ -867,12 +919,12 @@
               </nav>
             {/if}
             {#if cooperativeFulfilledLoading}
-              <p class="wish-fulfilled-status">Cargando deseos cumplidos...</p>
+              <p class="wish-fulfilled-status">{tr("Cargando deseos cumplidos...", "Loading fulfilled wishes...", "Chargement des souhaits accomplis...")}</p>
             {:else if cooperativeFulfilledError}
               <p class="wish-fulfilled-status is-error">{cooperativeFulfilledError}</p>
             {:else if cooperativeFulfilledTotalPages > 1}
               <p class="wish-fulfilled-status">
-                Mostrando {cooperativeFulfilledRangeStart}-{cooperativeFulfilledRangeEnd} de {cooperativeFulfilledTotal} deseos cumplidos.
+                {tr("Mostrando", "Showing", "Affichage")} {cooperativeFulfilledRangeStart}-{cooperativeFulfilledRangeEnd} {tr("de", "of", "de")} {cooperativeFulfilledTotal} {tr("deseos cumplidos.", "fulfilled wishes.", "souhaits accomplis.")}
               </p>
             {/if}
           </article>
@@ -881,57 +933,5 @@
     </div>
   </main>
 
-  <footer class="kiadez-footer">
-    <div class="footer-main">
-      <div class="footer-column footer-origin">
-        <p class="footer-poem">
-          Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br>
-          No para dominar, sino para orientar.<br>
-          Su luz no deslumbra: acompaña.
-        </p>
-      </div>
-
-      <div class="footer-columns">
-        <div class="footer-column">
-          <h4>Sobre nuestra red social</h4>
-          <ul>
-            <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
-            <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
-            <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
-            <li><a href="/contact.html">Contacto</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Idiomas</h4>
-          <ul>
-            <li><a href="/?lang=es">Español</a></li>
-            <li><a href="/?lang=en">English</a></li>
-            <li><a href="/?lang=fr">Français</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Contacto</h4>
-          <ul>
-            <li>info@kiadez.com</li>
-            <li>+57 333 225 6078</li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Información legal</h4>
-          <ul>
-            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
-            <li><a href="/terms.html">Términos y condiciones</a></li>
-            <li><a href="/privacy.html">Privacidad</a></li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="footer-bottom">
-      © 2026 Kiadez — Una red social para cumplir deseos.
-    </div>
-  </footer>
+  <AuthFooter />
 </div>

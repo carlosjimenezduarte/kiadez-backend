@@ -2,6 +2,13 @@
   import { onMount } from 'svelte';
   import { initPurposeCoverModule } from '../lib/purposeCover';
   import { logout } from '../lib/logout';
+  import AuthFooter from "../lib/AuthFooter.svelte";
+  import { getLocale } from "../lib/i18n";
+
+  const locale = getLocale();
+  const isEn = locale === "en";
+  const isFr = locale === "fr";
+  const tr = (es, en, fr = en) => (isEn ? en : isFr ? fr : es);
 
   onMount(() => {
     initPurposeCoverModule();
@@ -162,7 +169,7 @@
     let profilePhotoHistory = [];
     let profilePhotoHistoryIndex = 0;
     let homeAvatarProfilePhotoBusy = false;
-    let currentAboutDisplayName = (homeProfileName?.textContent || 'Usuario Kiadez').trim();
+    let currentAboutDisplayName = (homeProfileName?.textContent || tr('', '', '')).trim();
     let currentUsername = '';
     let pendingUsername = '';
     let viewerUserId = null;
@@ -179,35 +186,35 @@
     const USERNAME_MIN_LENGTH = 4;
     const USERNAME_MAX_LENGTH = 30;
     const USERNAME_PATTERN = /^[a-z0-9._]{4,30}$/;
-	    const PROFILE_PHOTO_POST_TEXT = 'Actualice mi foto de perfil.';
+	    const PROFILE_PHOTO_POST_TEXT = tr('', '', '');
 	    const DEFAULT_AVATAR_SRC = '/assets/avatar-default.jpg';
 	    const DEFAULT_COVER_SRC = '/assets/cover-default.jpg';
 	    const ORACLE_BACK_CARD_IMAGE = '/css/oracle/carta.webp';
     const HASHTAG_PATTERN = /(^|[^A-Za-z0-9_])#([A-Za-z0-9_]{2,50})/g;
     const GUARDIAN_RANK_NAMES = Object.freeze({
-      0: 'Sin rango',
-      1: 'Aspirante',
-      2: 'Aprendiz',
-      3: 'Guardián',
-      4: 'Guardián Consagrado',
-      5: 'Guardián Mayor',
-      6: 'Guardián del Logos',
-      7: 'Guardián del Umbral',
-      8: 'Guardián de Guardianes'
+      0: tr('', '', ''),
+      1: tr('', '', ''),
+      2: tr('', '', ''),
+      3: tr('', '', ''),
+      4: tr('', '', ''),
+      5: tr('', '', ''),
+      6: tr('', '', ''),
+      7: tr('', '', ''),
+      8: tr('', '', '')
     });
     const MONTH_LABELS = [
-      'Enero',
-      'Febrero',
-	      'Marzo',
-	      'Abril',
-	      'Mayo',
-	      'Junio',
-	      'Julio',
-	      'Agosto',
-	      'Septiembre',
-	      'Octubre',
-	      'Noviembre',
-	      'Diciembre'
+      tr('', '', ''),
+      tr('', '', ''),
+	      tr('', '', ''),
+	      tr('', '', ''),
+	      tr('', '', ''),
+	      tr('', '', ''),
+	      tr('', '', ''),
+	      tr('', '', ''),
+	      tr('', '', ''),
+	      tr('', '', ''),
+	      tr('', '', ''),
+	      tr('', '', '')
 	    ];
 	    const DEFAULT_PROFILE_PRIVACY_VISIBILITY = {
       public_profile_show_about: true,
@@ -236,8 +243,8 @@
 
     const formatGuardianRankLabel = (value) => {
       const rank = normalizeGuardianRank(value);
-      const rankName = GUARDIAN_RANK_NAMES[rank] || `Rango ${rank}`;
-      return `Rango ${rank} · ${rankName}`;
+      const rankName = GUARDIAN_RANK_NAMES[rank] || tr(`Rango ${rank}`, `Rank ${rank}`, `Rank ${rank}`);
+      return tr(`Rango ${rank} · ${rankName}`, `Rank ${rank} · ${rankName}`, `Rank ${rank} · ${rankName}`);
     };
 
     const applyHomeProfileRank = (value) => {
@@ -314,9 +321,9 @@
     };
 
     const minorStatusLabel = (status) => {
-      if (status === 'requested') return 'Solicitud enviada a adulto responsable';
-      if (status === 'pending') return 'Acreditación pendiente';
-      if (status === 'approved') return 'Cuenta acreditada';
+      if (status === 'requested') return tr('', '', '');
+      if (status === 'pending') return tr('', '', '');
+      if (status === 'approved') return tr('', '', '');
       return '';
     };
 
@@ -338,7 +345,9 @@
 	        minorProtectedBody.classList.toggle('hidden', minorProtectedCollapsed);
 	      }
 	      if (toggleMinorProtectedPanelBtn) {
-	        toggleMinorProtectedPanelBtn.textContent = minorProtectedCollapsed ? 'Expandir' : 'Reducir';
+	        toggleMinorProtectedPanelBtn.textContent = minorProtectedCollapsed
+            ? tr('', '', '')
+            : tr('', '', '');
 	      }
 	    };
 
@@ -379,7 +388,7 @@
       try {
         const res = await apiFetch('/auth/minor-accreditation/status');
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar el estado de acreditación.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         minorAccreditationState = data || null;
       } catch (error) {
         console.error(error);
@@ -408,18 +417,24 @@
       const relationship = String(minorRelationshipSelect?.value || 'padre').trim().toLowerCase();
 
       if (!guardianPhone) {
-        setMinorAccreditationModalStatus('Debes indicar el teléfono del adulto responsable.', true);
+        setMinorAccreditationModalStatus(
+          tr('Debes indicar el teléfono del adulto responsable.', "You must enter the responsible adult's phone number."),
+          true
+        );
         return;
       }
       if (!guardianEmail) {
-        setMinorAccreditationModalStatus('Debes indicar el correo del adulto responsable.', true);
+        setMinorAccreditationModalStatus(
+          tr('Debes indicar el correo del adulto responsable.', "You must enter the responsible adult's email."),
+          true
+        );
         return;
       }
 
-      const oldLabel = submitMinorAccreditationBtn?.textContent || 'Enviar solicitud';
+      const oldLabel = submitMinorAccreditationBtn?.textContent || tr('', '', '');
       if (submitMinorAccreditationBtn) {
         submitMinorAccreditationBtn.disabled = true;
-        submitMinorAccreditationBtn.textContent = 'Enviando...';
+        submitMinorAccreditationBtn.textContent = tr('', '', '');
       }
       setMinorAccreditationModalStatus('');
 
@@ -435,17 +450,21 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || 'No se pudo enviar la solicitud de acreditación.');
+          throw new Error(data.detail || tr('', '', ''));
         }
 
         await loadMinorAccreditationStatus();
         setMinorAccreditationModalStatus(
-          data.message || 'Solicitud enviada. Revisa con el adulto responsable el correo de validación.',
+          data.message ||
+            tr(
+              'Solicitud enviada. Revisa con el adulto responsable el correo de validación.',
+              'Request sent. Ask the responsible adult to check the validation email.'
+            ),
           false
         );
       } catch (error) {
         setMinorAccreditationModalStatus(
-          error.message || 'No se pudo enviar la solicitud de acreditación.',
+          error.message || tr('', '', ''),
           true
         );
       } finally {
@@ -550,7 +569,7 @@
 	      if (!isoDate) return '';
 	      const dateValue = new Date(isoDate);
 	      if (Number.isNaN(dateValue.getTime())) return '';
-      return dateValue.toLocaleDateString('es-CO', {
+      return dateValue.toLocaleDateString(isEn ? 'en-US' : isFr ? 'fr-FR' : 'es-CO', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
@@ -578,7 +597,7 @@
       if (!normalized) return '';
       try {
         const dateValue = new Date(`${normalized}T00:00:00Z`);
-        return new Intl.DateTimeFormat('es-CO', {
+        return new Intl.DateTimeFormat(isEn ? 'en-US' : isFr ? 'fr-FR' : 'es-CO', {
           day: 'numeric',
           month: 'long',
           year: 'numeric',
@@ -616,7 +635,7 @@
       }
 
       return {
-        name: MONTH_LABELS[safeMonthIndex] || 'Mes actual',
+        name: MONTH_LABELS[safeMonthIndex] || tr('', '', ''),
         activeDays,
         totalDays,
         padding: Array.from({ length: firstWeekday }, (_, idx) => `pad-${safeYear}-${safeMonthIndex + 1}-${idx}`),
@@ -627,7 +646,7 @@
     const renderHomeCalendarMonth = (monthData) => {
       if (!homeCalendarDots) return;
 
-      const monthName = String(monthData?.name || 'Mes actual');
+      const monthName = String(monthData?.name || tr('', '', ''));
       const activeDays = Math.max(0, Number(monthData?.activeDays || 0));
       const totalDays = Math.max(0, Number(monthData?.totalDays || 0));
       const padding = Array.isArray(monthData?.padding) ? monthData.padding : [];
@@ -643,7 +662,9 @@
         ...days.map((day) => {
           const posts = Math.max(0, Number(day?.posts || 0));
           const hasPosts = posts > 0;
-          const postsLabel = posts === 1 ? '1 publicación' : `${posts} publicaciones`;
+          const postsLabel = posts === 1
+            ? tr('', '', '')
+            : tr(`${posts} publicaciones`, `${posts} posts`, `${posts} posts`);
           const dayLabel = formatHomeCalendarDayLabel(day?.date_utc) || String(day?.date_utc || '');
           const title = `${dayLabel} · ${postsLabel}`;
           const stateClass = hasPosts ? 'is-active' : 'is-idle';
@@ -778,7 +799,7 @@
 	      try {
 	        const res = await apiFetch(endpoint);
 	        const data = await res.json();
-	        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar la portada del perfil.');
+	        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
 	        applyCoverState(data);
 	      } catch (error) {
 	        console.error(error);
@@ -856,7 +877,7 @@
       try {
         const res = await apiFetch(`/privacy/user/${encodeURIComponent(String(profileId))}`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar la privacidad del perfil.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         applyProfilePrivacyVisibility(data);
       } catch (error) {
         console.error(error);
@@ -867,7 +888,9 @@
     const updateHomeAboutWordCounter = () => {
       if (!homeAboutWordCounter) return;
       const words = countWords(homeAboutInput?.value || '');
-      homeAboutWordCounter.textContent = `${words} / ${HOME_ABOUT_MAX_WORDS} palabras`;
+      homeAboutWordCounter.textContent = isEn || isFr
+        ? `${words} / ${HOME_ABOUT_MAX_WORDS} words`
+        : `${words} / ${HOME_ABOUT_MAX_WORDS} palabras`;
       homeAboutWordCounter.classList.toggle('is-error', words > HOME_ABOUT_MAX_WORDS);
     };
 
@@ -875,21 +898,21 @@
 
     const relativeTime = (isoDate) => {
       const ts = Date.parse(isoDate);
-      if (Number.isNaN(ts)) return 'ahora';
+      if (Number.isNaN(ts)) return tr('', '', '');
       const minutes = Math.floor((Date.now() - ts) / 60000);
-      if (minutes < 1) return 'ahora';
-      if (minutes < 60) return `hace ${minutes} min`;
+      if (minutes < 1) return tr('', '', '');
+      if (minutes < 60) return isEn || isFr ? `${minutes} min ago` : `hace ${minutes} min`;
       const hours = Math.floor(minutes / 60);
-      if (hours < 24) return `hace ${hours} h`;
+      if (hours < 24) return isEn || isFr ? `${hours} h ago` : `hace ${hours} h`;
       const days = Math.floor(hours / 24);
-      return `hace ${days} dia${days > 1 ? 's' : ''}`;
+      return isEn || isFr ? `${days} day${days > 1 ? 's' : ''} ago` : `hace ${days} dia${days > 1 ? 's' : ''}`;
     };
 
     const apiFetch = async (path, options = {}) => {
       const token = getAccessToken();
       if (!token) {
         window.location.href = '/login.html';
-        throw new Error('No hay sesion activa');
+	        throw new Error(tr('', '', ''));
       }
       const headers = {
         ...(options.headers || {}),
@@ -900,7 +923,7 @@
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         window.location.href = '/login.html';
-        throw new Error('Sesion expirada');
+	        throw new Error(tr('', '', ''));
       }
       return res;
     };
@@ -929,7 +952,7 @@
       const res = await apiFetch('/auth/me');
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || 'No se pudo cargar tu perfil.');
+        throw new Error(data.detail || tr('', '', ''));
       }
       const userId = Number(data?.user_number);
       const guardianRank = normalizeGuardianRank(data?.guardian_rank);
@@ -946,16 +969,16 @@
       if (Number.isFinite(idValue) && idValue > 0) {
         const res = await apiFetch(`/follows/profile?user_id=${encodeURIComponent(String(idValue))}`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar el perfil.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         return data;
       }
       if (usernameValue) {
         const res = await apiFetch(`/follows/profile?username=${encodeURIComponent(usernameValue)}`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar el perfil.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         return data;
       }
-      throw new Error('Parámetros inválidos para cargar perfil.');
+      throw new Error(tr('', '', ''));
     };
 
     const applyForeignProfileHeader = (profile) => {
@@ -966,7 +989,7 @@
 
       const handleText =
         String(profile?.handle || '').trim() ||
-        (activeProfileUsername ? `@${activeProfileUsername}` : activeProfileUserId ? `@id${activeProfileUserId}` : '@usuario');
+	        (activeProfileUsername ? `@${activeProfileUsername}` : activeProfileUserId ? `@id${activeProfileUserId}` : tr('', '', ''));
 
       if (homeUsernameValue) homeUsernameValue.textContent = handleText;
       if (homeUsernameLink) {
@@ -1029,7 +1052,10 @@
     };
 
     const applyHomeAbout = (about) => {
-      const displayName = (about?.display_name || '').trim() || (homeProfileName?.textContent || '').trim() || 'Usuario Kiadez';
+      const displayName =
+        (about?.display_name || '').trim() ||
+        (homeProfileName?.textContent || '').trim() ||
+        tr('', '', '');
       const aboutText = (about?.about_text || '').trim();
       currentAboutDisplayName = displayName;
       if (homeProfileName) homeProfileName.textContent = displayName;
@@ -1041,8 +1067,8 @@
       }
       if (homeAboutEmptyState) {
         homeAboutEmptyState.textContent = isViewingOwnProfile
-          ? 'Cuéntale a la comunidad quién eres en pocas palabras.'
-          : 'Este usuario aún no ha compartido su sección "Acerca de mí".';
+          ? tr('', '', '')
+          : tr('', '', '');
         homeAboutEmptyState.classList.toggle('hidden', Boolean(aboutText));
       }
     };
@@ -1058,7 +1084,7 @@
             : '/biography/about';
         const res = await apiFetch(endpoint);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar "Acerca de mi".');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         applyHomeAbout(data);
       } catch (error) {
         console.error(error);
@@ -1068,12 +1094,18 @@
         }
         if (homeAboutEmptyState) {
           const reason = String(error?.message || '').trim();
-          if (!isViewingOwnProfile && reason.toLowerCase().includes('oculta por privacidad')) {
-            homeAboutEmptyState.textContent = 'Este usuario decidió ocultar su sección "Acerca de mí".';
+	          if (
+            !isViewingOwnProfile
+            && (reason.toLowerCase().includes('oculta por privacidad') || reason.toLowerCase().includes('hidden by privacy'))
+          ) {
+            homeAboutEmptyState.textContent = tr(
+              'Este usuario decidió ocultar su sección "Acerca de mí".',
+              'This user chose to hide their "About me" section.'
+            );
           } else {
             homeAboutEmptyState.textContent = isViewingOwnProfile
-              ? 'No se pudo cargar tu sección "Acerca de mí".'
-              : 'No se pudo cargar la sección "Acerca de mí" de este perfil.';
+              ? tr('', '', '')
+              : tr('', '', '');
           }
           homeAboutEmptyState.classList.remove('hidden');
         }
@@ -1137,9 +1169,11 @@
       }
       if (profilePhotoPostMeta) {
         if (!post) {
-          profilePhotoPostMeta.textContent = '· Publicacion pendiente';
+          profilePhotoPostMeta.textContent = tr('', '', '');
         } else {
-          profilePhotoPostMeta.textContent = `· ${relativeTime(post.created_at)} · ${post.visibility === 'private' ? 'Privado' : 'Publico'}`;
+          profilePhotoPostMeta.textContent = `· ${relativeTime(post.created_at)} · ${
+            post.visibility === 'private' ? tr('', '', '') : tr('', '', '')
+          }`;
         }
       }
       if (profilePhotoStarPost) {
@@ -1148,16 +1182,16 @@
         const starCount = Number(post?.star_count || 0);
         profilePhotoStarPost.disabled = !post || starredByMe || isMine;
         profilePhotoStarPost.textContent = starredByMe
-          ? `⭐ Estrella donada (${starCount})`
-          : `⭐ Donar estrella (${starCount})`;
+          ? `⭐ ${tr('', '', '')} (${starCount})`
+          : `⭐ ${tr('', '', '')} (${starCount})`;
       }
       if (profilePhotoCommentPost) {
         profilePhotoCommentPost.disabled = !post;
-        profilePhotoCommentPost.textContent = `💬 Comentar (${Number(post?.comment_count || 0)})`;
+        profilePhotoCommentPost.textContent = `💬 ${tr('', '', '')} (${Number(post?.comment_count || 0)})`;
       }
       if (profilePhotoSharePost) {
         profilePhotoSharePost.disabled = !post;
-        profilePhotoSharePost.textContent = `🔁 Compartir (${Number(post?.share_count || 0)})`;
+        profilePhotoSharePost.textContent = `🔁 ${tr('', '', '')} (${Number(post?.share_count || 0)})`;
       }
       setProfilePhotoPostStatus('');
     };
@@ -1218,7 +1252,7 @@
       try {
         const res = await apiFetch('/media/profile-photo');
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar la foto de perfil.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         profilePhotoMediaId = data.media_id || null;
         setHomeAvatarSource(data.url || DEFAULT_AVATAR_SRC);
       } catch (error) {
@@ -1246,7 +1280,9 @@
 	        if (viewerUserId) activeProfileUserId = viewerUserId;
 	        syncProfileModuleLinks();
 	      }
-      if (homeUsernameValue) homeUsernameValue.textContent = hasUsername ? `@${username}` : '@elige-tu-usuario';
+      if (homeUsernameValue) {
+        homeUsernameValue.textContent = hasUsername ? `@${username}` : tr('', '', '');
+      }
       if (homeUsernameLink) {
         homeUsernameLink.href = profilePath;
         homeUsernameLink.classList.toggle('is-empty', !hasUsername);
@@ -1259,11 +1295,14 @@
       if (homeUsernameCooldown) {
         const canUpdate = Boolean(state?.can_update);
         if (canUpdate) {
-          homeUsernameCooldown.textContent = 'Puedes cambiar tu nombre de usuario ahora.';
+          homeUsernameCooldown.textContent = tr('', '', '');
         } else if (state?.cooldown_until) {
-          homeUsernameCooldown.textContent = `Podrás cambiarlo nuevamente el ${formatIsoDate(state.cooldown_until)}.`;
+          homeUsernameCooldown.textContent = tr(
+            `Podrás cambiarlo nuevamente el ${formatIsoDate(state.cooldown_until)}.`,
+            `You can change it again on ${formatIsoDate(state.cooldown_until)}.`
+          );
         } else {
-          homeUsernameCooldown.textContent = 'Nombre de usuario bloqueado temporalmente.';
+          homeUsernameCooldown.textContent = tr('', '', '');
         }
       }
       setProfileCanonicalLinks(profilePath);
@@ -1275,7 +1314,7 @@
       try {
         const res = await apiFetch('/auth/username');
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar tu nombre de usuario.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         applyUsernameState(data);
       } catch (error) {
         console.error(error);
@@ -1286,8 +1325,11 @@
       if (!homeUsernamePreview) return;
       const normalized = normalizeUsername(homeUsernameInput?.value || '');
       homeUsernamePreview.textContent = normalized
-        ? `Enlace: ${window.location.origin}/home_user.html?u=${normalized}`
-        : 'Enlace: /home_user.html';
+        ? tr(
+          `Enlace: ${window.location.origin}/home_user.html?u=${normalized}`,
+          `Link: ${window.location.origin}/home_user.html?u=${normalized}`
+        )
+        : tr('', '', '');
     };
 
     const openHomeUsernameModalPanel = () => {
@@ -1310,12 +1352,18 @@
     };
 
     const validateUsernameInput = (username) => {
-      if (!username) return 'Digita un nombre de usuario.';
+      if (!username) return tr('', '', '');
       if (username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH) {
-        return `El nombre de usuario debe tener entre ${USERNAME_MIN_LENGTH} y ${USERNAME_MAX_LENGTH} caracteres.`;
+        return tr(
+          `El nombre de usuario debe tener entre ${USERNAME_MIN_LENGTH} y ${USERNAME_MAX_LENGTH} caracteres.`,
+          `Username must be between ${USERNAME_MIN_LENGTH} and ${USERNAME_MAX_LENGTH} characters.`
+        );
       }
       if (!USERNAME_PATTERN.test(username)) {
-        return 'Usa solo letras minúsculas, números, punto o guión bajo.';
+        return tr(
+          'Usa solo letras minúsculas, números, punto o guión bajo.',
+          'Use only lowercase letters, numbers, dot, or underscore.'
+        );
       }
       return '';
     };
@@ -1342,18 +1390,21 @@
         return;
       }
 
-      const oldLabel = saveHomeUsernameBtn?.textContent || 'Aceptar';
+      const oldLabel = saveHomeUsernameBtn?.textContent || tr('', '', '');
       if (saveHomeUsernameBtn) {
         saveHomeUsernameBtn.disabled = true;
-        saveHomeUsernameBtn.textContent = 'Validando...';
+        saveHomeUsernameBtn.textContent = tr('', '', '');
       }
 
       try {
         const res = await apiFetch(`/auth/username/check?username=${encodeURIComponent(candidate)}`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo validar el nombre de usuario.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         if (!data.available) {
-          setHomeUsernameModalStatus(data.detail || 'Ese nombre de usuario no está disponible.', true);
+          setHomeUsernameModalStatus(
+            data.detail || tr('', '', ''),
+            true
+          );
           homeUsernameConfirmWrap?.classList.add('hidden');
           pendingUsername = '';
           return;
@@ -1361,12 +1412,15 @@
 
         pendingUsername = candidate;
         if (homeUsernameConfirmText) {
-          homeUsernameConfirmText.textContent = `¿Estás seguro de que deseas este nombre de usuario: @${candidate}?`;
+          homeUsernameConfirmText.textContent = tr(
+            `¿Estás seguro de que deseas este nombre de usuario: @${candidate}?`,
+            `Are you sure you want this username: @${candidate}?`
+          );
         }
         homeUsernameConfirmWrap?.classList.remove('hidden');
         setHomeUsernameModalStatus('');
       } catch (error) {
-        setHomeUsernameModalStatus(error.message || 'No se pudo validar el nombre de usuario.', true);
+        setHomeUsernameModalStatus(error.message || tr('', '', ''), true);
       } finally {
         if (saveHomeUsernameBtn) {
           saveHomeUsernameBtn.disabled = false;
@@ -1383,14 +1437,17 @@
 
     const handleConfirmUsernameChange = async () => {
       if (!pendingUsername) {
-        setHomeUsernameModalStatus('Primero valida un nombre de usuario disponible.', true);
+        setHomeUsernameModalStatus(
+          tr('', '', ''),
+          true
+        );
         return;
       }
 
-      const oldLabel = confirmHomeUsernameBtn?.textContent || 'Sí';
+      const oldLabel = confirmHomeUsernameBtn?.textContent || tr('', '', '');
       if (confirmHomeUsernameBtn) {
         confirmHomeUsernameBtn.disabled = true;
-        confirmHomeUsernameBtn.textContent = 'Guardando...';
+        confirmHomeUsernameBtn.textContent = tr('', '', '');
       }
 
       try {
@@ -1400,12 +1457,17 @@
           body: JSON.stringify({ username: pendingUsername })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo actualizar el nombre de usuario.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         applyUsernameState(data.state || null);
         closeHomeUsernameModalPanel();
-        setPostsStatus(`Tu nombre de usuario ahora es @${data?.state?.username || pendingUsername}.`);
+        setPostsStatus(
+          tr(
+            `Tu nombre de usuario ahora es @${data?.state?.username || pendingUsername}.`,
+            `Your username is now @${data?.state?.username || pendingUsername}.`
+          )
+        );
       } catch (error) {
-        setHomeUsernameModalStatus(error.message || 'No se pudo actualizar el nombre de usuario.', true);
+        setHomeUsernameModalStatus(error.message || tr('', '', ''), true);
       } finally {
         if (confirmHomeUsernameBtn) {
           confirmHomeUsernameBtn.disabled = false;
@@ -1436,7 +1498,7 @@
         homePublicWishList.innerHTML = `
           <li class="wish-item wish-item-home-public wish-item-empty">
             <span class="wish-dot"></span>
-            <span class="wish-item-label">Aún no tienes deseos públicos activos.</span>
+            <span class="wish-item-label">${escapeHtml(tr('', '', ''))}</span>
           </li>
         `;
         return;
@@ -1444,10 +1506,10 @@
 
       homePublicWishList.innerHTML = topSeven
         .map((wish) => {
-          const wishText = escapeHtml(wish?.wish_text || 'Deseo sin descripción');
+          const wishText = escapeHtml(wish?.wish_text || tr('', '', ''));
           const mediaUrl = (wish?.media_url || '').trim();
           const mediaHtml = mediaUrl
-            ? `<img class="wish-item-thumb" src="${escapeHtml(mediaUrl)}" alt="Imagen del deseo público" loading="lazy" />`
+            ? `<img class="wish-item-thumb" src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(tr('', '', ''))}" loading="lazy" />`
             : '<span class="wish-dot"></span>';
 
           return `
@@ -1489,10 +1551,12 @@
 
       homeCooperativeWishList.innerHTML = topSeven
         .map((wish) => {
-          const wishText = escapeHtml(wish?.wish_text || 'Deseo cooperativo sin descripción');
+          const wishText = escapeHtml(
+            wish?.wish_text || tr('', '', '')
+          );
           const mediaUrl = (wish?.media_url || '').trim();
           const mediaHtml = mediaUrl
-            ? `<img class="wish-item-thumb" src="${escapeHtml(mediaUrl)}" alt="Imagen del deseo cooperativo" loading="lazy" />`
+            ? `<img class="wish-item-thumb" src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(tr('', '', ''))}" loading="lazy" />`
             : '<span class="wish-dot"></span>';
 
           return `
@@ -1518,12 +1582,12 @@
 	            : '/public-wishes/personal';
 	        const res = await apiFetch(endpoint);
 	        const data = await res.json();
-	        if (!res.ok) throw new Error(data.detail || 'No se pudieron cargar tus deseos públicos.');
+	        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
 	        renderHomePublicWishes(data?.items || [], data?.active_count || 0, data?.active_limit || 50);
 	        setHomePublicWishStatus('');
       } catch (error) {
         renderHomePublicWishes([], 0, 50);
-        setHomePublicWishStatus(error.message || 'No se pudieron cargar tus deseos públicos.', true);
+        setHomePublicWishStatus(error.message || tr('', '', ''), true);
       }
     };
 
@@ -1542,14 +1606,14 @@
             : '/public-wishes/cooperative';
         const res = await apiFetch(endpoint);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudieron cargar tus deseos cooperativos.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         renderHomeCooperativeWishes(data?.items || [], data?.active_count || 0, data?.active_limit || 20);
         setHomeCooperativeWishStatus('');
       } catch (error) {
         hasActiveCooperativeWishes = false;
         updateHomeCooperativePanelVisibility();
         renderHomeCooperativeWishes([], 0, 20);
-        setHomeCooperativeWishStatus(error.message || 'No se pudieron cargar tus deseos cooperativos.', true);
+        setHomeCooperativeWishStatus(error.message || tr('', '', ''), true);
       }
     };
 
@@ -1569,15 +1633,19 @@
       if (homeFulfilledWishCount) {
         const safeTotal = Math.max(0, Number(total || wishes.length));
         homeFulfilledWishCount.textContent = safeTotal > 7
-          ? `${topSeven.length} de ${safeTotal}`
-          : `${topSeven.length} recientes`;
+          ? isEn
+            ? `${topSeven.length} of ${safeTotal}`
+            : `${topSeven.length} de ${safeTotal}`
+          : isEn
+            ? `${topSeven.length} recent`
+            : `${topSeven.length} recientes`;
       }
 
       if (topSeven.length === 0) {
         homeFulfilledWishList.innerHTML = `
           <li class="wish-item wish-item-home-public wish-item-empty">
             <span class="wish-dot"></span>
-            <span class="wish-item-label">Aún no tienes deseos cumplidos.</span>
+            <span class="wish-item-label">${escapeHtml(tr('', '', ''))}</span>
           </li>
         `;
         return;
@@ -1585,10 +1653,10 @@
 
       homeFulfilledWishList.innerHTML = topSeven
         .map((wish) => {
-          const wishText = escapeHtml(wish?.wish_text || 'Deseo cumplido sin descripción');
+          const wishText = escapeHtml(wish?.wish_text || tr('', '', ''));
           const mediaUrl = (wish?.fulfilled_evidence_media_url || wish?.media_url || '').trim();
           const mediaHtml = mediaUrl
-            ? `<img class="wish-item-thumb" src="${escapeHtml(mediaUrl)}" alt="Imagen del deseo cumplido" loading="lazy" />`
+            ? `<img class="wish-item-thumb" src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(tr('', '', ''))}" loading="lazy" />`
             : '<span class="wish-dot"></span>';
 
           return `
@@ -1614,12 +1682,12 @@
 	            : '/public-wishes/personal/fulfilled?limit=7&offset=0';
 	        const res = await apiFetch(endpoint);
 	        const data = await res.json();
-	        if (!res.ok) throw new Error(data.detail || 'No se pudieron cargar tus deseos cumplidos.');
+	        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
 	        renderHomeFulfilledWishes(data?.items || [], data?.total || 0);
 	        setHomeFulfilledWishStatus('');
       } catch (error) {
         renderHomeFulfilledWishes([], 0);
-        setHomeFulfilledWishStatus(error.message || 'No se pudieron cargar tus deseos cumplidos.', true);
+        setHomeFulfilledWishStatus(error.message || tr('', '', ''), true);
       }
     };
 
@@ -1640,12 +1708,12 @@
       try {
         const res = await apiFetch('/private-wishes/personal');
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudieron cargar tus deseos privados.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         renderHomePrivateWishSummary(data?.active_count || 0, data?.active_limit || 50);
         setHomePrivateWishStatus('');
       } catch (error) {
         renderHomePrivateWishSummary(0, 50);
-        setHomePrivateWishStatus(error.message || 'No se pudieron cargar tus deseos privados.', true);
+        setHomePrivateWishStatus(error.message || tr('', '', ''), true);
       }
     };
 
@@ -1671,13 +1739,13 @@
         return;
       }
 
-      setHomeCalendarStatus('Cargando actividad del mes actual...');
+      setHomeCalendarStatus(tr('', '', ''));
       renderFallbackCalendar();
 
       try {
         const profileId = Number(activeProfileUserId);
         if (!isViewingOwnProfile && (!Number.isFinite(profileId) || profileId <= 0)) {
-          throw new Error('No se pudo identificar este perfil para cargar su calendario.');
+          throw new Error(tr('', '', ''));
         }
 
         const requestYear = new Date().getUTCFullYear();
@@ -1687,7 +1755,7 @@
 
         const res = await apiFetch(endpoint);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar el calendario del mes actual.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
 
         const todayIso = toIsoDateUtc(data?.today_utc) || fallbackTodayIso;
         const monthYear = Number(todayIso.slice(0, 4)) || requestYear;
@@ -1703,7 +1771,7 @@
         setHomeCalendarStatus('');
       } catch (error) {
         renderFallbackCalendar();
-        setHomeCalendarStatus(error?.message || 'No se pudo cargar el calendario del mes actual.', true);
+        setHomeCalendarStatus(error?.message || tr('', '', ''), true);
 	      }
 	    };
 
@@ -1712,30 +1780,33 @@
 	    const applyHomeOracleNoSelectionState = (summaryText) => {
 	      if (homeOracleCardImage) {
 	        homeOracleCardImage.src = ORACLE_BACK_CARD_IMAGE;
-	        homeOracleCardImage.alt = 'Carta del Oráculo en reverso';
+	        homeOracleCardImage.alt = tr('', '', '');
 	      }
 	      if (homeOracleSummary) {
 	        homeOracleSummary.textContent =
-	          summaryText || 'Conoce El Oráculo y elige tu primera carta para reflexionar sobre tu presente.';
+	          summaryText || tr(
+            'Conoce El Oráculo y elige tu primera carta para reflexionar sobre tu presente.',
+            'Discover the Oracle and choose your first card to reflect on your present.'
+          );
 	      }
 	    };
 
 	    const loadHomeOracle = async () => {
 	      if (!homeOracleCardImage) return;
 
-	      if (!isViewingOwnProfile && !activeProfilePrivacyVisibility.public_profile_show_oracle) {
-	        applyHomeOracleNoSelectionState('Este módulo es privado en este perfil.');
-	        setHomeOracleStatus('');
-	        return;
-	      }
+		      if (!isViewingOwnProfile && !activeProfilePrivacyVisibility.public_profile_show_oracle) {
+		        applyHomeOracleNoSelectionState(tr('', '', ''));
+		        setHomeOracleStatus('');
+		        return;
+		      }
 
-	      setHomeOracleStatus('Cargando estado del Oráculo...');
+		      setHomeOracleStatus(tr('', '', ''));
 	      applyHomeOracleNoSelectionState('');
 
 	      try {
 	        const profileId = Number(activeProfileUserId);
 	        if (!isViewingOwnProfile && (!Number.isFinite(profileId) || profileId <= 0)) {
-	          throw new Error('No se pudo identificar este perfil para cargar su Oráculo.');
+		          throw new Error(tr('', '', ''));
 	        }
 
 	        const endpoint = isViewingOwnProfile
@@ -1743,7 +1814,7 @@
 	          : `/oracle/public/${encodeURIComponent(String(profileId))}`;
 	        const res = await apiFetch(endpoint);
 	        const data = await res.json();
-	        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar el estado del Oráculo.');
+		        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
 
 	        const responses = Array.isArray(data?.responses) ? data.responses : [];
 	        const latest = responses.find((entry) => {
@@ -1754,9 +1825,12 @@
 	        if (!latest) {
 	          applyHomeOracleNoSelectionState(
 	            isViewingOwnProfile
-	              ? 'Conoce El Oráculo y elige tu primera carta para reflexionar sobre tu presente.'
-	              : 'Este usuario aún no ha compartido una carta del Oráculo.'
-	          );
+		              ? tr(
+                    'Conoce El Oráculo y elige tu primera carta para reflexionar sobre tu presente.',
+                    'Discover the Oracle and choose your first card to reflect on your present.'
+                  )
+		              : tr('', '', '')
+		          );
 	          setHomeOracleStatus('');
 	          return;
 	        }
@@ -1766,26 +1840,47 @@
 	        const textPublic = String(latest?.text_public || '').trim();
 
 	        homeOracleCardImage.src = getOracleCardImage(cardId);
-	        homeOracleCardImage.alt = `Carta más reciente elegida en El Oráculo (${cardId})`;
+		        homeOracleCardImage.alt = tr(
+              `Carta más reciente elegida en El Oráculo (${cardId})`,
+              `Most recent card chosen in the Oracle (${cardId})`
+            );
 
 	        if (responseType === 'public' && textPublic) {
 	          if (homeOracleSummary) homeOracleSummary.textContent = truncateText(textPublic);
 	        } else if (responseType === 'secret' && isViewingOwnProfile) {
-	          if (homeOracleSummary) homeOracleSummary.textContent = 'Tu respuesta a esta carta está guardada en secreto en tu Vault.';
-	        } else if (responseType === 'heart' && isViewingOwnProfile) {
-	          if (homeOracleSummary) homeOracleSummary.textContent = 'Elegiste dejar esta carta reposando en tu corazón.';
-	        } else {
-	          if (homeOracleSummary) homeOracleSummary.textContent = 'Esta es la carta más reciente que se eligió en El Oráculo.';
-	        }
+		          if (homeOracleSummary) {
+                homeOracleSummary.textContent = tr(
+                  'Tu respuesta a esta carta está guardada en secreto en tu Vault.',
+                  'Your response to this card is stored in secret in your Vault.'
+                );
+              }
+		        } else if (responseType === 'heart' && isViewingOwnProfile) {
+		          if (homeOracleSummary) {
+                homeOracleSummary.textContent = tr(
+                  'Elegiste dejar esta carta reposando en tu corazón.',
+                  'You chose to let this card rest in your heart.'
+                );
+              }
+		        } else {
+		          if (homeOracleSummary) {
+                homeOracleSummary.textContent = tr(
+                  'Esta es la carta más reciente que se eligió en El Oráculo.',
+                  'This is the most recent card chosen in the Oracle.'
+                );
+              }
+		        }
 
 	        setHomeOracleStatus('');
 	      } catch (error) {
 	        applyHomeOracleNoSelectionState(
 	          isViewingOwnProfile
-	            ? 'Conoce El Oráculo y elige tu primera carta para reflexionar sobre tu presente.'
-	            : 'No se pudo cargar este módulo del Oráculo.'
-	        );
-	        setHomeOracleStatus(error?.message || 'No se pudo cargar el estado del Oráculo.', true);
+		            ? tr(
+                  'Conoce El Oráculo y elige tu primera carta para reflexionar sobre tu presente.',
+                  'Discover the Oracle and choose your first card to reflect on your present.'
+                )
+		            : tr('', '', '')
+		        );
+		        setHomeOracleStatus(error?.message || tr('', '', ''), true);
 	      }
 	    };
 
@@ -1806,7 +1901,7 @@
           const albumGroup = {
             __kind: 'album',
             album_id: albumId,
-            album_name: String(post?.album_name || '').trim() || `Álbum ${albumId}`,
+            album_name: String(post?.album_name || '').trim() || tr(`Álbum ${albumId}`, `Album ${albumId}`, `Album ${albumId}`),
             album_items: [post]
           };
           grouped.set(albumId, albumGroup);
@@ -1883,7 +1978,7 @@
       if (!Array.isArray(displayPosts) || displayPosts.length === 0) {
         postsList.innerHTML = `
           <article class="panel post post-empty">
-            <p class="post-text">Aun no hay publicaciones. Crea la primera desde el boton "Que estas pensando?".</p>
+            <p class="post-text">${escapeHtml(tr('', '', ''))}</p>
           </article>
         `;
         return;
@@ -1901,7 +1996,7 @@
               .map((albumPost, index) => {
                 const mediaNode = albumPost.media_kind === 'video'
                   ? `<video src="${escapeHtml(albumPost.media_url || '')}" muted playsinline preload="metadata"></video>`
-                  : `<img src="${escapeHtml(albumPost.media_url || '')}" alt="Archivo del álbum" loading="lazy" />`;
+                  : `<img src="${escapeHtml(albumPost.media_url || '')}" alt="${escapeHtml(tr('', '', ''))}" loading="lazy" />`;
                 const showExtra = index === 3 && extraItems > 0
                   ? `<span class="post-album-more">+${extraItems}</span>`
                   : '';
@@ -1915,7 +2010,7 @@
               .join('');
 
             mediaHtml = `
-              <div class="post-album-grid" aria-label="Publicación agrupada de álbum">
+              <div class="post-album-grid" aria-label="${escapeHtml(tr('', '', ''))}">
                 ${previewHtml}
               </div>
             `;
@@ -1923,43 +2018,43 @@
             mediaHtml = post.media_url
               ? post.media_kind === 'video'
                 ? `<div class="post-media"><video src="${post.media_url}" controls></video></div>`
-                : `<div class="post-media"><img src="${post.media_url}" alt="Media de la publicacion" /></div>`
+                : `<div class="post-media"><img src="${post.media_url}" alt="${escapeHtml(tr('', '', ''))}" /></div>`
               : '';
           }
 
           const starDisabled = post.starred_by_me || post.is_mine ? 'disabled' : '';
           const starLabel = post.starred_by_me
-            ? `⭐ Estrella donada (${post.star_count})`
-            : `⭐ Donar estrella (${post.star_count})`;
+            ? `⭐ ${tr('', '', '')} (${post.star_count})`
+            : `⭐ ${tr('', '', '')} (${post.star_count})`;
           const reportBtn = post.is_mine
             ? ''
-            : `<button class="post-head-btn" type="button" data-action="report-post" data-post-id="${post.id}" title="Reportar publicacion">🚩</button>`;
+            : `<button class="post-head-btn" type="button" data-action="report-post" data-post-id="${post.id}" title="${escapeHtml(tr('', '', ''))}">🚩</button>`;
           const editBtn = post.is_mine
-            ? `<button class="post-head-btn" type="button" data-action="edit-post" data-post-id="${post.id}" title="Editar texto de la publicacion">📝</button>`
+            ? `<button class="post-head-btn" type="button" data-action="edit-post" data-post-id="${post.id}" title="${escapeHtml(tr('', '', ''))}">📝</button>`
             : '';
           const deleteBtn = post.is_mine
-            ? `<button class="post-head-btn" type="button" data-action="delete-post" data-post-id="${post.id}" title="Eliminar publicacion">🗑</button>`
+            ? `<button class="post-head-btn" type="button" data-action="delete-post" data-post-id="${post.id}" title="${escapeHtml(tr('', '', ''))}">🗑</button>`
             : '';
           const albumMeta = isAlbumGroup
-            ? `<p class="post-album-meta">${escapeHtml(post.album_name || "Álbum")} · ${Number(post.album_total_items || 0)} archivo(s)</p>`
+            ? `<p class="post-album-meta">${escapeHtml(post.album_name || tr('', '', ''))} · ${Number(post.album_total_items || 0)} ${escapeHtml(tr('', '', ''))}</p>`
             : '';
-	          const openAlbumBtn = isAlbumGroup
-	            ? `<button class="post-btn" type="button" data-action="open-album-gallery" data-album-id="${Number(post.album_id || 0)}">🖼️ Hojear álbum (${Number(post.album_total_items || 0)})</button>`
-	            : '';
-	          const authorProfileUrl = escapeHtml(String(post?.__author_profile_url || buildAuthorProfileUrl(post?.author)));
-	          const authorName = escapeHtml(post?.author?.name || 'Usuario');
-	          const authorAvatarUrl = escapeHtml(String(post?.__author_avatar_url || DEFAULT_AVATAR_SRC).trim() || DEFAULT_AVATAR_SRC);
+		          const openAlbumBtn = isAlbumGroup
+		            ? `<button class="post-btn" type="button" data-action="open-album-gallery" data-album-id="${Number(post.album_id || 0)}">🖼️ ${escapeHtml(tr('', '', ''))} (${Number(post.album_total_items || 0)})</button>`
+		            : '';
+		          const authorProfileUrl = escapeHtml(String(post?.__author_profile_url || buildAuthorProfileUrl(post?.author)));
+		          const authorName = escapeHtml(post?.author?.name || tr('', '', ''));
+		          const authorAvatarUrl = escapeHtml(String(post?.__author_avatar_url || DEFAULT_AVATAR_SRC).trim() || DEFAULT_AVATAR_SRC);
 
 	          return `
 	            <article class="panel post" data-post-id="${post.id}">
 	              <div class="post-head">
 	                <div class="post-head-author">
 	                  <a class="post-author-avatar-link" href="${authorProfileUrl}">
-	                    <img class="post-author-avatar" src="${authorAvatarUrl}" alt="Foto de perfil de ${authorName}" loading="lazy" />
+		                    <img class="post-author-avatar" src="${authorAvatarUrl}" alt="${escapeHtml(tr('', '', ''))} ${authorName}" loading="lazy" />
 	                  </a>
 	                  <div class="post-head-main">
 	                    <a class="post-author-link" href="${authorProfileUrl}">${authorName}</a>
-	                    <span class="post-meta">· ${relativeTime(post.created_at)} · ${post.visibility === 'private' ? 'Privado' : 'Publico'}</span>
+		                    <span class="post-meta">· ${relativeTime(post.created_at)} · ${post.visibility === 'private' ? tr('', '', '') : tr('', '', '')}</span>
 	                  </div>
 	                </div>
 	                <div class="post-head-actions">
@@ -1973,15 +2068,15 @@
               ${mediaHtml}
               <div class="post-actions">
                 <button class="post-btn" type="button" data-action="star-post" data-post-id="${post.id}" ${starDisabled}>${starLabel}</button>
-                <button class="post-btn" type="button" data-action="comment-post" data-post-id="${post.id}">💬 Comentar (${post.comment_count})</button>
-                <button class="post-btn" type="button" data-action="share-post" data-post-id="${post.id}">🔁 Compartir (${post.share_count})</button>
-                ${openAlbumBtn}
-              </div>
-            </article>
-          `;
-        })
-        .join('');
-    };
+	                <button class="post-btn" type="button" data-action="comment-post" data-post-id="${post.id}">💬 ${escapeHtml(tr('', '', ''))} (${post.comment_count})</button>
+	                <button class="post-btn" type="button" data-action="share-post" data-post-id="${post.id}">🔁 ${escapeHtml(tr('', '', ''))} (${post.share_count})</button>
+	                ${openAlbumBtn}
+	              </div>
+	            </article>
+	          `;
+	        })
+	        .join('');
+	    };
 
     const loadMyStats = async () => {
       try {
@@ -1990,7 +2085,7 @@
           const res = await apiFetch('/posts/me/stats');
           const data = await res.json();
           if (res.ok) {
-            starsTotalLabel.textContent = Number(data.my_received_stars_total || 0).toLocaleString('es-CO');
+            starsTotalLabel.textContent = Number(data.my_received_stars_total || 0).toLocaleString(isEn ? 'en-US' : isFr ? 'fr-FR' : 'es-CO');
           }
           return;
         }
@@ -2004,7 +2099,7 @@
         const res = await apiFetch(`/follows/profile?user_id=${encodeURIComponent(String(profileId))}`);
         const data = await res.json();
         if (res.ok) {
-          starsTotalLabel.textContent = Number(data.received_stars_total || 0).toLocaleString('es-CO');
+          starsTotalLabel.textContent = Number(data.received_stars_total || 0).toLocaleString(isEn ? 'en-US' : isFr ? 'fr-FR' : 'es-CO');
         }
       } catch (error) {
         console.error(error);
@@ -2023,7 +2118,7 @@
 	        const res = await apiFetch(endpoint);
 	        const data = await res.json();
 	        if (!res.ok) {
-	          setPostsStatus(data.detail || 'No se pudo cargar las publicaciones.', true);
+	          setPostsStatus(data.detail || tr('', '', ''), true);
 	          return;
 	        }
 	        const sourcePosts = Array.isArray(data) ? data : [];
@@ -2061,7 +2156,7 @@
 	        if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
 	        setPostsStatus('');
 	      } catch (error) {
-	        setPostsStatus('No se pudo conectar con el servidor de publicaciones.', true);
+	        setPostsStatus(tr('', '', ''), true);
 	      }
     };
 
@@ -2075,7 +2170,7 @@
     const closePost = () => {
       postModalOverlay?.classList.add('hidden');
       postModalOverlay?.setAttribute('aria-hidden', 'true');
-      if (uploadHint) uploadHint.textContent = 'Sin archivo adjunto';
+      if (uploadHint) uploadHint.textContent = tr('', '', '');
       if (postPreview) {
         postPreview.innerHTML = '';
         postPreview.classList.add('hidden');
@@ -2117,14 +2212,14 @@
       postPreview.classList.remove('hidden');
 
       if (file.type.startsWith('image/')) {
-        postPreview.innerHTML = `<img src="${selectedFileURL}" alt="Previsualizacion" />`;
+        postPreview.innerHTML = `<img src="${selectedFileURL}" alt="${escapeHtml(tr('', '', ''))}" />`;
       } else if (file.type.startsWith('video/')) {
         postPreview.innerHTML = `<video src="${selectedFileURL}" controls></video>`;
       } else {
         selectedFile = null;
         postPreview.innerHTML = '';
         postPreview.classList.add('hidden');
-        setPostsStatus('Solo se permiten archivos de imagen o video.', true);
+        setPostsStatus(tr('', '', ''), true);
       }
     };
 
@@ -2144,7 +2239,7 @@
         });
         const uploadData = await uploadRes.json();
         if (!uploadRes.ok) {
-          throw new Error(uploadData.detail || 'No se pudo subir la imagen.');
+          throw new Error(uploadData.detail || tr('', '', ''));
         }
         return { media_id: uploadData.media_id, media_kind: 'image' };
       }
@@ -2162,7 +2257,7 @@
       });
       const presignData = await presignRes.json();
       if (!presignRes.ok) {
-        throw new Error(presignData.detail || 'No se pudo preparar la carga de media.');
+        throw new Error(presignData.detail || tr('', '', ''));
       }
 
       const proxyForm = new FormData();
@@ -2174,7 +2269,7 @@
       });
       const proxyData = await proxyRes.json();
       if (!proxyRes.ok) {
-        throw new Error(proxyData.detail || 'No se pudo subir el archivo.');
+        throw new Error(proxyData.detail || tr('', '', ''));
       }
 
       return { media_id: presignData.media_id, media_kind: 'video' };
@@ -2183,7 +2278,7 @@
     const uploadProfilePhotoFilePresigned = async (file) => {
       if (!file) return null;
       if (!file.type?.startsWith('image/')) {
-        throw new Error('Solo se permiten imágenes para la foto de perfil.');
+        throw new Error(tr('', '', ''));
       }
 
       const presignRes = await apiFetch('/media/presign/upload', {
@@ -2198,7 +2293,7 @@
       });
       const presignData = await presignRes.json();
       if (!presignRes.ok) {
-        throw new Error(presignData.detail || 'No se pudo preparar la carga de la foto de perfil.');
+        throw new Error(presignData.detail || tr('', '', ''));
       }
 
       try {
@@ -2208,13 +2303,16 @@
           body: file
         });
         if (!uploadRes.ok) {
-          throw new Error('No se pudo subir la imagen al storage.');
+          throw new Error(tr('', '', ''));
         }
       } catch (error) {
         const message = (error?.message || '').toLowerCase();
         if (message.includes('failed to fetch') || message.includes('cors')) {
           throw new Error(
-            'La subida directa al bucket fue bloqueada por CORS. Debes habilitar CORS en tu bucket de media para permitir PUT desde tu frontend.'
+            tr(
+              'La subida directa al bucket fue bloqueada por CORS. Debes habilitar CORS en tu bucket de media para permitir PUT desde tu frontend.',
+              'Direct upload to the bucket was blocked by CORS. You must enable CORS on your media bucket to allow PUT requests from your frontend.'
+            )
           );
         }
         throw error;
@@ -2227,7 +2325,7 @@
       });
       const confirmData = await confirmRes.json();
       if (!confirmRes.ok) {
-        throw new Error(confirmData.detail || 'No se pudo confirmar la foto de perfil.');
+        throw new Error(confirmData.detail || tr('', '', ''));
       }
 
       return { media_id: presignData.media_id, media_kind: 'image' };
@@ -2242,14 +2340,14 @@
       if (!isViewingOwnProfile) return;
       const text = (postText?.value || '').trim();
       if (!text && !selectedFile) {
-        setPostsStatus('Debes escribir texto o adjuntar imagen/video.', true);
+        setPostsStatus(tr('', '', ''), true);
         return;
       }
 
-      const oldLabel = publishPost?.textContent || 'Publicar';
+      const oldLabel = publishPost?.textContent || tr('', '', '');
       if (publishPost) {
         publishPost.disabled = true;
-        publishPost.textContent = 'Publicando...';
+        publishPost.textContent = tr('', '', '');
       }
 
       try {
@@ -2257,7 +2355,12 @@
         if (minorAccreditationState?.is_minor_protected && visibilityValue === 'public') {
           visibilityValue = 'private';
           if (postVisibility) postVisibility.value = 'private';
-          setPostsStatus('Tu cuenta está en modo protegido. Esta publicación se guardará en privado.');
+          setPostsStatus(
+            tr(
+              'Tu cuenta está en modo protegido. Esta publicación se guardará en privado.',
+              'Your account is in protected mode. This post will be saved as private.'
+            )
+          );
         }
         const mediaData = await uploadMediaIfNeeded(visibilityValue);
         const payload = {
@@ -2274,14 +2377,14 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || 'No se pudo crear la publicacion.');
+          throw new Error(data.detail || tr('', '', ''));
         }
 
-        setPostsStatus('Publicacion creada correctamente.');
+        setPostsStatus(tr('', '', ''));
         closePost();
         await Promise.all([loadFeed(), loadMyStats(), loadHomeCalendar()]);
       } catch (error) {
-        setPostsStatus(error.message || 'No se pudo publicar.', true);
+        setPostsStatus(error.message || tr('', '', ''), true);
       } finally {
         if (publishPost) {
           publishPost.disabled = false;
@@ -2305,7 +2408,7 @@
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || 'No se pudo crear la publicacion.');
+        throw new Error(data.detail || tr('', '', ''));
       }
       return data;
     };
@@ -2313,7 +2416,7 @@
     const ensureProfilePhotoPost = async () => {
       if (!profilePhotoMediaId) {
         renderProfilePhotoPost(null);
-        setProfilePhotoPostStatus('Primero debes cargar una foto de perfil.', true);
+        setProfilePhotoPostStatus(tr('', '', ''), true);
         return false;
       }
 
@@ -2363,17 +2466,20 @@
         profilePhotoViewerPostId = profilePhotoPostId || null;
         syncProfilePhotoPostFromFeed();
       } catch (error) {
-        setProfilePhotoPostStatus(error.message || 'No se pudo abrir la publicacion de la foto de perfil.', true);
+        setProfilePhotoPostStatus(
+          error.message || tr('', '', ''),
+          true
+        );
       }
     };
 
     const setProfilePhotoFromMediaId = async (mediaId) => {
       if (!isViewingOwnProfile) {
-        throw new Error('No autorizado para cambiar esta foto de perfil.');
+        throw new Error(tr('', '', ''));
       }
       const normalized = Number(mediaId);
       if (!Number.isFinite(normalized) || normalized <= 0) {
-        throw new Error('Media inválida para foto de perfil.');
+        throw new Error(tr('', '', ''));
       }
       const res = await apiFetch('/media/profile-photo', {
         method: 'POST',
@@ -2382,7 +2488,7 @@
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || 'No se pudo actualizar la foto de perfil.');
+        throw new Error(data.detail || tr('', '', ''));
       }
       profilePhotoMediaId = data.media_id || null;
       setProfilePhotoPostId(null);
@@ -2415,20 +2521,20 @@
       closeHomeAvatarDropdown();
       if (homeAvatarProfilePhotoBusy) return;
       if (!file.type?.startsWith('image/')) {
-        setPostsStatus('Solo se permiten imágenes para la foto de perfil.', true);
+        setPostsStatus(tr('', '', ''), true);
         if (homeAvatarFile) homeAvatarFile.value = '';
         return;
       }
 
       homeAvatarProfilePhotoBusy = true;
-      setPostsStatus('Subiendo foto de perfil...');
+      setPostsStatus(tr('', '', ''));
       try {
         const uploaded = await uploadProfilePhotoFilePresigned(file);
         await setProfilePhotoFromMediaId(uploaded?.media_id);
-        setPostsStatus('Foto de perfil actualizada.');
+        setPostsStatus(tr('', '', ''));
         void ensureProfilePhotoPost().catch((error) => console.error(error));
       } catch (error) {
-        setPostsStatus(error.message || 'No se pudo actualizar tu foto de perfil.', true);
+        setPostsStatus(error.message || tr('', '', ''), true);
       } finally {
         homeAvatarProfilePhotoBusy = false;
         if (homeAvatarFile) homeAvatarFile.value = '';
@@ -2501,13 +2607,13 @@
     const loadComments = async () => {
       if (!selectedCommentPostId || !commentsList) return;
       commentsList.innerHTML = '';
-      if (commentsStatus) commentsStatus.textContent = 'Cargando comentarios...';
+      if (commentsStatus) commentsStatus.textContent = tr('', '', '');
       try {
         const res = await apiFetch(`/posts/${selectedCommentPostId}/comments?limit=200`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo cargar comentarios.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         if (!Array.isArray(data) || data.length === 0) {
-          commentsList.innerHTML = '<p class="post-comments-empty">Aun no hay comentarios.</p>';
+          commentsList.innerHTML = `<p class="post-comments-empty">${escapeHtml(tr('', '', ''))}</p>`;
         } else {
           commentsList.innerHTML = data
             .map(
@@ -2525,14 +2631,17 @@
         }
         if (commentsStatus) commentsStatus.textContent = '';
       } catch (error) {
-        if (commentsStatus) commentsStatus.textContent = error.message || 'No se pudieron cargar comentarios.';
+        if (commentsStatus) commentsStatus.textContent = error.message || tr('', '', '');
       }
     };
 
     const openCommentsForPost = async (postId, title = null) => {
       selectedCommentPostId = postId;
       if (commentsTitle) {
-        commentsTitle.textContent = title || `Comentarios de la publicacion #${postId}`;
+        commentsTitle.textContent = title || tr(
+          `Comentarios de la publicación #${postId}`,
+          `Comments on post #${postId}`
+        );
       }
       commentsOverlay?.classList.remove('hidden');
       commentsOverlay?.setAttribute('aria-hidden', 'false');
@@ -2544,22 +2653,22 @@
         ? currentFeedPosts.find((item) => Number(item?.id) === Number(postId))
         : null;
       if (post?.is_mine) {
-        setStatus('No puedes donarte estrellas a ti mismo.', true);
+        setStatus(tr('', '', ''), true);
         return;
       }
       if (post?.starred_by_me) {
-        setStatus('Ya donaste una estrella a esta publicación.', true);
+        setStatus(tr('', '', ''), true);
         return;
       }
       try {
         const res = await apiFetch(`/posts/${postId}/stars`, { method: 'POST' });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo donar la estrella.');
-        setStatus('Estrella donada.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
+        setStatus(tr('', '', ''));
         await Promise.all([loadFeed(), loadMyStats()]);
         if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
       } catch (error) {
-        setStatus(error.message || 'No se pudo donar la estrella.', true);
+        setStatus(error.message || tr('', '', ''), true);
       }
     };
 
@@ -2575,15 +2684,15 @@
         shareUrlObject.searchParams.set('post', String(postId));
         const shareUrl = shareUrlObject.toString();
         if (navigator.share) {
-          await navigator.share({ title: 'Kiadez', text: 'Mira esta publicacion', url: shareUrl });
+          await navigator.share({ title: 'Kiadez', text: tr('', '', ''), url: shareUrl });
         } else if (navigator.clipboard?.writeText) {
           await navigator.clipboard.writeText(shareUrl);
         }
-        setStatus('Publicacion compartida.');
+        setStatus(tr('', '', ''));
         await loadFeed();
         if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
       } catch (error) {
-        setStatus(error.message || 'No se pudo compartir.', true);
+        setStatus(error.message || tr('', '', ''), true);
       }
     };
 
@@ -2599,14 +2708,20 @@
       const aboutText = (homeAboutInput?.value || '').trim();
       const wordCount = countWords(aboutText);
       if (wordCount > HOME_ABOUT_MAX_WORDS) {
-        setHomeAboutModalStatus(`Puedes escribir maximo ${HOME_ABOUT_MAX_WORDS} palabras.`, true);
+        setHomeAboutModalStatus(
+          tr(
+            `Puedes escribir máximo ${HOME_ABOUT_MAX_WORDS} palabras.`,
+            `You can write up to ${HOME_ABOUT_MAX_WORDS} words.`
+          ),
+          true
+        );
         return;
       }
 
-      const oldLabel = saveHomeAboutBtn?.textContent || 'Guardar';
+      const oldLabel = saveHomeAboutBtn?.textContent || tr('', '', '');
       if (saveHomeAboutBtn) {
         saveHomeAboutBtn.disabled = true;
-        saveHomeAboutBtn.textContent = 'Guardando...';
+        saveHomeAboutBtn.textContent = tr('', '', '');
       }
 
       try {
@@ -2614,17 +2729,17 @@
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            display_name: (currentAboutDisplayName || homeProfileName?.textContent || 'Usuario Kiadez').trim(),
+            display_name: (currentAboutDisplayName || homeProfileName?.textContent || tr('', '', '')).trim(),
             about_text: aboutText || null
           })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo guardar "Acerca de mi".');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         applyHomeAbout(data);
         closeHomeAboutModalPanel();
-        setPostsStatus('"Acerca de mi" actualizado.');
+        setPostsStatus(tr('', '', ''));
       } catch (error) {
-        setHomeAboutModalStatus(error.message || 'No se pudo guardar "Acerca de mi".', true);
+        setHomeAboutModalStatus(error.message || tr('', '', ''), true);
       } finally {
         if (saveHomeAboutBtn) {
           saveHomeAboutBtn.disabled = false;
@@ -2640,7 +2755,10 @@
 
     const handleProfilePhotoComment = async () => {
       if (!profilePhotoPost?.id) return;
-      await openCommentsForPost(profilePhotoPost.id, 'Comentarios de tu foto de perfil');
+      await openCommentsForPost(
+        profilePhotoPost.id,
+        tr('', '', '')
+      );
     };
 
     const handleProfilePhotoShare = async () => {
@@ -2745,12 +2863,17 @@
       try {
         const res = await apiFetch(`/posts/${selectedDeletePostId}`, { method: 'DELETE' });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo eliminar la publicacion.');
-        setPostsStatus(`Publicacion eliminada. Se restaron ${data.removed_stars || 0} estrellas asociadas.`);
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
+        setPostsStatus(
+          tr(
+            `Publicación eliminada. Se restaron ${data.removed_stars || 0} estrellas asociadas.`,
+            `Post deleted. ${data.removed_stars || 0} associated stars were removed.`
+          )
+        );
         closeDeleteModal();
         await Promise.all([loadFeed(), loadMyStats(), loadHomeCalendar()]);
       } catch (error) {
-        setPostsStatus(error.message || 'No se pudo eliminar la publicacion.', true);
+        setPostsStatus(error.message || tr('', '', ''), true);
       }
     };
 
@@ -2758,14 +2881,14 @@
       if (!selectedEditPostId) return;
       const text = (editPostTextInput?.value || '').trim();
       if (!text) {
-        setEditPostModalStatus('El texto de la publicación no puede estar vacío.', true);
+        setEditPostModalStatus(tr('', '', ''), true);
         return;
       }
 
-      const oldLabel = saveEditPost?.textContent || 'Guardar cambios';
+      const oldLabel = saveEditPost?.textContent || tr('', '', '');
       if (saveEditPost) {
         saveEditPost.disabled = true;
-        saveEditPost.textContent = 'Guardando...';
+        saveEditPost.textContent = tr('', '', '');
       }
       setEditPostModalStatus('');
 
@@ -2776,13 +2899,13 @@
           body: JSON.stringify({ text }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo editar la publicación.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
 
         closeEditModal();
-        setPostsStatus('Publicación actualizada.');
+        setPostsStatus(tr('', '', ''));
         await Promise.all([loadFeed(), loadMyStats(), loadHomeCalendar()]);
       } catch (error) {
-        setEditPostModalStatus(error.message || 'No se pudo editar la publicación.', true);
+        setEditPostModalStatus(error.message || tr('', '', ''), true);
       } finally {
         if (saveEditPost) {
           saveEditPost.disabled = false;
@@ -2810,12 +2933,15 @@
       const selected = document.querySelector('input[name="postReportReason"]:checked');
       const reason = selected?.value;
       if (!reason) {
-        setPostsStatus('Debes elegir una razon de reporte.', true);
+        setPostsStatus(tr('', '', ''), true);
         return;
       }
       const otherReason = (reportReasonOther?.value || '').trim();
       if (reason === 'other' && !otherReason) {
-        setPostsStatus('Debes escribir la razon cuando eliges "Otra razon".', true);
+        setPostsStatus(
+          tr('', '', ''),
+          true
+        );
         return;
       }
 
@@ -2826,11 +2952,11 @@
           body: JSON.stringify({ reason, other_reason: otherReason || null })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo enviar el reporte.');
-        setPostsStatus('Reporte enviado correctamente.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
+        setPostsStatus(tr('', '', ''));
         closeReportModal();
       } catch (error) {
-        setPostsStatus(error.message || 'No se pudo enviar el reporte.', true);
+        setPostsStatus(error.message || tr('', '', ''), true);
       }
     };
 
@@ -2838,7 +2964,7 @@
       if (isViewingOwnProfile) return;
       const targetUserId = Number(activeProfileUserId);
       if (!Number.isFinite(targetUserId) || targetUserId <= 0) {
-        setPostsStatus('No se pudo identificar el usuario a denunciar.', true);
+        setPostsStatus(tr('', '', ''), true);
         return;
       }
       selectedReportProfileUserId = targetUserId;
@@ -2852,19 +2978,22 @@
       const selected = document.querySelector('input[name="profileReportReason"]:checked');
       const reason = selected?.value;
       if (!reason) {
-        setReportProfileModalStatus('Debes elegir una razón de reporte.', true);
+        setReportProfileModalStatus(tr('', '', ''), true);
         return;
       }
       const otherReason = (reportProfileReasonOther?.value || '').trim();
       if (reason === 'other' && !otherReason) {
-        setReportProfileModalStatus('Debes escribir la razón cuando eliges "Otro".', true);
+        setReportProfileModalStatus(
+          tr('', '', ''),
+          true
+        );
         return;
       }
 
-      const oldLabel = submitReportProfile?.textContent || 'Enviar reporte';
+      const oldLabel = submitReportProfile?.textContent || tr('', '', '');
       if (submitReportProfile) {
         submitReportProfile.disabled = true;
-        submitReportProfile.textContent = 'Enviando...';
+        submitReportProfile.textContent = tr('', '', '');
       }
       setReportProfileModalStatus('');
 
@@ -2875,11 +3004,11 @@
           body: JSON.stringify({ reason, other_reason: otherReason || null })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo enviar el reporte de perfil.');
-        setPostsStatus('Reporte de perfil enviado correctamente.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
+        setPostsStatus(tr('', '', ''));
         closeReportProfileModalPanel();
       } catch (error) {
-        setReportProfileModalStatus(error.message || 'No se pudo enviar el reporte de perfil.', true);
+        setReportProfileModalStatus(error.message || tr('', '', ''), true);
       } finally {
         if (submitReportProfile) {
           submitReportProfile.disabled = false;
@@ -2892,7 +3021,7 @@
       if (!selectedCommentPostId) return;
       const text = (commentInput?.value || '').trim();
       if (!text) {
-        if (commentsStatus) commentsStatus.textContent = 'Escribe un comentario antes de enviar.';
+        if (commentsStatus) commentsStatus.textContent = tr('', '', '');
         return;
       }
       try {
@@ -2902,12 +3031,12 @@
           body: JSON.stringify({ text })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'No se pudo crear el comentario.');
+        if (!res.ok) throw new Error(data.detail || tr('', '', ''));
         if (commentInput) commentInput.value = '';
         if (commentsStatus) commentsStatus.textContent = '';
         await Promise.all([loadComments(), loadFeed()]);
       } catch (error) {
-        if (commentsStatus) commentsStatus.textContent = error.message || 'No se pudo guardar el comentario.';
+        if (commentsStatus) commentsStatus.textContent = error.message || tr('', '', '');
       }
     };
 
@@ -3001,7 +3130,7 @@
         await resolveProfileContext();
       } catch (error) {
         console.error(error);
-        setPostsStatus(error.message || 'No se pudo cargar el perfil.', true);
+        setPostsStatus(error.message || tr('', '', ''), true);
       }
 
 	      if (isViewingOwnProfile) {
@@ -3116,7 +3245,7 @@
 <svelte:head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kiadez — Inicio</title>
+  <title>{tr("Kiadez — Inicio", "Kiadez — Home", "Kiadez — Accueil")}</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
@@ -3127,49 +3256,49 @@
         <img src="/css/logo-kiadez.webp" alt="Kiadez" />
       </a>
       <form class="topbar-search" role="search" on:submit|preventDefault>
-        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+        <input type="search" placeholder={tr("Buscar en Kiadez", "Search on Kiadez", "Rechercher sur Kiadez")} aria-label={tr("Buscar", "Search", "Rechercher")} />
       </form>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-center">
-	      <button class="topbar-btn is-active" id="homeTopbarBtn" type="button">🏠 Home</button>
-	      <a class="topbar-btn" href="/gallery.html" data-profile-module="gallery">🖼️ Galería</a>
-	      <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 Deseos públicos</a>
-	      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-	      <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ Deseos cumplidos</a>
+	      <button class="topbar-btn is-active" id="homeTopbarBtn" type="button">🏠 {tr("Home", "Home", "Accueil")}</button>
+	      <a class="topbar-btn" href="/gallery.html" data-profile-module="gallery">🖼️ {tr("Galería", "Gallery", "Galerie")}</a>
+	      <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 {tr("Deseos públicos", "Public wishes", "Souhaits publics")}</a>
+	      <a class="topbar-btn" href="/my-private-whishes.html">🔒 {tr("Deseos privados", "Private wishes", "Souhaits privés")}</a>
+	      <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ {tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis")}</a>
 	    </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
       <details class="topbar-dropdown" id="profileDropdown">
-        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" data-viewer-avatar />
+        <summary class="topbar-avatar-btn" aria-label={tr("Perfil del usuario", "User profile", "Profil utilisateur")}>
+          <img src="/assets/avatar-default.jpg" alt={tr("Foto de perfil del usuario", "User profile photo", "Photo de profil utilisateur")} data-viewer-avatar />
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
-          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+          <a href="/privacy-and-settings.html" role="menuitem">{tr("Configuración y privacidad", "Settings and privacy", "Paramètres et confidentialité")}</a>
+          <button type="button" role="menuitem" on:click={logout}>{tr("Cerrar sesión", "Sign out", "Se déconnecter")}</button>
         </div>
       </details>
 
-      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+      <button class="topbar-icon" type="button" aria-label={tr("Notificaciones", "Notifications", "Alertes")}>
         🔔
         <span class="topbar-badge">3</span>
       </button>
 
       <details class="topbar-dropdown" id="menuDropdown">
-        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+        <summary class="topbar-menu-btn" aria-label={tr("Abrir menú", "Open menu", "Ouvrir le menu")}>
           <span class="topbar-menu-icon" aria-hidden="true">☰</span>
-          <span class="topbar-menu-label">Menú</span>
+          <span class="topbar-menu-label">{tr("Menú", "Menu", "Navigation")}</span>
         </summary>
         <div class="dropdown-menu" role="menu">
           <button class="dropdown-action" id="menuPublishBtn" type="button" role="menuitem">
-            Publicar
+            {tr("Publicar", "Publish", "Publier")}
           </button>
-          <a href="/home_user.html" role="menuitem" data-my-home-link="true">Mi Home</a>
-          <a href="/achievements.html" role="menuitem" data-profile-module="achievements">Logros recientes</a>
-          <a href="/gallery.html" role="menuitem" data-profile-module="gallery">Galería</a>
-	          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
-          <a href="/my-biography.html" role="menuitem" data-profile-module="biography">Mi Biografía</a>
-          <a href="/messages.html" role="menuitem">Mensajes</a>
+          <a href="/home_user.html" role="menuitem" data-my-home-link="true">{tr("Mi Home", "My Home", "Mon Home")}</a>
+          <a href="/achievements.html" role="menuitem" data-profile-module="achievements">{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+          <a href="/gallery.html" role="menuitem" data-profile-module="gallery">{tr("Galería", "Gallery", "Galerie")}</a>
+	          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">{tr("Calendario", "Calendar", "Calendrier")}</a>
+          <a href="/my-biography.html" role="menuitem" data-profile-module="biography">{tr("Mi Biografía", "My Biography", "Ma biographie")}</a>
+          <a href="/messages.html" role="menuitem">{tr("Mensajes", "Messages", "Messagerie")}</a>
         </div>
       </details>
     </div>
@@ -3178,53 +3307,53 @@
   <main class="user-home">
     <section class="cover" id="cover" data-profile-module="cover_purposes">
       <div class="cover-media" id="coverMedia">
-        <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
+	        <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt={tr("Portada", "Cover", "Couverture")} />
 
         <div class="cover-actions">
-          <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
-            Cambiar portada
+          <button class="icon-btn" id="btnChangeCover" type="button" title={tr("Cambiar portada", "Change cover", "Changer la couverture")}>
+            {tr("Cambiar portada", "Change cover", "Changer la couverture")}
           </button>
-          <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title="Editar mi propósito de vida">
-            Editar mi propósito de vida
+          <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title={tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier mon objectif de vie")}>
+            {tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier mon objectif de vie")}
           </button>
 
           <input id="coverFile" type="file" accept="image/*" class="hidden" />
         </div>
 
-        <div class="purpose-triangle" aria-label="Deseos de propósito">
-          <button class="purpose-pill purpose-top" type="button" id="purpose1">
-            Deseo #1: Secreto
-          </button>
+	        <div class="purpose-triangle" aria-label={tr("Deseos de propósito", "Purpose wishes", "Souhaits de finalité")}>
+	          <button class="purpose-pill purpose-top" type="button" id="purpose1">
+	            {tr("Deseo #1: Secreto", "Wish #1: Secret", "Souhait #1 : Secret")}
+	          </button>
 
-          <button class="purpose-pill purpose-left" type="button" id="purpose2">
-            Deseo construir el Reino de Combray
-          </button>
+	          <button class="purpose-pill purpose-left" type="button" id="purpose2">
+	            {tr("Deseo construir el Reino de Combray", "I wish to build the Kingdom of Combray", "Je souhaite construire le Royaume de Combray")}
+	          </button>
 
-          <button class="purpose-pill purpose-right" type="button" id="purpose3">
-            Deseo estar unido a Jesús
-          </button>
-        </div>
+	          <button class="purpose-pill purpose-right" type="button" id="purpose3">
+	            {tr("Deseo estar unido a Jesús", "I wish to be united with Jesus", "Je souhaite être uni à Jésus")}
+	          </button>
+	        </div>
 
         <div class="cover-hint" id="coverHint">
-          Arrastra la portada para encuadrarla
+          {tr("Arrastra la portada para encuadrarla", "Drag the cover to frame it", "Fais glisser la couverture pour la cadrer")}
         </div>
       </div>
     </section>
 
     <div class="home-body">
-      <nav class="profile-nav" aria-label="Navegación de perfil">
-        <a class="nav-pill" href="/home_user.html" title="Home" data-profile-link="true">Home</a>
-        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas" data-profile-module="stars">
+      <nav class="profile-nav" aria-label={tr("Navegación de perfil", "Profile navigation", "Navigation du profil")}>
+        <a class="nav-pill" href="/home_user.html" title={tr("Home", "Home", "Accueil")} data-profile-link="true">{tr("Home", "Home", "Accueil")}</a>
+        <a class="nav-pill" href="/star-pool-found.html" title={tr("Estrellas", "Stars", "Étoiles")} data-profile-module="stars">
           <span class="nav-icon">⭐</span>
-          <span><strong id="homeStarsTotal">0</strong> estrellas</span>
+          <span><strong id="homeStarsTotal">0</strong> {tr("estrellas", "stars", "étoiles")}</span>
         </a>
 
-        <a class="nav-pill" href="/followers.html" title="Seguidores" data-profile-module="followers">Seguidores</a>
-        <a class="nav-pill" href="/achievements.html" title="Logros recientes" data-profile-module="achievements">Logros recientes</a>
-        <a class="nav-pill" href="/gallery.html" title="Galería" data-profile-module="gallery">Galería</a>
-	        <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
-        <a class="nav-pill" href="/my-biography.html" title="Mi biografía" data-profile-module="biography">Mi biografía</a>
-        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
+        <a class="nav-pill" href="/followers.html" title={tr("Seguidores", "Followers", "Abonnés")} data-profile-module="followers">{tr("Seguidores", "Followers", "Abonnés")}</a>
+        <a class="nav-pill" href="/achievements.html" title={tr("Logros recientes", "Recent achievements", "Réalisations récentes")} data-profile-module="achievements">{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+        <a class="nav-pill" href="/gallery.html" title={tr("Galería", "Gallery", "Galerie")} data-profile-module="gallery">{tr("Galería", "Gallery", "Galerie")}</a>
+	        <a class="nav-pill" href="/calendar.html" title={tr("Calendario", "Calendar", "Calendrier")} data-profile-module="calendar">{tr("Calendario", "Calendar", "Calendrier")}</a>
+        <a class="nav-pill" href="/my-biography.html" title={tr("Mi biografía", "My biography", "Ma biographie")} data-profile-module="biography">{tr("Mi biografía", "My biography", "Ma biographie")}</a>
+        <a class="nav-pill" href="/messages.html" title={tr("Mensajes", "Messages", "Messagerie")}>{tr("Mensajes", "Messages", "Messagerie")}</a>
       </nav>
 
       <section class="profile-grid">
@@ -3232,17 +3361,17 @@
           <article class="panel profile-card">
             <div class="profile-row">
               <details class="topbar-dropdown profile-avatar-dropdown" id="homeAvatarDropdown">
-                <summary class="profile-avatar-btn" id="homeAvatarButton" aria-label="Foto de perfil" title="Foto de perfil">
-                  <img class="avatar profile-avatar-image" src="/assets/avatar-default.jpg" alt="Foto de perfil" data-profile-avatar />
-                </summary>
-                <div class="dropdown-menu" role="menu">
-                  <button class="dropdown-action hidden" id="homeAvatarViewBtn" type="button" role="menuitem">
-                    Ver imagen de perfil
-                  </button>
-                  <button class="dropdown-action" id="homeAvatarUploadBtn" type="button" role="menuitem">
-                    Subir imagen de perfil
-                  </button>
-                </div>
+	                <summary class="profile-avatar-btn" id="homeAvatarButton" aria-label={tr("Foto de perfil", "Profile photo", "Photo de profil")} title={tr("Foto de perfil", "Profile photo", "Photo de profil")}>
+	                  <img class="avatar profile-avatar-image" src="/assets/avatar-default.jpg" alt={tr("Foto de perfil", "Profile photo", "Photo de profil")} data-profile-avatar />
+	                </summary>
+	                <div class="dropdown-menu" role="menu">
+	                  <button class="dropdown-action hidden" id="homeAvatarViewBtn" type="button" role="menuitem">
+	                    {tr("Ver imagen de perfil", "View profile image", "Voir la photo de profil")}
+	                  </button>
+	                  <button class="dropdown-action" id="homeAvatarUploadBtn" type="button" role="menuitem">
+	                    {tr("Subir imagen de perfil", "Upload profile image", "Téléverser la photo de profil")}
+	                  </button>
+	                </div>
               </details>
               <input id="homeAvatarFile" type="file" accept="image/*" class="hidden" />
               <div class="profile-meta">
@@ -3250,14 +3379,14 @@
                 <p class="profile-rank hidden" id="homeProfileRank"></p>
                 <div class="home-username-row">
                   <a class="home-username-link is-empty" id="homeUsernameLink" href="/home_user.html" data-profile-link="true">
-                    <span id="homeUsernameValue">@elige-tu-usuario</span>
-                  </a>
-                  <button class="infobox-edit-btn home-username-edit-btn" id="homeUsernameEditBtn" type="button" title="Modificar nombre de usuario">
-                    <img src="/css/icons/iconedit.webp" alt="Editar usuario" />
-                  </button>
-                  <button class="post-head-btn home-username-report-btn hidden" id="homeUsernameReportBtn" type="button" title="Denunciar perfil" aria-label="Denunciar perfil">
-                    🚩
-                  </button>
+	                    <span id="homeUsernameValue">{tr("@elige-tu-usuario", "@choose-your-username", "@choisis-ton-nom-utilisateur")}</span>
+	                  </a>
+	                  <button class="infobox-edit-btn home-username-edit-btn" id="homeUsernameEditBtn" type="button" title={tr("Modificar nombre de usuario", "Edit username", "Modifier le nom d'utilisateur")}>
+	                    <img src="/css/icons/iconedit.webp" alt={tr("Editar usuario", "Edit user", "Modifier l'utilisateur")} />
+	                  </button>
+	                  <button class="post-head-btn home-username-report-btn hidden" id="homeUsernameReportBtn" type="button" title={tr("Denunciar perfil", "Report profile", "Signaler le profil")} aria-label={tr("Denunciar perfil", "Report profile", "Signaler le profil")}>
+	                    🚩
+	                  </button>
                 </div>
                 <p class="home-username-cooldown" id="homeUsernameCooldown"></p>
               </div>
@@ -3266,54 +3395,54 @@
 
           <article class="panel" id="homeAboutPanel">
             <div class="panel-head home-about-head">
-              <h3 class="panel-title">Acerca de mí</h3>
-              <button class="infobox-edit-btn home-about-edit-btn" id="homeAboutEditBtn" type="button" title="Modificar acerca de mí">
-                <img src="/css/icons/iconedit.webp" alt="Editar" />
-              </button>
+              <h3 class="panel-title">{tr("Acerca de mí", "About me", "À propos de moi")}</h3>
+	              <button class="infobox-edit-btn home-about-edit-btn" id="homeAboutEditBtn" type="button" title={tr("Modificar acerca de mí", "Edit about me", "Modifier À propos de moi")}>
+	                <img src="/css/icons/iconedit.webp" alt={tr("Editar", "Edit", "Modifier")} />
+	              </button>
             </div>
             <p class="panel-muted" id="homeAboutEmptyState">
-              Cargando sección "Acerca de mí"...
+              {tr('', '', '')}
             </p>
             <p class="panel-text home-about-text hidden" id="homeAboutTextValue"></p>
           </article>
 
           <article class="panel" id="homeFulfilledPanel">
             <div class="panel-head">
-              <h3 class="panel-title">Mis deseos cumplidos</h3>
-              <span class="panel-badge" id="homeFulfilledWishCount">0 recientes</span>
+              <h3 class="panel-title">{tr("Mis deseos cumplidos", "My fulfilled wishes", "Mes souhaits accomplis")}</h3>
+              <span class="panel-badge" id="homeFulfilledWishCount">{tr("0 recientes", "0 recent", "0 récents")}</span>
             </div>
 
             <ul class="wish-list" id="homeFulfilledWishList">
               <li class="wish-item wish-item-home-public wish-item-empty">
                 <span class="wish-dot"></span>
-                <span class="wish-item-label">Cargando tus deseos cumplidos...</span>
+                <span class="wish-item-label">{tr("Cargando tus deseos cumplidos...", "Loading your fulfilled wishes...", "Chargement de tes souhaits accomplis...")}</span>
               </li>
             </ul>
             <p class="home-public-wish-status" id="homeFulfilledWishStatus" aria-live="polite"></p>
 
-	            <a href="/my-fulfilled-whises.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="fulfilled_wishes">Ver más</a>
+	            <a href="/my-fulfilled-whises.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="fulfilled_wishes">{tr("Ver más", "See more", "Voir plus")}</a>
           </article>
 
           <article class="panel" id="homePublicPanel">
             <div class="panel-head">
-              <h3 class="panel-title">Mis deseos públicos</h3>
+              <h3 class="panel-title">{tr("Mis deseos públicos", "My public wishes", "Mes souhaits publics")}</h3>
               <span class="panel-badge" id="homePublicWishCount">0 / 50</span>
             </div>
 
             <ul class="wish-list" id="homePublicWishList">
               <li class="wish-item wish-item-home-public wish-item-empty">
                 <span class="wish-dot"></span>
-                <span class="wish-item-label">Cargando tus deseos públicos...</span>
+                <span class="wish-item-label">{tr("Cargando tus deseos públicos...", "Loading your public wishes...", "Chargement de tes souhaits publics...")}</span>
               </li>
             </ul>
             <p class="home-public-wish-status" id="homePublicWishStatus" aria-live="polite"></p>
 
-	            <a href="/my-public-whishes.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="public_wishes">Ver más</a>
+	            <a href="/my-public-whishes.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="public_wishes">{tr("Ver más", "See more", "Voir plus")}</a>
           </article>
 
           <article class="panel hidden" id="homeCooperativePanel">
             <div class="panel-head">
-              <h3 class="panel-title">Deseos cooperativos</h3>
+              <h3 class="panel-title">{tr("Deseos cooperativos", "Cooperative wishes", "Souhaits coopératifs")}</h3>
               <span class="panel-badge" id="homeCooperativeWishCount">0 / 20</span>
             </div>
 
@@ -3325,35 +3454,35 @@
                 class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn"
                 data-profile-module="public_wishes_cooperative"
               >
-                Ver más
+                {tr("Ver más", "See more", "Voir plus")}
               </a>
           </article>
 
           <article class="panel">
             <div class="panel-head">
-              <h3 class="panel-title">Deseos privados</h3>
+              <h3 class="panel-title">{tr("Deseos privados", "Private wishes", "Souhaits privés")}</h3>
               <span class="panel-badge" id="homePrivateWishCount">0 / 50</span>
             </div>
 
             <div class="secret-meter">
               <div class="secret-number" id="homePrivateWishTotal">0 / 50</div>
-              <div class="secret-sub">Solo tú puedes ver esta cifra</div>
+              <div class="secret-sub">{tr("Solo tú puedes ver esta cifra", "Only you can see this value", "Seul toi peux voir cette valeur")}</div>
             </div>
             <p class="home-public-wish-status" id="homePrivateWishStatus" aria-live="polite"></p>
 
-            <a href="/my-private-whishes.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn">Ir a Deseos privados</a>
+            <a href="/my-private-whishes.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn">{tr("Ir a Deseos privados", "Go to private wishes", "Aller aux souhaits privés")}</a>
           </article>
 
           <article class="panel" id="homeCalendarPanel">
             <div class="panel-head">
-              <h3 class="panel-title">Calendario</h3>
-              <span class="panel-badge">Mes actual</span>
+              <h3 class="panel-title">{tr("Calendario", "Calendar", "Calendrier")}</h3>
+              <span class="panel-badge">{tr("Mes actual", "Current month", "Mois en cours")}</span>
             </div>
 
-            <div class="home-calendar-shell" aria-label="Actividad mensual de publicaciones">
+            <div class="home-calendar-shell" aria-label={tr("Actividad mensual de publicaciones", "Monthly posting activity", "Activité mensuelle de publication")}>
               <article class="month-card home-calendar-month-card">
                 <div class="month-name">
-                  <span id="homeCalendarMonthName">Mes actual</span>
+                  <span id="homeCalendarMonthName">{tr("Mes actual", "Current month", "Mois en cours")}</span>
                   <span class="month-status" id="homeCalendarMonthProgress">0 / 0</span>
                 </div>
                 <div class="month-dots home-calendar-dots" id="homeCalendarDots"></div>
@@ -3361,53 +3490,55 @@
             </div>
             <p class="home-public-wish-status" id="homeCalendarStatus" aria-live="polite"></p>
 
-	            <a href="/calendar.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="calendar">Ver más</a>
+	            <a href="/calendar.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="calendar">{tr("Ver más", "See more", "Voir plus")}</a>
           </article>
 
 	          <article class="panel" id="homeOraclePanel">
 	            <div class="panel-head">
-	              <h3 class="panel-title">Oráculo</h3>
-	              <span class="panel-badge">Última carta</span>
+	              <h3 class="panel-title">{tr("Oráculo", "Oracle", "Oracle")}</h3>
+	              <span class="panel-badge">{tr("Última carta", "Latest card", "Dernière carte")}</span>
 	            </div>
 
 	            <div class="oracle-card">
-	              <img id="homeOracleCardImage" src="/css/oracle/carta.webp" alt="Carta del Oráculo en reverso" />
+	              <img id="homeOracleCardImage" src="/css/oracle/carta.webp" alt={tr("Carta del Oráculo en reverso", "Oracle card back", "Dos de carte Oracle")} />
 	            </div>
 	            <p class="panel-muted" id="homeOracleSummary">
-	              Conoce El Oráculo y elige tu primera carta para reflexionar sobre tu presente.
+	              {tr("Conoce El Oráculo y elige tu primera carta para reflexionar sobre tu presente.", "Discover the Oracle and choose your first card to reflect on your present.", "Découvre l'Oracle et choisis ta première carte pour réfléchir à ton présent.")}
 	            </p>
 	            <p class="home-public-wish-status" id="homeOracleStatus" aria-live="polite"></p>
 
-		            <a href="/oracle.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="oracle">Visitar el Oráculo</a>
+		            <a href="/oracle.html" class="btn btn-outline btn-compact btn-inline home-public-wish-more-btn" data-profile-module="oracle">{tr("Visitar el Oráculo", "Visit Oracle", "Visiter l'Oracle")}</a>
 	          </article>
 	        </aside>
 
 	        <section class="right-col">
 	          <article class="panel composer">
 	            <div class="composer-row">
-	              <img class="avatar avatar-sm composer-avatar" src="/assets/avatar-default.jpg" alt="Avatar" data-viewer-avatar />
+		              <img class="avatar avatar-sm composer-avatar" src="/assets/avatar-default.jpg" alt={tr("Avatar", "Avatar", "Avatar")} data-viewer-avatar />
 	              <button class="composer-input" id="openPostModal" type="button">
-	                ¿Qué estás pensando?
+	                {tr("¿Qué estás pensando?", "What are you thinking?", "À quoi penses-tu ?")}
 	              </button>
 	            </div>
 	          </article>
 
           <article class="panel minor-protected-panel hidden" id="minorProtectedPanel">
             <div class="panel-head minor-protected-head">
-              <h3 class="panel-title">Cuenta en modo protegido</h3>
+              <h3 class="panel-title">{tr("Cuenta en modo protegido", "Account in protected mode", "Compte en mode protégé")}</h3>
               <button class="btn btn-outline btn-compact minor-protected-toggle" id="toggleMinorProtectedPanel" type="button">
-                Reducir
+                {tr("Reducir", "Collapse", "Réduire")}
               </button>
             </div>
             <div class="minor-protected-body" id="minorProtectedBody">
               <p class="panel-muted">
-                Según la fecha de nacimiento registrada, tu perfil requiere validación de un padre, madre o tutor legal para habilitar funciones públicas.
-                Puedes usar la plataforma con normalidad, pero tu contenido permanecerá privado hasta completar este proceso.
+                {tr(
+                  "Según la fecha de nacimiento registrada, tu perfil requiere validación de un padre, madre o tutor legal para habilitar funciones públicas. Puedes usar la plataforma con normalidad, pero tu contenido permanecerá privado hasta completar este proceso.",
+                  "Based on your registered birth date, your profile requires validation by a parent or legal guardian to enable public features. You can use the platform normally, but your content will remain private until this process is completed."
+                )}
               </p>
               <p class="panel-muted minor-protected-state" id="minorProtectedStateLabel"></p>
               <div class="minor-protected-actions">
                 <button class="btn btn-primary btn-compact" id="openMinorAccreditationModal" type="button">
-                  Acreditar cuenta
+                  {tr("Acreditar cuenta", "Accredit account", "Accréditer le compte")}
                 </button>
               </div>
             </div>
@@ -3420,111 +3551,62 @@
     </div>
   </main>
 
-  <footer class="kiadez-footer">
-    <div class="footer-main">
-      <div class="footer-column footer-origin">
-        <p class="footer-poem">
-          Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br />
-          No para dominar, sino para orientar.<br />
-          Su luz no deslumbra: acompaña.
-        </p>
-      </div>
-
-      <div class="footer-columns">
-        <div class="footer-column">
-          <h4>Sobre nuestra red social</h4>
-          <ul>
-            <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
-            <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
-            <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
-            <li><a href="/contact.html">Contacto</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Idiomas</h4>
-          <ul>
-            <li><a href="/?lang=es">Español</a></li>
-            <li><a href="/?lang=en">English</a></li>
-            <li><a href="/?lang=fr">Français</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Contacto</h4>
-          <ul>
-            <li>info@kiadez.com</li>
-            <li>+57 333 225 6078</li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Información legal</h4>
-          <ul>
-            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
-            <li><a href="/terms.html">Términos y condiciones</a></li>
-            <li><a href="/privacy.html">Privacidad</a></li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="footer-bottom">
-      © 2026 Kiadez — Una red social para cumplir deseos.
-    </div>
-  </footer>
+  <AuthFooter />
 </div>
 
 <div class="modal-overlay hidden" id="postModalOverlay" aria-hidden="true">
-  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="Crear publicación">
+  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-label={tr("Crear publicación", "Create post", "Créer une publication")}>
     <div class="modal-head">
-      <h3>Crear publicación</h3>
+      <h3>{tr("Crear publicación", "Create post", "Créer une publication")}</h3>
       <button class="modal-close" type="button" id="closePostModal">✕</button>
     </div>
 
 	    <div class="modal-body">
 	      <div class="post-modal-top">
-	        <img class="avatar avatar-sm composer-avatar" src="/assets/avatar-default.jpg" alt="Avatar" data-viewer-avatar />
+		        <img class="avatar avatar-sm composer-avatar" src="/assets/avatar-default.jpg" alt={tr("Avatar", "Avatar", "Avatar")} data-viewer-avatar />
 	        <div>
-	          <div class="post-modal-name"><strong>Carlos Jiménez Duarte</strong></div>
+          <div class="post-modal-name"><strong>Carlos Jiménez Duarte</strong></div>
           <select class="modal-select" id="postVisibility">
-            <option value="public">Público</option>
-            <option value="private">Privado</option>
+            <option value="public">{tr("Público", "Public", "Public")}</option>
+            <option value="private">{tr("Privado", "Private", "Privé")}</option>
           </select>
         </div>
       </div>
 
-      <textarea class="modal-textarea" id="postText" rows="5" placeholder="Escribe algo..."></textarea>
+      <textarea class="modal-textarea" id="postText" rows="5" placeholder={tr("Escribe algo...", "Write something...", "Écris quelque chose...")}></textarea>
 
       <div class="upload-row">
-        <label class="upload-btn" for="postFile">Adjuntar imagen o video</label>
+        <label class="upload-btn" for="postFile">{tr("Adjuntar imagen o video", "Attach image or video", "Joindre image ou vidéo")}</label>
         <input id="postFile" type="file" accept="image/*,video/*" class="hidden" />
-        <div class="upload-hint" id="uploadHint">Sin archivo adjunto</div>
+        <div class="upload-hint" id="uploadHint">{tr("Sin archivo adjunto", "No file attached", "Aucun fichier joint")}</div>
       </div>
 
       <div class="preview hidden" id="postPreview"></div>
     </div>
 
     <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelPost">Cancelar</button>
-      <button class="btn btn-primary btn-compact" type="button" id="publishPost">Publicar</button>
+      <button class="btn btn-outline btn-compact" type="button" id="cancelPost">{tr("Cancelar", "Cancel", "Annuler")}</button>
+      <button class="btn btn-primary btn-compact" type="button" id="publishPost">{tr("Publicar", "Publish", "Publier")}</button>
     </div>
   </div>
 </div>
 
 <div class="modal-overlay hidden" id="minorAccreditationModalOverlay" aria-hidden="true">
-  <div class="modal minor-accreditation-modal" role="dialog" aria-modal="true" aria-label="Acreditar cuenta">
+  <div class="modal minor-accreditation-modal" role="dialog" aria-modal="true" aria-label={tr("Acreditar cuenta", "Accredit account", "Accréditer le compte")}>
     <div class="modal-head">
-      <h3>Acreditar cuenta</h3>
+      <h3>{tr("Acreditar cuenta", "Accredit account", "Accréditer le compte")}</h3>
       <button class="modal-close" type="button" id="closeMinorAccreditationModal">✕</button>
     </div>
 
     <div class="modal-body">
       <p class="panel-muted">
-        Registra los datos del padre, madre o tutor legal para enviar la solicitud de validación.
+        {tr(
+          "Registra los datos del padre, madre o tutor legal para enviar la solicitud de validación.",
+          "Register the parent or legal guardian details to send the validation request."
+        )}
       </p>
 
-      <label class="modal-label" for="minorGuardianPhoneInput">Teléfono del padre, madre o tutor legal</label>
+      <label class="modal-label" for="minorGuardianPhoneInput">{tr("Teléfono del padre, madre o tutor legal", "Phone of parent or legal guardian", "Téléphone du parent ou tuteur légal")}</label>
       <input
         class="modal-input"
         id="minorGuardianPhoneInput"
@@ -3533,7 +3615,7 @@
         placeholder="+57 321 6852619"
       />
 
-      <label class="modal-label" for="minorGuardianEmailInput">Correo electrónico del adulto responsable</label>
+      <label class="modal-label" for="minorGuardianEmailInput">{tr("Correo electrónico del adulto responsable", "Responsible adult email", "E-mail de l'adulte responsable")}</label>
       <input
         class="modal-input"
         id="minorGuardianEmailInput"
@@ -3542,28 +3624,28 @@
         placeholder="ejemplo@correo.com"
       />
 
-      <label class="modal-label" for="minorRelationshipSelect">Parentesco</label>
+      <label class="modal-label" for="minorRelationshipSelect">{tr("Parentesco", "Relationship", "Relation")}</label>
       <select class="modal-select" id="minorRelationshipSelect">
-        <option value="padre">Padre</option>
-        <option value="madre">Madre</option>
-        <option value="tutor_legal">Tutor legal</option>
-        <option value="adulto_responsable">Adulto responsable</option>
+        <option value="padre">{tr("Padre", "Father", "Père")}</option>
+        <option value="madre">{tr("Madre", "Mother", "Mère")}</option>
+        <option value="tutor_legal">{tr("Tutor legal", "Legal guardian", "Tuteur légal")}</option>
+        <option value="adulto_responsable">{tr("Adulto responsable", "Responsible adult", "Adulte responsable")}</option>
       </select>
 
       <p class="minor-accreditation-modal-status" id="minorAccreditationModalStatus" aria-live="polite"></p>
     </div>
 
     <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelMinorAccreditationModal">Cancelar</button>
-      <button class="btn btn-primary btn-compact" type="button" id="submitMinorAccreditation">Enviar solicitud</button>
+      <button class="btn btn-outline btn-compact" type="button" id="cancelMinorAccreditationModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+      <button class="btn btn-primary btn-compact" type="button" id="submitMinorAccreditation">{tr("Enviar solicitud", "Send request", "Envoyer la demande")}</button>
     </div>
   </div>
 </div>
 
 <div class="modal-overlay hidden" id="profilePhotoPostModalOverlay" aria-hidden="true">
-  <div class="modal modal-wide profile-photo-post-modal" role="dialog" aria-modal="true" aria-label="Publicación de foto de perfil">
+  <div class="modal modal-wide profile-photo-post-modal" role="dialog" aria-modal="true" aria-label={tr("Publicación de foto de perfil", "Profile photo post", "Publication de photo de profil")}>
     <div class="modal-head">
-      <h3>Foto de perfil</h3>
+      <h3>{tr("Foto de perfil", "Profile photo", "Photo de profil")}</h3>
       <button class="modal-close" type="button" id="closeProfilePhotoPostModal">✕</button>
     </div>
     <div class="modal-body">
@@ -3571,54 +3653,54 @@
         <div class="post-head">
           <div>
             <strong id="profilePhotoPostAuthor">Carlos Jiménez Duarte</strong>
-            <span class="post-meta" id="profilePhotoPostMeta">· Publicación pendiente</span>
-          </div>
-        </div>
-        <p class="post-text">Actualice mi foto de perfil.</p>
+	            <span class="post-meta" id="profilePhotoPostMeta">{tr("· Publicación pendiente", "· Pending post", "· Publication en attente")}</span>
+	          </div>
+	        </div>
+	        <p class="post-text">{tr("Actualicé mi foto de perfil.", "I updated my profile photo.", "J'ai mis à jour ma photo de profil.")}</p>
         <div class="post-media profile-photo-media">
           <button
             class="profile-photo-nav profile-photo-nav-prev hidden"
             type="button"
             id="profilePhotoPrevBtn"
-            aria-label="Foto de perfil anterior"
-            title="Foto anterior"
+            aria-label={tr("Foto de perfil anterior", "Previous profile photo", "Photo de profil précédente")}
+            title={tr("Foto anterior", "Previous photo", "Photo précédente")}
           >
             ‹
           </button>
-          <img id="profilePhotoPostImage" src="/assets/avatar-default.jpg" alt="Foto de perfil" />
+	          <img id="profilePhotoPostImage" src="/assets/avatar-default.jpg" alt={tr("Foto de perfil", "Profile photo", "Photo de profil")} />
           <button
             class="profile-photo-nav profile-photo-nav-next hidden"
             type="button"
             id="profilePhotoNextBtn"
-            aria-label="Foto de perfil siguiente"
-            title="Foto siguiente"
+            aria-label={tr("Foto de perfil siguiente", "Next profile photo", "Photo de profil suivante")}
+            title={tr("Foto siguiente", "Next photo", "Photo suivante")}
           >
             ›
           </button>
         </div>
         <div class="post-actions">
-          <button class="post-btn" type="button" id="profilePhotoStarPost">⭐ Donar estrella (0)</button>
-          <button class="post-btn" type="button" id="profilePhotoCommentPost">💬 Comentar (0)</button>
-          <button class="post-btn" type="button" id="profilePhotoSharePost">🔁 Compartir (0)</button>
+          <button class="post-btn" type="button" id="profilePhotoStarPost">⭐ {tr("Donar estrella", "Donate star", "Donner une étoile")} (0)</button>
+          <button class="post-btn" type="button" id="profilePhotoCommentPost">💬 {tr("Comentar", "Comment", "Commenter")} (0)</button>
+          <button class="post-btn" type="button" id="profilePhotoSharePost">🔁 {tr("Compartir", "Share", "Partager")} (0)</button>
         </div>
       </article>
       <p class="profile-photo-post-status" id="profilePhotoPostStatus" aria-live="polite"></p>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelProfilePhotoPostModal">Cerrar</button>
+      <button class="btn btn-outline btn-compact" type="button" id="cancelProfilePhotoPostModal">{tr("Cerrar", "Close", "Fermer")}</button>
     </div>
   </div>
 </div>
 
 <div class="modal-overlay hidden" id="homeUsernameModalOverlay" aria-hidden="true">
-  <div class="modal home-username-modal" role="dialog" aria-modal="true" aria-label="Modificar nombre de usuario">
+  <div class="modal home-username-modal" role="dialog" aria-modal="true" aria-label={tr("Modificar nombre de usuario", "Edit username", "Modifier le nom d'utilisateur")}>
     <div class="modal-head">
-      <h3>Modificar nombre de usuario</h3>
+      <h3>{tr("Modificar nombre de usuario", "Edit username", "Modifier le nom d'utilisateur")}</h3>
       <button class="modal-close" type="button" id="closeHomeUsernameModal">✕</button>
     </div>
     <div class="modal-body">
-      <p class="panel-muted">Elige un nombre de usuario único. Solo podrás cambiarlo una vez por mes.</p>
-      <label class="modal-label" for="homeUsernameInput">Nombre de usuario</label>
+      <p class="panel-muted">{tr("Elige un nombre de usuario único. Solo podrás cambiarlo una vez por mes.", "Choose a unique username. You can change it only once per month.", "Choisis un nom d'utilisateur unique. Tu ne peux le modifier qu'une fois par mois.")}</p>
+      <label class="modal-label" for="homeUsernameInput">{tr("Nombre de usuario", "Username", "Nom d'utilisateur")}</label>
       <div class="home-username-input-wrap">
         <span class="home-username-prefix">@</span>
         <input
@@ -3628,162 +3710,165 @@
           minlength="4"
           maxlength="30"
           autocomplete="off"
-          placeholder="tunombredeusuario"
+          placeholder={tr("tunombredeusuario", "yourusername", "tonnomutilisateur")}
         />
       </div>
-      <p class="home-username-preview" id="homeUsernamePreview">Enlace: /home_user.html</p>
+      <p class="home-username-preview" id="homeUsernamePreview">{tr("Enlace: /home_user.html", "Link: /home_user.html", "Lien : /home_user.html")}</p>
       <p class="infobox-photo-status" id="homeUsernameModalStatus" aria-live="polite"></p>
       <div class="home-username-confirm-wrap hidden" id="homeUsernameConfirmWrap">
         <p class="modal-label-center" id="homeUsernameConfirmText">
-          ¿Estás seguro de que deseas este nombre de usuario?
+          {tr("¿Estás seguro de que deseas este nombre de usuario?", "Are you sure you want this username?", "Es-tu sûr de vouloir ce nom d'utilisateur ?")}
         </p>
         <div class="home-username-confirm-actions">
-          <button class="btn btn-primary btn-compact" type="button" id="confirmHomeUsernameBtn">Sí</button>
-          <button class="btn btn-outline btn-compact" type="button" id="cancelHomeUsernameConfirmBtn">Cancelar</button>
+          <button class="btn btn-primary btn-compact" type="button" id="confirmHomeUsernameBtn">{tr("Sí", "Yes", "Oui")}</button>
+          <button class="btn btn-outline btn-compact" type="button" id="cancelHomeUsernameConfirmBtn">{tr("Cancelar", "Cancel", "Annuler")}</button>
         </div>
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelHomeUsernameModal">Cancelar</button>
-      <button class="btn btn-primary btn-compact" type="button" id="saveHomeUsernameBtn">Aceptar</button>
+      <button class="btn btn-outline btn-compact" type="button" id="cancelHomeUsernameModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+      <button class="btn btn-primary btn-compact" type="button" id="saveHomeUsernameBtn">{tr("Aceptar", "Accept", "Accepter")}</button>
     </div>
   </div>
 </div>
 
 <div class="modal-overlay hidden" id="homeAboutModalOverlay" aria-hidden="true">
-  <div class="modal home-about-modal" role="dialog" aria-modal="true" aria-label="Modificar acerca de mí">
+  <div class="modal home-about-modal" role="dialog" aria-modal="true" aria-label={tr("Modificar acerca de mí", "Edit about me", "Modifier À propos de moi")}>
     <div class="modal-head">
-      <h3>Modificar "Acerca de mí"</h3>
+      <h3>{tr('', '', '')}</h3>
       <button class="modal-close" type="button" id="closeHomeAboutModal">✕</button>
     </div>
     <div class="modal-body">
-      <p class="panel-muted">Describe quién eres en un máximo de 50 palabras.</p>
-      <textarea class="modal-textarea home-about-textarea" id="homeAboutInput" rows="5" placeholder="Escribe aquí..."></textarea>
-      <p class="home-about-word-count" id="homeAboutWordCounter">0 / 50 palabras</p>
+      <p class="panel-muted">{tr("Describe quién eres en un máximo de 50 palabras.", "Describe who you are in up to 50 words.", "Décris qui tu es en 50 mots maximum.")}</p>
+      <textarea class="modal-textarea home-about-textarea" id="homeAboutInput" rows="5" placeholder={tr("Escribe aquí...", "Write here...", "Écris ici...")}></textarea>
+      <p class="home-about-word-count" id="homeAboutWordCounter">{tr("0 / 50 palabras", "0 / 50 words", "0 / 50 mots")}</p>
       <p class="infobox-photo-status" id="homeAboutModalStatus" aria-live="polite"></p>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelHomeAboutModal">Cancelar</button>
-      <button class="btn btn-primary btn-compact" type="button" id="saveHomeAboutBtn">Guardar</button>
+      <button class="btn btn-outline btn-compact" type="button" id="cancelHomeAboutModal">{tr("Cancelar", "Cancel", "Annuler")}</button>
+      <button class="btn btn-primary btn-compact" type="button" id="saveHomeAboutBtn">{tr("Guardar", "Save", "Enregistrer")}</button>
     </div>
   </div>
 </div>
 
 <div class="modal-overlay hidden" id="deletePostModalOverlay" aria-hidden="true">
-  <div class="modal wish-modal delete-wish-modal" role="dialog" aria-modal="true" aria-label="Eliminar publicación">
+  <div class="modal wish-modal delete-wish-modal" role="dialog" aria-modal="true" aria-label={tr("Eliminar publicación", "Delete post", "Supprimer la publication")}>
     <div class="modal-head">
-      <h3>Eliminar publicación</h3>
+      <h3>{tr("Eliminar publicación", "Delete post", "Supprimer la publication")}</h3>
       <button class="modal-close" type="button" id="closeDeletePostModal">✕</button>
     </div>
     <div class="modal-body">
       <p class="modal-label-center">
-        Esta acción eliminará la publicación y restará permanentemente las estrellas asociadas a ella.
+        {tr(
+          "Esta acción eliminará la publicación y restará permanentemente las estrellas asociadas a ella.",
+          "This action will delete the post and permanently deduct the associated stars."
+        )}
       </p>
-      <p class="modal-label-center muted">Esta acción no se puede deshacer.</p>
+      <p class="modal-label-center muted">{tr("Esta acción no se puede deshacer.", "This action cannot be undone.", "Cette action est irréversible.")}</p>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelDeletePost">Cancelar</button>
-      <button class="btn btn-primary btn-compact" type="button" id="confirmDeletePost">Eliminar</button>
+      <button class="btn btn-outline btn-compact" type="button" id="cancelDeletePost">{tr("Cancelar", "Cancel", "Annuler")}</button>
+      <button class="btn btn-primary btn-compact" type="button" id="confirmDeletePost">{tr("Eliminar", "Delete", "Supprimer")}</button>
     </div>
   </div>
 </div>
 
 <div class="modal-overlay hidden" id="editPostModalOverlay" aria-hidden="true">
-  <div class="modal wish-modal fulfill-wish-modal" role="dialog" aria-modal="true" aria-label="Editar publicación">
+  <div class="modal wish-modal fulfill-wish-modal" role="dialog" aria-modal="true" aria-label={tr("Editar publicación", "Edit post", "Modifier la publication")}>
     <div class="modal-head">
-      <h3>Editar publicación</h3>
+      <h3>{tr("Editar publicación", "Edit post", "Modifier la publication")}</h3>
       <button class="modal-close" type="button" id="closeEditPostModal">✕</button>
     </div>
     <div class="modal-body">
       <p class="modal-label-center">
-        Puedes corregir ortografía o gramática del texto publicado.
+        {tr("Puedes corregir ortografía o gramática del texto publicado.", "You can correct spelling or grammar in the published text.", "Tu peux corriger l'orthographe ou la grammaire du texte publié.")}
       </p>
-      <label class="modal-label" for="editPostText">Texto</label>
-      <textarea class="modal-textarea" id="editPostText" rows="5" maxlength="2000" placeholder="Escribe el texto actualizado"></textarea>
+      <label class="modal-label" for="editPostText">{tr("Texto", "Text", "Texte")}</label>
+      <textarea class="modal-textarea" id="editPostText" rows="5" maxlength="2000" placeholder={tr("Escribe el texto actualizado", "Write the updated text", "Écris le texte mis à jour")}></textarea>
       <p class="infobox-photo-status" id="editPostModalStatus" aria-live="polite"></p>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelEditPost">Cancelar</button>
-      <button class="btn btn-primary btn-compact" type="button" id="saveEditPost">Guardar cambios</button>
+      <button class="btn btn-outline btn-compact" type="button" id="cancelEditPost">{tr("Cancelar", "Cancel", "Annuler")}</button>
+      <button class="btn btn-primary btn-compact" type="button" id="saveEditPost">{tr("Guardar cambios", "Save changes", "Enregistrer les modifications")}</button>
     </div>
   </div>
 </div>
 
 <div class="modal-overlay hidden" id="reportPostModalOverlay" aria-hidden="true">
-  <div class="modal wish-modal fulfill-wish-modal report-post-modal" role="dialog" aria-modal="true" aria-label="Reportar publicación">
+  <div class="modal wish-modal fulfill-wish-modal report-post-modal" role="dialog" aria-modal="true" aria-label={tr("Reportar publicación", "Report post", "Signaler la publication")}>
     <div class="modal-head">
-      <h3>Reportar publicación</h3>
+      <h3>{tr("Reportar publicación", "Report post", "Signaler la publication")}</h3>
       <button class="modal-close" type="button" id="closeReportPostModal">✕</button>
     </div>
     <div class="modal-body">
       <p class="modal-label-center">
-        Selecciona la razón por la cual deseas reportar esta publicación.
+        {tr("Selecciona la razón por la cual deseas reportar esta publicación.", "Select the reason why you want to report this post.", "Sélectionne la raison pour laquelle tu veux signaler cette publication.")}
       </p>
       <div class="report-reasons">
-        <label class="report-option"><input type="radio" name="postReportReason" value="violent" checked /> Contenido violento o perturbador</label>
-        <label class="report-option"><input type="radio" name="postReportReason" value="divisive" /> Contenido que promueve confrontación o división excesiva</label>
-        <label class="report-option"><input type="radio" name="postReportReason" value="sexual" /> Contenido sexual explícito o inapropiado</label>
-        <label class="report-option"><input type="radio" name="postReportReason" value="other" /> Otra razón</label>
+        <label class="report-option"><input type="radio" name="postReportReason" value="violent" checked /> {tr("Contenido violento o perturbador", "Violent or disturbing content", "Contenu violent ou perturbant")}</label>
+        <label class="report-option"><input type="radio" name="postReportReason" value="divisive" /> {tr("Contenido que promueve confrontación o división excesiva", "Content that promotes confrontation or excessive division", "Contenu qui favorise la confrontation ou une division excessive")}</label>
+        <label class="report-option"><input type="radio" name="postReportReason" value="sexual" /> {tr("Contenido sexual explícito o inapropiado", "Explicit or inappropriate sexual content", "Contenu sexuel explicite ou inapproprié")}</label>
+        <label class="report-option"><input type="radio" name="postReportReason" value="other" /> {tr("Otra razón", "Other reason", "Autre raison")}</label>
       </div>
       <div id="reportReasonOtherWrap" class="report-other-wrap hidden">
-        <label class="modal-label" for="reportReasonOther">Describe la razón</label>
-        <textarea class="modal-textarea" id="reportReasonOther" rows="3" placeholder="Escribe tu razón"></textarea>
+        <label class="modal-label" for="reportReasonOther">{tr("Describe la razón", "Describe the reason", "Décris la raison")}</label>
+        <textarea class="modal-textarea" id="reportReasonOther" rows="3" placeholder={tr("Escribe tu razón", "Write your reason", "Écris ta raison")}></textarea>
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelReportPost">Cancelar</button>
-      <button class="btn btn-primary btn-compact" type="button" id="submitReportPost">Enviar reporte</button>
+      <button class="btn btn-outline btn-compact" type="button" id="cancelReportPost">{tr("Cancelar", "Cancel", "Annuler")}</button>
+      <button class="btn btn-primary btn-compact" type="button" id="submitReportPost">{tr("Enviar reporte", "Send report", "Envoyer le signalement")}</button>
     </div>
   </div>
 </div>
 
 <div class="modal-overlay hidden" id="reportProfileModalOverlay" aria-hidden="true">
-  <div class="modal wish-modal fulfill-wish-modal" role="dialog" aria-modal="true" aria-label="Reportar perfil">
+  <div class="modal wish-modal fulfill-wish-modal" role="dialog" aria-modal="true" aria-label={tr("Reportar perfil", "Report profile", "Signaler le profil")}>
     <div class="modal-head">
-      <h3>Reportar perfil</h3>
+      <h3>{tr("Reportar perfil", "Report profile", "Signaler le profil")}</h3>
       <button class="modal-close" type="button" id="closeReportProfileModal">✕</button>
     </div>
     <div class="modal-body">
       <p class="modal-label-center">
-        Selecciona la razón por la cual deseas reportar este perfil.
+        {tr("Selecciona la razón por la cual deseas reportar este perfil.", "Select the reason why you want to report this profile.", "Sélectionne la raison pour laquelle tu veux signaler ce profil.")}
       </p>
       <div class="report-reasons">
-        <label class="report-option"><input type="radio" name="profileReportReason" value="fake_or_illegal" checked /> Perfil falso o contenido ilegal</label>
-        <label class="report-option"><input type="radio" name="profileReportReason" value="external_manipulation" /> Manipulación hacia otros usuarios en la vida real a través de medios externos a esta plataforma</label>
-        <label class="report-option"><input type="radio" name="profileReportReason" value="star_manipulation" /> Abuso de publicaciones para atraer estrellas</label>
-        <label class="report-option"><input type="radio" name="profileReportReason" value="abusive_or_coercive" /> Conducta abusiva o coercitiva</label>
-        <label class="report-option"><input type="radio" name="profileReportReason" value="wish_system_abuse" /> Uso indebido del sistema de deseos</label>
-        <label class="report-option"><input type="radio" name="profileReportReason" value="safety_risk" /> Riesgo para la seguridad de otros</label>
-        <label class="report-option"><input type="radio" name="profileReportReason" value="other" /> Otro (Especificar)</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="fake_or_illegal" checked /> {tr("Perfil falso o contenido ilegal", "Fake profile or illegal content", "Profil faux ou contenu illégal")}</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="external_manipulation" /> {tr("Manipulación hacia otros usuarios en la vida real a través de medios externos a esta plataforma", "Manipulation of other users in real life through means external to this platform", "Manipulation d'autres utilisateurs dans la vie réelle via des moyens externes à cette plateforme")}</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="star_manipulation" /> {tr("Abuso de publicaciones para atraer estrellas", "Abusive posting to attract stars", "Publications abusives pour attirer des étoiles")}</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="abusive_or_coercive" /> {tr("Conducta abusiva o coercitiva", "Abusive or coercive behavior", "Comportement abusif ou coercitif")}</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="wish_system_abuse" /> {tr("Uso indebido del sistema de deseos", "Misuse of the wishes system", "Mauvaise utilisation du système des souhaits")}</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="safety_risk" /> {tr("Riesgo para la seguridad de otros", "Risk to the safety of others", "Risque pour la sécurité des autres")}</label>
+        <label class="report-option"><input type="radio" name="profileReportReason" value="other" /> {tr("Otro (Especificar)", "Other (Specify)", "Autre (préciser)")}</label>
       </div>
       <div id="reportProfileReasonOtherWrap" class="report-other-wrap hidden">
-        <label class="modal-label" for="reportProfileReasonOther">Describe la razón</label>
-        <textarea class="modal-textarea" id="reportProfileReasonOther" rows="3" placeholder="Escribe tu razón"></textarea>
+        <label class="modal-label" for="reportProfileReasonOther">{tr("Describe la razón", "Describe the reason", "Décris la raison")}</label>
+        <textarea class="modal-textarea" id="reportProfileReasonOther" rows="3" placeholder={tr("Escribe tu razón", "Write your reason", "Écris ta raison")}></textarea>
       </div>
       <p class="infobox-photo-status" id="reportProfileModalStatus" aria-live="polite"></p>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelReportProfile">Cancelar</button>
-      <button class="btn btn-primary btn-compact" type="button" id="submitReportProfile">Enviar reporte</button>
+      <button class="btn btn-outline btn-compact" type="button" id="cancelReportProfile">{tr("Cancelar", "Cancel", "Annuler")}</button>
+      <button class="btn btn-primary btn-compact" type="button" id="submitReportProfile">{tr("Enviar reporte", "Send report", "Envoyer le signalement")}</button>
     </div>
   </div>
 </div>
 
 <div class="modal-overlay hidden" id="postCommentsModalOverlay" aria-hidden="true">
-  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="Comentarios de publicación">
+  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-label={tr("Comentarios de publicación", "Post comments", "Commentaires de publication")}>
     <div class="modal-head">
-      <h3 id="postCommentsTitle">Comentarios</h3>
+      <h3 id="postCommentsTitle">{tr("Comentarios", "Comments", "Commentaires")}</h3>
       <button class="modal-close" type="button" id="closePostCommentsModal">✕</button>
     </div>
     <div class="modal-body">
       <p class="posts-status" id="postCommentsStatus"></p>
       <div class="post-comments-list" id="postCommentsList"></div>
-      <label class="modal-label" for="postCommentInput">Agregar comentario</label>
-      <textarea class="modal-textarea" id="postCommentInput" rows="3" maxlength="1200" placeholder="Escribe un comentario"></textarea>
+      <label class="modal-label" for="postCommentInput">{tr("Agregar comentario", "Add comment", "Ajouter un commentaire")}</label>
+      <textarea class="modal-textarea" id="postCommentInput" rows="3" maxlength="1200" placeholder={tr("Escribe un comentario", "Write a comment", "Écrire un commentaire")}></textarea>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelPostCommentsModal">Cerrar</button>
-      <button class="btn btn-primary btn-compact" type="button" id="sendPostComment">Comentar</button>
+      <button class="btn btn-outline btn-compact" type="button" id="cancelPostCommentsModal">{tr("Cerrar", "Close", "Fermer")}</button>
+      <button class="btn btn-primary btn-compact" type="button" id="sendPostComment">{tr("Comentar", "Comment", "Commenter")}</button>
     </div>
   </div>
 </div>

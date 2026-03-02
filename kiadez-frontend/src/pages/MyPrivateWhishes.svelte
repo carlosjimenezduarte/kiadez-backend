@@ -1,13 +1,22 @@
 <script>
   import { onMount } from "svelte";
+  import AuthFooter from "../lib/AuthFooter.svelte";
+  import { getLocale } from "../lib/i18n";
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { clearDekSession, getDekSessionHex, setDekSessionHex } from "../lib/dekSession";
   import { logout } from "../lib/logout";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
 
+  const locale = getLocale();
+  const isEn = locale === "en";
+  const isFr = locale === "fr";
+  const tr = (es, en, fr = en) => (isEn ? en : isFr ? fr : es);
+
   const PRIVATE_FULFILLED_VISIBLE_SLOTS = 10;
-  const PLACEHOLDER_PRIVATE_FULFILLED_MESSAGE =
-    "Aquí se publicará tu deseo privado cuando lo marques como cumplido.";
+  const PLACEHOLDER_PRIVATE_FULFILLED_MESSAGE = tr(
+    "Aquí se publicará tu deseo privado cuando lo marques como cumplido.",
+    "Your private wish will be published here once you mark it as fulfilled."
+  );
   const privateCompletedSlots = Array.from(
     { length: PRIVATE_FULFILLED_VISIBLE_SLOTS },
     (_, index) => index + 1
@@ -24,20 +33,41 @@
   };
 
   const personalTypeHintMap = {
-    "Espiritual": "Deseos relacionados con el sentido de vida, la conciencia, la fe, la paz interior y el crecimiento espiritual. Ejemplo: perseverar en el hábito de la meditación, leer libros sobre espiritualidad, asistir a misa.",
-    "Material": "Deseos vinculados a bienes, objetos o condiciones tangibles que mejoran la calidad de vida. Pueden involucrar recursos externos y, en algunos casos, la ayuda o participación de otras personas. Ejemplo: tener una cafetera nueva, un nuevo auto, una nueva computadora.",
-    "Monetario": "Deseos relacionados exclusivamente con metas económicas personales. No pueden ser concedidos por otras personas y funcionan como objetivos de ahorro, disciplina y logro individual. Solo el propio usuario puede cumplirlos.",
-    "Profesional": "Deseos asociados al desarrollo laboral, académico o creativo. Incluyen proyectos, estudios, reconocimiento, impacto profesional y crecimiento en la vocación personal. Ejemplo: estudiar arquitectura y graduarme de la Universidad Politécnico de Milán.",
-    "Salud y cuerpo": "Deseos enfocados en el bienestar físico, la energía vital, la recuperación y la relación consciente con el cuerpo. No sustituyen atención médica ni tratamientos profesionales. Ejemplo: mantener la disciplina de ejercitar tu cuerpo a diario, correr 1 km diario, alimentarte bien.",
-    "Relacional": "Deseos relacionados con vínculos humanos: familia, pareja, amistades y comunidad. Incluyen encuentros, reconciliaciones, fortalecimiento de relaciones y construcción de lazos significativos. Ejemplo: tomarse una cerveza con Lars Ulrich, ir a un concierto con tu hermano, disfrutar de un día en familia en el Restaurante La Matriarca.",
-    "Vivencial": "Deseos orientados a experiencias, momentos únicos y vivencias significativas. No se definen por la posesión, sino por el hecho de vivir algo que deje huella en la memoria y la conciencia. Ejemplo: lanzarse en paracaídas, visitar Las Islas Maldivas, viajar en helicóptero."
+    "Espiritual": tr(
+      "Deseos relacionados con el sentido de vida, la conciencia, la fe, la paz interior y el crecimiento espiritual. Ejemplo: perseverar en el hábito de la meditación, leer libros sobre espiritualidad, asistir a misa.",
+      "Wishes related to life meaning, awareness, faith, inner peace, and spiritual growth. Example: keep a meditation habit, read spirituality books, attend mass."
+    ),
+    "Material": tr(
+      "Deseos vinculados a bienes, objetos o condiciones tangibles que mejoran la calidad de vida. Pueden involucrar recursos externos y, en algunos casos, la ayuda o participación de otras personas. Ejemplo: tener una cafetera nueva, un nuevo auto, una nueva computadora.",
+      "Wishes linked to goods, objects, or tangible conditions that improve quality of life. They may involve external resources and, in some cases, help from others. Example: a new coffee maker, a new car, a new computer."
+    ),
+    "Monetario": tr(
+      "Deseos relacionados exclusivamente con metas económicas personales. No pueden ser concedidos por otras personas y funcionan como objetivos de ahorro, disciplina y logro individual. Solo el propio usuario puede cumplirlos.",
+      "Wishes focused exclusively on personal financial goals. They cannot be granted by other people and work as savings, discipline, and individual achievement goals. Only the user can fulfill them."
+    ),
+    "Profesional": tr(
+      "Deseos asociados al desarrollo laboral, académico o creativo. Incluyen proyectos, estudios, reconocimiento, impacto profesional y crecimiento en la vocación personal. Ejemplo: estudiar arquitectura y graduarme de la Universidad Politécnico de Milán.",
+      "Wishes tied to career, academic, or creative development. They include projects, studies, recognition, professional impact, and growth in your personal vocation. Example: study architecture and graduate from Politecnico di Milano."
+    ),
+    "Salud y cuerpo": tr(
+      "Deseos enfocados en el bienestar físico, la energía vital, la recuperación y la relación consciente con el cuerpo. No sustituyen atención médica ni tratamientos profesionales. Ejemplo: mantener la disciplina de ejercitar tu cuerpo a diario, correr 1 km diario, alimentarte bien.",
+      "Wishes focused on physical well-being, vitality, recovery, and conscious care of the body. They do not replace medical care or professional treatment. Example: keep a daily workout habit, run 1 km each day, eat well."
+    ),
+    "Relacional": tr(
+      "Deseos relacionados con vínculos humanos: familia, pareja, amistades y comunidad. Incluyen encuentros, reconciliaciones, fortalecimiento de relaciones y construcción de lazos significativos. Ejemplo: tomarse una cerveza con Lars Ulrich, ir a un concierto con tu hermano, disfrutar de un día en familia en el Restaurante La Matriarca.",
+      "Wishes related to human bonds: family, partner, friends, and community. They include reunions, reconciliation, stronger relationships, and meaningful connections. Example: have a beer with Lars Ulrich, attend a concert with your brother, enjoy a family day at La Matriarca restaurant."
+    ),
+    "Vivencial": tr(
+      "Deseos orientados a experiencias, momentos únicos y vivencias significativas. No se definen por la posesión, sino por el hecho de vivir algo que deje huella en la memoria y la conciencia. Ejemplo: lanzarse en paracaídas, visitar Las Islas Maldivas, viajar en helicóptero.",
+      "Wishes focused on experiences, unique moments, and meaningful memories. They are not defined by ownership, but by living something that leaves a mark on memory and awareness. Example: skydive, visit the Maldives, fly in a helicopter."
+    )
   };
 
   const formatFulfilledDate = (value) => {
     if (!value) return "";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleDateString("es-CO", {
+    return date.toLocaleDateString(isEn ? "en-US" : isFr ? "fr-FR" : "es-CO", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric"
@@ -46,13 +76,32 @@
 
   const getTypeIconSrc = (wishType) => personalTypeIconMap[wishType] || personalTypeIconMap["Espiritual"];
 
-  const getWishTypeHint = (wishType) => {
-    const normalized = String(wishType || "").trim();
-    if (!normalized) return "Deseo personal";
-    return `Deseo ${normalized.toLowerCase()}`;
+  const WISH_TYPE_LABELS = {
+    "Espiritual": tr("Espiritual", "Spiritual", "Spirituel"),
+    "Material": tr("Material", "Material", "Matériel"),
+    "Monetario": tr("Monetario", "Financial", "Financier"),
+    "Profesional": tr("Profesional", "Professional", "Professionnel"),
+    "Salud y cuerpo": tr("Salud y cuerpo", "Health and body", "Santé et corps"),
+    "Relacional": tr("Relacional", "Relational", "Relationnel"),
+    "Vivencial": tr("Vivencial", "Experiential", "Expérientiel")
   };
 
-  const PURPOSE_ORIGIN_HINT = "Este deseo fue alguna vez un deseo de propósito de vida";
+  const getWishTypeLabel = (wishType) => {
+    const normalized = String(wishType || "").trim();
+    return WISH_TYPE_LABELS[normalized] || normalized || tr("Espiritual", "Spiritual", "Spirituel");
+  };
+
+  const getWishTypeHint = (wishType) => {
+    const normalized = String(wishType || "").trim();
+    if (!normalized) return tr("Deseo personal", "Personal wish", "Souhait personnel");
+    const label = getWishTypeLabel(normalized);
+    return isEn || isFr ? `${label} wish` : `Deseo ${label.toLowerCase()}`;
+  };
+
+  const PURPOSE_ORIGIN_HINT = tr(
+    "Este deseo fue alguna vez un deseo de propósito de vida",
+    "This wish was once a life-purpose wish"
+  );
 
   const DEFAULT_PURPOSE_ICON_SRC = "/css/icons/iconelemental.webp";
 
@@ -64,11 +113,11 @@
   };
 
   const getPurposeIconLabel = (iconKey) => {
-    if (iconKey === "air") return "Aire";
-    if (iconKey === "earth") return "Tierra";
-    if (iconKey === "water") return "Agua";
-    if (iconKey === "fire") return "Fuego";
-    return "Propósito";
+    if (iconKey === "air") return tr("Aire", "Air", "Air");
+    if (iconKey === "earth") return tr("Tierra", "Earth", "Terre");
+    if (iconKey === "water") return tr("Agua", "Water", "Eau");
+    if (iconKey === "fire") return tr("Fuego", "Fire", "Feu");
+    return tr("Propósito", "Purpose", "Mission");
   };
 
   const getPurposeIconSrc = (iconKey) => purposeIconMap[String(iconKey || "")] || "";
@@ -192,7 +241,7 @@
       const token = getAccessToken();
       if (!token) {
         window.location.href = "/login.html";
-        throw new Error("No hay sesión activa.");
+        throw new Error(tr("No hay sesión activa.", "No active session.", "Aucune session active."));
       }
       const headers = {
         ...(options.headers || {}),
@@ -203,7 +252,7 @@
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         window.location.href = "/login.html";
-        throw new Error("Sesión expirada.");
+        throw new Error(tr("Sesión expirada.", "Session expired.", "Session expirée."));
       }
       return res;
     };
@@ -211,7 +260,7 @@
     const importDekFromSession = async () => {
       const dekHex = getDekSessionHex();
       if (!dekHex) {
-        throw new Error("Debes desbloquear tu clave privada personal primero.");
+        throw new Error(tr("Debes desbloquear tu clave privada personal primero.", "You must unlock your personal private key first.", "Tu dois unlock your personal private key first."));
       }
       const dekRaw = hexToBuf(dekHex);
       return crypto.subtle.importKey("raw", dekRaw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
@@ -257,7 +306,7 @@
       const vaultRes = await apiFetch("/vault/record");
       const vaultData = await vaultRes.json();
       if (!vaultRes.ok) {
-        throw new Error(vaultData.detail || "No se pudo leer el vault.");
+        throw new Error(vaultData.detail || tr("No se pudo leer el vault.", "Could not read the vault.", "Impossible de lire le coffre."));
       }
       const kdfSalt = hexToBuf(vaultData.kdf_salt_b64 || "");
       const wrappedDekNonce = new Uint8Array(hexToBuf(vaultData.wrapped_dek_nonce_b64 || ""));
@@ -286,7 +335,7 @@
     const presignEncryptedUpload = async (file) => {
       const contentType = resolveImageContentType(file);
       if (!contentType) {
-        throw new Error("Tipo de imagen no reconocido. Usa WEBP, PNG o JPEG.");
+        throw new Error(tr("Tipo de imagen no reconocido. Usa WEBP, PNG o JPEG.", "Unknown image type. Use WEBP, PNG, or JPEG.", "Type d'image inconnu. Utilise WEBP, PNG ou JPEG."));
       }
 
       // AES-GCM adds 16 bytes tag; we also prefix 12 bytes nonce => +28 bytes total.
@@ -305,7 +354,7 @@
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo preparar la carga cifrada.");
+        throw new Error(data.detail || tr("No se pudo preparar la carga cifrada.", "Could not prepare the encrypted upload.", "Impossible de prepare the encrypted upload."));
       }
       return { ...data, contentType };
     };
@@ -317,7 +366,7 @@
       const presign = await presignEncryptedUpload(file);
       const mediaId = Number(presign.media_id || 0);
       if (!Number.isFinite(mediaId) || mediaId <= 0) {
-        throw new Error("No se pudo preparar la carga (media_id inválido).");
+        throw new Error(tr("No se pudo preparar la carga (media_id inválido).", "Could not prepare upload (invalid media_id).", "Impossible de préparer l'envoi (media_id invalide)."));
       }
 
       const aad = new TextEncoder().encode(`${PRIVATE_MEDIA_AAD_PREFIX}${mediaId}`);
@@ -347,7 +396,7 @@
       });
       const uploadData = await parseResponseJson(uploadRes);
       if (!uploadRes.ok) {
-        throw new Error(uploadData.detail || "No se pudo subir la imagen cifrada.");
+        throw new Error(uploadData.detail || tr("No se pudo subir la imagen cifrada.", "Could not upload the encrypted image.", "Impossible de upload the encrypted image."));
       }
 
       return {
@@ -384,7 +433,7 @@
 
     prefixInputs.forEach((input) => {
       const field = /** @type {HTMLInputElement | HTMLTextAreaElement} */ (input);
-      const prefix = field.dataset.prefix || "Deseo ";
+      const prefix = field.dataset.prefix || tr("Deseo ", "Wish ", "Souhait ");
       const counterId = field.dataset.counter;
       const counterEl = counterId ? document.getElementById(counterId) : null;
       const maxLength = field.maxLength > 0 ? field.maxLength : null;
@@ -483,7 +532,7 @@
       if (!privatePasswordInput || !privateLockRoot) return;
       const value = privatePasswordInput.value || "";
       if (!value.trim()) {
-        setInlineError(privateSecurityError, "Debes digitar tu clave privada personal.");
+        setInlineError(privateSecurityError, tr("Debes digitar tu clave privada personal.", "You must enter your personal private key.", "Tu dois saisir ta clé privée personnelle."));
         return;
       }
 
@@ -501,7 +550,7 @@
       } catch (err) {
         setInlineError(
           privateSecurityError,
-          err?.message || "Contraseña incorrecta. Inténtalo de nuevo."
+          err?.message || tr("Contraseña incorrecta. Inténtalo de nuevo.", "Incorrect password. Try again.", "Mot de passe incorrect. Réessaie.")
         );
       }
     };
@@ -554,15 +603,15 @@
       setInlineError(privateChangePasswordError, "");
 
       if (!current.trim()) {
-        setInlineError(privateChangePasswordError, "Debes digitar tu contraseña privada actual.");
+        setInlineError(privateChangePasswordError, tr("Debes digitar tu contraseña privada actual.", "You must enter your current private password.", "Tu dois enter your current private password."));
         return;
       }
       if (!next.trim() || next.length < 8) {
-        setInlineError(privateChangePasswordError, "Tu nueva clave debe tener al menos 8 caracteres.");
+        setInlineError(privateChangePasswordError, tr("Tu nueva clave debe tener al menos 8 caracteres.", "Your new key must have at least 8 characters.", "Ta nouvelle clé doit contenir au moins 8 caractères."));
         return;
       }
       if (next !== next2) {
-        setInlineError(privateChangePasswordError, "La confirmación no coincide con tu nueva clave.");
+        setInlineError(privateChangePasswordError, tr("La confirmación no coincide con tu nueva clave.", "Confirmation does not match your new key.", "La confirmation ne correspond pas à ta nouvelle clé."));
         return;
       }
 
@@ -592,7 +641,7 @@
         });
         const rewrapData = await rewrapRes.json().catch(() => ({}));
         if (!rewrapRes.ok) {
-          throw new Error(rewrapData.detail || "No se pudo actualizar tu clave privada.");
+          throw new Error(rewrapData.detail || tr("No se pudo actualizar tu clave privada.", "Could not update your private key.", "Impossible de update your private key."));
         }
 
         // Ya tenemos el DEK, así que podemos desbloquear la página inmediatamente.
@@ -612,7 +661,7 @@
       } catch (err) {
         setInlineError(
           privateChangePasswordError,
-          err?.message || "No se pudo modificar la contraseña privada."
+          err?.message || tr("No se pudo modificar la contraseña privada.", "Could not change the private password.", "Impossible de change the private password.")
         );
       }
     };
@@ -669,8 +718,12 @@
         const data = await res.json().catch(() => ({}));
         if (!res.ok) return;
         resetKeywords = data?.keywords || null;
-        if (privateResetKeywordLabel && resetKeywords && resetKeywords.es) {
-          privateResetKeywordLabel.textContent = String(resetKeywords.es);
+        if (privateResetKeywordLabel && resetKeywords) {
+          const preferred = isEn || isFr ? resetKeywords.en : resetKeywords.es;
+          const fallback = resetKeywords.es || resetKeywords.en;
+          if (preferred || fallback) {
+            privateResetKeywordLabel.textContent = String(preferred || fallback);
+          }
         }
       } catch {
         // no-op: si falla, dejamos el texto por defecto
@@ -681,7 +734,7 @@
       setInlineError(privateResetKeywordError, "");
       const typed = (privateResetKeywordInput?.value || "").trim();
       if (!typed) {
-        setInlineError(privateResetKeywordError, "Debes escribir la palabra de confirmación.");
+        setInlineError(privateResetKeywordError, tr("Debes escribir la palabra de confirmación.", "You must type the confirmation word.", "Tu dois type the confirmation word."));
         return;
       }
 
@@ -690,7 +743,7 @@
         : ["ELIMINAR", "DELETE", "SUPPRIMER"];
 
       if (!allowed.includes(typed.toUpperCase())) {
-        setInlineError(privateResetKeywordError, "La palabra de confirmación no coincide.");
+        setInlineError(privateResetKeywordError, tr("La palabra de confirmación no coincide.", "The confirmation word does not match.", "Le mot de confirmation ne correspond pas."));
         return;
       }
 
@@ -702,7 +755,7 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudo restaurar tu clave privada.");
+          throw new Error(data.detail || tr("No se pudo restaurar tu clave privada.", "Could not reset your private key.", "Impossible de réinitialiser ta clé privée."));
         }
 
         // Limpieza local para que la UI no quede en un estado inconsistente.
@@ -714,7 +767,7 @@
       } catch (err) {
         setInlineError(
           privateResetKeywordError,
-          err?.message || "No se pudo restaurar tu clave privada."
+          err?.message || tr("No se pudo restaurar tu clave privada.", "Could not reset your private key.", "Impossible de réinitialiser ta clé privée.")
         );
       }
     };
@@ -848,7 +901,7 @@
       const res = await apiFetch("/private-wishes/personal");
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudieron cargar tus deseos privados.");
+        throw new Error(data.detail || tr("No se pudieron cargar tus deseos privados.", "Could not load your private wishes.", "Impossible de load your private wishes."));
       }
       return data;
     };
@@ -860,7 +913,7 @@
       const res = await apiFetch(`/private-wishes/personal/fulfilled?limit=${limit}&offset=${offset}`);
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudieron cargar tus deseos privados cumplidos.");
+        throw new Error(data.detail || tr("No se pudieron cargar tus deseos privados cumplidos.", "Could not load your fulfilled private wishes.", "Impossible de charger tes souhaits privés accomplis."));
       }
       return data;
     };
@@ -873,7 +926,7 @@
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo crear el deseo privado.");
+        throw new Error(data.detail || tr("No se pudo crear el deseo privado.", "Could not create the private wish.", "Impossible de create the private wish."));
       }
       return data;
     };
@@ -886,7 +939,7 @@
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo actualizar el deseo privado.");
+        throw new Error(data.detail || tr("No se pudo actualizar el deseo privado.", "Could not update the private wish.", "Impossible de update the private wish."));
       }
       return data;
     };
@@ -895,7 +948,7 @@
       const res = await apiFetch(`/private-wishes/personal/${wishId}`, { method: "DELETE" });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo borrar el deseo privado.");
+        throw new Error(data.detail || tr("No se pudo borrar el deseo privado.", "Could not delete the private wish.", "Impossible de supprimer le souhait privé."));
       }
       return data;
     };
@@ -908,7 +961,7 @@
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo marcar el deseo como cumplido.");
+        throw new Error(data.detail || tr("No se pudo marcar el deseo como cumplido.", "Could not mark the wish as fulfilled.", "Impossible de marquer le souhait comme accompli."));
       }
       return data;
     };
@@ -1109,7 +1162,7 @@
           fulfillEvidenceImage = null;
         }
         if (previewPlaceholder) {
-          previewPlaceholder.textContent = "Sube la evidencia visual.";
+          previewPlaceholder.textContent = tr("Sube la evidencia visual.", "Upload visual evidence.", "Téléverser une preuve visuelle.");
         }
         if (previewName) {
           previewName.textContent = "PNG, WEBP, JPEG, etc.";
@@ -1122,12 +1175,12 @@
       if (!fulfillEvidenceImage) {
         fulfillEvidenceImage = document.createElement("img");
         fulfillEvidenceImage.className = "wish-preview-image";
-        fulfillEvidenceImage.alt = "Evidencia seleccionada";
+        fulfillEvidenceImage.alt = tr("Evidencia seleccionada", "Selected evidence", "Preuve sélectionnée");
         fulfillEvidencePreview.insertBefore(fulfillEvidenceImage, fulfillEvidencePreview.firstChild);
       }
       fulfillEvidenceImage.src = fulfillEvidenceUrl;
       if (previewPlaceholder) {
-        previewPlaceholder.textContent = "Imagen seleccionada";
+        previewPlaceholder.textContent = tr("Imagen seleccionada", "Selected image", "Image sélectionnée");
       }
       if (previewName) {
         previewName.textContent = file.name;
@@ -1163,10 +1216,10 @@
           personalPreviewImage = null;
         }
         if (previewPlaceholder) {
-          previewPlaceholder.textContent = "Seleccionar imagen";
+          previewPlaceholder.textContent = tr("Seleccionar imagen", "Select image", "Sélectionner une image");
         }
         if (personalWishFileName) {
-          personalWishFileName.textContent = "Sin imagen seleccionada";
+          personalWishFileName.textContent = tr("Sin imagen seleccionada", "No image selected", "Aucune image sélectionnée");
         }
         return;
       }
@@ -1176,12 +1229,12 @@
       if (!personalPreviewImage) {
         personalPreviewImage = document.createElement("img");
         personalPreviewImage.className = "wish-preview-image";
-        personalPreviewImage.alt = "Vista previa de la imagen seleccionada";
+        personalPreviewImage.alt = tr("Vista previa de la imagen seleccionada", "Selected image preview", "Aperçu de l'image sélectionnée");
         personalWishPreview.insertBefore(personalPreviewImage, personalWishPreview.firstChild);
       }
       personalPreviewImage.src = personalPreviewUrl;
       if (previewPlaceholder) {
-        previewPlaceholder.textContent = "Imagen seleccionada";
+        previewPlaceholder.textContent = tr("Imagen seleccionada", "Selected image", "Image sélectionnée");
       }
       if (personalWishFileName) {
         personalWishFileName.textContent = file.name;
@@ -1206,15 +1259,15 @@
       if (!personalPreviewImage) {
         personalPreviewImage = document.createElement("img");
         personalPreviewImage.className = "wish-preview-image";
-        personalPreviewImage.alt = "Vista previa de la imagen seleccionada";
+        personalPreviewImage.alt = tr("Vista previa de la imagen seleccionada", "Selected image preview", "Aperçu de l'image sélectionnée");
         personalWishPreview.insertBefore(personalPreviewImage, personalWishPreview.firstChild);
       }
       personalPreviewImage.src = url;
       if (previewPlaceholder) {
-        previewPlaceholder.textContent = "Imagen seleccionada";
+        previewPlaceholder.textContent = tr("Imagen seleccionada", "Selected image", "Image sélectionnée");
       }
       if (personalWishFileName) {
-        personalWishFileName.textContent = label || "Imagen actual";
+        personalWishFileName.textContent = label || tr("Imagen actual", "Current image", "Image actuelle");
       }
     };
 
@@ -1322,7 +1375,7 @@
       const categoryIcon = document.createElement("img");
       categoryIcon.className = "wish-slot-category-icon";
       categoryIcon.src = categoryIconSrc;
-      categoryIcon.alt = selectedType;
+      categoryIcon.alt = getWishTypeLabel(selectedType);
       header.appendChild(categoryIcon);
 
       const title = document.createElement("div");
@@ -1335,9 +1388,9 @@
 
       const actions = document.createElement("div");
       actions.className = "wish-slot-actions wish-slot-actions-inline";
-      actions.appendChild(createWishActionBtn("/css/icons/iconedit.webp", "Editar deseo", "edit"));
-      actions.appendChild(createWishActionBtn("/css/icons/iconfulfill.webp", "Marcar como cumplido", "fulfill"));
-      actions.appendChild(createWishActionBtn("/css/icons/icondelete.webp", "Borrar deseo", "delete"));
+      actions.appendChild(createWishActionBtn("/css/icons/iconedit.webp", tr("Editar deseo", "Edit wish", "Modifier le souhait"), "edit"));
+      actions.appendChild(createWishActionBtn("/css/icons/iconfulfill.webp", tr("Marcar como cumplido", "Mark as fulfilled", "Marquer comme accompli"), "fulfill"));
+      actions.appendChild(createWishActionBtn("/css/icons/icondelete.webp", tr("Borrar deseo", "Delete wish", "Supprimer le souhait"), "delete"));
       leftCol.appendChild(actions);
       body.appendChild(leftCol);
 
@@ -1347,7 +1400,7 @@
         const img = document.createElement("img");
         img.className = "wish-slot-image";
         img.src = imageUrl;
-        img.alt = "Imagen del deseo";
+        img.alt = tr("Imagen del deseo", "Wish image", "Image du souhait");
         imageWrap.appendChild(img);
         body.appendChild(imageWrap);
         slot.dataset.imageUrl = imageUrl;
@@ -1601,7 +1654,7 @@
         privateFulfilledError =
           error instanceof Error
             ? error.message
-            : "No se pudieron cargar tus deseos privados cumplidos.";
+            : tr("No se pudieron cargar tus deseos privados cumplidos.", "Could not load your fulfilled private wishes.", "Impossible de charger tes souhaits privés accomplis.");
       } finally {
         if (epoch === privateUiEpoch && requestId === privateFulfilledRequestId) {
           privateFulfilledLoading = false;
@@ -1621,12 +1674,12 @@
 	      void loadPrivateFulfilledWishesFromApi(epoch);
 	    });
 	
-	    const resetPersonalWishForm = () => {
-      if (personalWishText) {
-        const prefix = personalWishText.dataset.prefix || "Deseo ";
-        personalWishText.value = prefix;
-        personalWishText.dispatchEvent(new Event("input", { bubbles: true }));
-      }
+		    const resetPersonalWishForm = () => {
+	      if (personalWishText) {
+	        const prefix = personalWishText.dataset.prefix || tr("Deseo ", "Wish ", "Souhait ");
+	        personalWishText.value = prefix;
+	        personalWishText.dispatchEvent(new Event("input", { bubbles: true }));
+	      }
       if (personalWishMedia) {
         personalWishMedia.value = "";
       }
@@ -1663,7 +1716,7 @@
       if (!personalWishTypeIcon) return;
       const src = personalTypeIconMap[value] || personalTypeIconMap["Espiritual"];
       personalWishTypeIcon.src = src;
-      personalWishTypeIcon.alt = value;
+      personalWishTypeIcon.alt = getWishTypeLabel(value);
     };
 
     const syncPersonalTypeHint = (value) => {
@@ -1691,7 +1744,7 @@
       if (!activePersonalSlot) return;
       if (!personalWishText) return;
       if (!isPersonalWishValid()) {
-        setPersonalWishError(true, "No has descrito tu deseo.");
+        setPersonalWishError(true, tr("No has descrito tu deseo.", "You have not described your wish.", "Tu n'as pas décrit ton souhait."));
         return;
       }
 
@@ -1771,7 +1824,7 @@
       } catch (error) {
         console.error(error);
         if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) return;
-        setPersonalWishError(true, error?.message || "No se pudo guardar tu deseo privado.");
+        setPersonalWishError(true, error?.message || tr("No se pudo guardar tu deseo privado.", "Could not save your private wish.", "Impossible de save your private wish."));
       }
     };
 
@@ -1791,7 +1844,7 @@
             } catch (error) {
               console.error(error);
               if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) return;
-              window.alert(error?.message || "No se pudo borrar el deseo privado.");
+              window.alert(error?.message || tr("No se pudo borrar el deseo privado.", "Could not delete the private wish.", "Impossible de supprimer le souhait privé."));
               return;
             }
           }
@@ -1808,7 +1861,7 @@
       const epoch = privateUiEpoch;
       const wishId = parsePositiveId(activeFulfillSlot.dataset.wishId);
       if (!wishId) {
-        window.alert("Primero debes guardar el deseo antes de marcarlo como cumplido.");
+        window.alert(tr("Primero debes guardar el deseo antes de marcarlo como cumplido.", "You must save the wish before marking it as fulfilled.", "Tu dois save the wish before marking it as fulfilled."));
         return;
       }
 
@@ -1826,7 +1879,7 @@
       } catch (error) {
         console.error(error);
         if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) return;
-        window.alert(error?.message || "No se pudo marcar el deseo como cumplido.");
+        window.alert(error?.message || tr("No se pudo marcar el deseo como cumplido.", "Could not mark the wish as fulfilled.", "Impossible de marquer le souhait comme accompli."));
       }
     };
 
@@ -1855,7 +1908,7 @@
           } else if (actionBtn.dataset.action === "edit") {
             activePersonalSlot = slot;
             const existingDescription = slot.dataset.description || "";
-            const prefix = personalWishText ? personalWishText.dataset.prefix || "Deseo " : "Deseo ";
+            const prefix = personalWishText ? personalWishText.dataset.prefix || tr("Deseo ", "Wish ", "Souhait ") : tr("Deseo ", "Wish ", "Souhait ");
             if (personalWishText) {
               personalWishText.value = existingDescription
                 ? `${prefix}${existingDescription.replace(prefix, "").trim()}`
@@ -1873,7 +1926,7 @@
               }
             }
 
-            setPersonalPreviewFromUrl(slot.dataset.imageUrl || null, "Imagen actual");
+            setPersonalPreviewFromUrl(slot.dataset.imageUrl || null, tr("Imagen actual", "Current image", "Image actuelle"));
             openPersonalWishModal();
           } else if (actionBtn.dataset.action === "fulfill") {
             openFulfillWishModal(slot);
@@ -1888,7 +1941,7 @@
 <svelte:head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kiadez — Mis deseos privados</title>
+  <title>{tr("Kiadez — Mis deseos privados", "Kiadez — My private wishes", "Kiadez — Mes souhaits privés")}</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
@@ -1900,46 +1953,46 @@
           <img src="/css/logo-kiadez.webp" alt="Kiadez" />
         </a>
         <form class="topbar-search" role="search" on:submit|preventDefault>
-          <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+          <input type="search" placeholder={tr("Buscar en Kiadez", "Search in Kiadez", "Rechercher dans Kiadez")} aria-label={tr("Buscar", "Search", "Rechercher")} />
         </form>
       </div>
 
       <div class="feed-topbar-zone feed-topbar-center">
         <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
-        <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-        <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
-      <a class="topbar-btn is-active" href="/my-private-whishes.html">🔒 Deseos privados</a>
-        <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+        <a class="topbar-btn" href="/gallery.html">🖼️ {tr("Galería", "Gallery", "Galerie")}</a>
+        <a class="topbar-btn" href="/my-public-whishes.html">🌐 {tr("Deseos públicos", "Public wishes", "Souhaits publics")}</a>
+      <a class="topbar-btn is-active" href="/my-private-whishes.html">🔒 {tr("Deseos privados", "Private wishes", "Souhaits privés")}</a>
+        <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ {tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis")}</a>
       </div>
 
       <div class="feed-topbar-zone feed-topbar-right">
         <details class="topbar-dropdown" id="profileDropdown">
-          <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-            <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+          <summary class="topbar-avatar-btn" aria-label={tr("Perfil del usuario", "User profile", "Profil utilisateur")}>
+            <img src="/assets/avatar-default.jpg" alt={tr("Perfil de Carlos Jiménez Duarte", "Carlos Jiménez Duarte profile", "Profil de Carlos Jiménez Duarte")} />
           </summary>
           <div class="dropdown-menu" role="menu">
-            <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
-            <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+            <a href="/privacy-and-settings.html" role="menuitem">{tr("Configuración y privacidad", "Settings and privacy", "Paramètres et confidentialité")}</a>
+            <button type="button" role="menuitem" on:click={logout}>{tr("Cerrar sesión", "Sign out", "Se déconnecter")}</button>
           </div>
         </details>
 
-        <button class="topbar-icon" type="button" aria-label="Notificaciones">
+        <button class="topbar-icon" type="button" aria-label={tr("Notificaciones", "Notifications", "Alertes")}>
           🔔
           <span class="topbar-badge">3</span>
         </button>
 
         <details class="topbar-dropdown" id="menuDropdown">
-          <summary class="topbar-menu-btn" aria-label="Abrir menú">
+          <summary class="topbar-menu-btn" aria-label={tr("Abrir menú", "Open menu", "Ouvrir le menu")}>
             <span class="topbar-menu-icon" aria-hidden="true">☰</span>
-            <span class="topbar-menu-label">Menú</span>
+            <span class="topbar-menu-label">{tr("Menú", "Menu", "Navigation")}</span>
           </summary>
           <div class="dropdown-menu" role="menu">
-            <a href="/home_user.html" role="menuitem">Mi Home</a>
-            <a href="/achievements.html" role="menuitem">Logros recientes</a>
-            <a href="/gallery.html" role="menuitem">Galería</a>
-            <a href="/calendar.html" role="menuitem">Calendario</a>
-            <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
-          <a href="/messages.html" role="menuitem">Mensajes</a>
+            <a href="/home_user.html" role="menuitem">{tr("Mi Home", "My Home", "Mon accueil")}</a>
+            <a href="/achievements.html" role="menuitem">{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+            <a href="/gallery.html" role="menuitem">{tr("Galería", "Gallery", "Galerie")}</a>
+            <a href="/calendar.html" role="menuitem">{tr("Calendario", "Calendar", "Calendrier")}</a>
+            <a href="/my-biography.html" role="menuitem">{tr("Mi Biografía", "My Biography", "Ma biographie")}</a>
+          <a href="/messages.html" role="menuitem">{tr("Mensajes", "Messages", "Messagerie")}</a>
           </div>
         </details>
       </div>
@@ -1951,35 +2004,35 @@
        *  ========================= -->
       <section class="cover" id="cover">
         <div class="cover-media" id="coverMedia">
-          <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
+          <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt={tr("Portada", "Cover", "Couverture")} />
 
           <div class="cover-actions">
-            <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
-              Cambiar portada
+            <button class="icon-btn" id="btnChangeCover" type="button" title={tr("Cambiar portada", "Change cover", "Changer la couverture")}>
+              {tr("Cambiar portada", "Change cover", "Changer la couverture")}
             </button>
-            <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title="Editar mi propósito de vida">
-              Editar mi propósito de vida
+            <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title={tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier ma mission de vie")}>
+              {tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier ma mission de vie")}
             </button>
 
             <input id="coverFile" type="file" accept="image/*" class="hidden" />
           </div>
 
-          <div class="purpose-triangle" aria-label="Deseos de propósito">
+          <div class="purpose-triangle" aria-label={tr("Deseos de propósito", "Purpose wishes", "Souhaits de mission")}>
             <button class="purpose-pill purpose-top" type="button" id="purpose1">
-              Deseo #1: Secreto
+              {tr("Deseo #1: Secreto", "Wish #1: Secret", "Souhait n°1 : Secret")}
             </button>
 
             <button class="purpose-pill purpose-left" type="button" id="purpose2">
-              Deseo construir el Reino de Combray
+              {tr("Deseo construir el Reino de Combray", "I wish to build the Kingdom of Combray", "Je souhaite construire le Royaume de Combray")}
             </button>
 
             <button class="purpose-pill purpose-right" type="button" id="purpose3">
-              Deseo estar unido a Jesús
+              {tr("Deseo estar unido a Jesús", "I wish to be united with Jesus", "Je souhaite être uni à Jésus")}
             </button>
           </div>
 
           <div class="cover-hint" id="coverHint">
-            Arrastra la portada para encuadrarla
+            {tr("Arrastra la portada para encuadrarla", "Drag the cover to frame it", "Déplace la couverture pour l'ajuster")}
           </div>
         </div>
       </section>
@@ -1989,33 +2042,33 @@
         <!-- =========================
          *  NAV / LINKS
          *  ========================= -->
-        <nav class="profile-nav" aria-label="Navegación de perfil">
+        <nav class="profile-nav" aria-label={tr("Navegación de perfil", "Profile navigation", "Navigation du profil")}>
           <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
-          <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+          <a class="nav-pill" href="/star-pool-found.html" title={tr("Estrellas", "Stars", "Étoiles")}>
             <span class="nav-icon">⭐</span>
-            <span><strong id="privateWishesStarsTotal">0</strong> estrellas</span>
+            <span><strong id="privateWishesStarsTotal">0</strong> {tr("estrellas", "stars", "étoiles")}</span>
           </a>
-          <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-          <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-          <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-          <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
-          <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
-        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
+          <a class="nav-pill" href="/followers.html" title={tr("Seguidores", "Followers", "Abonnés")}>{tr("Seguidores", "Followers", "Abonnés")}</a>
+          <a class="nav-pill" href="/achievements.html" title={tr("Logros recientes", "Recent achievements", "Réalisations récentes")}>{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+          <a class="nav-pill" href="/gallery.html" title={tr("Galería", "Gallery", "Galerie")}>{tr("Galería", "Gallery", "Galerie")}</a>
+          <a class="nav-pill" href="/calendar.html" title={tr("Calendario", "Calendar", "Calendrier")}>{tr("Calendario", "Calendar", "Calendrier")}</a>
+          <a class="nav-pill" href="/my-biography.html" title={tr("Mi biografía", "My biography", "Ma biographie")}>{tr("Mi biografía", "My biography", "Ma biographie")}</a>
+        <a class="nav-pill" href="/messages.html" title={tr("Mensajes", "Messages", "Messagerie")}>{tr("Mensajes", "Messages", "Messagerie")}</a>
         </nav>
 
         <!-- =========================
          *  MIS DESEOS PRIVADOS
          *  ========================= -->
-        <section class="private-wishes-shell" aria-label="Mis deseos privados">
+        <section class="private-wishes-shell" aria-label={tr("Mis deseos privados", "My private wishes", "Mes souhaits privés")}>
           <header class="private-wishes-head">
             <div>
-              <h2 class="private-wishes-title">Mis deseos privados</h2>
+              <h2 class="private-wishes-title">{tr("Mis deseos privados", "My private wishes", "Mes souhaits privés")}</h2>
             </div>
 
             <div class="private-wishes-tags">
-              <button class="btn btn-outline btn-compact private-censor-btn" type="button" id="private-censor-interface" title="Censurar interfaz de deseos privados">
+              <button class="btn btn-outline btn-compact private-censor-btn" type="button" id="private-censor-interface" title={tr("Censurar interfaz de deseos privados", "Hide private wishes interface", "Masquer l'interface des souhaits privés")}>
                 <span class="private-censor-icon" aria-hidden="true">🔒</span>
-                <span>Censurar interfaz de deseos privados</span>
+                <span>{tr("Censurar interfaz de deseos privados", "Hide private wishes interface", "Masquer l'interface des souhaits privés")}</span>
               </button>
             </div>
           </header>
@@ -2023,17 +2076,17 @@
           <!-- =========================
            *  LISTAS DE DESEOS
            *  ========================= -->
-          <section class="wish-lists-grid" aria-label="Listas de deseos">
+          <section class="wish-lists-grid" aria-label={tr("Listas de deseos", "Wish lists", "Listes de souhaits")}>
             <article class="panel wish-list-panel">
               <div class="panel-head">
-                <h3 class="panel-title">Deseos privados</h3>
+                <h3 class="panel-title">{tr("Deseos privados", "Private wishes", "Souhaits privés")}</h3>
                 <span class="panel-badge"><span id="private-personal-wish-count">7</span> / 50</span>
               </div>
 
-              <ol class="wish-slot-list" id="private-personal-wish-list" data-total="50" aria-label="Deseos personales">
+              <ol class="wish-slot-list" id="private-personal-wish-list" data-total="50" aria-label={tr("Deseos personales", "Personal wishes", "Souhaits personnels")}>
               </ol>
               <div class="wish-add-row">
-                <button class="wish-add-btn" id="private-personal-wish-add" type="button" title="Agregar deseo">
+                <button class="wish-add-btn" id="private-personal-wish-add" type="button" title={tr("Agregar deseo", "Add wish", "Ajouter un souhait")}>
                   <span class="wish-add-plus">+</span>
                 </button>
               </div>
@@ -2042,14 +2095,14 @@
             <div class="fulfilled-wishes-page">
               <article class="panel wish-list-panel">
                 <div class="panel-head">
-                  <h3 class="panel-title">Deseos privados cumplidos</h3>
+                  <h3 class="panel-title">{tr("Deseos privados cumplidos", "Fulfilled private wishes", "Souhaits privés accomplis")}</h3>
                   <span class="panel-badge">
                     {privateFulfilledItems.length} / {PRIVATE_FULFILLED_VISIBLE_SLOTS}
                   </span>
                 </div>
                 <ol
                   class="wish-slot-list wish-slot-list-fulfilled"
-                  aria-label="Deseos privados cumplidos"
+                  aria-label={tr("Deseos privados cumplidos", "Fulfilled private wishes", "Souhaits privés accomplis")}
                   style={`counter-reset: wish ${Math.max(0, privateFulfilledRangeStart - 1)};`}
                 >
                   {#each privateFulfilledView as item}
@@ -2076,9 +2129,9 @@
 	                                <br />
 	                                <div class="wish-slot-title">{item.wish.wish_text}</div>
 	                                <div class="wish-slot-meta wish-slot-meta-fulfilled">
-	                                  {#if item.wish.fulfilled_at}
+                                  {#if item.wish.fulfilled_at}
                                     <span class="wish-type-pill wish-fulfilled-date-pill">
-                                      Cumplido el {formatFulfilledDate(item.wish.fulfilled_at)}
+                                      {tr("Cumplido el", "Fulfilled on", "Accompli le")} {formatFulfilledDate(item.wish.fulfilled_at)}
                                     </span>
                                   {/if}
                                 </div>
@@ -2090,7 +2143,7 @@
                                 <img
                                   class="wish-slot-image wish-slot-image-fulfilled"
                                   src={fulfilledImageUrl}
-                                  alt="Evidencia del deseo privado cumplido"
+                                  alt={tr("Evidencia del deseo privado cumplido", "Evidence of the fulfilled private wish", "Preuve du souhait privé accompli")}
                                   loading="lazy"
                                 />
                               </div>
@@ -2106,11 +2159,11 @@
                   {/each}
                 </ol>
                 {#if privateFulfilledTotal > 0 && privateFulfilledTotal >= PRIVATE_FULFILLED_VISIBLE_SLOTS}
-                  <nav class="wish-pagination" aria-label="Paginación de deseos privados cumplidos">
+                  <nav class="wish-pagination" aria-label={tr("Paginación de deseos privados cumplidos", "Fulfilled private wishes pagination", "Pagination des souhaits privés accomplis")}>
                     <button
                       class="wish-page-btn is-arrow"
                       type="button"
-                      aria-label="Página anterior"
+                      aria-label={tr("Página anterior", "Previous page", "Page précédente")}
                       on:click={() => goToPrivateFulfilledPage(privateFulfilledPage - 1)}
                       disabled={privateFulfilledPage <= 1}
                     >
@@ -2129,7 +2182,7 @@
                     <button
                       class="wish-page-btn is-arrow"
                       type="button"
-                      aria-label="Página siguiente"
+                      aria-label={tr("Página siguiente", "Next page", "Page suivante")}
                       on:click={() => goToPrivateFulfilledPage(privateFulfilledPage + 1)}
                       disabled={privateFulfilledPage >= privateFulfilledTotalPages}
                     >
@@ -2138,12 +2191,12 @@
                   </nav>
                 {/if}
                 {#if privateFulfilledLoading}
-                  <p class="wish-fulfilled-status">Cargando deseos cumplidos...</p>
+                  <p class="wish-fulfilled-status">{tr("Cargando deseos cumplidos...", "Loading fulfilled wishes...", "Chargement des souhaits accomplis...")}</p>
                 {:else if privateFulfilledError}
                   <p class="wish-fulfilled-status is-error">{privateFulfilledError}</p>
                 {:else if privateFulfilledTotal > 0 && privateFulfilledTotal >= PRIVATE_FULFILLED_VISIBLE_SLOTS}
                   <p class="wish-fulfilled-status">
-                    Mostrando {privateFulfilledRangeStart}-{privateFulfilledRangeEnd} de {privateFulfilledTotal} deseos cumplidos.
+                    {tr("Mostrando", "Showing", "Affichage")} {privateFulfilledRangeStart}-{privateFulfilledRangeEnd} {tr("de", "of", "de")} {privateFulfilledTotal} {tr("deseos cumplidos.", "fulfilled wishes.", "souhaits accomplis.")}
                   </p>
                 {/if}
               </article>
@@ -2152,38 +2205,35 @@
 
           <template id="private-wish-lamp-slot-template">
             <div class="wish-slot-row wish-slot-row-empty">
-              <button class="wish-add-btn wish-lamp-btn" type="button" title="Agregar deseo">
-                <img class="wish-lamp-icon" src="/css/icons/iconlamp.webp" alt="Agregar deseo" />
+              <button class="wish-add-btn wish-lamp-btn" type="button" title={tr("Agregar deseo", "Add wish", "Ajouter un souhait")}>
+                <img class="wish-lamp-icon" src="/css/icons/iconlamp.webp" alt={tr("Agregar deseo", "Add wish", "Ajouter un souhait")} />
               </button>
             </div>
           </template>
 
           <div class="modal-overlay hidden" id="private-personal-wish-modal" aria-hidden="true">
             <div class="modal modal-wide personal-wish-modal" role="dialog" aria-modal="true"
-              aria-label="Configurar deseo personal">
+              aria-label={tr("Configurar deseo personal", "Set up personal wish", "Configurer un souhait personnel")}>
               <div class="modal-head">
-                <h3>Configurar deseo personal</h3>
+                <h3>{tr("Configurar deseo personal", "Set up personal wish", "Configurer un souhait personnel")}</h3>
                 <button class="modal-close" type="button" id="private-close-personal-wish-modal">✕</button>
               </div>
               <div class="modal-body personal-wish-body">
                 <div class="wish-modal-grid">
                   <div class="wish-modal-col">
                     <div class="wish-config-icon personal-wish-hero">
-                      <img src="/css/icons/iconpersonal.webp" alt="Deseo personal" />
+                      <img src="/css/icons/iconpersonal.webp" alt={tr("Deseo personal", "Personal wish", "Souhait personnel")} />
                     </div>
-                    <h2 class="modal-label modal-label-center">Descripción del deseo</h2>
-                    <label class="modal-label hidden" for="private-personal-wish-text">Descripción del deseo</label>
+                    <h2 class="modal-label modal-label-center">{tr("Descripción del deseo", "Wish description", "Description du souhait")}</h2>
+                    <label class="modal-label hidden" for="private-personal-wish-text">{tr("Descripción del deseo", "Wish description", "Description du souhait")}</label>
                     <textarea class="modal-textarea wish-prefix-input wish-textarea-compact" id="private-personal-wish-text"
-                      rows="3" maxlength="80" data-prefix="Deseo " data-counter="private-personal-wish-counter"></textarea>
+                      rows="3" maxlength="80" data-prefix={tr("Deseo ", "Wish ", "Souhait ")} data-counter="private-personal-wish-counter"></textarea>
                     <div class="wish-counter" id="private-personal-wish-counter" aria-live="polite">0/80</div>
-                    <div class="wish-error" id="private-personal-wish-error" role="alert">No has descrito tu deseo</div>
+                    <div class="wish-error" id="private-personal-wish-error" role="alert">{tr("No has descrito tu deseo", "You have not described your wish", "Tu n'as pas décrit ton souhait")}</div>
                     <div class="wish-warning">
                       <span class="wish-warning-icon">!</span>
                       <span id="private-personal-wish-type-hint">
-                        Deseos relacionados con el sentido de vida, la conciencia, la fe, la paz interior y el
-                        crecimiento
-                        espiritual. Ejemplo: perseverar en el hábito de la meditación, leer libros sobre espiritualidad,
-                        asistir a misa.
+                        {personalTypeHintMap["Espiritual"]}
                       </span>
                     </div>
                   </div>
@@ -2191,50 +2241,50 @@
                   <div class="wish-modal-col">
                     <fieldset class="wish-type-fieldset">
                       <div class="wish-type-selected">
-                        <img id="private-personal-wish-type-icon" src="/css/icons/Espiritual.webp" alt="Espiritual" />
+                        <img id="private-personal-wish-type-icon" src="/css/icons/Espiritual.webp" alt={getWishTypeLabel("Espiritual")} />
                       </div>
-                      <h2 class="modal-label modal-label-center">Tipo de deseo</h2>
+                      <h2 class="modal-label modal-label-center">{tr("Tipo de deseo", "Wish type", "Type de souhait")}</h2>
                       <div class="wish-type-grid">
                         <label class="wish-type-option">
                           <input type="radio" name="private-personal-wish-type" value="Espiritual" checked />
                           <span class="wish-type-visual">
-                            <span>Espiritual</span>
+                            <span>{getWishTypeLabel("Espiritual")}</span>
                           </span>
                         </label>
                         <label class="wish-type-option">
                           <input type="radio" name="private-personal-wish-type" value="Material" />
                           <span class="wish-type-visual">
-                            <span>Material</span>
+                            <span>{getWishTypeLabel("Material")}</span>
                           </span>
                         </label>
                         <label class="wish-type-option">
                           <input type="radio" name="private-personal-wish-type" value="Monetario" />
                           <span class="wish-type-visual">
-                            <span>Monetario</span>
+                            <span>{getWishTypeLabel("Monetario")}</span>
                           </span>
                         </label>
                         <label class="wish-type-option">
                           <input type="radio" name="private-personal-wish-type" value="Profesional" />
                           <span class="wish-type-visual">
-                            <span>Profesional</span>
+                            <span>{getWishTypeLabel("Profesional")}</span>
                           </span>
                         </label>
                         <label class="wish-type-option">
                           <input type="radio" name="private-personal-wish-type" value="Salud y cuerpo" />
                           <span class="wish-type-visual">
-                            <span>Salud y cuerpo</span>
+                            <span>{getWishTypeLabel("Salud y cuerpo")}</span>
                           </span>
                         </label>
                         <label class="wish-type-option">
                           <input type="radio" name="private-personal-wish-type" value="Relacional" />
                           <span class="wish-type-visual">
-                            <span>Relacional</span>
+                            <span>{getWishTypeLabel("Relacional")}</span>
                           </span>
                         </label>
                         <label class="wish-type-option">
                           <input type="radio" name="private-personal-wish-type" value="Vivencial" />
                           <span class="wish-type-visual">
-                            <span>Vivencial</span>
+                            <span>{getWishTypeLabel("Vivencial")}</span>
                           </span>
                         </label>
                       </div>
@@ -2242,23 +2292,23 @@
                   </div>
 
                   <div class="wish-modal-col">
-                    <h2 class="modal-label modal-label-center">Agregar imagen</h2>
-                    <label class="modal-label hidden" for="private-personal-wish-media">Agregar imagen</label>
+                    <h2 class="modal-label modal-label-center">{tr("Agregar imagen", "Add image", "Ajouter une image")}</h2>
+                    <label class="modal-label hidden" for="private-personal-wish-media">{tr("Agregar imagen", "Add image", "Ajouter une image")}</label>
                     <input class="modal-input hidden" id="private-personal-wish-media" type="file" accept="image/*" />
                     <div class="wish-image-preview" id="private-personal-wish-preview" aria-live="polite">
-                      <label class="wish-image-btn" for="private-personal-wish-media" aria-label="Seleccionar imagen">+</label>
+                      <label class="wish-image-btn" for="private-personal-wish-media" aria-label={tr("Seleccionar imagen", "Select image", "Sélectionner une image")}>+</label>
                       <div class="wish-preview-content">
-                        <span class="wish-preview-placeholder">Seleccionar imagen</span>
-                        <span class="wish-preview-name" id="private-personal-wish-file-name">Sin imagen seleccionada</span>
+                        <span class="wish-preview-placeholder">{tr("Seleccionar imagen", "Select image", "Sélectionner une image")}</span>
+                        <span class="wish-preview-name" id="private-personal-wish-file-name">{tr("Sin imagen seleccionada", "No image selected", "Aucune image sélectionnée")}</span>
                       </div>
                     </div>
                     <div class="wish-config-icon personal-wish-hero">
-                      <img src="/css/icons/iconsave.webp" alt="guardar" />
+                      <img src="/css/icons/iconsave.webp" alt={tr("guardar", "save", "enregistrer")} />
                     </div>
                     <div class="wish-form-actions wish-form-actions-center">
                       <br>
                       <button class="btn btn-primary btn-compact btn-icon" type="button" id="private-confirm-personal-wish">
-                        ¡Confirmar mi deseo!
+                        {tr("¡Confirmar mi deseo!", "Confirm my wish!", "Confirmer mon souhait !")}
                       </button>
                     </div>
                   </div>
@@ -2268,110 +2318,109 @@
           </div>
 
           <div class="modal-overlay hidden" id="private-delete-wish-modal" aria-hidden="true">
-            <div class="modal wish-modal delete-wish-modal" role="dialog" aria-modal="true" aria-label="Borrar deseo">
+            <div class="modal wish-modal delete-wish-modal" role="dialog" aria-modal="true" aria-label={tr("Borrar deseo", "Delete wish", "Supprimer le souhait")}>
               <div class="modal-head">
-                <h3>¿Estás seguro de que deseas borrar este deseo?</h3>
+                <h3>{tr("¿Estás seguro de que deseas borrar este deseo?", "Are you sure you want to delete this wish?", "Es-tu sûr de vouloir supprimer ce souhait ?")}</h3>
               </div>
               <div class="modal-actions">
-                <button class="btn btn-primary btn-compact" type="button" id="private-confirm-delete-wish">Sí</button>
-                <button class="btn btn-outline btn-compact" type="button" id="private-cancel-delete-wish">No</button>
+                <button class="btn btn-primary btn-compact" type="button" id="private-confirm-delete-wish">{tr("Sí", "Yes", "Oui")}</button>
+                <button class="btn btn-outline btn-compact" type="button" id="private-cancel-delete-wish">{tr("No", "No", "Non")}</button>
               </div>
             </div>
           </div>
 
           <div class="modal-overlay hidden" id="private-fulfill-wish-modal" aria-hidden="true">
             <div class="modal wish-modal fulfill-wish-modal" role="dialog" aria-modal="true"
-              aria-label="Subir evidencia">
+              aria-label={tr("Subir evidencia", "Upload evidence", "Téléverser une preuve")}>
               <div class="modal-head">
-                <h3>¡Sube la evidencia!</h3>
+                <h3>{tr("¡Sube la evidencia!", "Upload the evidence!", "Téléverse la preuve !")}</h3>
               </div>
               <div class="modal-body">
                 <input id="private-fulfill-evidence" type="file" accept="image/*" class="hidden" />
                 <div class="wish-image-preview" id="private-fulfill-evidence-preview" aria-live="polite">
-                  <label class="wish-image-btn" for="private-fulfill-evidence" aria-label="Sube la evidencia visual">+</label>
+                  <label class="wish-image-btn" for="private-fulfill-evidence" aria-label={tr("Sube la evidencia visual", "Upload visual evidence", "Téléverser une preuve visuelle")}>+</label>
                   <div class="wish-preview-content">
-                    <span class="wish-preview-placeholder">Sube la evidencia visual.</span>
+                    <span class="wish-preview-placeholder">{tr("Sube la evidencia visual.", "Upload visual evidence.", "Téléverser une preuve visuelle.")}</span>
                     <span class="wish-preview-name">PNG, WEBP, JPEG, etc.</span>
                   </div>
                 </div>
                 <p class="panel-muted">
-                  <strong>¿Declaras bajo verdad de juramento que este deseo se ha cumplido?</strong>
+                  <strong>{tr("¿Declaras bajo verdad de juramento que este deseo se ha cumplido?", "Do you swear that this wish has been fulfilled?", "Jures-tu que ce souhait a été accompli ?")}</strong>
                 </p>
               </div>
               <div class="modal-actions">
                 <button class="btn btn-primary btn-compact" type="button" id="private-confirm-fulfill-wish">
-                  Juro bajo verdad de juramento que este deseo se ha cumplido
+                  {tr("Juro bajo verdad de juramento que este deseo se ha cumplido", "I swear that this wish has been fulfilled", "Je jure que ce souhait a été accompli")}
                 </button>
               </div>
               <div class="modal-actions">
-                <button class="btn btn-outline btn-compact" type="button" id="private-cancel-fulfill-wish">Cancelar</button>
+                <button class="btn btn-outline btn-compact" type="button" id="private-cancel-fulfill-wish">{tr("Cancelar", "Cancel", "Annuler")}</button>
               </div>
             </div>
           </div>
 
           <div class="modal-overlay hidden" id="private-ican-confirm-modal" aria-hidden="true">
             <div class="modal wish-modal ican-confirm-modal" role="dialog" aria-modal="true"
-              aria-label="Conceder deseo">
+              aria-label={tr("Conceder deseo", "Grant wish", "Accorder le souhait")}>
               <div class="modal-head">
-                <h3>Yo puedo conceder ese deseo</h3>
+                <h3>{tr("Yo puedo conceder ese deseo", "I can grant this wish", "Je peux accorder ce souhait")}</h3>
               </div>
               <div class="modal-body">
-                <p class="panel-muted">¿Estás seguro de que deseas cumplir este deseo?</p>
+                <p class="panel-muted">{tr("¿Estás seguro de que deseas cumplir este deseo?", "Are you sure you want to fulfill this wish?", "Es-tu sûr de vouloir accomplir ce souhait ?")}</p>
               </div>
               <div class="modal-actions">
-                <button class="btn btn-primary btn-compact" type="button" id="private-ican-confirm-yes">Sí</button>
-                <button class="btn btn-outline btn-compact" type="button" id="private-ican-confirm-no">No</button>
+                <button class="btn btn-primary btn-compact" type="button" id="private-ican-confirm-yes">{tr("Sí", "Yes", "Oui")}</button>
+                <button class="btn btn-outline btn-compact" type="button" id="private-ican-confirm-no">{tr("No", "No", "Non")}</button>
               </div>
             </div>
           </div>
 
           <div class="modal-overlay hidden" id="private-guardian-contact-modal" aria-hidden="true">
             <div class="modal wish-modal guardian-contact-modal" role="dialog" aria-modal="true"
-              aria-label="Contactar a un Guardián">
+              aria-label={tr("Contactar a un Guardián", "Contact a Guardian", "Contacter un Gardien")}>
               <div class="modal-head">
-                <h3>Contactar a un Guardián</h3>
+                <h3>{tr("Contactar a un Guardián", "Contact a Guardian", "Contacter un Gardien")}</h3>
               </div>
               <div class="modal-body">
-                <h2 class="guardian-section-title">Selecciona a un Guardián</h2>
+                <h2 class="guardian-section-title">{tr("Selecciona a un Guardián", "Select a Guardian", "Sélectionner un Gardien")}</h2>
                 <div class="guardian-row guardian-select">
                   <button class="guardian-option" type="button" aria-pressed="false">
-                    <img class="guardian-avatar" src="/css/icons/Guardian1.png" alt="Guardián 1" />
+                    <img class="guardian-avatar" src="/css/icons/Guardian1.png" alt={tr("Guardián 1", "Guardian 1", "Gardien 1")} />
                   </button>
                   <button class="guardian-option" type="button" aria-pressed="false">
-                    <img class="guardian-avatar" src="/css/icons/Guardian2.png" alt="Guardián 2" />
+                    <img class="guardian-avatar" src="/css/icons/Guardian2.png" alt={tr("Guardián 2", "Guardian 2", "Gardien 2")} />
                   </button>
                   <button class="guardian-option" type="button" aria-pressed="false">
-                    <img class="guardian-avatar" src="/css/icons/Guardian3.png" alt="Guardián 3" />
+                    <img class="guardian-avatar" src="/css/icons/Guardian3.png" alt={tr("Guardián 3", "Guardian 3", "Gardien 3")} />
                   </button>
                   <button class="guardian-option" type="button" aria-pressed="false">
-                    <img class="guardian-avatar" src="/css/icons/Guardian4.png" alt="Guardián 4" />
+                    <img class="guardian-avatar" src="/css/icons/Guardian4.png" alt={tr("Guardián 4", "Guardian 4", "Gardien 4")} />
                   </button>
                 </div>
 
-                <h2 class="guardian-section-title">Describe por qué deseas conceder ese deseo</h2>
-                <label class="modal-label hidden" for="private-guardian-reason-visitor">Describe por qué deseas conceder ese
-                  deseo</label>
+                <h2 class="guardian-section-title">{tr("Describe por qué deseas conceder ese deseo", "Describe why you want to grant this wish", "Décris pourquoi tu veux accorder ce souhait")}</h2>
+                <label class="modal-label hidden" for="private-guardian-reason-visitor">{tr("Describe por qué deseas conceder ese deseo", "Describe why you want to grant this wish", "Décris pourquoi tu veux accorder ce souhait")}</label>
                 <textarea class="modal-textarea" id="private-guardian-reason-visitor" rows="3"></textarea>
 
-                <h2 class="guardian-section-title">Número telefónico</h2>
-                <label class="modal-label hidden" for="private-guardian-phone-visitor">Número telefónico</label>
+                <h2 class="guardian-section-title">{tr("Número telefónico", "Phone number", "Numéro de téléphone")}</h2>
+                <label class="modal-label hidden" for="private-guardian-phone-visitor">{tr("Número telefónico", "Phone number", "Numéro de téléphone")}</label>
                 <input class="modal-input" id="private-guardian-phone-visitor" type="tel" inputmode="tel"
                   placeholder="+57 300 000 0000" />
 
                 <h2 class="guardian-section-title">E-mail</h2>
                 <label class="modal-label hidden" for="private-guardian-email-visitor">E-mail</label>
-                <input class="modal-input" id="private-guardian-email-visitor" type="email" placeholder="correo@ejemplo.com" />
+                <input class="modal-input" id="private-guardian-email-visitor" type="email" placeholder={tr("correo@ejemplo.com", "email@example.com", "courriel@exemple.com")} />
 
-                <h2 class="guardian-section-title">Evidencia</h2>
+                <h2 class="guardian-section-title">{tr("Evidencia", "Evidence", "Preuve")}</h2>
                 <div class="upload-row">
-                  <label class="upload-btn" for="private-guardian-evidence-visitor">Adjuntar imagen o video</label>
+                  <label class="upload-btn" for="private-guardian-evidence-visitor">{tr("Adjuntar imagen o video", "Attach image or video", "Joindre une image ou une vidéo")}</label>
                   <input id="private-guardian-evidence-visitor" type="file" accept="image/*,video/*" class="hidden" />
-                  <div class="upload-hint">Envíanos una evidencia de tu buena intención</div>
+                  <div class="upload-hint">{tr("Envíanos una evidencia de tu buena intención", "Send us evidence of your good intention", "Envoie-nous une preuve de ta bonne intention")}</div>
                 </div>
               </div>
               <div class="modal-actions">
-                <button class="btn btn-primary btn-compact" type="button">Enviar</button>
-                <button class="btn btn-outline btn-compact" type="button" id="private-cancel-guardian-modal">Cancelar</button>
+                <button class="btn btn-primary btn-compact" type="button">{tr("Enviar", "Send", "Envoyer")}</button>
+                <button class="btn btn-outline btn-compact" type="button" id="private-cancel-guardian-modal">{tr("Cancelar", "Cancel", "Annuler")}</button>
               </div>
             </div>
           </div>
@@ -2382,45 +2431,42 @@
         <!-- =========================
          *  SEGURIDAD / PRIVATE LOCK
          *  ========================= -->
-        <section class="private-security-overlay" aria-label="Seguridad de deseos privados">
+        <section class="private-security-overlay" aria-label={tr("Seguridad de deseos privados", "Private wishes security", "Sécurité des souhaits privés")}>
           <div class="private-security-card" role="dialog" aria-modal="true" aria-live="polite">
-            <img class="private-security-hero" src="/css/cpp-key.webp" alt="Clave privada" />
+            <img class="private-security-hero" src="/css/cpp-key.webp" alt={tr("Clave privada", "Private key", "Clé privée")} />
 
-            <h2 class="private-security-title">Digita tu contraseña privada personal:</h2>
+            <h2 class="private-security-title">{tr("Digita tu contraseña privada personal:", "Enter your personal private password:", "Saisis ton mot de passe privé personnel :")}</h2>
 
             <div class="private-security-input-row">
-              <label class="modal-label hidden" for="private-security-password">Contraseña privada</label>
+              <label class="modal-label hidden" for="private-security-password">{tr("Contraseña privada", "Private password", "Mot de passe privé")}</label>
               <input class="modal-input private-security-input" id="private-security-password" type="password"
                 autocomplete="off" inputmode="text" placeholder="••••••••••••••" />
               <button class="private-security-btn private-security-unlock" type="button" id="private-security-unlock"
-                aria-label="Ingresar" title="Ingresar">
-                <img src="/css/icons/icondoor.webp" alt="Ingresar" />
+                aria-label={tr("Ingresar", "Enter", "Entrer")} title={tr("Ingresar", "Enter", "Entrer")}>
+                <img src="/css/icons/icondoor.webp" alt={tr("Ingresar", "Enter", "Entrer")} />
               </button>
             </div>
 
             <p class="private-security-error" id="private-security-error" role="alert">
-              Contraseña incorrecta. Inténtalo de nuevo.
+              {tr("Contraseña incorrecta. Inténtalo de nuevo.", "Incorrect password. Try again.", "Mot de passe incorrect. Réessaie.")}
             </p>
 
             <div class="private-security-actions">
-              <button class="private-security-btn" type="button" aria-label="Modificar contraseña privada personal"
-                id="private-security-change-password" title="Modificar contraseña privada personal">
-                <img src="/css/icons/iconedit.webp" alt="Cambiar contraseña" />
+              <button class="private-security-btn" type="button" aria-label={tr("Modificar contraseña privada personal", "Change personal private password", "Modifier le mot de passe privé personnel")}
+                id="private-security-change-password" title={tr("Modificar contraseña privada personal", "Change personal private password", "Modifier le mot de passe privé personnel")}>
+                <img src="/css/icons/iconedit.webp" alt={tr("Cambiar contraseña", "Change password", "Changer le mot de passe")} />
               </button>
-              <button class="private-security-btn" type="button" aria-label="Reiniciar contraseña"
-                id="private-security-reset-password" title="Reiniciar contraseña">
-                <img src="/css/icons/icondelete.webp" alt="Reiniciar contraseña" />
+              <button class="private-security-btn" type="button" aria-label={tr("Reiniciar contraseña", "Reset password", "Réinitialiser le mot de passe")}
+                id="private-security-reset-password" title={tr("Reiniciar contraseña", "Reset password", "Réinitialiser le mot de passe")}>
+                <img src="/css/icons/icondelete.webp" alt={tr("Reiniciar contraseña", "Reset password", "Réinitialiser le mot de passe")} />
               </button>
             </div>
 
             <p class="private-security-note">
-              Tu clave secreta personal protege toda la información privada que declares en esta red social: deseos,
-              propósitos y datos confidenciales. Si la pierdes, no podrás recuperar el acceso a esa información. En caso
-              de olvido, podrás reiniciar la clave, pero esto implicará la eliminación definitiva de todos tus deseos
-              privados y datos confidenciales, los cuales deberán configurarse nuevamente. Sin esta clave, nadie puede
-              acceder a tu información privada: ni el Guardián Supremo Absoluto ni las bases de datos de la red social
-              tienen visibilidad sobre lo que has decidido mantener en secreto. Se recomienda guardar tu clave secreta
-              —de forma digital o física— en un lugar seguro.
+              {tr(
+                "Tu clave secreta personal protege toda la información privada que declares en esta red social: deseos, propósitos y datos confidenciales. Si la pierdes, no podrás recuperar el acceso a esa información. En caso de olvido, podrás reiniciar la clave, pero esto implicará la eliminación definitiva de todos tus deseos privados y datos confidenciales, los cuales deberán configurarse nuevamente. Sin esta clave, nadie puede acceder a tu información privada: ni el Guardián Supremo Absoluto ni las bases de datos de la red social tienen visibilidad sobre lo que has decidido mantener en secreto. Se recomienda guardar tu clave secreta de forma digital o física en un lugar seguro.",
+                "Your personal secret key protects all private information you declare in this social network: wishes, purposes, and confidential data. If you lose it, you will not be able to recover access to that information. If forgotten, you can reset the key, but this will permanently delete all your private wishes and confidential data, which must be set up again. Without this key, no one can access your private information, not even the highest guardian or the platform databases. It is recommended to store your secret key, digitally or physically, in a safe place."
+              )}
             </p>
           </div>
         </section>
@@ -2428,128 +2474,76 @@
     </main>
 
     <div class="modal-overlay hidden" id="private-change-password-modal" aria-hidden="true">
-      <div class="modal wish-modal private-change-password-modal" role="dialog" aria-modal="true" aria-label="Modificar contraseña privada personal">
+      <div class="modal wish-modal private-change-password-modal" role="dialog" aria-modal="true" aria-label={tr("Modificar contraseña privada personal", "Change personal private password", "Modifier le mot de passe privé personnel")}>
         <div class="modal-head">
-          <h3>Modificar contraseña privada personal</h3>
+          <h3>{tr("Modificar contraseña privada personal", "Change personal private password", "Modifier le mot de passe privé personnel")}</h3>
           <button class="modal-close" type="button" id="private-change-password-cancel">✕</button>
         </div>
         <div class="modal-body">
-          <label class="modal-label" for="private-current-password">Digita tu actual contraseña privada personal</label>
+          <label class="modal-label" for="private-current-password">{tr("Digita tu actual contraseña privada personal", "Enter your current personal private password", "Saisis ton mot de passe privé personnel actuel")}</label>
           <input class="modal-input" id="private-current-password" type="password" autocomplete="off" />
 
-          <label class="modal-label" for="private-new-password">Digita tu nueva contraseña privada personal</label>
+          <label class="modal-label" for="private-new-password">{tr("Digita tu nueva contraseña privada personal", "Enter your new personal private password", "Saisis ton nouveau mot de passe privé personnel")}</label>
           <input class="modal-input" id="private-new-password" type="password" autocomplete="off" />
 
-          <label class="modal-label" for="private-confirm-password">Confirma tu nueva contraseña privada actual</label>
+          <label class="modal-label" for="private-confirm-password">{tr("Confirma tu nueva contraseña privada actual", "Confirm your new personal private password", "Confirme ton nouveau mot de passe privé personnel")}</label>
           <input class="modal-input" id="private-confirm-password" type="password" autocomplete="off" />
 
           <p class="private-security-error" id="private-change-password-error" role="alert"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-primary btn-compact" type="button" id="private-change-password-confirm">Confirmar</button>
-          <button class="btn btn-outline btn-compact" type="button" id="private-change-password-cancel-footer">Cancelar</button>
+          <button class="btn btn-primary btn-compact" type="button" id="private-change-password-confirm">{tr("Confirmar", "Confirm", "Confirmer")}</button>
+          <button class="btn btn-outline btn-compact" type="button" id="private-change-password-cancel-footer">{tr("Cancelar", "Cancel", "Annuler")}</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay hidden" id="private-reset-password-modal" aria-hidden="true">
-      <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label="Restaurar contraseña privada personal">
+      <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label={tr("Restaurar contraseña privada personal", "Reset personal private password", "Réinitialiser le mot de passe privé personnel")}>
         <div class="modal-head">
-          <h3>Restaurar contraseña privada personal</h3>
+          <h3>{tr("Restaurar contraseña privada personal", "Reset personal private password", "Réinitialiser le mot de passe privé personnel")}</h3>
           <button class="modal-close" type="button" id="private-reset-password-cancel">✕</button>
         </div>
         <div class="modal-body">
           <p class="private-reset-text">
-            Estás a punto de reiniciar tu clave secreta personal porque la has olvidado.
+            {tr("Estás a punto de reiniciar tu clave secreta personal porque la has olvidado.", "You are about to reset your personal secret key because you forgot it.", "Tu es sur le point de réinitialiser ta clé secrète personnelle parce que tu l'as oubliée.")}
           </p>
           <p class="private-reset-text">
-            Esta acción eliminará de forma permanente todos tus deseos privados y tu información cifrada.
+            {tr("Esta acción eliminará de forma permanente todos tus deseos privados y tu información cifrada.", "This action will permanently remove all your private wishes and encrypted information.", "Cette action supprimera définitivement tous tes souhaits privés et informations chiffrées.")}
           </p>
           <p class="private-reset-text private-reset-question">
-            ¿Estás seguro de que deseas continuar?
+            {tr("¿Estás seguro de que deseas continuar?", "Are you sure you want to continue?", "Es-tu sûr de vouloir continuer ?")}
           </p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-primary btn-compact" type="button" id="private-reset-password-confirm">Sí, continuar</button>
-          <button class="btn btn-outline btn-compact" type="button" id="private-reset-password-cancel-footer">Cancelar</button>
+          <button class="btn btn-primary btn-compact" type="button" id="private-reset-password-confirm">{tr("Sí, continuar", "Yes, continue", "Oui, continuer")}</button>
+          <button class="btn btn-outline btn-compact" type="button" id="private-reset-password-cancel-footer">{tr("Cancelar", "Cancel", "Annuler")}</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay hidden" id="private-reset-password-final-modal" aria-hidden="true">
-      <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label="Confirmación final de eliminación">
+      <div class="modal wish-modal private-reset-modal" role="dialog" aria-modal="true" aria-label={tr("Confirmación final de eliminación", "Final delete confirmation", "Confirmation finale de suppression")}>
         <div class="modal-head">
-          <h3>Confirmación final</h3>
+          <h3>{tr("Confirmación final", "Final confirmation", "Confirmation finale")}</h3>
           <button class="modal-close" type="button" id="private-reset-password-final-cancel">✕</button>
         </div>
         <div class="modal-body">
           <p class="private-reset-text">
-            Para confirmar la eliminación de tu clave secreta personal, escribe la siguiente palabra exactamente como se muestra:
+            {tr("Para confirmar la eliminación de tu clave secreta personal, escribe la siguiente palabra exactamente como se muestra:", "To confirm deletion of your personal secret key, type the following word exactly as shown:", "Pour confirmer la suppression de ta clé secrète personnelle, saisis le mot suivant exactement comme affiché :")}
           </p>
-          <p class="private-reset-text private-reset-keyword" id="private-reset-keyword-label">ELIMINAR</p>
+          <p class="private-reset-text private-reset-keyword" id="private-reset-keyword-label">{tr("ELIMINAR", "DELETE", "SUPPRIMER")}</p>
           <input class="modal-input" id="private-reset-password-keyword" type="text" autocomplete="off" />
 
           <p class="private-security-error" id="private-reset-password-error" role="alert"></p>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-primary btn-compact" type="button" id="private-reset-password-final-confirm">Eliminar clave</button>
-          <button class="btn btn-outline btn-compact" type="button" id="private-reset-password-final-cancel-footer">Cancelar</button>
+          <button class="btn btn-primary btn-compact" type="button" id="private-reset-password-final-confirm">{tr("Eliminar clave", "Delete key", "Supprimer la clé")}</button>
+          <button class="btn btn-outline btn-compact" type="button" id="private-reset-password-final-cancel-footer">{tr("Cancelar", "Cancel", "Annuler")}</button>
         </div>
       </div>
     </div>
 
-    <footer class="kiadez-footer">
-      <div class="footer-main">
-        <div class="footer-column footer-origin">
-          <p class="footer-poem">
-            Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br>
-            No para dominar, sino para orientar.<br>
-            Su luz no deslumbra: acompaña.
-          </p>
-        </div>
-
-        <div class="footer-columns">
-          <div class="footer-column">
-            <h4>Sobre nuestra red social</h4>
-            <ul>
-              <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
-              <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
-              <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
-              <li><a href="/contact.html">Contacto</a></li>
-            </ul>
-          </div>
-
-          <div class="footer-column">
-            <h4>Idiomas</h4>
-            <ul>
-              <li><a href="/?lang=es">Español</a></li>
-              <li><a href="/?lang=en">English</a></li>
-              <li><a href="/?lang=fr">Français</a></li>
-            </ul>
-          </div>
-
-          <div class="footer-column">
-            <h4>Contacto</h4>
-            <ul>
-              <li>info@kiadez.com</li>
-              <li>+57 333 225 6078</li>
-            </ul>
-          </div>
-
-          <div class="footer-column">
-            <h4>Información legal</h4>
-            <ul>
-              <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
-              <li><a href="/terms.html">Términos y condiciones</a></li>
-              <li><a href="/privacy.html">Privacidad</a></li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="footer-bottom">
-        © 2026 Kiadez — Una red social para cumplir deseos.
-      </div>
-    </footer>
+    <AuthFooter />
   </div>
 </div>

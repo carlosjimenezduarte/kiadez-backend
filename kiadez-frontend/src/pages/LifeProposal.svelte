@@ -29,7 +29,7 @@
               window.location.href = "/home_user.html";
             }
           } catch (error) {
-            console.error("No se pudo validar onboarding de propósito de vida", error);
+            console.error("Could not validate life purpose onboarding", error);
           }
         })();
 
@@ -47,7 +47,7 @@
         async function importDekFromSession() {
           const dekHex = getDekSessionHex();
           if (!dekHex) {
-            throw new Error("Vault no desbloqueado. Crea tu clave privada o desbloquéala primero.");
+            throw new Error("Vault not unlocked. Create your private key or unlock it first.");
           }
           const dekRaw = hexToBuf(dekHex);
           return crypto.subtle.importKey(
@@ -78,11 +78,11 @@
         }
     
         function getIconLabel(iconKey) {
-          if (iconKey === "air") return "Aire";
-          if (iconKey === "earth") return "Tierra";
-          if (iconKey === "water") return "Agua";
-          if (iconKey === "fire") return "Fuego";
-          return "Icono";
+          if (iconKey === "air") return "Air";
+          if (iconKey === "earth") return "Earth";
+          if (iconKey === "water") return "Water";
+          if (iconKey === "fire") return "Fire";
+          return "Icon";
         }
     
         function getIconSrc(iconKey) {
@@ -92,7 +92,7 @@
         const prefixInputs = document.querySelectorAll(".wish-prefix-input");
         prefixInputs.forEach((input) => {
           const field = /** @type {HTMLTextAreaElement} */ (input);
-          const prefix = field.dataset.prefix || "Deseo ";
+          const prefix = field.dataset.prefix || "Wish ";
           const maxLength = field.maxLength > 0 ? field.maxLength : null;
 
           const clampToMax = () => {
@@ -143,8 +143,8 @@
           if (confirmText) {
             const number = groupEl?.dataset?.purpose;
             confirmText.textContent = number
-              ? `¿Confirmar el propósito ${number} como público?`
-              : "¿Confirmar este deseo como público?";
+              ? `Confirm purpose ${number} as public?`
+              : "Confirm this wish as public?";
           }
           confirmOverlay?.classList.remove("hidden");
           confirmOverlay?.setAttribute("aria-hidden", "false");
@@ -168,7 +168,7 @@
             return;
           }
           pendingConfirmGroup.dataset.isPrivate = "false";
-          setPurposeStatus(pendingConfirmGroup, "Estado: confirmado (publico).");
+          setPurposeStatus(pendingConfirmGroup, "Status: confirmed (public).");
           closeConfirmModal();
         });
 
@@ -191,7 +191,7 @@
     
             if (action === "secret") {
               groupEl.dataset.isPrivate = "true";
-              setPurposeStatus(groupEl, "Estado: marcado como secreto.");
+              setPurposeStatus(groupEl, "Status: marked as secret.");
               return;
             }
     
@@ -232,10 +232,10 @@
             const actionBtn = groupEl.querySelector(".purpose-action[data-action=\"icon\"]");
             if (actionBtn) {
               actionBtn.innerHTML = `<img src="${getIconSrc(iconKey)}" alt="${label}">`;
-              actionBtn.title = `Icono: ${label}`;
+              actionBtn.title = `Icon: ${label}`;
             }
     
-            setPurposeStatus(groupEl, `Estado: icono asociado: ${label}.`);
+            setPurposeStatus(groupEl, `Status: associated icon: ${label}.`);
             panel.classList.remove("is-open");
           });
         });
@@ -246,7 +246,7 @@
             groupEl.dataset.revealAt = dateInput.value || "";
             if (!dateInput.value) return;
             const formatted = dateInput.value.split("-").reverse().join("/");
-            setPurposeStatus(groupEl, `Estado: se revelara el dia ${formatted}.`);
+            setPurposeStatus(groupEl, `Status: will be revealed on ${formatted}.`);
           });
         });
     
@@ -271,7 +271,7 @@
             const textarea = groupEl.querySelector("textarea");
             const text = textarea.value.trim();
             if (!text) {
-              alert("Completa los tres propósitos.");
+              alert("Complete all three purposes.");
               return;
             }
     
@@ -316,7 +316,7 @@
             const data = await res.json();
     
             if (!res.ok) {
-              alert(data.detail || "No se pudo guardar el propósito.");
+              alert(data.detail || "Could not save the purpose.");
               return;
             }
     
@@ -324,7 +324,7 @@
     
           } catch (err) {
             console.error(err);
-            alert("Error de conexión con el servidor.");
+            alert("Server connection error.");
           }
         });
   });
@@ -333,7 +333,7 @@
 <svelte:head>
 <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kiadez — Propósito de vida</title>
+  <title>Kiadez — Life purpose</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
@@ -342,124 +342,124 @@
     <main class="auth-center">
       <div class="auth-card auth-card--wide auth-card--life">
 
-        <h2 class="auth-title">Tu propósito de vida</h2>
+        <h2 class="auth-title">Your life purpose</h2>
 
         <div class="auth-message">
           <p>
-            Escribe tres deseos que orienten tu camino.
+            Write three wishes to guide your path.
             <br>
-            Son brújula, no presión.
+            They are a compass, not pressure.
           </p>
           <p class="muted">
-            Estos propósitos se guardan cifrados con tu clave privada personal.
+            These purposes are stored encrypted with your personal private key.
           </p>
         </div>
 
         <form id="life-form">
           <div class="purpose-group" data-purpose="1">
-            <textarea id="p1" class="wish-prefix-input" data-prefix="Deseo " rows="1" maxlength="80" placeholder="Deseo 1" required>Deseo </textarea>
-            <div class="purpose-actions" role="group" aria-label="Acciones para propósito 1">
-              <button type="button" class="purpose-action" data-action="confirm" title="Confirmar deseo de propósito" aria-label="Confirmar deseo de propósito">
-                <img src="/css/icons/iconsave.webp" alt="Guardar propósito">
+            <textarea id="p1" class="wish-prefix-input" data-prefix="Wish " rows="1" maxlength="80" placeholder="Wish 1" required>Wish </textarea>
+            <div class="purpose-actions" role="group" aria-label="Actions for purpose 1">
+              <button type="button" class="purpose-action" data-action="confirm" title="Confirm purpose wish" aria-label="Confirm purpose wish">
+                <img src="/css/icons/iconsave.webp" alt="Save purpose">
               </button>
-              <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto" aria-label="Convertir en secreto">
-                <img src="/css/icons/iconkey.webp" alt="Marcar como secreto">
+              <button type="button" class="purpose-action" data-action="secret" title="Mark as secret" aria-label="Mark as secret">
+                <img src="/css/icons/iconkey.webp" alt="Mark as secret">
               </button>
-              <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha" aria-label="Revelar en fecha">
-                <img src="/css/icons/iconcalendar.webp" alt="Programar fecha">
+              <button type="button" class="purpose-action" data-action="reveal" title="Reveal on date" aria-label="Reveal on date">
+                <img src="/css/icons/iconcalendar.webp" alt="Schedule date">
               </button>
-              <button type="button" class="purpose-action" data-action="icon" title="Elegir icono" aria-label="Elegir icono">
-                <img src="/css/icons/iconelemental.webp" alt="Elegir icono">
-              </button>
-            </div>
-            <input type="date" class="purpose-date" aria-label="Fecha de revelacion para proposito 1">
-            <div class="purpose-icon-panel" aria-label="Selector de iconos">
-              <button type="button" class="purpose-icon" data-icon="air" title="Aire">
-                <img src="assets/air.png" alt="Aire">
-              </button>
-              <button type="button" class="purpose-icon" data-icon="earth" title="Tierra">
-                <img src="assets/earth.png" alt="Tierra">
-              </button>
-              <button type="button" class="purpose-icon" data-icon="water" title="Agua">
-                <img src="assets/water.png" alt="Agua">
-              </button>
-              <button type="button" class="purpose-icon" data-icon="fire" title="Fuego">
-                <img src="assets/fire.png" alt="Fuego">
+              <button type="button" class="purpose-action" data-action="icon" title="Choose icon" aria-label="Choose icon">
+                <img src="/css/icons/iconelemental.webp" alt="Choose icon">
               </button>
             </div>
-            <div class="purpose-status" aria-live="polite">Estado: público por defecto.</div>
+            <input type="date" class="purpose-date" aria-label="Reveal date for purpose 1">
+            <div class="purpose-icon-panel" aria-label="Icon selector">
+              <button type="button" class="purpose-icon" data-icon="air" title="Air">
+                <img src="assets/air.png" alt="Air">
+              </button>
+              <button type="button" class="purpose-icon" data-icon="earth" title="Earth">
+                <img src="assets/earth.png" alt="Earth">
+              </button>
+              <button type="button" class="purpose-icon" data-icon="water" title="Water">
+                <img src="assets/water.png" alt="Water">
+              </button>
+              <button type="button" class="purpose-icon" data-icon="fire" title="Fire">
+                <img src="assets/fire.png" alt="Fire">
+              </button>
+            </div>
+            <div class="purpose-status" aria-live="polite">Status: public by default.</div>
           </div>
 
           <div class="purpose-group" data-purpose="2">
-            <textarea id="p2" class="wish-prefix-input" data-prefix="Deseo " rows="1" maxlength="80" placeholder="Deseo 2" required>Deseo </textarea>
-            <div class="purpose-actions" role="group" aria-label="Acciones para propósito 2">
-              <button type="button" class="purpose-action" data-action="confirm" title="Confirmar deseo de propósito" aria-label="Confirmar deseo de propósito">
-                <img src="/css/icons/iconsave.webp" alt="Guardar propósito">
+            <textarea id="p2" class="wish-prefix-input" data-prefix="Wish " rows="1" maxlength="80" placeholder="Wish 2" required>Wish </textarea>
+            <div class="purpose-actions" role="group" aria-label="Actions for purpose 2">
+              <button type="button" class="purpose-action" data-action="confirm" title="Confirm purpose wish" aria-label="Confirm purpose wish">
+                <img src="/css/icons/iconsave.webp" alt="Save purpose">
               </button>
-              <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto" aria-label="Convertir en secreto">
-                <img src="/css/icons/iconkey.webp" alt="Marcar como secreto">
+              <button type="button" class="purpose-action" data-action="secret" title="Mark as secret" aria-label="Mark as secret">
+                <img src="/css/icons/iconkey.webp" alt="Mark as secret">
               </button>
-              <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha" aria-label="Revelar en fecha">
-                <img src="/css/icons/iconcalendar.webp" alt="Programar fecha">
+              <button type="button" class="purpose-action" data-action="reveal" title="Reveal on date" aria-label="Reveal on date">
+                <img src="/css/icons/iconcalendar.webp" alt="Schedule date">
               </button>
-              <button type="button" class="purpose-action" data-action="icon" title="Elegir icono" aria-label="Elegir icono">
-                <img src="/css/icons/iconelemental.webp" alt="Elegir icono">
-              </button>
-            </div>
-            <input type="date" class="purpose-date" aria-label="Fecha de revelacion para proposito 2">
-            <div class="purpose-icon-panel" aria-label="Selector de iconos">
-              <button type="button" class="purpose-icon" data-icon="air" title="Aire">
-                <img src="assets/air.png" alt="Aire">
-              </button>
-              <button type="button" class="purpose-icon" data-icon="earth" title="Tierra">
-                <img src="assets/earth.png" alt="Tierra">
-              </button>
-              <button type="button" class="purpose-icon" data-icon="water" title="Agua">
-                <img src="assets/water.png" alt="Agua">
-              </button>
-              <button type="button" class="purpose-icon" data-icon="fire" title="Fuego">
-                <img src="assets/fire.png" alt="Fuego">
+              <button type="button" class="purpose-action" data-action="icon" title="Choose icon" aria-label="Choose icon">
+                <img src="/css/icons/iconelemental.webp" alt="Choose icon">
               </button>
             </div>
-            <div class="purpose-status" aria-live="polite">Estado: público por defecto.</div>
+            <input type="date" class="purpose-date" aria-label="Reveal date for purpose 2">
+            <div class="purpose-icon-panel" aria-label="Icon selector">
+              <button type="button" class="purpose-icon" data-icon="air" title="Air">
+                <img src="assets/air.png" alt="Air">
+              </button>
+              <button type="button" class="purpose-icon" data-icon="earth" title="Earth">
+                <img src="assets/earth.png" alt="Earth">
+              </button>
+              <button type="button" class="purpose-icon" data-icon="water" title="Water">
+                <img src="assets/water.png" alt="Water">
+              </button>
+              <button type="button" class="purpose-icon" data-icon="fire" title="Fire">
+                <img src="assets/fire.png" alt="Fire">
+              </button>
+            </div>
+            <div class="purpose-status" aria-live="polite">Status: public by default.</div>
           </div>
 
           <div class="purpose-group" data-purpose="3">
-            <textarea id="p3" class="wish-prefix-input" data-prefix="Deseo " rows="1" maxlength="80" placeholder="Deseo 3" required>Deseo </textarea>
-            <div class="purpose-actions" role="group" aria-label="Acciones para propósito 3">
-              <button type="button" class="purpose-action" data-action="confirm" title="Confirmar deseo de propósito" aria-label="Confirmar deseo de propósito">
-                <img src="/css/icons/iconsave.webp" alt="Guardar propósito">
+            <textarea id="p3" class="wish-prefix-input" data-prefix="Wish " rows="1" maxlength="80" placeholder="Wish 3" required>Wish </textarea>
+            <div class="purpose-actions" role="group" aria-label="Actions for purpose 3">
+              <button type="button" class="purpose-action" data-action="confirm" title="Confirm purpose wish" aria-label="Confirm purpose wish">
+                <img src="/css/icons/iconsave.webp" alt="Save purpose">
               </button>
-              <button type="button" class="purpose-action" data-action="secret" title="Convertir en secreto" aria-label="Convertir en secreto">
-                <img src="/css/icons/iconkey.webp" alt="Marcar como secreto">
+              <button type="button" class="purpose-action" data-action="secret" title="Mark as secret" aria-label="Mark as secret">
+                <img src="/css/icons/iconkey.webp" alt="Mark as secret">
               </button>
-              <button type="button" class="purpose-action" data-action="reveal" title="Revelar en fecha" aria-label="Revelar en fecha">
-                <img src="/css/icons/iconcalendar.webp" alt="Programar fecha">
+              <button type="button" class="purpose-action" data-action="reveal" title="Reveal on date" aria-label="Reveal on date">
+                <img src="/css/icons/iconcalendar.webp" alt="Schedule date">
               </button>
-              <button type="button" class="purpose-action" data-action="icon" title="Elegir icono" aria-label="Elegir icono">
-                <img src="/css/icons/iconelemental.webp" alt="Elegir icono">
-              </button>
-            </div>
-            <input type="date" class="purpose-date" aria-label="Fecha de revelacion para proposito 3">
-            <div class="purpose-icon-panel" aria-label="Selector de iconos">
-              <button type="button" class="purpose-icon" data-icon="air" title="Aire">
-                <img src="assets/air.png" alt="Aire">
-              </button>
-              <button type="button" class="purpose-icon" data-icon="earth" title="Tierra">
-                <img src="assets/earth.png" alt="Tierra">
-              </button>
-              <button type="button" class="purpose-icon" data-icon="water" title="Agua">
-                <img src="assets/water.png" alt="Agua">
-              </button>
-              <button type="button" class="purpose-icon" data-icon="fire" title="Fuego">
-                <img src="assets/fire.png" alt="Fuego">
+              <button type="button" class="purpose-action" data-action="icon" title="Choose icon" aria-label="Choose icon">
+                <img src="/css/icons/iconelemental.webp" alt="Choose icon">
               </button>
             </div>
-            <div class="purpose-status" aria-live="polite">Estado: público por defecto.</div>
+            <input type="date" class="purpose-date" aria-label="Reveal date for purpose 3">
+            <div class="purpose-icon-panel" aria-label="Icon selector">
+              <button type="button" class="purpose-icon" data-icon="air" title="Air">
+                <img src="assets/air.png" alt="Air">
+              </button>
+              <button type="button" class="purpose-icon" data-icon="earth" title="Earth">
+                <img src="assets/earth.png" alt="Earth">
+              </button>
+              <button type="button" class="purpose-icon" data-icon="water" title="Water">
+                <img src="assets/water.png" alt="Water">
+              </button>
+              <button type="button" class="purpose-icon" data-icon="fire" title="Fire">
+                <img src="assets/fire.png" alt="Fire">
+              </button>
+            </div>
+            <div class="purpose-status" aria-live="polite">Status: public by default.</div>
           </div>
 
-          <button type="submit" class="btn btn-primary">Guardar propósito</button>
-          <a href="/create-private-key.html" class="btn btn-outline">Volver</a>
+          <button type="submit" class="btn btn-primary">Save purpose</button>
+          <a href="/create-private-key.html" class="btn btn-outline">Back</a>
         </form>
 
         <div class="auth-brand">
@@ -471,31 +471,31 @@
     </main>
 
     <div class="modal-overlay hidden" id="lifeConfirmOverlay" aria-hidden="true">
-      <div class="modal" role="dialog" aria-modal="true" aria-label="Confirmar propósito público">
+      <div class="modal" role="dialog" aria-modal="true" aria-label="Confirm public purpose">
         <div class="modal-head">
-          <h3>Confirmar propósito</h3>
+          <h3>Confirm purpose</h3>
           <button class="modal-close" type="button" id="lifeConfirmClose">✕</button>
         </div>
 
         <div class="modal-body">
           <p class="modal-label-center" id="lifeConfirmText">
-            ¿Confirmar este deseo como público?
+            Confirm this wish as public?
           </p>
           <p class="modal-label-center muted">
-            Se guardará como público.
+            It will be saved as public.
           </p>
         </div>
 
         <div class="modal-actions">
-          <button class="btn btn-outline btn-compact" type="button" id="lifeConfirmCancel">Cancelar</button>
-          <button class="btn btn-primary btn-compact" type="button" id="lifeConfirmOk">Confirmar</button>
+          <button class="btn btn-outline btn-compact" type="button" id="lifeConfirmCancel">Cancel</button>
+          <button class="btn btn-primary btn-compact" type="button" id="lifeConfirmOk">Confirm</button>
         </div>
       </div>
     </div>
 
     <footer class="kiadez-footer">
       <div class="footer-bottom">
-        © 2026 Kiadez — Una red social para cumplir deseos.
+        © 2026 Kiadez — A social network to fulfill wishes.
       </div>
     </footer>
 

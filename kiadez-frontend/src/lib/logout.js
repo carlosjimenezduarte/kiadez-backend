@@ -1,8 +1,24 @@
 import { clearDekSession } from "./dekSession";
 
 // Frontend-only logout: clears local tokens + sensitive session state, then redirects to login.
-// Note: signature supports being used directly as an event handler (Svelte passes the event object).
-export function logout({ redirectTo = "/login.html" } = {}) {
+// Supports both direct usage as event handler (`on:click={logout}`) and manual invocation
+// (`logout({ redirectTo: "/somewhere" })`).
+/**
+ * @param {{ redirectTo?: string } | Event | undefined} arg
+ */
+export function logout(arg) {
+  let redirectTo = "/login.html";
+
+  if (
+    arg &&
+    typeof arg === "object" &&
+    "redirectTo" in arg &&
+    typeof arg.redirectTo === "string" &&
+    arg.redirectTo.trim()
+  ) {
+    redirectTo = arg.redirectTo;
+  }
+
   try {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");

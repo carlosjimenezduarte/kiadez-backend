@@ -4,10 +4,16 @@
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
   import { syncTopbarAvatar } from "../lib/topbarAvatar";
+  import AuthFooter from "../lib/AuthFooter.svelte";
+  import { getLocale } from "../lib/i18n";
 
   const API = "http://127.0.0.1:8000";
   const RECENT_LIMIT = 20;
   const POSTS_FETCH_LIMIT = 100;
+  const locale = getLocale();
+  const isEn = locale === "en";
+  const isFr = locale === "fr";
+  const tr = (es, en, fr = en) => (isEn ? en : isFr ? fr : es);
 
   let isLoading = true;
   let loadError = "";
@@ -63,7 +69,7 @@
     }
   };
 
-  const readApiError = (payload, fallback = "Error inesperado.") => {
+  const readApiError = (payload, fallback = tr("Error inesperado.", "Unexpected error.", "Erreur inattendue.")) => {
     const detail = payload?.detail;
     if (typeof detail === "string" && detail.trim()) {
       return detail.trim();
@@ -101,7 +107,7 @@
     return fallback;
   };
 
-  const readUnknownError = (error, fallback = "Error inesperado.") => {
+  const readUnknownError = (error, fallback = tr("Error inesperado.", "Unexpected error.", "Erreur inattendue.")) => {
     if (!error) return fallback;
 
     if (typeof error === "string" && error.trim()) {
@@ -138,7 +144,7 @@
     const token = getAccessToken();
     if (!token) {
       window.location.href = "/login.html";
-      throw new Error("No hay sesión activa.");
+      throw new Error(tr("No hay sesión activa.", "No active session.", "Aucune session active."));
     }
 
     const response = await fetch(`${API}${path}`, {
@@ -154,7 +160,7 @@
       localStorage.removeItem("refresh_token");
       localStorage.removeItem("kiadez_access_token");
       window.location.href = "/login.html";
-      throw new Error("Tu sesión expiró. Inicia sesión nuevamente.");
+      throw new Error(tr("Tu sesión expiró. Inicia sesión nuevamente.", "Your session expired. Sign in again.", "Ta session a expiré. Connecte-toi de nouveau."));
     }
 
     return response;
@@ -194,12 +200,24 @@
       return `hace ${amount} ${label}`;
     };
 
-    if (absMs < minute) return future ? "en instantes" : "hace instantes";
-    if (absMs < hour) return format(absMs / minute, "minuto");
-    if (absMs < day) return format(absMs / hour, "hora");
-    if (absMs < 7 * day) return format(absMs / day, "día");
+    if (isEn) {
+      const formatEn = (num, unit) => {
+        const amount = Math.max(1, Math.floor(num));
+        const label = amount === 1 ? unit : `${unit}s`;
+        return future ? `in ${amount} ${label}` : `${amount} ${label} ago`;
+      };
+      if (absMs < minute) return future ? "in moments" : "moments ago";
+      if (absMs < hour) return formatEn(absMs / minute, "minute");
+      if (absMs < day) return formatEn(absMs / hour, "hour");
+      if (absMs < 7 * day) return formatEn(absMs / day, "day");
+    } else {
+      if (absMs < minute) return future ? "en instantes" : "hace instantes";
+      if (absMs < hour) return format(absMs / minute, "minuto");
+      if (absMs < day) return format(absMs / hour, "hora");
+      if (absMs < 7 * day) return format(absMs / day, "día");
+    }
 
-    return date.toLocaleString("es-CO", {
+    return date.toLocaleString(isEn ? "en-US" : isFr ? "fr-FR" : "es-CO", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -302,7 +320,7 @@
       const response = await apiFetch(`/posts/${normalizedPostId}/comments?limit=200`);
       const data = await parseResponseJson(response);
       if (!response.ok) {
-        throw new Error(readApiError(data, "No se pudieron cargar los comentarios."));
+        throw new Error(readApiError(data, tr("No se pudieron cargar los comentarios.", "Could not load comments.", "Impossible de charger les commentaires.")));
       }
 
       viewerComments = Array.isArray(data) ? data : [];
@@ -310,7 +328,7 @@
     } catch (error) {
       viewerComments = [];
       viewerLoadedPostId = 0;
-      setViewerStatus(readUnknownError(error, "No se pudieron cargar los comentarios."), true);
+      setViewerStatus(readUnknownError(error, tr("No se pudieron cargar los comentarios.", "Could not load comments.", "Impossible de charger les commentaires.")), true);
     } finally {
       viewerCommentsLoading = false;
     }
@@ -321,7 +339,7 @@
     const data = await parseResponseJson(response);
     if (!response.ok) {
       throw new Error(
-        readApiError(data, "No se pudieron cargar las publicaciones de imagen.")
+        readApiError(data, tr("No se pudieron cargar las publicaciones de imagen.", "Could not load image posts.", "Impossible de load image posts."))
       );
     }
 
@@ -393,7 +411,10 @@
 
     if (ignored > 0) {
       setAlbumModalStatus(
-        `${ignored} archivo(s) ignorado(s). Solo se permiten imágenes y videos.`,
+        tr(
+          `${ignored} archivo(s) ignorado(s). Solo se permiten imágenes y videos.`,
+          `${ignored} file(s) ignored. Only images and videos are allowed.`
+        ),
         true
       );
       return;
@@ -414,14 +435,14 @@
       const response = await apiFetch(`/gallery/mine/folders/${normalizedFolderId}`);
       const data = await parseResponseJson(response);
       if (!response.ok) {
-        throw new Error(readApiError(data, "No se pudo cargar el álbum."));
+        throw new Error(readApiError(data, tr("No se pudo cargar el álbum.", "Could not load album.", "Impossible de charger l'album.")));
       }
 
       activeFolderDetail = data;
       renameFolderName = String(data?.name || "");
     } catch (error) {
       activeFolderDetail = null;
-      setStatus(readUnknownError(error, "No se pudo cargar el álbum."), true);
+      setStatus(readUnknownError(error, tr("No se pudo cargar el álbum.", "Could not load album.", "Impossible de charger l'album.")), true);
     } finally {
       folderDetailLoading = false;
     }
@@ -440,7 +461,7 @@
       const postsData = await parseResponseJson(postsResponse);
       if (!postsResponse.ok) {
         throw new Error(
-          readApiError(postsData, "No se pudieron cargar tus publicaciones.")
+          readApiError(postsData, tr("No se pudieron cargar tus publicaciones.", "Could not load your posts.", "Impossible de load your posts."))
         );
       }
       applyRecentPosts({ items: postsData, preferredViewerPostId });
@@ -455,7 +476,10 @@
         setStatus(
           readApiError(
             galleryData,
-            "No se pudieron cargar los álbumes. Tus publicaciones siguen disponibles."
+            tr(
+              "No se pudieron cargar los álbumes. Tus publicaciones siguen disponibles.",
+              "Could not load albums. Your posts are still available."
+            )
           ),
           true
         );
@@ -486,7 +510,7 @@
       }
       await loadFolderDetail(activeFolderId);
     } catch (error) {
-      loadError = readUnknownError(error, "No se pudo cargar la galería.");
+      loadError = readUnknownError(error, tr("No se pudo cargar la galería.", "Could not load gallery.", "Impossible de load gallery."));
       activeFolderId = "";
       activeFolderDetail = null;
     } finally {
@@ -502,7 +526,7 @@
   const uploadAlbumMediaFile = async (file, visibilityValue) => {
     const mediaKind = normalizeAlbumFileKind(file);
     if (!mediaKind) {
-      throw new Error("Solo se permiten imágenes y videos.");
+      throw new Error(tr("Solo se permiten imágenes y videos.", "Only images and videos are allowed.", "Seules les images et vidéos sont autorisées."));
     }
 
     if (mediaKind === "image") {
@@ -516,12 +540,12 @@
       });
       const uploadData = await parseResponseJson(uploadRes);
       if (!uploadRes.ok) {
-        throw new Error(readApiError(uploadData, "No se pudo subir una imagen."));
+        throw new Error(readApiError(uploadData, tr("No se pudo subir una imagen.", "Could not upload an image.", "Impossible de upload an image.")));
       }
 
       const mediaId = Number(uploadData?.media_id || 0);
       if (!mediaId) {
-        throw new Error("No se recibió el identificador de la media subida.");
+        throw new Error(tr("No se recibió el identificador de la media subida.", "No uploaded media identifier was received.", "Aucun identifiant de média téléversé n'a été reçu."));
       }
       return mediaId;
     }
@@ -540,12 +564,12 @@
     });
     const presignData = await parseResponseJson(presignRes);
     if (!presignRes.ok) {
-      throw new Error(readApiError(presignData, "No se pudo preparar la carga del video."));
+      throw new Error(readApiError(presignData, tr("No se pudo preparar la carga del video.", "Could not prepare video upload.", "Impossible de préparer l'envoi vidéo.")));
     }
 
     const mediaId = Number(presignData?.media_id || 0);
     if (!mediaId) {
-      throw new Error("No se recibió un media_id válido para el video.");
+      throw new Error(tr("No se recibió un media_id válido para el video.", "No valid media_id was received for the video.", "Aucun media_id valide n'a été reçu pour la vidéo."));
     }
 
     const proxyForm = new FormData();
@@ -557,7 +581,7 @@
     });
     const proxyData = await parseResponseJson(proxyRes);
     if (!proxyRes.ok) {
-      throw new Error(readApiError(proxyData, "No se pudo subir el video."));
+      throw new Error(readApiError(proxyData, tr("No se pudo subir el video.", "Could not upload video.", "Impossible de upload video.")));
     }
 
     return mediaId;
@@ -568,16 +592,16 @@
 
     const normalizedName = String(albumName || "").trim();
     if (!normalizedName) {
-      setAlbumModalStatus("Debes escribir el nombre del álbum.", true);
+      setAlbumModalStatus(tr("Debes escribir el nombre del álbum.", "You must enter the album name.", "Tu dois enter the album name."), true);
       return;
     }
     if (!albumFiles.length) {
-      setAlbumModalStatus("Adjunta al menos una imagen o video.", true);
+      setAlbumModalStatus(tr("Adjunta al menos una imagen o video.", "Attach at least one image or video.", "Joins au moins une image ou une vidéo."), true);
       return;
     }
 
     albumPublishing = true;
-    setAlbumModalStatus("Subiendo contenido del álbum...");
+    setAlbumModalStatus(tr("Subiendo contenido del álbum...", "Uploading album content...", "Téléversement du contenu de l'album..."));
 
     try {
       const uploadedMediaIds = [];
@@ -586,7 +610,7 @@
         uploadedMediaIds.push(mediaId);
       }
 
-      setAlbumModalStatus("Publicando álbum...");
+      setAlbumModalStatus(tr("Publicando álbum...", "Publishing album...", "Publication de l'album..."));
       const response = await apiFetch("/gallery/mine/albums/publish", {
         method: "POST",
         headers: {
@@ -600,12 +624,12 @@
       });
       const data = await parseResponseJson(response);
       if (!response.ok) {
-        throw new Error(readApiError(data, "No se pudo publicar el álbum."));
+        throw new Error(readApiError(data, tr("No se pudo publicar el álbum.", "Could not publish album.", "Impossible de publier l'album.")));
       }
 
       const albumId = Number(data?.album?.id || 0);
       closeCreateAlbumModal();
-      setStatus("Álbum publicado correctamente.");
+      setStatus(tr("Álbum publicado correctamente.", "Album published successfully.", "Album publié avec succès."));
       await loadGallery({
         preserveFolder: true,
         preferredViewerPostId: 0,
@@ -615,7 +639,7 @@
         await loadFolderDetail(activeFolderId);
       }
     } catch (error) {
-      setAlbumModalStatus(readUnknownError(error, "No se pudo publicar el álbum."), true);
+      setAlbumModalStatus(readUnknownError(error, tr("No se pudo publicar el álbum.", "Could not publish album.", "Impossible de publier l'album.")), true);
     } finally {
       albumPublishing = false;
     }
@@ -626,13 +650,13 @@
 
     const normalizedFolderId = Number(activeFolderId || 0);
     if (!normalizedFolderId) {
-      setStatus("Selecciona un álbum para renombrar.", true);
+      setStatus(tr("Selecciona un álbum para renombrar.", "Select an album to rename.", "Sélectionne un album à renommer."), true);
       return;
     }
 
     const nextName = String(renameFolderName || "").trim();
     if (!nextName) {
-      setStatus("Debes escribir un nuevo nombre.", true);
+      setStatus(tr("Debes escribir un nuevo nombre.", "You must enter a new name.", "Tu dois enter a new name."), true);
       return;
     }
 
@@ -647,13 +671,13 @@
       });
       const data = await parseResponseJson(response);
       if (!response.ok) {
-        throw new Error(readApiError(data, "No se pudo renombrar el álbum."));
+        throw new Error(readApiError(data, tr("No se pudo renombrar el álbum.", "Could not rename album.", "Impossible de renommer l'album.")));
       }
 
-      setStatus("Álbum renombrado correctamente.");
+      setStatus(tr("Álbum renombrado correctamente.", "Album renamed successfully.", "Album renommé avec succès."));
       await loadGallery({ preserveFolder: true });
     } catch (error) {
-      setStatus(readUnknownError(error, "No se pudo renombrar el álbum."), true);
+      setStatus(readUnknownError(error, tr("No se pudo renombrar el álbum.", "Could not rename album.", "Impossible de renommer l'album.")), true);
     } finally {
       renameLoading = false;
     }
@@ -664,12 +688,15 @@
 
     const normalizedFolderId = Number(activeFolderId || 0);
     if (!normalizedFolderId) {
-      setStatus("Selecciona un álbum para eliminar.", true);
+      setStatus(tr("Selecciona un álbum para eliminar.", "Select an album to delete.", "Sélectionne un album à supprimer."), true);
       return;
     }
 
     const confirmed = window.confirm(
-      "¿Deseas eliminar este álbum? Sus asociaciones de media se perderán."
+      tr(
+        "¿Deseas eliminar este álbum? Sus asociaciones de media se perderán.",
+        "Do you want to delete this album? Its media associations will be lost."
+      )
     );
     if (!confirmed) return;
 
@@ -680,16 +707,16 @@
       });
       const data = await parseResponseJson(response);
       if (!response.ok) {
-        throw new Error(readApiError(data, "No se pudo eliminar el álbum."));
+        throw new Error(readApiError(data, tr("No se pudo eliminar el álbum.", "Could not delete album.", "Impossible de supprimer l'album.")));
       }
 
       activeFolderId = "";
       activeFolderDetail = null;
       renameFolderName = "";
-      setStatus("Álbum eliminado.");
+      setStatus(tr("Álbum eliminado.", "Album deleted.", "Album supprimé."));
       await loadGallery({ preserveFolder: false });
     } catch (error) {
-      setStatus(readUnknownError(error, "No se pudo eliminar el álbum."), true);
+      setStatus(readUnknownError(error, tr("No se pudo eliminar el álbum.", "Could not delete album.", "Impossible de supprimer l'album.")), true);
     } finally {
       deletingFolder = false;
     }
@@ -710,15 +737,15 @@
       const data = await parseResponseJson(response);
       if (!response.ok) {
         throw new Error(
-          readApiError(data, "No se pudo quitar la media del álbum.")
+          readApiError(data, tr("No se pudo quitar la media del álbum.", "Could not remove media from album.", "Impossible de supprimer le média de l'album."))
         );
       }
 
-      setStatus("Media retirada del álbum.");
+      setStatus(tr("Media retirada del álbum.", "Media removed from album.", "Média retiré de l'album."));
       await loadGallery({ preserveFolder: true });
     } catch (error) {
       setStatus(
-        readUnknownError(error, "No se pudo quitar la media del álbum."),
+        readUnknownError(error, tr("No se pudo quitar la media del álbum.", "Could not remove media from album.", "Impossible de supprimer le média de l'album.")),
         true
       );
     }
@@ -781,12 +808,12 @@
     if (!postId || viewerActionLoading) return;
 
     if (currentViewerPost?.is_mine) {
-      setViewerStatus("No puedes donarte estrellas a ti mismo.", true);
+      setViewerStatus(tr("No puedes donarte estrellas a ti mismo.", "You cannot donate stars to yourself.", "Tu ne peux pas donner d'étoiles à toi-même."), true);
       return;
     }
 
     if (currentViewerPost?.starred_by_me) {
-      setViewerStatus("Ya donaste una estrella a esta publicación.", true);
+      setViewerStatus(tr("Ya donaste una estrella a esta publicación.", "You already donated a star to this post.", "Tu as déjà donné une étoile à cette publication."), true);
       return;
     }
 
@@ -798,13 +825,13 @@
       });
       const data = await parseResponseJson(response);
       if (!response.ok) {
-        throw new Error(readApiError(data, "No se pudo donar la estrella."));
+        throw new Error(readApiError(data, tr("No se pudo donar la estrella.", "Could not donate star.", "Impossible de donner une étoile.")));
       }
 
       await loadRecentPostsOnly({ preferredViewerPostId: postId });
-      setViewerStatus("Estrella donada.");
+      setViewerStatus(tr("Estrella donada.", "Star donated.", "Étoile donnée."));
     } catch (error) {
-      setViewerStatus(readUnknownError(error, "No se pudo donar la estrella."), true);
+      setViewerStatus(readUnknownError(error, tr("No se pudo donar la estrella.", "Could not donate star.", "Impossible de donner une étoile.")), true);
     } finally {
       viewerActionLoading = false;
     }
@@ -823,7 +850,7 @@
       });
       const data = await parseResponseJson(response);
       if (!response.ok) {
-        throw new Error(readApiError(data, "No se pudo compartir la publicación."));
+        throw new Error(readApiError(data, tr("No se pudo compartir la publicación.", "Could not share post.", "Impossible de partager la publication.")));
       }
 
       const shareUrlObject = new URL("/home_user.html", window.location.origin);
@@ -834,7 +861,7 @@
         if (navigator.share) {
           await navigator.share({
             title: "Kiadez",
-            text: "Mira esta publicación",
+            text: tr("Mira esta publicación", "See this post", "Voir cette publication"),
             url: shareUrl,
           });
         } else if (navigator.clipboard?.writeText) {
@@ -847,10 +874,10 @@
       }
 
       await loadRecentPostsOnly({ preferredViewerPostId: postId });
-      setViewerStatus("Publicación compartida.");
+      setViewerStatus(tr("Publicación compartida.", "Post shared.", "Publication partagée."));
     } catch (error) {
       setViewerStatus(
-        readUnknownError(error, "No se pudo compartir la publicación."),
+        readUnknownError(error, tr("No se pudo compartir la publicación.", "Could not share post.", "Impossible de partager la publication.")),
         true
       );
     } finally {
@@ -864,7 +891,7 @@
 
     const text = String(viewerCommentText || "").trim();
     if (!text) {
-      setViewerStatus("Escribe un comentario antes de enviar.", true);
+      setViewerStatus(tr("Escribe un comentario antes de enviar.", "Write a comment before sending.", "Écris un commentaire avant d'envoyer."), true);
       return;
     }
 
@@ -881,7 +908,7 @@
       });
       const data = await parseResponseJson(response);
       if (!response.ok) {
-        throw new Error(readApiError(data, "No se pudo guardar el comentario."));
+        throw new Error(readApiError(data, tr("No se pudo guardar el comentario.", "Could not save comment.", "Impossible d'enregistrer le commentaire.")));
       }
 
       viewerCommentText = "";
@@ -889,10 +916,10 @@
         loadViewerCommentsForPost(postId),
         loadRecentPostsOnly({ preferredViewerPostId: postId }),
       ]);
-      setViewerStatus("Comentario publicado.");
+      setViewerStatus(tr("Comentario publicado.", "Comment posted.", "Commentaire publié."));
     } catch (error) {
       setViewerStatus(
-        readUnknownError(error, "No se pudo guardar el comentario."),
+        readUnknownError(error, tr("No se pudo guardar el comentario.", "Could not save comment.", "Impossible d'enregistrer le commentaire.")),
         true
       );
     } finally {
@@ -953,7 +980,7 @@
 <svelte:head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kiadez — Galería</title>
+  <title>{tr("Kiadez — Galería", "Kiadez — Gallery", "Kiadez — Galerie")}</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
@@ -964,46 +991,46 @@
         <img src="/css/logo-kiadez.webp" alt="Kiadez" />
       </a>
       <form class="topbar-search" role="search" on:submit|preventDefault>
-        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+        <input type="search" placeholder={tr("Buscar en Kiadez", "Search on Kiadez", "Rechercher sur Kiadez")} aria-label={tr("Buscar", "Search", "Rechercher")} />
       </form>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-center">
       <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
-      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-      <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
-      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+      <a class="topbar-btn" href="/gallery.html">🖼️ {tr("Galería", "Gallery", "Galerie")}</a>
+      <a class="topbar-btn" href="/my-public-whishes.html">🌐 {tr("Deseos públicos", "Public wishes", "Souhaits publics")}</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 {tr("Deseos privados", "Private wishes", "Souhaits privés")}</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ {tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis")}</a>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
       <details class="topbar-dropdown">
-        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-          <img src="/assets/avatar-default.jpg" alt="Perfil de usuario" />
+        <summary class="topbar-avatar-btn" aria-label={tr("Perfil del usuario", "User profile", "Profil utilisateur")}>
+          <img src="/assets/avatar-default.jpg" alt={tr("Foto de perfil del usuario", "User profile photo", "Photo de profil de l'utilisateur")} />
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
-          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+          <a href="/privacy-and-settings.html" role="menuitem">{tr("Configuración y privacidad", "Settings and privacy", "Paramètres et confidentialité")}</a>
+          <button type="button" role="menuitem" on:click={logout}>{tr("Cerrar sesión", "Sign out", "Se déconnecter")}</button>
         </div>
       </details>
 
-      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+      <button class="topbar-icon" type="button" aria-label={tr("Notificaciones", "Notifications", "Alertes")}>
         🔔
         <span class="topbar-badge">3</span>
       </button>
 
       <details class="topbar-dropdown">
-        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+        <summary class="topbar-menu-btn" aria-label={tr("Abrir menú", "Open menu", "Ouvrir le menu")}>
           <span class="topbar-menu-icon" aria-hidden="true">☰</span>
-          <span class="topbar-menu-label">Menú</span>
+          <span class="topbar-menu-label">{tr("Menú", "Menu", "Navigation")}</span>
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/home_user.html" role="menuitem">Mi Home</a>
-          <a href="/achievements.html" role="menuitem">Logros recientes</a>
-          <a href="/gallery.html" role="menuitem">Galería</a>
-          <a href="/calendar.html" role="menuitem">Calendario</a>
-          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
-          <a href="/messages.html" role="menuitem">Mensajes</a>
+          <a href="/home_user.html" role="menuitem">{tr("Mi Home", "My Home", "Mon accueil")}</a>
+          <a href="/achievements.html" role="menuitem">{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+          <a href="/gallery.html" role="menuitem">{tr("Galería", "Gallery", "Galerie")}</a>
+          <a href="/calendar.html" role="menuitem">{tr("Calendario", "Calendar", "Calendrier")}</a>
+          <a href="/my-biography.html" role="menuitem">{tr("Mi Biografía", "My Biography", "Ma biographie")}</a>
+          <a href="/messages.html" role="menuitem">{tr("Mensajes", "Messages", "Messagerie")}</a>
         </div>
       </details>
     </div>
@@ -1012,71 +1039,71 @@
   <main class="user-home">
     <section class="cover" id="cover">
       <div class="cover-media" id="coverMedia">
-        <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt="Portada" />
+        <img id="coverImg" class="cover-img" src="assets/cover-default.jpg" alt={tr("Portada", "Cover", "Couverture")} />
 
         <div class="cover-actions">
-          <button class="icon-btn" id="btnChangeCover" type="button" title="Cambiar portada">
-            Cambiar portada
+          <button class="icon-btn" id="btnChangeCover" type="button" title={tr("Cambiar portada", "Change cover", "Changer la couverture")}>
+            {tr("Cambiar portada", "Change cover", "Changer la couverture")}
           </button>
-          <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title="Editar mi propósito de vida">
-            Editar mi propósito de vida
+          <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button" title={tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier ma mission de vie")}>
+            {tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier ma mission de vie")}
           </button>
 
           <input id="coverFile" type="file" accept="image/*" class="hidden" />
         </div>
 
-        <div class="purpose-triangle" aria-label="Deseos de propósito">
+        <div class="purpose-triangle" aria-label={tr("Deseos de propósito", "Purpose wishes", "Souhaits de mission")}>
           <button class="purpose-pill purpose-top" type="button" id="purpose1">
-            Deseo #1: Secreto
+            {tr("Deseo #1: Secreto", "Wish #1: Secret", "Souhait n°1 : Secret")}
           </button>
 
           <button class="purpose-pill purpose-left" type="button" id="purpose2">
-            Deseo construir el Reino de Combray
+            {tr("Deseo construir el Reino de Combray", "I wish to build the Kingdom of Combray", "Je souhaite construire le Royaume de Combray")}
           </button>
 
           <button class="purpose-pill purpose-right" type="button" id="purpose3">
-            Deseo estar unido a Jesús
+            {tr("Deseo estar unido a Jesús", "I wish to be united with Jesus", "Je souhaite être uni à Jésus")}
           </button>
         </div>
 
         <div class="cover-hint" id="coverHint">
-          Arrastra la portada para encuadrarla
+          {tr("Arrastra la portada para encuadrarla", "Drag the cover to frame it", "Déplace la couverture pour l'ajuster")}
         </div>
       </div>
     </section>
 
     <div class="home-body gallery-body">
-      <nav class="profile-nav" aria-label="Navegación de perfil">
-        <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
-        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+      <nav class="profile-nav" aria-label={tr("Navegación de perfil", "Profile navigation", "Navigation du profil")}>
+        <a class="nav-pill" href="/home_user.html" title={tr("Home", "Home", "Accueil")}>{tr("Home", "Home", "Accueil")}</a>
+        <a class="nav-pill" href="/star-pool-found.html" title={tr("Estrellas", "Stars", "Étoiles")}>
           <span class="nav-icon">⭐</span>
-          <span><strong id="galleryStarsTotal">0</strong> estrellas</span>
+          <span><strong id="galleryStarsTotal">0</strong> {tr("estrellas", "stars", "étoiles")}</span>
         </a>
 
-        <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-        <a class="nav-pill is-active" href="/gallery.html" title="Galería">Galería</a>
-        <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
-        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
-        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
+        <a class="nav-pill" href="/followers.html" title={tr("Seguidores", "Followers", "Abonnés")}>{tr("Seguidores", "Followers", "Abonnés")}</a>
+        <a class="nav-pill" href="/achievements.html" title={tr("Logros recientes", "Recent achievements", "Réalisations récentes")}>{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+        <a class="nav-pill is-active" href="/gallery.html" title={tr("Galería", "Gallery", "Galerie")}>{tr("Galería", "Gallery", "Galerie")}</a>
+        <a class="nav-pill" href="/calendar.html" title={tr("Calendario", "Calendar", "Calendrier")}>{tr("Calendario", "Calendar", "Calendrier")}</a>
+        <a class="nav-pill" href="/my-biography.html" title={tr("Mi biografía", "My biography", "Ma biographie")}>{tr("Mi biografía", "My biography", "Ma biographie")}</a>
+        <a class="nav-pill" href="/messages.html" title={tr("Mensajes", "Messages", "Messagerie")}>{tr("Mensajes", "Messages", "Messagerie")}</a>
       </nav>
 
       {#if isLoading}
         <section class="panel">
-          <p class="panel-muted">Cargando tu galería...</p>
+          <p class="panel-muted">{tr("Cargando tu galería...", "Loading your gallery...", "Chargement de ta galerie...")}</p>
         </section>
       {:else if loadError}
         <section class="panel">
           <p class="posts-status posts-status-error">{loadError}</p>
           <button class="btn btn-outline" type="button" on:click={() => loadGallery({ preserveFolder: true })}>
-            Reintentar
+            {tr("Reintentar", "Retry", "Réessayer")}
           </button>
         </section>
       {:else}
         <section class="panel">
           <div class="panel-head gallery-head">
             <div>
-              <h2 class="panel-title">Últimas imágenes</h2>
+              <h2 class="panel-title">{tr("Últimas imágenes", "Latest images", "Dernières images")}</h2>
             </div>
           </div>
 
@@ -1088,19 +1115,19 @@
 
           {#if recentImagePosts.length === 0}
             <p class="panel-muted">
-              Aún no tienes publicaciones con imagen.
+              {tr("Aún no tienes publicaciones con imagen.", "You do not have image posts yet.", "Tu n'as pas encore de publications avec image.")}
             </p>
           {:else}
-            <div class="gallery-recent-grid" aria-label="Publicaciones con imagen">
+            <div class="gallery-recent-grid" aria-label={tr("Publicaciones con imagen", "Posts with image", "Publications avec image")}>
               {#each recentImagePosts as post, index (post.id)}
                 <article class="gallery-recent-item">
                   <button
                     class="gallery-recent-open"
                     type="button"
-                    title="Abrir publicación"
+                    title={tr("Abrir publicación", "Open post", "Ouvrir la publication")}
                     on:click={() => openPostViewerAt(index)}
                   >
-                    <img src={post.media_url} alt={`Publicación con imagen ${index + 1}`} loading="lazy" />
+                    <img src={post.media_url} alt={`${tr("Publicación con imagen", "Post with image", "Publication avec image")} ${index + 1}`} loading="lazy" />
                   </button>
                 </article>
               {/each}
@@ -1110,21 +1137,21 @@
 
         <section class="panel">
           <div class="panel-head">
-            <h3 class="panel-title">Álbumes</h3>
-            <span class="panel-badge">{folders.length} álbumes</span>
+            <h3 class="panel-title">{tr("Álbumes", "Albums", "Albums")}</h3>
+            <span class="panel-badge">{folders.length} {tr("álbumes", "albums", "albums")}</span>
           </div>
 
           <div class="gallery-folders-layout">
             <aside class="gallery-folders-sidebar">
               <button class="gallery-album-create-card" type="button" on:click={openCreateAlbumModal}>
                 <span class="gallery-album-create-plus">+</span>
-                <span>Crear álbum</span>
+                <span>{tr("Crear álbum", "Create album", "Créer un album")}</span>
               </button>
 
               {#if folders.length === 0}
-                <p class="panel-muted">Aún no tienes álbumes. Crea el primero para publicar contenido agrupado.</p>
+                <p class="panel-muted">{tr("Aún no tienes álbumes. Crea el primero para publicar contenido agrupado.", "You do not have albums yet. Create the first one to publish grouped content.", "Tu n'as pas encore d'albums. Crée le premier pour publier du contenu groupé.")}</p>
               {:else}
-                <div class="gallery-folder-list" aria-label="Lista de álbumes">
+                <div class="gallery-folder-list" aria-label={tr("Lista de álbumes", "Albums list", "Liste des albums")}>
                   {#each folders as folder (folder.id)}
                     <button
                       class={`gallery-folder-item ${String(folder.id) === String(activeFolderId) ? "is-active" : ""}`}
@@ -1133,7 +1160,7 @@
                     >
                       <strong>{folder.name}</strong>
                       <span>
-                        {folder.images_count} archivo(s) · {folder.visibility === "private" ? "Privado" : "Público"}
+                        {folder.images_count} {tr("archivo(s)", "file(s)", "fichier(s)")} · {folder.visibility === "private" ? tr("Privado", "Private", "Privé") : tr("Público", "Public", "Public")}
                       </span>
                     </button>
                   {/each}
@@ -1144,19 +1171,19 @@
             <div class="gallery-folder-detail">
               {#if !activeFolderId}
                 <div class="gallery-folder-placeholder">
-                  <p class="panel-muted">Selecciona o crea un álbum para ver su contenido.</p>
+                  <p class="panel-muted">{tr("Selecciona o crea un álbum para ver su contenido.", "Select or create an album to view its content.", "Sélectionne ou crée un album pour voir son contenu.")}</p>
                 </div>
               {:else if folderDetailLoading}
                 <div class="gallery-folder-placeholder">
-                  <p class="panel-muted">Cargando álbum...</p>
+                  <p class="panel-muted">{tr("Cargando álbum...", "Loading album...", "Chargement de l'album...")}</p>
                 </div>
               {:else if activeFolderDetail}
                 <div class="gallery-folder-head">
                   <div>
                     <h4>{activeFolderDetail.name}</h4>
                     <p>
-                      {activeFolderDetail.images_count} archivo(s) en este álbum ·
-                      {activeFolderDetail.visibility === "private" ? "Privado" : "Público"}
+                      {activeFolderDetail.images_count} {tr("archivo(s) en este álbum", "file(s) in this album", "fichier(s) dans cet album")} ·
+                      {activeFolderDetail.visibility === "private" ? tr("Privado", "Private", "Privé") : tr("Público", "Public", "Public")}
                     </p>
                   </div>
                 </div>
@@ -1166,11 +1193,11 @@
                     class="modal-input"
                     type="text"
                     maxlength="120"
-                    placeholder="Nombre del álbum"
+                    placeholder={tr("Nombre del álbum", "Album name", "Nom de l'album")}
                     bind:value={renameFolderName}
                   />
                   <button class="btn btn-outline" type="submit" disabled={renameLoading}>
-                    {renameLoading ? "Guardando..." : "Renombrar"}
+                    {renameLoading ? tr("Guardando...", "Saving...", "Enregistrement...") : tr("Renombrar", "Rename", "Renommer")}
                   </button>
                   <button
                     class="btn btn-outline gallery-delete-folder-btn"
@@ -1178,16 +1205,16 @@
                     on:click={deleteFolder}
                     disabled={deletingFolder}
                   >
-                    {deletingFolder ? "Eliminando..." : "Eliminar álbum"}
+                    {deletingFolder ? tr("Eliminando...", "Deleting...", "Suppression...") : tr("Eliminar álbum", "Delete album", "Supprimer l'album")}
                   </button>
                 </form>
 
                 {#if !activeFolderDetail.images || activeFolderDetail.images.length === 0}
                   <p class="panel-muted">
-                    Este álbum está vacío.
+                    {tr("Este álbum está vacío.", "This album is empty.", "Cet album est vide.")}
                   </p>
                 {:else}
-                  <div class="gallery-folder-grid" aria-label="Archivos del álbum">
+                  <div class="gallery-folder-grid" aria-label={tr("Archivos del álbum", "Album files", "Fichiers de l'album")}>
                     {#each activeFolderDetail.images as image (image.media_id)}
                       <article class="gallery-folder-card">
                         {#if image.media_kind === "video"}
@@ -1200,7 +1227,7 @@
                         <button
                           class="gallery-folder-remove"
                           type="button"
-                          title="Quitar del álbum"
+                          title={tr("Quitar del álbum", "Remove from album", "Retirer de l'album")}
                           on:click={() => removeImageFromFolder(image.media_id)}
                         >
                           ✕
@@ -1211,7 +1238,7 @@
                 {/if}
               {:else}
                 <div class="gallery-folder-placeholder">
-                  <p class="panel-muted">No se pudo cargar el contenido del álbum seleccionado.</p>
+                  <p class="panel-muted">{tr("No se pudo cargar el contenido del álbum seleccionado.", "Could not load selected album content.", "Impossible de load selected album content.")}</p>
                 </div>
               {/if}
             </div>
@@ -1226,38 +1253,38 @@
       <button
         class="gallery-album-modal-backdrop"
         type="button"
-        aria-label="Cerrar creación de álbum"
+        aria-label={tr("Cerrar creación de álbum", "Close album creation", "Fermer la création d'album")}
         on:click={closeCreateAlbumModal}
       ></button>
-      <div class="modal gallery-album-modal" role="dialog" aria-modal="true" aria-label="Crear álbum">
+      <div class="modal gallery-album-modal" role="dialog" aria-modal="true" aria-label={tr("Crear álbum", "Create album", "Créer un album")}>
         <div class="modal-head">
-          <h3>Crear álbum</h3>
+          <h3>{tr("Crear álbum", "Create album", "Créer un album")}</h3>
           <button class="modal-close" type="button" on:click={closeCreateAlbumModal}>✕</button>
         </div>
 
         <div class="modal-body gallery-album-modal-body">
-          <label class="modal-label" for="galleryAlbumNameInput">Nombre del álbum</label>
+          <label class="modal-label" for="galleryAlbumNameInput">{tr("Nombre del álbum", "Album name", "Nom de l'album")}</label>
           <input
             id="galleryAlbumNameInput"
             class="modal-input"
             type="text"
             maxlength="120"
-            placeholder="Ejemplo: Viaje de verano"
+            placeholder={tr("Ejemplo: Viaje de verano", "Example: Summer trip", "Exemple : Voyage d'été")}
             bind:value={albumName}
           />
 
-          <label class="modal-label" for="galleryAlbumVisibilitySelect">Visibilidad</label>
+          <label class="modal-label" for="galleryAlbumVisibilitySelect">{tr("Visibilidad", "Visibility", "Visibilité")}</label>
           <select
             id="galleryAlbumVisibilitySelect"
             class="modal-select"
             bind:value={albumVisibility}
           >
-            <option value="public">Público</option>
-            <option value="private">Privado</option>
+            <option value="public">{tr("Público", "Public", "Public")}</option>
+            <option value="private">{tr("Privado", "Private", "Privé")}</option>
           </select>
 
           <label class="modal-label" for="galleryAlbumFilesInput">
-            Subir contenido: fotos/videos 🖼️
+            {tr("Subir contenido: fotos/videos 🖼️", "Upload content: photos/videos 🖼️", "Téléverser du contenu : photos/vidéos 🖼️")}
           </label>
           <input
             id="galleryAlbumFilesInput"
@@ -1270,14 +1297,14 @@
           />
 
           <div class="gallery-album-preview-head">
-            <strong>Previsualización</strong>
-            <span>{albumFiles.length} archivo(s)</span>
+            <strong>{tr("Previsualización", "Preview", "Aperçu")}</strong>
+            <span>{albumFiles.length} {tr("archivo(s)", "file(s)", "fichier(s)")}</span>
           </div>
 
           {#if albumFiles.length === 0}
-            <p class="panel-muted">Aún no has seleccionado archivos para este álbum.</p>
+            <p class="panel-muted">{tr("Aún no has seleccionado archivos para este álbum.", "You have not selected files for this album yet.", "Tu n'as pas encore sélectionné de fichiers pour cet album.")}</p>
           {:else}
-            <div class="gallery-album-preview-grid" aria-label="Previsualización del álbum">
+            <div class="gallery-album-preview-grid" aria-label={tr("Previsualización del álbum", "Album preview", "Aperçu de l'album")}>
               {#each albumFiles as item, index (`${item.name}-${index}`)}
                 <article class="gallery-album-preview-card">
                   {#if item.media_kind === "video"}
@@ -1285,7 +1312,7 @@
                       <track kind="captions" />
                     </video>
                   {:else}
-                    <img src={item.preview_url} alt={`Archivo ${index + 1}`} loading="lazy" />
+                    <img src={item.preview_url} alt={`${tr("Archivo", "File", "Fichier")} ${index + 1}`} loading="lazy" />
                   {/if}
                   <p>{item.name}</p>
                 </article>
@@ -1307,7 +1334,7 @@
             on:click={closeCreateAlbumModal}
             disabled={albumPublishing}
           >
-            Cancelar
+            {tr("Cancelar", "Cancel", "Annuler")}
           </button>
           <button
             class="btn btn-primary btn-compact"
@@ -1315,7 +1342,7 @@
             on:click={publishAlbum}
             disabled={albumPublishing}
           >
-            {albumPublishing ? "Publicando..." : "Publicar álbum"}
+            {albumPublishing ? tr("Publicando...", "Publishing...", "Publication...") : tr("Publicar álbum", "Publish album", "Publier l'album")}
           </button>
         </div>
       </div>
@@ -1324,10 +1351,10 @@
 
   {#if showPostViewer && currentViewerPost}
     <div class="modal-overlay gallery-post-viewer-overlay" aria-hidden="false">
-      <button class="gallery-post-viewer-backdrop" type="button" aria-label="Cerrar publicación" on:click={closePostViewer}></button>
-      <div class="modal gallery-post-viewer" role="dialog" aria-modal="true" aria-label="Publicación con imagen">
+      <button class="gallery-post-viewer-backdrop" type="button" aria-label={tr("Cerrar publicación", "Close post", "Fermer la publication")} on:click={closePostViewer}></button>
+      <div class="modal gallery-post-viewer" role="dialog" aria-modal="true" aria-label={tr("Publicación con imagen", "Post with image", "Publication avec image")}>
         <div class="modal-head">
-          <h3>Publicación con imagen</h3>
+          <h3>{tr("Publicación con imagen", "Post with image", "Publication avec image")}</h3>
           <button class="modal-close" type="button" on:click={closePostViewer}>✕</button>
         </div>
 
@@ -1338,29 +1365,29 @@
               type="button"
               on:click={() => void goViewerPrev()}
               disabled={!viewerCanPrev}
-              aria-label="Imagen anterior"
+              aria-label={tr("Imagen anterior", "Previous image", "Image précédente")}
             >
               ‹
             </button>
 
-            <img src={currentViewerPost.media_url} alt="Publicación en vista completa" loading="eager" />
+            <img src={currentViewerPost.media_url} alt={tr("Publicación en vista completa", "Full view post", "Voir la publication en grand")} loading="eager" />
 
             <button
               class="gallery-post-viewer-nav gallery-post-viewer-nav-next"
               type="button"
               on:click={() => void goViewerNext()}
               disabled={!viewerCanNext}
-              aria-label="Siguiente imagen"
+              aria-label={tr("Siguiente imagen", "Next image", "Image suivante")}
             >
               ›
             </button>
 
-            <p class="gallery-post-viewer-counter">{viewerPostIndex + 1} de {recentImagePosts.length}</p>
+            <p class="gallery-post-viewer-counter">{viewerPostIndex + 1} {tr("de", "of", "de")} {recentImagePosts.length}</p>
           </section>
 
           <aside class="gallery-post-viewer-side">
             <header class="gallery-post-viewer-author">
-              <strong>{currentViewerPost.author?.name || "Usuario"}</strong>
+              <strong>{currentViewerPost.author?.name || tr("Usuario", "User", "Utilisateur")}</strong>
               <span>{relativeTime(currentViewerPost.created_at)}</span>
             </header>
 
@@ -1380,14 +1407,14 @@
                 }
               >
                 {#if currentViewerPost?.starred_by_me}
-                  ⭐ Estrella donada ({currentViewerPost.star_count})
+                  ⭐ {tr("Estrella donada", "Star donated", "Étoile donnée")} ({currentViewerPost.star_count})
                 {:else}
-                  ⭐ Donar estrella ({currentViewerPost.star_count})
+                  ⭐ {tr("Donar estrella", "Donate star", "Donner une étoile")} ({currentViewerPost.star_count})
                 {/if}
               </button>
 
               <button class="post-btn" type="button" on:click={focusViewerCommentInput}>
-                💬 Comentar ({currentViewerPost.comment_count})
+                💬 {tr("Comentar", "Comment", "Commenter")} ({currentViewerPost.comment_count})
               </button>
 
               <button
@@ -1396,7 +1423,7 @@
                 on:click={shareViewerPost}
                 disabled={viewerActionLoading}
               >
-                🔁 Compartir ({currentViewerPost.share_count})
+                🔁 {tr("Compartir", "Share", "Partager")} ({currentViewerPost.share_count})
               </button>
             </div>
 
@@ -1407,18 +1434,18 @@
             {/if}
 
             <section class="gallery-post-viewer-comments">
-              <h4>Comentarios</h4>
+              <h4>{tr("Comentarios", "Comments", "Commentaires")}</h4>
 
               {#if viewerCommentsLoading}
-                <p class="panel-muted">Cargando comentarios...</p>
+                <p class="panel-muted">{tr("Cargando comentarios...", "Loading comments...", "Chargement des commentaires...")}</p>
               {:else if viewerComments.length === 0}
-                <p class="post-comments-empty">Aún no hay comentarios.</p>
+                <p class="post-comments-empty">{tr("Aún no hay comentarios.", "There are no comments yet.", "Il n'y a pas encore de commentaires.")}</p>
               {:else}
                 <div class="post-comments-list gallery-viewer-comments-list">
                   {#each viewerComments as comment (comment.id)}
                     <article class="post-comment-item">
                       <div class="post-comment-head">
-                        <strong>{comment.author?.name || "Usuario"}</strong>
+                        <strong>{comment.author?.name || tr("Usuario", "User", "Utilisateur")}</strong>
                         <span>{relativeTime(comment.created_at)}</span>
                       </div>
                       <p>{@html escapeHtml(comment.text)}</p>
@@ -1434,7 +1461,7 @@
                 class="modal-textarea gallery-post-viewer-comment-input"
                 rows="3"
                 maxlength="1200"
-                placeholder="Escribe un comentario..."
+                placeholder={tr("Escribe un comentario...", "Write a comment...", "Écris un commentaire...")}
                 bind:value={viewerCommentText}
               ></textarea>
               <div class="gallery-post-viewer-comment-actions">
@@ -1443,7 +1470,7 @@
                   type="submit"
                   disabled={viewerCommentSubmitting}
                 >
-                  {viewerCommentSubmitting ? "Enviando..." : "Comentar"}
+                  {viewerCommentSubmitting ? tr("Enviando...", "Sending...", "Envoi...") : tr("Comentar", "Comment", "Commenter")}
                 </button>
               </div>
             </form>
@@ -1452,59 +1479,5 @@
       </div>
     </div>
   {/if}
-
-  <footer class="kiadez-footer">
-    <div class="footer-main">
-      <div class="footer-column footer-origin">
-        <p class="footer-poem">
-          Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br />
-          No para dominar, sino para orientar.<br />
-          Su luz no deslumbra: acompaña.
-        </p>
-      </div>
-
-      <div class="footer-columns">
-        <div class="footer-column">
-          <h4>Sobre nuestra red social</h4>
-          <ul>
-            <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
-            <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
-            <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
-            <li><a href="/contact.html">Contacto</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Idiomas</h4>
-          <ul>
-            <li><a href="/?lang=es">Español</a></li>
-            <li><a href="/?lang=en">English</a></li>
-            <li><a href="/?lang=fr">Français</a></li>
-            <li><a href="/?lang=pt">Português</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Contacto</h4>
-          <ul>
-            <li>info@kiadez.com</li>
-            <li>+57 333 225 6078</li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Información legal</h4>
-          <ul>
-            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
-            <li><a href="/terms.html">Términos y condiciones</a></li>
-            <li><a href="/privacy.html">Privacidad</a></li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="footer-bottom">
-      © 2026 Kiadez — Una red social para cumplir deseos.
-    </div>
-  </footer>
+  <AuthFooter />
 </div>

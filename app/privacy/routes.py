@@ -1,18 +1,23 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.minor_accreditation import force_minor_private_profile_flags, is_minor_protected
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.db.database import get_db
 from app.db.models.user import User
 from app.privacy.schemas import PublicProfilePrivacyOut, PublicProfilePrivacyUpdateRequest
 
 
 router = APIRouter(prefix="/privacy", tags=["privacy"])
+
+
+def _msg_user_not_found(locale: str) -> str:
+    return i18n_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable.")
 
 
 def _serialize(user: User) -> PublicProfilePrivacyOut:
@@ -52,24 +57,28 @@ def _serialize(user: User) -> PublicProfilePrivacyOut:
 
 @router.get("/mine", response_model=PublicProfilePrivacyOut)
 def get_my_privacy_settings(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = locale_from_request(request, default="en")
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
     return _serialize(user)
 
 
 @router.put("/mine", response_model=PublicProfilePrivacyOut)
 def update_my_privacy_settings(
+    request: Request,
     payload: PublicProfilePrivacyUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = locale_from_request(request, default="en")
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     updates = payload.model_dump(exclude_unset=True)
     for key, value in updates.items():
@@ -87,11 +96,13 @@ def update_my_privacy_settings(
 
 @router.get("/user/{user_id}", response_model=PublicProfilePrivacyOut)
 def get_user_privacy_settings(
+    request: Request,
     user_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = locale_from_request(request, default="en")
     user = db.execute(select(User).where(User.id == user_id, User.is_active.is_(True))).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
     return _serialize(user)

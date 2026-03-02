@@ -61,7 +61,7 @@ from app.db.database import get_db
 from app.db.repositories.user_repository import UserRepository
 
 # FastAPI
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends, Header, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import Body
@@ -78,6 +78,7 @@ from app.core.mailer import (
     send_minor_account_accreditation_email,
 )
 from app.core.password_reset import generate_password_reset_token, get_password_reset_expiry
+from app.core.i18n import locale_from_request, tr as i18n_tr
 
 
 
@@ -92,6 +93,8 @@ from .models import (
     PasswordResetConfirm,
     PasswordChangeRequest,
     EmailChangeRequest,
+    ProfileNameOut,
+    ProfileNameUpdateRequest,
     AccountClosureRequest,
     AccountClosureResponse,
     UsernameState,
@@ -159,6 +162,155 @@ USERNAME_RESERVED = {
 }
 
 
+def _locale(request: Request | None) -> str:
+    return locale_from_request(request, default="en")
+
+
+def _td(locale: str, en: str, **fmt: object) -> str:
+    translations: dict[str, tuple[str, str]] = {
+        "Unauthorized": ("No autorizado.", "Non autorisé."),
+        "Unauthorized.": ("No autorizado.", "Non autorisé."),
+        "Your account is suspended by a Guardian decision.": (
+            "Tu cuenta está suspendida por decisión de un Guardián.",
+            "Votre compte est suspendu par décision d'un Gardien.",
+        ),
+        "Your account was permanently closed by a Guardian decision.": (
+            "Tu cuenta fue cerrada permanentemente por decisión de un Guardián.",
+            "Votre compte a été fermé définitivement par décision d'un Gardien.",
+        ),
+        "Invalid username. Use 4-30 characters (a-z, 0-9, dot or underscore).": (
+            "Nombre de usuario inválido. Usa 4-30 caracteres (a-z, 0-9, punto o guion bajo).",
+            "Nom d'utilisateur invalide. Utilisez 4 à 30 caractères (a-z, 0-9, point ou souligné).",
+        ),
+        "That username is reserved.": ("Ese nombre de usuario está reservado.", "Ce nom d'utilisateur est réservé."),
+        "Birth date is not valid.": ("La fecha de nacimiento no es válida.", "La date de naissance n'est pas valide."),
+        "Email is already registered.": ("El correo ya está registrado.", "L'e-mail est déjà enregistré."),
+        "Invalid credentials": ("Credenciales inválidas.", "Identifiants invalides."),
+        "Invalid refresh.": ("Refresh inválido.", "Refresh invalide."),
+        "You must register the responsible adult phone number.": (
+            "Debes registrar el teléfono del adulto responsable.",
+            "Vous devez enregistrer le téléphone de l'adulte responsable.",
+        ),
+        "You must register the responsible adult email.": (
+            "Debes registrar el correo del adulto responsable.",
+            "Vous devez enregistrer l'e-mail de l'adulte responsable.",
+        ),
+        "Could not send accreditation email to the responsible adult.": (
+            "No se pudo enviar el correo de acreditación al adulto responsable.",
+            "Impossible d'envoyer l'e-mail d'accréditation à l'adulte responsable.",
+        ),
+        "Your account does not require age accreditation.": (
+            "Tu cuenta no requiere acreditación de edad.",
+            "Votre compte ne nécessite pas d'accréditation d'âge.",
+        ),
+        "Your account has already been accredited by a responsible adult.": (
+            "Tu cuenta ya fue acreditada por un adulto responsable.",
+            "Votre compte a déjà été accrédité par un adulte responsable.",
+        ),
+        "Request sent. The responsible adult must approve it from the secure link.": (
+            "Solicitud enviada. El adulto responsable debe aprobarla desde el enlace seguro.",
+            "Demande envoyée. L'adulte responsable doit l'approuver depuis le lien sécurisé.",
+        ),
+        "Invalid link": ("Enlace inválido", "Lien invalide"),
+        "No valid approval token was found.": (
+            "No se encontró un token de aprobación válido.",
+            "Aucun jeton d'approbation valide n'a été trouvé.",
+        ),
+        "Expired or invalid link": ("Enlace expirado o inválido", "Lien expiré ou invalide"),
+        "The approval link is no longer available. Request a new one from the minor account.": (
+            "El enlace de aprobación ya no está disponible. Solicita uno nuevo desde la cuenta del menor.",
+            "Le lien d'approbation n'est plus disponible. Demandez-en un nouveau depuis le compte du mineur.",
+        ),
+        "Account unavailable": ("Cuenta no disponible", "Compte indisponible"),
+        "The minor account is not active at this moment.": (
+            "La cuenta del menor no está activa en este momento.",
+            "Le compte du mineur n'est pas actif pour le moment.",
+        ),
+        "Validation was approved successfully. The account can now enable public features.": (
+            "La validación fue aprobada correctamente. La cuenta ahora puede habilitar funciones públicas.",
+            "La validation a été approuvée avec succès. Le compte peut maintenant activer les fonctionnalités publiques.",
+        ),
+        "The account no longer requires age validation.": (
+            "La cuenta ya no requiere validación de edad.",
+            "Le compte ne nécessite plus de validation d'âge.",
+        ),
+        "Validation completed": ("Validación completada", "Validation terminée"),
+        "This is already your current username.": (
+            "Este ya es tu nombre de usuario actual.",
+            "Ceci est déjà votre nom d'utilisateur actuel.",
+        ),
+        "That username is already in use.": (
+            "Ese nombre de usuario ya está en uso.",
+            "Ce nom d'utilisateur est déjà utilisé.",
+        ),
+        "Username available.": ("Nombre de usuario disponible.", "Nom d'utilisateur disponible."),
+        "You will be able to change your username again on {date}.": (
+            "Podrás cambiar tu nombre de usuario nuevamente el {date}.",
+            "Vous pourrez changer de nom d'utilisateur à nouveau le {date}.",
+        ),
+        "Current password is incorrect.": (
+            "La contraseña actual es incorrecta.",
+            "Le mot de passe actuel est incorrect.",
+        ),
+        "Passwords do not match.": ("Las contraseñas no coinciden.", "Les mots de passe ne correspondent pas."),
+        "New email must be different from the current one.": (
+            "El nuevo correo debe ser distinto al actual.",
+            "Le nouvel e-mail doit être différent de l'actuel.",
+        ),
+        "Email updated, but not all security notifications could be sent.": (
+            "Correo actualizado, pero no se pudieron enviar todas las notificaciones de seguridad.",
+            "E-mail mis à jour, mais toutes les notifications de sécurité n'ont pas pu être envoyées.",
+        ),
+        "Email updated successfully. We sent confirmation to the new email and an alert to the previous email.": (
+            "Correo actualizado correctamente. Enviamos confirmación al nuevo correo y una alerta al correo anterior.",
+            "E-mail mis à jour avec succès. Nous avons envoyé une confirmation au nouvel e-mail et une alerte à l'ancien.",
+        ),
+        "First name and last name are required.": (
+            "El nombre y el apellido son obligatorios.",
+            "Le prénom et le nom sont obligatoires.",
+        ),
+        "You must specify the reason in Other.": (
+            "Debes especificar el motivo en Otro.",
+            "Vous devez préciser la raison dans Autre.",
+        ),
+        "Invalid closure reason.": ("Motivo de cierre inválido.", "Motif de fermeture invalide."),
+        "Your account was closed and your public information was disabled. You have 30 days to sign in again with your password or restore it. After that period, the account will be permanently deleted.": (
+            "Tu cuenta fue cerrada y tu información pública fue deshabilitada. Tienes 30 días para iniciar sesión nuevamente con tu contraseña o restaurarla. Después de ese período, la cuenta será eliminada permanentemente.",
+            "Votre compte a été fermé et vos informations publiques ont été désactivées. Vous avez 30 jours pour vous reconnecter avec votre mot de passe ou le restaurer. Après cette période, le compte sera supprimé définitivement.",
+        ),
+        "2FA is already enabled for this user.": (
+            "La autenticación 2FA ya está habilitada para este usuario.",
+            "L'authentification 2FA est déjà activée pour cet utilisateur.",
+        ),
+        "2FA is not configured for this user.": (
+            "La autenticación 2FA no está configurada para este usuario.",
+            "L'authentification 2FA n'est pas configurée pour cet utilisateur.",
+        ),
+        "2FA is already enabled.": ("La autenticación 2FA ya está habilitada.", "L'authentification 2FA est déjà activée."),
+        "Invalid 2FA code.": ("Código 2FA inválido.", "Code 2FA invalide."),
+        "Invalid token": ("Token inválido.", "Jeton invalide."),
+        "Invalid token.": ("Token inválido.", "Jeton invalide."),
+        "Invalid 2FA token": ("Token 2FA inválido.", "Jeton 2FA invalide."),
+        "Invalid user": ("Usuario inválido.", "Utilisateur invalide."),
+        "Invalid user.": ("Usuario inválido.", "Utilisateur invalide."),
+        "2FA not configured": ("2FA no configurado.", "2FA non configuré."),
+        "Incorrect code": ("Código incorrecto.", "Code incorrect."),
+        "Invalid or used token.": ("Token inválido o ya utilizado.", "Jeton invalide ou déjà utilisé."),
+        "Expired token.": ("Token expirado.", "Jeton expiré."),
+    }
+    english = en.format(**fmt) if fmt else en
+    pair = translations.get(en)
+    if not pair:
+        return english
+    es, fr = pair
+    return i18n_tr(
+        locale,
+        es=(es.format(**fmt) if fmt else es),
+        en=english,
+        fr=(fr.format(**fmt) if fmt else fr),
+    )
+
+
 def _normalize_guardian_moderation_status(raw: str | None) -> str:
     value = str(raw or "").strip().lower()
     if value in {
@@ -169,13 +321,13 @@ def _normalize_guardian_moderation_status(raw: str | None) -> str:
     return GUARDIAN_MODERATION_STATUS_ACTIVE
 
 
-def _guardian_moderation_block_detail(status: str) -> str:
+def _guardian_moderation_block_detail(locale: str, status: str) -> str:
     normalized = _normalize_guardian_moderation_status(status)
     if normalized == GUARDIAN_MODERATION_STATUS_SUSPENDED:
-        return "Tu cuenta está suspendida por decisión de un Guardián."
+        return _td(locale, "Your account is suspended by a Guardian decision.")
     if normalized == GUARDIAN_MODERATION_STATUS_CLOSED:
-        return "Tu cuenta fue cerrada de forma definitiva por decisión de un Guardián."
-    return "No autorizado."
+        return _td(locale, "Your account was permanently closed by a Guardian decision.")
+    return _td(locale, "Unauthorized.")
 
 
 def _normalize_username(raw: str) -> str:
@@ -183,6 +335,10 @@ def _normalize_username(raw: str) -> str:
     while username.startswith("@"):
         username = username[1:]
     return username
+
+
+def _normalize_human_name(value: str) -> str:
+    return " ".join((value or "").strip().split())
 
 
 def _to_utc(dt: datetime) -> datetime:
@@ -197,14 +353,14 @@ def _next_username_change_at(user: User) -> datetime | None:
     return _to_utc(user.username_updated_at) + timedelta(days=USERNAME_COOLDOWN_DAYS)
 
 
-def _validate_username_or_raise(username: str) -> None:
+def _validate_username_or_raise(username: str, *, locale: str) -> None:
     if not USERNAME_PATTERN.match(username):
         raise HTTPException(
             status_code=400,
-            detail="Nombre de usuario inválido. Usa 4-30 caracteres (a-z, 0-9, punto o guión bajo).",
+            detail=_td(locale, "Invalid username. Use 4-30 characters (a-z, 0-9, dot or underscore)."),
         )
     if username in USERNAME_RESERVED:
-        raise HTTPException(status_code=400, detail="Ese nombre de usuario está reservado.")
+        raise HTTPException(status_code=400, detail=_td(locale, "That username is reserved."))
 
 
 def _build_profile_url(username: str | None) -> str:
@@ -557,13 +713,15 @@ def _purge_expired_closed_accounts(*, db: Session, now: datetime) -> None:
     db.commit()
 
 def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> UserPublic:
+    locale = _locale(request)
     try:
         payload = decode_token(token)
         if payload.get("typ") != "access":
-            raise ValueError("Tipo de token incorrecto.")
+            raise ValueError("Incorrect token type.")
 
         user_id = int(payload["sub"])
 
@@ -571,28 +729,30 @@ def get_current_user(
         user = repo.get_user_by_id(user_id)
 
         if not user:
-            raise ValueError("Usuario no encontrado o inactivo.")
+            raise ValueError("User not found or inactive.")
 
         moderation_status = _normalize_guardian_moderation_status(user.guardian_moderation_status)
         if moderation_status != GUARDIAN_MODERATION_STATUS_ACTIVE:
-            raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(moderation_status))
+            raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(locale, moderation_status))
 
         if not user.is_active:
-            raise ValueError("Usuario no encontrado o inactivo.")
+            raise ValueError("User not found or inactive.")
 
         user = _sync_minor_protected_state(db=db, user=user)
         return _to_user_public(user)
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=401, detail="No autorizado")
+        raise HTTPException(status_code=401, detail=_td(locale, "Unauthorized"))
 
 
 @router.post("/register", response_model=UserPublic)
 def register(
+    request: Request,
     data: RegisterRequest,
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     # 1. Validar política de contraseña
     validate_password_policy(data.password)
     pw_hash = hash_password(data.password)
@@ -603,7 +763,7 @@ def register(
     if birth_date > date.today():
         raise HTTPException(
             status_code=400,
-            detail="La fecha de nacimiento no es válida.",
+            detail=_td(locale, "Birth date is not valid."),
         )
 
     # 3. Calcular edad
@@ -648,7 +808,7 @@ def register(
         db.rollback()
         raise HTTPException(
             status_code=400,
-            detail="El correo electrónico ya está registrado.",
+            detail=_td(locale, "Email is already registered."),
         )
 
     return _to_user_public(user)
@@ -669,7 +829,12 @@ def verification_status(
 
 
 @router.post("/login")
-def login(data: LoginRequest, db: Session = Depends(get_db)):
+def login(
+    request: Request,
+    data: LoginRequest,
+    db: Session = Depends(get_db),
+):
+    locale = _locale(request)
     now_utc = datetime.now(timezone.utc)
     _purge_expired_closed_accounts(db=db, now=now_utc)
 
@@ -677,18 +842,18 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     user = repo.get_user_by_email(data.email)
 
     if not user:
-        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+        raise HTTPException(status_code=401, detail=_td(locale, "Invalid credentials"))
 
     if not verify_password(data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+        raise HTTPException(status_code=401, detail=_td(locale, "Invalid credentials"))
 
     moderation_status = _normalize_guardian_moderation_status(user.guardian_moderation_status)
 
     if not user.is_active:
         if moderation_status != GUARDIAN_MODERATION_STATUS_ACTIVE:
-            raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(moderation_status))
+            raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(locale, moderation_status))
         if not _is_account_closure_pending(user, now=now_utc):
-            raise HTTPException(status_code=401, detail="Credenciales inválidas")
+            raise HTTPException(status_code=401, detail=_td(locale, "Invalid credentials"))
 
         _mark_account_closure_restored(
             db=db,
@@ -699,7 +864,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(user)
     elif moderation_status != GUARDIAN_MODERATION_STATUS_ACTIVE:
-        raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(moderation_status))
+        raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(locale, moderation_status))
 
     # 🔐 Revisar si tiene 2FA activo
     two_fa_repo = User2FARepository(db)
@@ -730,22 +895,24 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
  
 @router.post("/refresh", response_model=TokenPair)
 def refresh(
+    request: Request,
     refresh_token: str = Body(..., embed=True),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     try:
         payload = decode_token(refresh_token)
         if payload.get("typ") != "refresh":
-            raise ValueError("Tipo de token incorrecto.")
+            raise ValueError("Incorrect token type.")
 
         jti = payload.get("jti")
         if not jti:
-            raise ValueError("Refresh token inválido.")
+            raise ValueError("Invalid refresh token.")
 
         refresh_repo = RefreshTokenRepository(db)
         token_row = refresh_repo.get_valid(jti)
         if not token_row:
-            raise ValueError("Refresh token revocado o expirado.")
+            raise ValueError("Revoked or expired refresh token.")
 
         user_id = int(payload["sub"])
 
@@ -753,14 +920,14 @@ def refresh(
         user = repo.get_user_by_id(user_id)
 
         if not user:
-            raise ValueError("Usuario no encontrado o inactivo.")
+            raise ValueError("User not found or inactive.")
 
         moderation_status = _normalize_guardian_moderation_status(user.guardian_moderation_status)
         if moderation_status != GUARDIAN_MODERATION_STATUS_ACTIVE:
-            raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(moderation_status))
+            raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(locale, moderation_status))
 
         if not user.is_active:
-            raise ValueError("Usuario no encontrado o inactivo.")
+            raise ValueError("User not found or inactive.")
 
         access = create_access_token(
             sub=user.id,
@@ -786,7 +953,7 @@ def refresh(
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=401, detail="Refresh inválido.")
+        raise HTTPException(status_code=401, detail=_td(locale, "Invalid refresh."))
 
 
 
@@ -795,14 +962,62 @@ def me(current: UserPublic = Depends(get_current_user)):
     return current
 
 
-@router.get("/minor-accreditation/status", response_model=MinorAccreditationStatusOut)
-def get_minor_accreditation_status(
+@router.get("/profile/name", response_model=ProfileNameOut)
+def get_profile_name(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
+    user = db.query(User).filter(User.id == current.user_number).one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail=_td(locale, "Unauthorized"))
+
+    return ProfileNameOut(
+        first_name=_normalize_human_name(user.first_name),
+        last_name=_normalize_human_name(user.last_name),
+    )
+
+
+@router.put("/profile/name", response_model=ProfileNameOut)
+def update_profile_name(
+    request: Request,
+    payload: ProfileNameUpdateRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    locale = _locale(request)
+    user = db.query(User).filter(User.id == current.user_number).one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail=_td(locale, "Unauthorized"))
+
+    first_name = _normalize_human_name(payload.first_name)
+    last_name = _normalize_human_name(payload.last_name)
+    if not first_name or not last_name:
+        raise HTTPException(status_code=400, detail=_td(locale, "First name and last name are required."))
+
+    if first_name != user.first_name or last_name != user.last_name:
+        user.first_name = first_name
+        user.last_name = last_name
+        db.commit()
+        db.refresh(user)
+
+    return ProfileNameOut(
+        first_name=_normalize_human_name(user.first_name),
+        last_name=_normalize_human_name(user.last_name),
+    )
+
+
+@router.get("/minor-accreditation/status", response_model=MinorAccreditationStatusOut)
+def get_minor_accreditation_status(
+    request: Request,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="No autorizado")
+        raise HTTPException(status_code=401, detail=_td(locale, "Unauthorized"))
 
     user = _sync_minor_protected_state(db=db, user=user)
     return _minor_status_out(user)
@@ -810,13 +1025,15 @@ def get_minor_accreditation_status(
 
 @router.post("/minor-accreditation/request", response_model=MinorAccreditationRequestOut)
 def request_minor_accreditation(
+    request: Request,
     payload: MinorAccreditationRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="No autorizado")
+        raise HTTPException(status_code=401, detail=_td(locale, "Unauthorized"))
 
     user = _sync_minor_protected_state(db=db, user=user)
     current_status = resolve_minor_status(user)
@@ -827,7 +1044,7 @@ def request_minor_accreditation(
             status=MINOR_STATUS_NOT_REQUIRED,
             is_minor_protected=False,
             can_publish_public=True,
-            message="Tu cuenta no requiere acreditación por edad.",
+            message=_td(locale, "Your account does not require age accreditation."),
         )
 
     if current_status == MINOR_STATUS_APPROVED:
@@ -836,7 +1053,7 @@ def request_minor_accreditation(
             status=MINOR_STATUS_APPROVED,
             is_minor_protected=False,
             can_publish_public=True,
-            message="Tu cuenta ya fue acreditada por un adulto responsable.",
+            message=_td(locale, "Your account has already been accredited by a responsible adult."),
         )
 
     guardian_phone = " ".join((payload.guardian_phone or "").strip().split())
@@ -844,9 +1061,9 @@ def request_minor_accreditation(
     relationship = normalize_minor_relationship(payload.relationship)
 
     if not guardian_phone:
-        raise HTTPException(status_code=400, detail="Debes registrar el teléfono del adulto responsable.")
+        raise HTTPException(status_code=400, detail=_td(locale, "You must register the responsible adult phone number."))
     if not guardian_email:
-        raise HTTPException(status_code=400, detail="Debes registrar el correo del adulto responsable.")
+        raise HTTPException(status_code=400, detail=_td(locale, "You must register the responsible adult email."))
 
     token = secrets.token_urlsafe(32)
     token_hash = _hash_minor_approval_token(token)
@@ -870,7 +1087,7 @@ def request_minor_accreditation(
     if profile_username:
         minor_username = f"@{profile_username}"
     else:
-        minor_username = f"{(user.first_name or '').strip()} {(user.last_name or '').strip()}".strip() or f"Usuario {user.id}"
+        minor_username = f"{(user.first_name or '').strip()} {(user.last_name or '').strip()}".strip() or f"User {user.id}"
 
     registration_date_label = (
         user.created_at.astimezone(timezone.utc).strftime("%Y-%m-%d")
@@ -890,7 +1107,7 @@ def request_minor_accreditation(
     except Exception:
         raise HTTPException(
             status_code=500,
-            detail="No se pudo enviar el correo de acreditación al adulto responsable.",
+            detail=_td(locale, "Could not send accreditation email to the responsible adult."),
         )
 
     return MinorAccreditationRequestOut(
@@ -898,18 +1115,18 @@ def request_minor_accreditation(
         status=MINOR_STATUS_REQUESTED,
         is_minor_protected=True,
         can_publish_public=False,
-        message="Solicitud enviada. El adulto responsable debe aprobarla desde el enlace seguro.",
+        message=_td(locale, "Request sent. The responsible adult must approve it from the secure link."),
     )
 
 
 def _minor_approval_html(*, title: str, body: str, success: bool) -> HTMLResponse:
-    safe_title = title.strip() or "Validación de cuenta"
-    safe_body = body.strip() or "No se pudo procesar la solicitud."
+    safe_title = title.strip() or "Account validation"
+    safe_body = body.strip() or "The request could not be processed."
     color = "#0b5f2a" if success else "#8f1e1e"
     status_code = 200 if success else 400
     html = f"""
     <!DOCTYPE html>
-    <html lang="es">
+    <html lang="en">
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -928,14 +1145,16 @@ def _minor_approval_html(*, title: str, body: str, success: bool) -> HTMLRespons
 
 @router.get("/minor-accreditation/approve", response_class=HTMLResponse)
 def approve_minor_accreditation(
+    request: Request,
     token: str = Query(..., min_length=24, max_length=255),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     raw_token = (token or "").strip()
     if not raw_token:
         return _minor_approval_html(
-            title="Enlace inválido",
-            body="No se encontró un token válido de aprobación.",
+            title=_td(locale, "Invalid link"),
+            body=_td(locale, "No valid approval token was found."),
             success=False,
         )
 
@@ -951,26 +1170,26 @@ def approve_minor_accreditation(
     ).scalar_one_or_none()
     if user is None:
         return _minor_approval_html(
-            title="Enlace expirado o inválido",
-            body="El enlace de aprobación ya no está disponible. Solicita uno nuevo desde la cuenta del menor.",
+            title=_td(locale, "Expired or invalid link"),
+            body=_td(locale, "The approval link is no longer available. Request a new one from the minor account."),
             success=False,
         )
 
     if not user.is_active:
         return _minor_approval_html(
-            title="Cuenta no disponible",
-            body="La cuenta del menor no está activa en este momento.",
+            title=_td(locale, "Account unavailable"),
+            body=_td(locale, "The minor account is not active at this moment."),
             success=False,
         )
 
     if is_underage(user.birth_date):
         user.minor_accreditation_status = MINOR_STATUS_APPROVED
         user.minor_accreditation_approved_at = now_utc
-        message = "La validación fue aprobada correctamente. La cuenta ya puede habilitar funciones públicas."
+        message = _td(locale, "Validation was approved successfully. The account can now enable public features.")
     else:
         user.minor_accreditation_status = MINOR_STATUS_NOT_REQUIRED
         user.minor_accreditation_approved_at = None
-        message = "La cuenta ya no requiere validación por edad."
+        message = _td(locale, "The account no longer requires age validation.")
 
     user.minor_accreditation_token_hash = None
     user.minor_accreditation_token_expires_at = None
@@ -978,7 +1197,7 @@ def approve_minor_accreditation(
     db.commit()
 
     return _minor_approval_html(
-        title="Validación completada",
+        title=_td(locale, "Validation completed"),
         body=message,
         success=True,
     )
@@ -986,30 +1205,34 @@ def approve_minor_accreditation(
 
 @router.get("/username", response_model=UsernameState)
 def username_state(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.query(User).filter(User.id == current.user_number).one_or_none()
     if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="No autorizado")
+        raise HTTPException(status_code=401, detail=_td(locale, "Unauthorized"))
     return _build_username_state(user)
 
 
 @router.get("/username/check", response_model=UsernameAvailabilityOut)
 def check_username_availability(
+    request: Request,
     username: str = Query(..., min_length=4, max_length=30),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     normalized = _normalize_username(username)
-    _validate_username_or_raise(normalized)
+    _validate_username_or_raise(normalized, locale=locale)
 
     current_username = (current.username or "").strip().lower()
     if normalized == current_username:
         return UsernameAvailabilityOut(
             username=normalized,
             available=True,
-            detail="Este ya es tu nombre de usuario actual.",
+            detail=_td(locale, "This is already your current username."),
         )
 
     existing = (
@@ -1021,28 +1244,30 @@ def check_username_availability(
         return UsernameAvailabilityOut(
             username=normalized,
             available=False,
-            detail="Ese nombre de usuario ya está en uso.",
+            detail=_td(locale, "That username is already in use."),
         )
 
     return UsernameAvailabilityOut(
         username=normalized,
         available=True,
-        detail="Nombre de usuario disponible.",
+        detail=_td(locale, "Username available."),
     )
 
 
 @router.put("/username", response_model=UsernameUpdateResponse)
 def update_username(
+    request: Request,
     payload: UsernameUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.query(User).filter(User.id == current.user_number).one_or_none()
     if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="No autorizado")
+        raise HTTPException(status_code=401, detail=_td(locale, "Unauthorized"))
 
     normalized = _normalize_username(payload.username)
-    _validate_username_or_raise(normalized)
+    _validate_username_or_raise(normalized, locale=locale)
 
     if normalized == (user.username or ""):
         return UsernameUpdateResponse(
@@ -1055,7 +1280,11 @@ def update_username(
     if next_change_at is not None and now_utc < next_change_at:
         raise HTTPException(
             status_code=429,
-            detail=f"Podrás modificar tu nombre de usuario nuevamente el {next_change_at.date().isoformat()}.",
+            detail=_td(
+                locale,
+                "You will be able to change your username again on {date}.",
+                date=next_change_at.date().isoformat(),
+            ),
         )
 
     existing = (
@@ -1064,7 +1293,7 @@ def update_username(
         .first()
     )
     if existing:
-        raise HTTPException(status_code=409, detail="Ese nombre de usuario ya está en uso.")
+        raise HTTPException(status_code=409, detail=_td(locale, "That username is already in use."))
 
     user.username = normalized
     user.username_updated_at = now_utc
@@ -1079,21 +1308,23 @@ def update_username(
 
 @router.post("/password/change")
 def change_password(
+    request: Request,
     payload: PasswordChangeRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     repo = UserRepository(db)
     user = repo.get_user_by_id(current.user_number)
 
     if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="No autorizado")
+        raise HTTPException(status_code=401, detail=_td(locale, "Unauthorized"))
 
     if not verify_password(payload.current_password, user.password_hash):
-        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta.")
+        raise HTTPException(status_code=400, detail=_td(locale, "Current password is incorrect."))
 
     if payload.new_password != payload.new_password_confirm:
-        raise HTTPException(status_code=400, detail="Las contraseñas no coinciden.")
+        raise HTTPException(status_code=400, detail=_td(locale, "Passwords do not match."))
 
     try:
         validate_password_policy(payload.new_password)
@@ -1111,28 +1342,30 @@ def change_password(
 
 @router.post("/email/change")
 def change_email(
+    request: Request,
     payload: EmailChangeRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     repo = UserRepository(db)
     user = repo.get_user_by_id(current.user_number)
 
     if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="No autorizado")
+        raise HTTPException(status_code=401, detail=_td(locale, "Unauthorized"))
 
     if not verify_password(payload.current_password, user.password_hash):
-        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta.")
+        raise HTTPException(status_code=400, detail=_td(locale, "Current password is incorrect."))
 
     new_email = payload.new_email.strip().lower()
     current_email = user.email.strip().lower()
 
     if new_email == current_email:
-        raise HTTPException(status_code=400, detail="El nuevo correo debe ser distinto al actual.")
+        raise HTTPException(status_code=400, detail=_td(locale, "New email must be different from the current one."))
 
     existing = repo.get_user_by_email(new_email)
     if existing and existing.id != user.id:
-        raise HTTPException(status_code=409, detail="El correo electrónico ya está registrado.")
+        raise HTTPException(status_code=409, detail=_td(locale, "Email is already registered."))
 
     previous_email = user.email
     user.email = new_email
@@ -1143,7 +1376,7 @@ def change_email(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="El correo electrónico ya está registrado.")
+        raise HTTPException(status_code=409, detail=_td(locale, "Email is already registered."))
 
     delivery_issues: list[str] = []
 
@@ -1168,43 +1401,48 @@ def change_email(
         return {
             "changed": True,
             "email": user.email,
-            "message": "Correo actualizado, pero no se pudieron enviar todas las notificaciones de seguridad.",
+            "message": _td(locale, "Email updated, but not all security notifications could be sent."),
         }
 
     return {
         "changed": True,
         "email": user.email,
-        "message": "Correo actualizado correctamente. Enviamos confirmación al nuevo correo y alerta al correo anterior.",
+        "message": _td(
+            locale,
+            "Email updated successfully. We sent confirmation to the new email and an alert to the previous email.",
+        ),
     }
 
 
 @router.post("/account/close", response_model=AccountClosureResponse)
 def close_account(
+    request: Request,
     payload: AccountClosureRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     now_utc = datetime.now(timezone.utc)
     _purge_expired_closed_accounts(db=db, now=now_utc)
 
     repo = UserRepository(db)
     user = repo.get_user_by_id(current.user_number)
     if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="No autorizado")
+        raise HTTPException(status_code=401, detail=_td(locale, "Unauthorized"))
 
     if not verify_password(payload.current_password, user.password_hash):
-        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta.")
+        raise HTTPException(status_code=400, detail=_td(locale, "Current password is incorrect."))
 
     other_reason = (payload.other_reason or "").strip()
     if payload.reason.value == "other" and not other_reason:
-        raise HTTPException(status_code=400, detail="Debes especificar el motivo en “Otro”.")
+        raise HTTPException(status_code=400, detail=_td(locale, "You must specify the reason in Other."))
     if payload.reason.value != "other":
         other_reason = ""
 
     try:
         reason_db = AccountClosureReasonDB(payload.reason.value)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Motivo de cierre inválido.") from exc
+        raise HTTPException(status_code=400, detail=_td(locale, "Invalid closure reason.")) from exc
 
     restore_deadline = now_utc + timedelta(days=ACCOUNT_CLOSURE_GRACE_DAYS)
 
@@ -1246,19 +1484,20 @@ def close_account(
     return AccountClosureResponse(
         closed=True,
         restore_deadline_at=restore_deadline,
-        message=(
-            "Tu cuenta fue cerrada y tu información pública quedó inhabilitada. "
-            "Tienes 30 días para volver a ingresar con tu clave o restaurarla. "
-            "Después de ese plazo, la cuenta se eliminará de forma permanente."
+        message=_td(
+            locale,
+            "Your account was closed and your public information was disabled. You have 30 days to sign in again with your password or restore it. After that period, the account will be permanently deleted.",
         ),
     )
 
 
 @router.post("/2fa/setup")
 def setup_2fa(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     # 1. Verificar si ya existe 2FA activo
     existing = (
         db.query(User2FA)
@@ -1269,7 +1508,7 @@ def setup_2fa(
     if existing and existing.is_enabled:
         raise HTTPException(
             status_code=400,
-            detail="2FA ya está habilitado para este usuario.",
+            detail=_td(locale, "2FA is already enabled for this user."),
         )
 
     # 2. Generar secreto TOTP
@@ -1317,10 +1556,12 @@ def setup_2fa(
 
 @router.post("/2fa/confirm")
 def confirm_2fa(
+    request: Request,
     code: str = Body(..., embed=True),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
 
     # 1. Buscar registro 2FA del usuario
     two_fa = (
@@ -1332,13 +1573,13 @@ def confirm_2fa(
     if not two_fa:
         raise HTTPException(
             status_code=400,
-            detail="2FA no está configurado para este usuario.",
+            detail=_td(locale, "2FA is not configured for this user."),
         )
 
     if two_fa.is_enabled:
         raise HTTPException(
             status_code=400,
-            detail="2FA ya está habilitado.",
+            detail=_td(locale, "2FA is already enabled."),
         )
 
     # 2. Descifrar el secreto
@@ -1348,7 +1589,7 @@ def confirm_2fa(
     if not verify_totp_code(secret=secret, code=code):
         raise HTTPException(
             status_code=400,
-            detail="Código 2FA inválido.",
+            detail=_td(locale, "Invalid 2FA code."),
         )
 
     # 4. Activar oficialmente 2FA
@@ -1415,46 +1656,48 @@ def disable_2fa(
 
 @router.post("/2fa/verify")
 def verify_2fa(
+    request: Request,
     data: TwoFAVerifyRequest,
     authorization: str = Header(...),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     # Extraer token
     if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Token inválido")
+        raise HTTPException(status_code=401, detail=_td(locale, "Invalid token"))
 
     temp_token = authorization.replace("Bearer ", "")
 
     try:
         user_id = decode_2fa_temp_token(temp_token)
     except Exception:
-        raise HTTPException(status_code=401, detail="Token 2FA inválido")
+        raise HTTPException(status_code=401, detail=_td(locale, "Invalid 2FA token"))
 
     repo = UserRepository(db)
     user = repo.get_user_by_id(user_id)
 
     if not user:
-        raise HTTPException(status_code=401, detail="Usuario inválido")
+        raise HTTPException(status_code=401, detail=_td(locale, "Invalid user"))
 
     moderation_status = _normalize_guardian_moderation_status(user.guardian_moderation_status)
     if moderation_status != GUARDIAN_MODERATION_STATUS_ACTIVE:
-        raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(moderation_status))
+        raise HTTPException(status_code=403, detail=_guardian_moderation_block_detail(locale, moderation_status))
 
     if not user.is_active:
-        raise HTTPException(status_code=401, detail="Usuario inválido")
+        raise HTTPException(status_code=401, detail=_td(locale, "Invalid user"))
 
     # Validar TOTP
     two_fa_repo = User2FARepository(db)
     two_fa = two_fa_repo.get_by_user_id(user.id)
 
     if not two_fa or not two_fa.is_enabled:
-        raise HTTPException(status_code=400, detail="2FA no configurado")
+        raise HTTPException(status_code=400, detail=_td(locale, "2FA not configured"))
 
     secret = decrypt_secret(two_fa.secret_encrypted)
 
     if not verify_totp_code(secret=secret, code=data.code):
 
-        raise HTTPException(status_code=401, detail="Código incorrecto")
+        raise HTTPException(status_code=401, detail=_td(locale, "Incorrect code"))
 
 
     # 🎉 Login exitoso
@@ -1509,16 +1752,25 @@ def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
 
 @router.post("/resend-verification")
 def resend_verification(
+    request: Request,
     email: str = Body(..., embed=True),
     db: Session = Depends(get_db),
 ):
+    locale = locale_from_request(request, default="en")
     email = email.strip().lower()
 
     repo = UserRepository(db)
     user = repo.get_user_by_email(email)
 
     # Respuesta genérica SIEMPRE (seguridad: no revelamos si existe)
-    generic = {"message": "Si el correo existe y no está verificado, enviaremos un nuevo enlace."}
+    generic = {
+        "message": i18n_tr(
+            locale,
+            es="Si el correo existe y no está verificado, enviaremos un enlace nuevo.",
+            en="If the email exists and is not verified, we will send a new link.",
+            fr="Si l'e-mail existe et n'est pas vérifié, nous enverrons un nouveau lien.",
+        )
+    }
 
     if not user:
         return generic
@@ -1547,23 +1799,47 @@ def resend_verification(
         send_verification_email(to_email=user.email, token=token)
     except Exception:
         # El token quedó creado; si falla el SMTP, no exponemos detalles
-        raise HTTPException(status_code=500, detail="No se pudo enviar el correo en este momento.")
+        raise HTTPException(
+            status_code=500,
+            detail=i18n_tr(
+                locale,
+                es="No se pudo enviar el correo en este momento.",
+                en="Could not send email at this time.",
+                fr="Impossible d'envoyer l'e-mail pour le moment.",
+            ),
+        )
 
-    return {"message": "Listo. Si tu correo no estaba verificado, enviamos un enlace nuevo."}
+    return {
+        "message": i18n_tr(
+            locale,
+            es="Listo. Si tu correo no estaba verificado, enviamos un enlace nuevo.",
+            en="Done. If your email was not verified, we sent a new link.",
+            fr="Terminé. Si votre e-mail n'était pas vérifié, nous avons envoyé un nouveau lien.",
+        )
+    }
 
 
 @router.post("/password-reset/request")
 def request_password_reset(
     payload: PasswordResetRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
+    locale = locale_from_request(request, default="en")
     now_utc = datetime.now(timezone.utc)
     _purge_expired_closed_accounts(db=db, now=now_utc)
 
     email = payload.email.strip().lower()
 
     # Respuesta genérica para evitar enumeración
-    generic = {"message": "Si el correo existe, enviaremos un enlace de recuperación."}
+    generic = {
+        "message": i18n_tr(
+            locale,
+            es="Si el correo existe, enviaremos un enlace de recuperación.",
+            en="If the email exists, we will send a recovery link.",
+            fr="Si l'e-mail existe, nous enverrons un lien de récupération.",
+        )
+    }
 
     repo = UserRepository(db)
     user = repo.get_user_by_email(email)
@@ -1589,7 +1865,15 @@ def request_password_reset(
     try:
         send_password_reset_email(to_email=user.email, token=token)
     except Exception:
-        raise HTTPException(status_code=500, detail="No se pudo enviar el correo.")
+        raise HTTPException(
+            status_code=500,
+            detail=i18n_tr(
+                locale,
+                es="No se pudo enviar el correo.",
+                en="Could not send email.",
+                fr="Impossible d'envoyer l'e-mail.",
+            ),
+        )
 
     return generic
 
@@ -1597,14 +1881,16 @@ def request_password_reset(
 @router.post("/password-reset/confirm")
 def confirm_password_reset(
     payload: PasswordResetConfirm,
+    request: Request,
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     now_utc = datetime.now(timezone.utc)
     _purge_expired_closed_accounts(db=db, now=now_utc)
 
     token = payload.token.strip()
     if not token:
-        raise HTTPException(status_code=400, detail="Token inválido.")
+        raise HTTPException(status_code=400, detail=_td(locale, "Invalid token."))
 
     reset = (
         db.query(PasswordResetToken)
@@ -1613,20 +1899,20 @@ def confirm_password_reset(
     )
 
     if not reset or reset.is_used:
-        raise HTTPException(status_code=400, detail="Token inválido o usado.")
+        raise HTTPException(status_code=400, detail=_td(locale, "Invalid or used token."))
 
     if reset.expires_at < now_utc:
-        raise HTTPException(status_code=400, detail="Token expirado.")
+        raise HTTPException(status_code=400, detail=_td(locale, "Expired token."))
 
     repo = UserRepository(db)
     user = repo.get_user_by_id(reset.user_id)
     if not user:
-        raise HTTPException(status_code=400, detail="Usuario inválido.")
+        raise HTTPException(status_code=400, detail=_td(locale, "Invalid user."))
 
     restore_after_reset = False
     if not user.is_active:
         if not _is_account_closure_pending(user, now=now_utc):
-            raise HTTPException(status_code=400, detail="Usuario inválido.")
+            raise HTTPException(status_code=400, detail=_td(locale, "Invalid user."))
         restore_after_reset = True
 
     validate_password_policy(payload.new_password)

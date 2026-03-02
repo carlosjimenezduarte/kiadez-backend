@@ -18,7 +18,7 @@ class PostCreateRequest(BaseModel):
     def validate_payload(self):
         text = (self.text or "").strip()
         if not text and self.media_id is None:
-            raise ValueError("La publicación debe tener texto o media.")
+            raise ValueError("A post must include text or media.")
         if self.media_id is None and self.media_kind is not None:
             raise ValueError("media_kind requiere media_id.")
         return self
@@ -124,7 +124,7 @@ class PostReportCreateRequest(BaseModel):
     @model_validator(mode="after")
     def validate_other_reason(self):
         if self.reason == PostReportReason.other and not (self.other_reason or "").strip():
-            raise ValueError("Debes describir la otra razón del reporte.")
+            raise ValueError("You must describe the other report reason.")
         if self.reason != PostReportReason.other:
             self.other_reason = None
         return self

@@ -286,7 +286,7 @@ class BiographyDistinctionsUpdateRequest(BaseModel):
     @model_validator(mode="after")
     def validate_slots(self):
         if len(self.slots) > 10:
-            raise ValueError("Distinciones permite máximo 10 registros.")
+            raise ValueError("Distinctions allow a maximum of 10 records.")
         return self
 
 

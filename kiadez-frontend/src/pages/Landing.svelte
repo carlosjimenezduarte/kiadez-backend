@@ -1,7 +1,15 @@
 <script>
+  import AuthFooter from "../lib/AuthFooter.svelte";
+  import { getLocale } from "../lib/i18n";
+
+  const locale = getLocale();
+  const isEn = locale === "en";
+  const isFr = locale === "fr";
+  const tr = (es, en, fr = en) => (isEn ? en : isFr ? fr : es);
+
   function handleSubmit(event) {
     event.preventDefault();
-    alert('Aquí conectamos con Kiadez API 🔐');
+    alert(tr("Aquí conectamos con Kiadez API.", "This is where we connect to the Kiadez API.", "C'est ici que nous nous connectons à l'API Kiadez."));
   }
 </script>
 
@@ -16,23 +24,23 @@
   <main class="hero">
     <section class="hero-left">
       <div class="auth-card">
-        <h2 class="auth-title">Iniciar sesión en Kiadez</h2>
+        <h2 class="auth-title">{tr("Iniciar sesión en Kiadez", "Sign in to Kiadez", "Se connecter à Kiadez")}</h2>
 
         <form id="auth-form" on:submit={handleSubmit}>
-          <input type="email" placeholder="Correo electrónico" required />
-          <input type="password" placeholder="Contraseña" required />
+          <input type="email" placeholder={tr("Correo electrónico", "Email address", "Adresse e-mail")} required />
+          <input type="password" placeholder={tr("Contraseña", "Password", "Mot de passe")} required />
 
           <button type="submit" class="btn btn-primary">
-            Iniciar sesión
+            {tr("Iniciar sesión", "Sign in", "Se connecter")}
           </button>
 
           <a href="/forgot-password.html" class="auth-link">
-            ¿Olvidaste tu contraseña?
+            {tr("¿Olvidaste tu contraseña?", "Forgot your password?", "Mot de passe oublié ?")}
           </a>
 
           <div class="auth-divider"></div>
           <a href="register.html" class="btn btn-outline">
-            Registrarse en Kiadez
+            {tr("Registrarse en Kiadez", "Create an account", "Créer un compte")}
           </a>
         </form>
 
@@ -47,12 +55,14 @@
       <h1 class="hero-title">Kiadez</h1>
 
       <p class="hero-subtitle">
-        Una red social pensada para cumplir los deseos
+        {tr("Una red social pensada para cumplir los deseos", "A social network designed to fulfill wishes", "Un réseau social conçu pour accomplir les souhaits")}
       </p>
 
       <blockquote class="hero-quote">
-        La sabiduría suprema consiste en tener sueños lo suficientemente grandes
-        para no perderlos de vista mientras se persiguen.
+        {tr(
+          "La sabiduría suprema consiste en tener sueños lo suficientemente grandes para no perderlos de vista mientras se persiguen.",
+          "Supreme wisdom is having dreams so big that you never lose sight of them while pursuing them."
+        )}
         <br />
         <br />
         <span>— William Faulkner</span>
@@ -60,57 +70,5 @@
     </section>
   </main>
 
-  <footer class="kiadez-footer">
-    <div class="footer-main">
-      <div class="footer-column footer-origin">
-        <p class="footer-poem">
-          Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br />
-          No para dominar, sino para orientar.<br />
-          Su luz no deslumbra: acompaña.
-        </p>
-      </div>
-
-      <div class="footer-columns">
-        <div class="footer-column">
-          <h4>Sobre nuestra red social</h4>
-          <ul>
-            <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
-            <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
-            <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
-            <li><a href="/contact.html">Contacto</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Idiomas</h4>
-          <ul>
-            <li><a href="/?lang=es">Español</a></li>
-            <li><a href="/?lang=en">English</a></li>
-            <li><a href="/?lang=fr">Français</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Contacto</h4>
-          <ul>
-            <li>info@kiadez.com</li>
-            <li>+57 333 225 6078</li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Información legal</h4>
-          <ul>
-            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
-            <li><a href="/terms.html">Términos y condiciones</a></li>
-            <li><a href="/privacy.html">Privacidad</a></li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="footer-bottom">
-      © 2026 Kiadez — Una red social para cumplir deseos.
-    </div>
-  </footer>
+  <AuthFooter />
 </div>

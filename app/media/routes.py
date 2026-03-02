@@ -2,7 +2,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from botocore.exceptions import ClientError
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth.routes import get_current_user
 from app.auth.models import UserPublic
 from app.core.config import settings
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.core.security import decode_token
 from app.core.storage import (
     S3NotConfiguredError,
@@ -44,13 +45,26 @@ oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error
 COVER_OFFSET_LIMIT = 4000
 
 
-def _ensure_media_storage_ready() -> None:
+def _locale(request: Request | None) -> str:
+    return locale_from_request(request, default="en")
+
+
+def _tr(locale: str, *, es: str, en: str, fr: str) -> str:
+    return i18n_tr(locale, es=es, en=en, fr=fr)
+
+
+def _ensure_media_storage_ready(locale: str) -> None:
     try:
         ensure_s3_configured()
     except S3NotConfiguredError as exc:
         raise HTTPException(
             status_code=503,
-            detail=f"Storage de media no configurado ({exc}).",
+            detail=_tr(
+                locale,
+                es=f"El almacenamiento de medios no está configurado ({exc}).",
+                en=f"Media storage is not configured ({exc}).",
+                fr=f"Le stockage des médias n'est pas configuré ({exc}).",
+            ),
         ) from exc
 
 
@@ -58,20 +72,39 @@ def _normalize_content_type(content_type: str) -> str:
     return content_type.split(";")[0].strip().lower()
 
 
-def _validate_media_size(content_type: str, size_bytes: int) -> None:
+def _validate_media_size(content_type: str, size_bytes: int, locale: str) -> None:
     normalized = _normalize_content_type(content_type)
     if normalized.startswith("image/"):
         max_bytes = settings.MEDIA_MAX_IMAGE_MB * 1024 * 1024
     elif normalized.startswith("video/"):
         max_bytes = settings.MEDIA_MAX_VIDEO_MB * 1024 * 1024
     else:
-        raise HTTPException(status_code=400, detail="Tipo de archivo no permitido.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="Tipo de archivo no permitido.",
+                en="File type not allowed.",
+                fr="Type de fichier non autorisé.",
+            ),
+        )
 
     if size_bytes <= 0:
-        raise HTTPException(status_code=400, detail="El archivo está vacío.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(locale, es="El archivo está vacío.", en="File is empty.", fr="Le fichier est vide."),
+        )
 
     if size_bytes > max_bytes:
-        raise HTTPException(status_code=400, detail="Archivo supera el tamaño permitido.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="El archivo supera el tamaño permitido.",
+                en="File exceeds the allowed size.",
+                fr="Le fichier dépasse la taille autorisée.",
+            ),
+        )
 
 
 def _build_object_key(
@@ -138,6 +171,7 @@ def _cover_photo_response_for_user(
     user: User,
     current_user_id: int,
     db: Session,
+    locale: str,
     allow_cleanup: bool = False,
 ) -> CoverPhotoResponse:
     offset_x = _clamp_cover_offset(user.cover_photo_offset_x)
@@ -172,7 +206,7 @@ def _cover_photo_response_for_user(
     if media.visibility == MediaVisibility.private and int(current_user_id) != int(user.id):
         return CoverPhotoResponse(offset_x=offset_x, offset_y=offset_y)
 
-    _ensure_media_storage_ready()
+    _ensure_media_storage_ready(locale)
     expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
     url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
     return CoverPhotoResponse(
@@ -186,12 +220,14 @@ def _cover_photo_response_for_user(
 
 @router.post("/presign/upload", response_model=MediaPresignResponse)
 def presign_upload(
+    request: Request,
     payload: MediaPresignRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_media_storage_ready()
-    _validate_media_size(payload.content_type, payload.size_bytes)
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale)
+    _validate_media_size(payload.content_type, payload.size_bytes, locale)
 
     object_key = _build_object_key(
         user_id=current.user_number,
@@ -223,7 +259,15 @@ def presign_upload(
         )
     except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail="No se pudo generar URL de subida.")
+        raise HTTPException(
+            status_code=500,
+            detail=_tr(
+                locale,
+                es="No se pudo generar la URL de carga.",
+                en="Could not generate upload URL.",
+                fr="Impossible de générer l'URL de téléversement.",
+            ),
+        )
 
     db.commit()
     db.refresh(media)
@@ -239,28 +283,52 @@ def presign_upload(
 
 @router.post("/confirm", response_model=MediaURLResponse)
 def confirm_upload(
+    request: Request,
     payload: MediaConfirmRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale)
     media = db.query(Media).filter(Media.id == payload.media_id).one_or_none()
     if not media:
-        raise HTTPException(status_code=404, detail="Media no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Medio no encontrado.", en="Media not found.", fr="Média introuvable."),
+        )
     if media.owner_id != current.user_number:
-        raise HTTPException(status_code=403, detail="No autorizado.")
+        raise HTTPException(
+            status_code=403,
+            detail=_tr(locale, es="No autorizado.", en="Not authorized.", fr="Non autorisé."),
+        )
 
     try:
         head = head_object(key=media.object_key)
     except ClientError:
-        raise HTTPException(status_code=400, detail="Archivo no encontrado en storage.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="Archivo no encontrado en el almacenamiento.",
+                en="File not found in storage.",
+                fr="Fichier introuvable dans le stockage.",
+            ),
+        )
 
     content_type = head.get("ContentType") or media.mime_type
     if not content_type:
-        raise HTTPException(status_code=400, detail="No se pudo detectar el tipo de archivo.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="No se pudo detectar el tipo de archivo.",
+                en="Could not detect file type.",
+                fr="Impossible de détecter le type de fichier.",
+            ),
+        )
 
     size_bytes = int(head.get("ContentLength") or media.size_bytes or 0)
-    _validate_media_size(content_type, size_bytes)
+    _validate_media_size(content_type, size_bytes, locale)
 
     media.size_bytes = size_bytes
     media.mime_type = _normalize_content_type(content_type)
@@ -288,6 +356,7 @@ def confirm_upload(
 
 @router.post("/upload/proxy", response_model=MediaURLResponse)
 async def upload_proxy(
+    request: Request,
     media_id: int = Form(...),
     file: UploadFile = File(...),
     current: UserPublic = Depends(get_current_user),
@@ -300,24 +369,47 @@ async def upload_proxy(
     2) Client encrypts bytes locally.
     3) Client POSTs ciphertext bytes here with media_id.
     """
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale)
 
     media = db.query(Media).filter(Media.id == media_id).one_or_none()
     if not media:
-        raise HTTPException(status_code=404, detail="Media no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Medio no encontrado.", en="Media not found.", fr="Média introuvable."),
+        )
     if media.owner_id != current.user_number:
-        raise HTTPException(status_code=403, detail="No autorizado.")
+        raise HTTPException(
+            status_code=403,
+            detail=_tr(locale, es="No autorizado.", en="Not authorized.", fr="Non autorisé."),
+        )
     if media.status != "pending":
-        raise HTTPException(status_code=409, detail="Media no está en estado pendiente.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="El medio no está en estado pendiente.",
+                en="Media is not in pending status.",
+                fr="Le média n'est pas en état d'attente.",
+            ),
+        )
 
     # Keep the content-type that was registered in DB (caller provided it on /presign/upload).
     content_type = _normalize_content_type(media.mime_type or file.content_type or "")
     if not content_type:
-        raise HTTPException(status_code=400, detail="No se pudo detectar el tipo de archivo.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="No se pudo detectar el tipo de archivo.",
+                en="Could not detect file type.",
+                fr="Impossible de détecter le type de fichier.",
+            ),
+        )
 
     content = await file.read()
     size_bytes = len(content)
-    _validate_media_size(content_type, size_bytes)
+    _validate_media_size(content_type, size_bytes, locale)
 
     try:
         client = get_s3_client()
@@ -329,7 +421,15 @@ async def upload_proxy(
         )
     except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail="No se pudo subir la imagen al storage.")
+        raise HTTPException(
+            status_code=500,
+            detail=_tr(
+                locale,
+                es="No se pudo cargar la imagen al almacenamiento.",
+                en="Could not upload the image to storage.",
+                fr="Impossible de téléverser l'image vers le stockage.",
+            ),
+        )
 
     media.size_bytes = size_bytes
     media.mime_type = content_type
@@ -343,6 +443,7 @@ async def upload_proxy(
 
 @router.get("/{media_id}/raw")
 def download_media_raw(
+    request: Request,
     media_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -351,24 +452,55 @@ def download_media_raw(
     Proxy media bytes through the backend (no bucket CORS needed).
     Useful for client-side decryption (E2EE) where JS needs access to bytes.
     """
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale)
     media = db.query(Media).filter(Media.id == media_id).one_or_none()
     if not media:
-        raise HTTPException(status_code=404, detail="Media no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Medio no encontrado.", en="Media not found.", fr="Média introuvable."),
+        )
     if media.status != "ready":
-        raise HTTPException(status_code=409, detail="Media aún no disponible.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="El medio aún no está disponible.",
+                en="Media is not available yet.",
+                fr="Le média n'est pas encore disponible.",
+            ),
+        )
 
     if media.visibility == MediaVisibility.private and media.owner_id != current.user_number:
-        raise HTTPException(status_code=403, detail="No autorizado.")
+        raise HTTPException(
+            status_code=403,
+            detail=_tr(locale, es="No autorizado.", en="Not authorized.", fr="Non autorisé."),
+        )
 
     try:
         client = get_s3_client()
         obj = client.get_object(Bucket=settings.S3_BUCKET, Key=media.object_key)
         body = obj["Body"]
     except ClientError:
-        raise HTTPException(status_code=404, detail="Archivo no encontrado en storage.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(
+                locale,
+                es="Archivo no encontrado en el almacenamiento.",
+                en="File not found in storage.",
+                fr="Fichier introuvable dans le stockage.",
+            ),
+        )
     except Exception:
-        raise HTTPException(status_code=500, detail="No se pudo descargar el archivo.")
+        raise HTTPException(
+            status_code=500,
+            detail=_tr(
+                locale,
+                es="No se pudo descargar el archivo.",
+                en="Could not download file.",
+                fr="Impossible de télécharger le fichier.",
+            ),
+        )
 
     # It's ciphertext for E2EE use cases, but keeping the stored mime_type is harmless for fetch().
     return StreamingResponse(
@@ -380,20 +512,30 @@ def download_media_raw(
 
 @router.post("/upload/direct", response_model=MediaURLResponse)
 async def upload_direct(
+    request: Request,
     file: UploadFile = File(...),
     visibility: MediaVisibility = Form(default=MediaVisibility.private),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale)
 
     content_type = _normalize_content_type(file.content_type or "")
     if not content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Solo se permiten imágenes en esta subida.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="Solo se permiten imágenes en esta carga.",
+                en="Only images are allowed in this upload.",
+                fr="Seules les images sont autorisées dans ce téléversement.",
+            ),
+        )
 
     content = await file.read()
     size_bytes = len(content)
-    _validate_media_size(content_type, size_bytes)
+    _validate_media_size(content_type, size_bytes, locale)
 
     object_key = _build_object_key(
         user_id=current.user_number,
@@ -424,7 +566,15 @@ async def upload_direct(
         )
     except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail="No se pudo subir la imagen al storage.")
+        raise HTTPException(
+            status_code=500,
+            detail=_tr(
+                locale,
+                es="No se pudo cargar la imagen al almacenamiento.",
+                en="Could not upload the image to storage.",
+                fr="Impossible de téléverser l'image vers le stockage.",
+            ),
+        )
 
     media.status = "ready"
     db.commit()
@@ -437,11 +587,13 @@ async def upload_direct(
 
 @router.get("/mine/images", response_model=MediaImageOptionListResponse)
 def list_my_images(
+    request: Request,
     limit: int = Query(default=24, ge=1, le=100),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale)
     medias = (
         db.query(Media)
         .filter(Media.owner_id == current.user_number)
@@ -468,12 +620,17 @@ def list_my_images(
 
 @router.get("/profile-photo", response_model=ProfilePhotoResponse)
 def get_profile_photo(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.query(User).filter(User.id == current.user_number).one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable."),
+        )
     if user.profile_photo_media_id is None:
         return ProfilePhotoResponse()
 
@@ -489,7 +646,7 @@ def get_profile_photo(
     if not (media.mime_type or "").lower().startswith("image/"):
         return ProfilePhotoResponse()
 
-    _ensure_media_storage_ready()
+    _ensure_media_storage_ready(locale)
     expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
     url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
     return ProfilePhotoResponse(media_id=media.id, url=url, expires_in=expires_in)
@@ -497,13 +654,18 @@ def get_profile_photo(
 
 @router.post("/profile-photo", response_model=ProfilePhotoResponse)
 def set_profile_photo(
+    request: Request,
     payload: ProfilePhotoSetRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.query(User).filter(User.id == current.user_number).one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable."),
+        )
 
     if payload.media_id is None:
         user.profile_photo_media_id = None
@@ -512,18 +674,40 @@ def set_profile_photo(
 
     media = db.query(Media).filter(Media.id == payload.media_id).one_or_none()
     if not media:
-        raise HTTPException(status_code=404, detail="Media no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Medio no encontrado.", en="Media not found.", fr="Média introuvable."),
+        )
     if media.owner_id != current.user_number:
-        raise HTTPException(status_code=403, detail="No autorizado.")
+        raise HTTPException(
+            status_code=403,
+            detail=_tr(locale, es="No autorizado.", en="Not authorized.", fr="Non autorisé."),
+        )
     if media.status != "ready":
-        raise HTTPException(status_code=409, detail="Media aún no disponible.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="El medio aún no está disponible.",
+                en="Media is not available yet.",
+                fr="Le média n'est pas encore disponible.",
+            ),
+        )
     if not (media.mime_type or "").lower().startswith("image/"):
-        raise HTTPException(status_code=400, detail="Solo puedes asignar imágenes.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="Solo puedes asignar imágenes.",
+                en="You can only assign images.",
+                fr="Tu ne peux attribuer que des images.",
+            ),
+        )
 
     user.profile_photo_media_id = media.id
     db.commit()
 
-    _ensure_media_storage_ready()
+    _ensure_media_storage_ready(locale)
     expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
     url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
     return ProfilePhotoResponse(media_id=media.id, url=url, expires_in=expires_in)
@@ -531,29 +715,40 @@ def set_profile_photo(
 
 @router.get("/cover-photo", response_model=CoverPhotoResponse)
 def get_cover_photo(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.query(User).filter(User.id == current.user_number).one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable."),
+        )
     return _cover_photo_response_for_user(
         user=user,
         current_user_id=int(current.user_number),
         db=db,
+        locale=locale,
         allow_cleanup=True,
     )
 
 
 @router.post("/cover-photo", response_model=CoverPhotoResponse)
 def set_cover_photo(
+    request: Request,
     payload: CoverPhotoSetRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.query(User).filter(User.id == current.user_number).one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable."),
+        )
 
     user.cover_photo_offset_x = _clamp_cover_offset(payload.offset_x)
     user.cover_photo_offset_y = _clamp_cover_offset(payload.offset_y)
@@ -571,13 +766,35 @@ def set_cover_photo(
 
     media = db.query(Media).filter(Media.id == payload.media_id).one_or_none()
     if not media:
-        raise HTTPException(status_code=404, detail="Media no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Medio no encontrado.", en="Media not found.", fr="Média introuvable."),
+        )
     if media.owner_id != current.user_number:
-        raise HTTPException(status_code=403, detail="No autorizado.")
+        raise HTTPException(
+            status_code=403,
+            detail=_tr(locale, es="No autorizado.", en="Not authorized.", fr="Non autorisé."),
+        )
     if media.status != "ready":
-        raise HTTPException(status_code=409, detail="Media aún no disponible.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="El medio aún no está disponible.",
+                en="Media is not available yet.",
+                fr="Le média n'est pas encore disponible.",
+            ),
+        )
     if not (media.mime_type or "").lower().startswith("image/"):
-        raise HTTPException(status_code=400, detail="Solo puedes asignar imágenes.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="Solo puedes asignar imágenes.",
+                en="You can only assign images.",
+                fr="Tu ne peux attribuer que des images.",
+            ),
+        )
 
     user.cover_photo_media_id = media.id
     db.commit()
@@ -587,19 +804,25 @@ def set_cover_photo(
         user=user,
         current_user_id=int(current.user_number),
         db=db,
+        locale=locale,
         allow_cleanup=True,
     )
 
 
 @router.get("/cover-photo/user/{user_id}", response_model=CoverPhotoResponse)
 def get_user_cover_photo(
+    request: Request,
     user_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.query(User).filter(User.id == int(user_id), User.is_active.is_(True)).one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable."),
+        )
 
     is_owner = int(user.id) == int(current.user_number)
     if not is_owner and not bool(user.public_profile_show_cover_purposes):
@@ -609,18 +832,24 @@ def get_user_cover_photo(
         user=user,
         current_user_id=int(current.user_number),
         db=db,
+        locale=locale,
         allow_cleanup=is_owner,
     )
 
 
 @router.get("/emblem", response_model=ProfilePhotoResponse)
 def get_emblem(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.query(User).filter(User.id == current.user_number).one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable."),
+        )
     if user.emblem_media_id is None:
         return ProfilePhotoResponse()
 
@@ -636,7 +865,7 @@ def get_emblem(
     if not (media.mime_type or "").lower().startswith("image/"):
         return ProfilePhotoResponse()
 
-    _ensure_media_storage_ready()
+    _ensure_media_storage_ready(locale)
     expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
     url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
     return ProfilePhotoResponse(media_id=media.id, url=url, expires_in=expires_in)
@@ -644,13 +873,18 @@ def get_emblem(
 
 @router.post("/emblem", response_model=ProfilePhotoResponse)
 def set_emblem(
+    request: Request,
     payload: ProfilePhotoSetRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.query(User).filter(User.id == current.user_number).one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable."),
+        )
 
     if payload.media_id is None:
         user.emblem_media_id = None
@@ -659,18 +893,40 @@ def set_emblem(
 
     media = db.query(Media).filter(Media.id == payload.media_id).one_or_none()
     if not media:
-        raise HTTPException(status_code=404, detail="Media no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Medio no encontrado.", en="Media not found.", fr="Média introuvable."),
+        )
     if media.owner_id != current.user_number:
-        raise HTTPException(status_code=403, detail="No autorizado.")
+        raise HTTPException(
+            status_code=403,
+            detail=_tr(locale, es="No autorizado.", en="Not authorized.", fr="Non autorisé."),
+        )
     if media.status != "ready":
-        raise HTTPException(status_code=409, detail="Media aún no disponible.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="El medio aún no está disponible.",
+                en="Media is not available yet.",
+                fr="Le média n'est pas encore disponible.",
+            ),
+        )
     if not (media.mime_type or "").lower().startswith("image/"):
-        raise HTTPException(status_code=400, detail="Solo puedes asignar imágenes.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="Solo puedes asignar imágenes.",
+                en="You can only assign images.",
+                fr="Tu ne peux attribuer que des images.",
+            ),
+        )
 
     user.emblem_media_id = media.id
     db.commit()
 
-    _ensure_media_storage_ready()
+    _ensure_media_storage_ready(locale)
     expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
     url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
     return ProfilePhotoResponse(media_id=media.id, url=url, expires_in=expires_in)
@@ -678,22 +934,38 @@ def set_emblem(
 
 @router.get("/{media_id}", response_model=MediaURLResponse)
 def get_media_url(
+    request: Request,
     media_id: int,
     token: str | None = Depends(oauth2_scheme_optional),
     db: Session = Depends(get_db),
 ):
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale)
     media = db.query(Media).filter(Media.id == media_id).one_or_none()
     if not media:
-        raise HTTPException(status_code=404, detail="Media no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Medio no encontrado.", en="Media not found.", fr="Média introuvable."),
+        )
 
     if media.status != "ready":
-        raise HTTPException(status_code=409, detail="Media aún no disponible.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="El medio aún no está disponible.",
+                en="Media is not available yet.",
+                fr="Le média n'est pas encore disponible.",
+            ),
+        )
 
     if media.visibility == MediaVisibility.private:
         user = _get_user_from_token(token, db)
         if not user or media.owner_id != user.id:
-            raise HTTPException(status_code=403, detail="No autorizado.")
+            raise HTTPException(
+                status_code=403,
+                detail=_tr(locale, es="No autorizado.", en="Not authorized.", fr="Non autorisé."),
+            )
 
     expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
     url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
@@ -702,21 +974,37 @@ def get_media_url(
 
 @router.delete("/{media_id}", response_model=MediaDeleteResponse)
 def delete_media(
+    request: Request,
     media_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_media_storage_ready()
+    locale = _locale(request)
+    _ensure_media_storage_ready(locale)
     media = db.query(Media).filter(Media.id == media_id).one_or_none()
     if not media:
-        raise HTTPException(status_code=404, detail="Media no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Medio no encontrado.", en="Media not found.", fr="Média introuvable."),
+        )
     if media.owner_id != current.user_number:
-        raise HTTPException(status_code=403, detail="No autorizado.")
+        raise HTTPException(
+            status_code=403,
+            detail=_tr(locale, es="No autorizado.", en="Not authorized.", fr="Non autorisé."),
+        )
 
     try:
         delete_object(key=media.object_key)
     except ClientError:
-        raise HTTPException(status_code=500, detail="No se pudo eliminar el objeto.")
+        raise HTTPException(
+            status_code=500,
+            detail=_tr(
+                locale,
+                es="No se pudo eliminar el objeto.",
+                en="Could not delete object.",
+                fr="Impossible de supprimer l'objet.",
+            ),
+        )
 
     db.delete(media)
     db.commit()

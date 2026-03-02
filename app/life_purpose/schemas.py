@@ -19,11 +19,11 @@ class LifePurposeSlotIn(BaseModel):
     def validate_content(self):
         if self.is_private:
             if not self.ciphertext_hex or not self.nonce_hex:
-                raise ValueError("ciphertext_hex y nonce_hex son requeridos si es privado.")
+                raise ValueError("ciphertext_hex and nonce_hex are required when entry is private.")
             self.text_public = None
         else:
             if not self.text_public:
-                raise ValueError("text_public es requerido si es publico.")
+                raise ValueError("text_public is required when entry is public.")
             self.ciphertext_hex = None
             self.nonce_hex = None
 
@@ -42,7 +42,7 @@ class LifePurposeRevealRequest(BaseModel):
     def normalize_text(self):
         self.text_public = self.text_public.strip()
         if not self.text_public:
-            raise ValueError("text_public es requerido.")
+            raise ValueError("text_public is required.")
         return self
 
 
@@ -82,14 +82,14 @@ class LifePurposeFulfillRequest(BaseModel):
         if self.publish_to == "public":
             self.wish_text = (self.wish_text or "").strip()
             if not self.wish_text:
-                raise ValueError("wish_text es requerido si publish_to es public.")
+                raise ValueError("wish_text is required when publish_to is public.")
             if self.wish_type is None:
                 self.wish_type = "Espiritual"
             self.ciphertext_hex = None
             self.nonce_hex = None
         else:
             if not self.ciphertext_hex or not self.nonce_hex:
-                raise ValueError("ciphertext_hex y nonce_hex son requeridos si publish_to es private.")
+                raise ValueError("ciphertext_hex and nonce_hex are required when publish_to is private.")
             self.wish_text = None
             self.wish_type = None
         return self

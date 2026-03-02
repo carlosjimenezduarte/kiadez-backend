@@ -85,9 +85,9 @@ class GuardianWishRequestDenyInput(BaseModel):
         self.subject = (self.subject or "").strip()
         self.body = (self.body or "").strip()
         if not self.subject:
-            raise ValueError("Debes escribir el asunto.")
+            raise ValueError("You must write the subject.")
         if not self.body:
-            raise ValueError("Debes escribir el mensaje.")
+            raise ValueError("You must write the message.")
         return self
 
 
@@ -100,9 +100,9 @@ class GuardianWishRequestOwnerMessageInput(BaseModel):
         self.subject = (self.subject or "").strip()
         self.body = (self.body or "").strip()
         if not self.subject:
-            raise ValueError("Debes escribir el asunto.")
+            raise ValueError("You must write the subject.")
         if not self.body:
-            raise ValueError("Debes escribir el mensaje.")
+            raise ValueError("You must write the message.")
         return self
 
 

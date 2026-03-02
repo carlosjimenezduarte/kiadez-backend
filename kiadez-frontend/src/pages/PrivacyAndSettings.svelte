@@ -1,27 +1,40 @@
 <script>
   import { onMount, tick } from "svelte";
   import { logout } from "../lib/logout";
+  import AuthFooter from "../lib/AuthFooter.svelte";
+  import { buildLangHref, getLocale, setLocale } from "../lib/i18n";
 
   const API = "http://127.0.0.1:8000";
   const PASSWORD_MIN_LENGTH = 8;
   const PASSWORD_RE_UPPER = /[A-Z]/;
   const PASSWORD_RE_DIGIT = /[0-9]/;
   const PASSWORD_RE_SPECIAL = /[^a-zA-Z0-9]/;
+  const SUPPORTED_LOCALES = ["es", "en", "fr"];
+  const locale = getLocale();
+  const isEn = locale === "en";
+  const isFr = locale === "fr";
+  const tr = (es, en, fr = en) => (isEn ? en : isFr ? fr : es);
 
   let changePasswordModalOpen = false;
   let changeEmailModalOpen = false;
+  let changeNameModalOpen = false;
   let changePasswordMode = "change"; // change | reset
   let changePasswordStatus = "";
   let changePasswordError = "";
   let emailChangeStatus = "";
   let emailChangeError = "";
+  let nameChangeStatus = "";
+  let nameChangeError = "";
   let resetStatus = "";
   let resetError = "";
   let isChangingPassword = false;
   let isChangingEmail = false;
+  let isChangingName = false;
   let isSendingReset = false;
 
   let meEmail = "";
+  let profileFirstName = "";
+  let profileLastName = "";
 
   let currentPassword = "";
   let emailCurrentPassword = "";
@@ -36,6 +49,7 @@
 
   let currentPasswordInput;
   let emailCurrentPasswordInput;
+  let firstNameInput;
 
   // -------------------------
   // 2FA
@@ -66,68 +80,107 @@
   const PRIVACY_TOGGLES = [
     {
       key: "public_profile_show_about",
-      label: "Acerca de mí",
-      description: "Controla si otras personas pueden ver tu módulo de presentación personal.",
+      label: tr("Acerca de mí", "About me", "À propos de moi"),
+      description: tr(
+        "Controla si otras personas pueden ver tu módulo de presentación personal.",
+        "Controls whether other people can view your personal introduction module."
+      ),
     },
     {
       key: "public_profile_show_biography",
-      label: "Mi biografía",
-      description: "Controla la visibilidad de tu módulo de biografía pública en el perfil.",
+      label: tr("Mi biografía", "My biography", "Ma biographie"),
+      description: tr(
+        "Controla la visibilidad de tu módulo de biografía pública en el perfil.",
+        "Controls visibility of your public biography module on your profile."
+      ),
     },
     {
       key: "public_profile_show_fulfilled_wishes",
-      label: "Mis deseos cumplidos",
-      description: "Permite o bloquea la visibilidad externa de tus deseos ya cumplidos.",
+      label: tr("Mis deseos cumplidos", "My fulfilled wishes", "Mes souhaits accomplis"),
+      description: tr(
+        "Permite o bloquea la visibilidad externa de tus deseos ya cumplidos.",
+        "Allows or blocks external visibility of your fulfilled wishes."
+      ),
     },
     {
       key: "public_profile_show_public_wishes",
-      label: "Mis deseos públicos",
-      description: "Permite o bloquea la visibilidad externa de tu listado de deseos públicos.",
+      label: tr("Mis deseos públicos", "My public wishes", "Mes souhaits publics"),
+      description: tr(
+        "Permite o bloquea la visibilidad externa de tu listado de deseos públicos.",
+        "Allows or blocks external visibility of your public wishes list."
+      ),
     },
     {
       key: "public_profile_show_cooperative_wishes",
-      label: "Deseos cooperativos",
-      description: "Controla si otros usuarios pueden ver e interactuar con tus deseos cooperativos.",
+      label: tr("Deseos cooperativos", "Cooperative wishes", "Souhaits coopératifs"),
+      description: tr(
+        "Controla si otros usuarios pueden ver e interactuar con tus deseos cooperativos.",
+        "Controls whether other users can view and interact with your cooperative wishes."
+      ),
     },
     {
       key: "public_profile_show_followers",
-      label: "Seguidores",
-      description: "Decide si otros usuarios pueden ver el conteo de seguidores de tu perfil.",
+      label: tr("Seguidores", "Followers", "Abonnés"),
+      description: tr(
+        "Decide si otros usuarios pueden ver el conteo de seguidores de tu perfil.",
+        "Decides whether other users can see your follower count."
+      ),
     },
     {
       key: "public_profile_show_gallery",
-      label: "Galería",
-      description: "Controla si el acceso a tu módulo de galería aparece visible en tu perfil.",
+      label: tr("Galería", "Gallery", "Galerie"),
+      description: tr(
+        "Controla si el acceso a tu módulo de galería aparece visible en tu perfil.",
+        "Controls whether access to your gallery module is visible on your profile."
+      ),
     },
     {
       key: "public_profile_show_recent_achievements",
-      label: "Logros recientes",
-      description: "Controla si el acceso a tus logros aparece visible para otros usuarios.",
+      label: tr("Logros recientes", "Recent achievements", "Réalisations récentes"),
+      description: tr(
+        "Controla si el acceso a tus logros aparece visible para otros usuarios.",
+        "Controls whether access to your achievements appears visible to other users."
+      ),
     },
     {
       key: "public_profile_show_stars",
-      label: "Estrellas",
-      description: "Controla la visibilidad del módulo de estrellas dentro de tu perfil público.",
+      label: tr("Estrellas", "Stars", "Étoiles"),
+      description: tr(
+        "Controla la visibilidad del módulo de estrellas dentro de tu perfil público.",
+        "Controls visibility of the stars module in your public profile."
+      ),
     },
     {
       key: "public_profile_show_cover_purposes",
-      label: "Portada y propósitos",
-      description: "Controla si tu portada y tus propósitos de vida se muestran en tu perfil público.",
+      label: tr("Portada y propósitos", "Cover and purposes", "Couverture et finalités"),
+      description: tr(
+        "Controla si tu portada y tus propósitos de vida se muestran en tu perfil público.",
+        "Controls whether your cover and life purposes are shown on your public profile."
+      ),
     },
     {
       key: "public_profile_show_calendar",
-      label: "Calendario",
-      description: "Controla si tu calendario y actividad temporal son visibles para otros.",
+      label: tr("Calendario", "Calendar", "Calendrier"),
+      description: tr(
+        "Controla si tu calendario y actividad temporal son visibles para otros.",
+        "Controls whether your calendar and timeline activity are visible to others."
+      ),
     },
     {
       key: "public_profile_show_oracle",
-      label: "Oráculo",
-      description: "Controla si otras personas pueden consultar tu oráculo en tu perfil.",
+      label: tr("Oráculo", "Oracle", "Oracle"),
+      description: tr(
+        "Controla si otras personas pueden consultar tu oráculo en tu perfil.",
+        "Controls whether others can consult your oracle on your profile."
+      ),
     },
     {
       key: "public_profile_show_personal_posts",
-      label: "Publicaciones personales",
-      description: "Si lo apagas, tus publicaciones no serán visibles para otros usuarios.",
+      label: tr("Publicaciones personales", "Personal posts", "Publications personnelles"),
+      description: tr(
+        "Si lo apagas, tus publicaciones no serán visibles para otros usuarios.",
+        "If disabled, your posts will not be visible to other users."
+      ),
     },
   ];
 
@@ -149,12 +202,36 @@
 
   const ACCOUNT_CLOSE_REASON_OTHER = "other";
   const ACCOUNT_CLOSE_OPTIONS = [
-    { value: "no_support", label: "No encontré el acompañamiento que esperaba en este momento" },
-    { value: "prefer_private_space", label: "Prefiero mantener mis deseos en un espacio más privado" },
-    { value: "personal_pause", label: "Deseo tomar una pausa personal" },
-    { value: "misaligned_platform", label: "No me siento alineado actualmente con la dinámica de la plataforma" },
-    { value: "goals_reached", label: "He alcanzado mis objetivos por ahora" },
-    { value: ACCOUNT_CLOSE_REASON_OTHER, label: "Otro (especificar)" },
+    {
+      value: "no_support",
+      label: tr(
+        "No encontré el acompañamiento que esperaba en este momento",
+        "I did not find the support I expected at this moment"
+      )
+    },
+    {
+      value: "prefer_private_space",
+      label: tr(
+        "Prefiero mantener mis deseos en un espacio más privado",
+        "I prefer to keep my wishes in a more private space"
+      )
+    },
+    {
+      value: "personal_pause",
+      label: tr("Deseo tomar una pausa personal", "I want to take a personal pause", "Je veux faire une pause personnelle")
+    },
+    {
+      value: "misaligned_platform",
+      label: tr(
+        "No me siento alineado actualmente con la dinámica de la plataforma",
+        "I currently do not feel aligned with the platform dynamics"
+      )
+    },
+    {
+      value: "goals_reached",
+      label: tr("He alcanzado mis objetivos por ahora", "I have reached my goals for now", "J'ai atteint mes objectifs pour le moment")
+    },
+    { value: ACCOUNT_CLOSE_REASON_OTHER, label: tr("Otro (especificar)", "Other (specify)", "Autre (préciser)") },
   ];
 
   let privacyModalOpen = false;
@@ -174,6 +251,26 @@
   let closeAccountDone = false;
   let closeAccountDeadlineLabel = "";
   let showCloseAccountPassword = false;
+  let languageModalOpen = false;
+
+  const openLanguageModal = () => {
+    languageModalOpen = true;
+  };
+
+  const closeLanguageModal = () => {
+    languageModalOpen = false;
+  };
+
+  const applyLocale = (nextLocale) => {
+    const normalized = String(nextLocale || "").trim().toLowerCase();
+    if (!SUPPORTED_LOCALES.includes(normalized)) return;
+    if (normalized === locale) {
+      languageModalOpen = false;
+      return;
+    }
+    setLocale(normalized);
+    window.location.href = buildLangHref(normalized);
+  };
 
   const getAccessToken = () => localStorage.getItem("access_token") || "";
 
@@ -189,10 +286,11 @@
     const token = getAccessToken();
     if (!token) {
       window.location.href = "/login.html";
-      throw new Error("No hay sesión activa.");
+      throw new Error(tr("No hay sesión activa.", "No active session.", "Aucune session active."));
     }
 
     const headers = {
+      "Accept-Language": locale,
       ...(options.headers || {}),
       Authorization: `Bearer ${token}`
     };
@@ -201,7 +299,7 @@
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       window.location.href = "/login.html";
-      throw new Error("Sesión expirada.");
+      throw new Error(tr("Sesión expirada.", "Session expired.", "Session expirée."));
     }
     return res;
   };
@@ -211,10 +309,22 @@
     const res = await apiFetch("/auth/me");
     const data = await parseResponseJson(res);
     if (!res.ok) {
-      throw new Error(data.detail || "No se pudo cargar tu información.");
+      throw new Error(data.detail || tr("No se pudo cargar tu información.", "Could not load your account information.", "Impossible de charger les informations de ton compte."));
     }
     meEmail = String(data?.email || "");
     return meEmail;
+  };
+
+  const normalizeHumanName = (value) => String(value || "").trim().replace(/\s+/g, " ");
+
+  const loadProfileName = async () => {
+    const res = await apiFetch("/auth/profile/name");
+    const data = await parseResponseJson(res);
+    if (!res.ok) {
+      throw new Error(data.detail || tr("No se pudo cargar tu nombre actual.", "Could not load your current name.", "Impossible de charger ton nom actuel."));
+    }
+    profileFirstName = normalizeHumanName(data?.first_name || "");
+    profileLastName = normalizeHumanName(data?.last_name || "");
   };
 
   const resetChangePasswordState = () => {
@@ -242,6 +352,30 @@
     emailCurrentPassword = "";
     newEmail = "";
     showEmailCurrentPassword = false;
+  };
+
+  const resetChangeNameState = () => {
+    nameChangeStatus = "";
+    nameChangeError = "";
+    isChangingName = false;
+  };
+
+  const openChangeNameModal = async () => {
+    resetChangeNameState();
+    changeNameModalOpen = true;
+    try {
+      await loadProfileName();
+    } catch (err) {
+      nameChangeError = err?.message || tr("No se pudo cargar tu nombre actual.", "Could not load your current name.", "Impossible de charger ton nom actuel.");
+    }
+
+    await tick();
+    firstNameInput?.focus();
+  };
+
+  const closeChangeNameModal = () => {
+    changeNameModalOpen = false;
+    resetChangeNameState();
   };
 
   const openChangePasswordModal = async () => {
@@ -297,22 +431,28 @@
     const next2 = String(newPasswordConfirm || "");
 
     if (!current.trim()) {
-      changePasswordError = "Debes digitar tu contraseña actual.";
+      changePasswordError = tr("Debes digitar tu contraseña actual.", "You must enter your current password.", "Tu dois saisir ton mot de passe actuel.");
       return;
     }
 
     if (!next.trim()) {
-      changePasswordError = "Debes digitar tu nueva contraseña.";
+      changePasswordError = tr("Debes digitar tu nueva contraseña.", "You must enter your new password.", "Tu dois saisir ton nouveau mot de passe.");
       return;
     }
 
     if (!newPasswordIsValid) {
-      changePasswordError = "Tu nueva contraseña no cumple la normativa requerida.";
+      changePasswordError = tr(
+        "Tu nueva contraseña no cumple la normativa requerida.",
+        "Your new password does not meet the required policy."
+      );
       return;
     }
 
     if (next !== next2) {
-      changePasswordError = "La confirmación no coincide con tu nueva contraseña.";
+      changePasswordError = tr(
+        "La confirmación no coincide con tu nueva contraseña.",
+        "Confirmation does not match your new password."
+      );
       return;
     }
 
@@ -329,10 +469,10 @@
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cambiar la contraseña.");
+        throw new Error(data.detail || tr("No se pudo cambiar la contraseña.", "Could not change password.", "Impossible de changer le mot de passe."));
       }
 
-      changePasswordStatus = "Contraseña actualizada correctamente.";
+      changePasswordStatus = tr("Contraseña actualizada correctamente.", "Password updated successfully.", "Mot de passe mis à jour avec succès.");
       currentPassword = "";
       newPassword = "";
       newPasswordConfirm = "";
@@ -340,7 +480,7 @@
       showNewPassword = false;
       showNewPasswordConfirm = false;
     } catch (err) {
-      changePasswordError = err?.message || "No se pudo cambiar la contraseña.";
+      changePasswordError = err?.message || tr("No se pudo cambiar la contraseña.", "Could not change password.", "Impossible de changer le mot de passe.");
     } finally {
       isChangingPassword = false;
     }
@@ -354,22 +494,33 @@
     try {
       const email = await loadMeEmail();
       if (!email) {
-        throw new Error("No pudimos identificar tu correo. Intenta iniciar sesión nuevamente.");
+        throw new Error(
+          tr(
+            "No pudimos identificar tu correo. Intenta iniciar sesión nuevamente.",
+            "We could not identify your email. Please sign in again."
+          )
+        );
       }
 
       const res = await fetch(`${API}/auth/password-reset/request`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept-Language": locale,
+        },
         body: JSON.stringify({ email }),
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo enviar el enlace de recuperación.");
+        throw new Error(data.detail || tr("No se pudo enviar el enlace de recuperación.", "Could not send recovery link.", "Impossible d'envoyer le lien de récupération."));
       }
 
-      resetStatus = data?.message || "Si el correo existe, enviaremos un enlace de recuperación.";
+      resetStatus = data?.message || tr(
+        "Si el correo existe, enviaremos un enlace de recuperación.",
+        "If the email exists, we will send a recovery link."
+      );
     } catch (err) {
-      resetError = err?.message || "No se pudo enviar el enlace de recuperación.";
+      resetError = err?.message || tr("No se pudo enviar el enlace de recuperación.", "Could not send recovery link.", "Impossible d'envoyer le lien de récupération.");
     } finally {
       isSendingReset = false;
     }
@@ -384,22 +535,22 @@
     const currentEmail = String(meEmail || "").trim().toLowerCase();
 
     if (!current) {
-      emailChangeError = "Debes digitar tu contraseña actual.";
+      emailChangeError = tr("Debes digitar tu contraseña actual.", "You must enter your current password.", "Tu dois saisir ton mot de passe actuel.");
       return;
     }
 
     if (!nextEmail) {
-      emailChangeError = "Debes digitar el nuevo correo.";
+      emailChangeError = tr("Debes digitar el nuevo correo.", "You must enter the new email.", "Tu dois saisir le nouvel e-mail.");
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
-      emailChangeError = "Digita un correo electrónico válido.";
+      emailChangeError = tr("Digita un correo electrónico válido.", "Enter a valid email address.", "Saisis une adresse e-mail valide.");
       return;
     }
 
     if (currentEmail && nextEmail === currentEmail) {
-      emailChangeError = "El nuevo correo debe ser distinto al actual.";
+      emailChangeError = tr("El nuevo correo debe ser distinto al actual.", "The new email must be different from the current one.", "Le nouvel e-mail doit être différent de l'actuel.");
       return;
     }
 
@@ -415,18 +566,60 @@
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo actualizar el correo.");
+        throw new Error(data.detail || tr("No se pudo actualizar el correo.", "Could not update email.", "Impossible de mettre à jour l'e-mail."));
       }
 
       meEmail = String(data?.email || nextEmail);
       newEmail = "";
       emailCurrentPassword = "";
       showEmailCurrentPassword = false;
-      emailChangeStatus = data?.message || "Correo actualizado correctamente.";
+      emailChangeStatus = data?.message || tr("Correo actualizado correctamente.", "Email updated successfully.", "E-mail mis à jour avec succès.");
     } catch (err) {
-      emailChangeError = err?.message || "No se pudo actualizar el correo.";
+      emailChangeError = err?.message || tr("No se pudo actualizar el correo.", "Could not update email.", "Impossible de mettre à jour l'e-mail.");
     } finally {
       isChangingEmail = false;
+    }
+  };
+
+  const handleChangeName = async () => {
+    nameChangeError = "";
+    nameChangeStatus = "";
+
+    const firstName = normalizeHumanName(profileFirstName);
+    const lastName = normalizeHumanName(profileLastName);
+
+    if (!firstName) {
+      nameChangeError = tr("Debes digitar al menos un nombre.", "You must enter at least one first name.", "Tu dois saisir au moins un prénom.");
+      return;
+    }
+
+    if (!lastName) {
+      nameChangeError = tr("Debes digitar al menos un apellido.", "You must enter at least one last name.", "Tu dois saisir au moins un nom.");
+      return;
+    }
+
+    isChangingName = true;
+    try {
+      const res = await apiFetch("/auth/profile/name", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          first_name: firstName,
+          last_name: lastName,
+        }),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || tr("No se pudo actualizar tu nombre.", "Could not update your name.", "Impossible de mettre à jour ton nom."));
+      }
+
+      profileFirstName = normalizeHumanName(data?.first_name || firstName);
+      profileLastName = normalizeHumanName(data?.last_name || lastName);
+      nameChangeStatus = tr("Nombre y apellido actualizados correctamente.", "First and last name updated successfully.", "Prénom et nom mis à jour avec succès.");
+    } catch (err) {
+      nameChangeError = err?.message || tr("No se pudo actualizar tu nombre.", "Could not update your name.", "Impossible de mettre à jour ton nom.");
+    } finally {
+      isChangingName = false;
     }
   };
 
@@ -458,11 +651,11 @@
       const res = await apiFetch("/auth/2fa/status");
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cargar el estado de 2FA.");
+        throw new Error(data.detail || tr("No se pudo cargar el estado de 2FA.", "Could not load 2FA status.", "Impossible de charger l'état 2FA."));
       }
       twofaStatus = data || null;
     } catch (err) {
-      twofaStatusError = err?.message || "No se pudo cargar el estado de 2FA.";
+      twofaStatusError = err?.message || tr("No se pudo cargar el estado de 2FA.", "Could not load 2FA status.", "Impossible de charger l'état 2FA.");
       twofaStatus = null;
     } finally {
       twofaStatusLoading = false;
@@ -486,9 +679,12 @@
     if (!twofaManualCode) return;
     try {
       await navigator.clipboard.writeText(twofaManualCode);
-      twofaConfirmStatus = "Código manual copiado al portapapeles.";
+      twofaConfirmStatus = tr("Código manual copiado al portapapeles.", "Manual code copied to clipboard.", "Code manuel copié dans le presse-papiers.");
     } catch {
-      twofaConfirmStatus = "No se pudo copiar automáticamente. Selecciona el código y cópialo.";
+      twofaConfirmStatus = tr(
+        "No se pudo copiar automáticamente. Selecciona el código y cópialo.",
+        "Could not copy automatically. Select the code and copy it."
+      );
     }
   };
 
@@ -502,7 +698,7 @@
       const res = await apiFetch("/auth/2fa/setup", { method: "POST" });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo generar el QR de 2FA.");
+        throw new Error(data.detail || tr("No se pudo generar el QR de 2FA.", "Could not generate 2FA QR.", "Impossible de générer le QR 2FA."));
       }
 
       twofaQrCode = String(data?.qr_code || "");
@@ -513,7 +709,7 @@
       await tick();
       twofaCodeInput?.focus();
     } catch (err) {
-      twofaSetupError = err?.message || "No se pudo generar el QR de 2FA.";
+      twofaSetupError = err?.message || tr("No se pudo generar el QR de 2FA.", "Could not generate 2FA QR.", "Impossible de générer le QR 2FA.");
       twofaQrCode = "";
       twofaManualCode = "";
       twofaIssuer = "";
@@ -528,7 +724,7 @@
 
     const code = String(twofaCode || "").trim();
     if (!/^[0-9]{6}$/.test(code)) {
-      twofaConfirmError = "Digita un código válido de 6 dígitos.";
+      twofaConfirmError = tr("Digita un código válido de 6 dígitos.", "Enter a valid 6-digit code.", "Saisis un code valide à 6 chiffres.");
       return;
     }
 
@@ -541,17 +737,20 @@
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo activar 2FA.");
+        throw new Error(data.detail || tr("No se pudo activar 2FA.", "Could not enable 2FA.", "Impossible d'activer la 2FA."));
       }
 
-      twofaConfirmStatus = "2FA habilitado correctamente. A partir de ahora se te pedirá un código al iniciar sesión.";
+      twofaConfirmStatus = tr(
+        "2FA habilitado correctamente. A partir de ahora se te pedirá un código al iniciar sesión.",
+        "2FA enabled successfully. You will now be asked for a code when signing in."
+      );
       twofaQrCode = "";
       twofaManualCode = "";
       twofaIssuer = "";
       twofaCode = "";
       void refreshTwoFAStatus();
     } catch (err) {
-      twofaConfirmError = err?.message || "No se pudo activar 2FA.";
+      twofaConfirmError = err?.message || tr("No se pudo activar 2FA.", "Could not enable 2FA.", "Impossible d'activer la 2FA.");
     } finally {
       twofaConfirmLoading = false;
     }
@@ -566,12 +765,12 @@
       const res = await apiFetch("/auth/2fa/disable", { method: "POST" });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo deshabilitar 2FA.");
+        throw new Error(data.detail || tr("No se pudo deshabilitar 2FA.", "Could not disable 2FA.", "Impossible de désactiver la 2FA."));
       }
       if (data?.disabled) {
-        twofaDisableStatus = "2FA deshabilitado.";
+        twofaDisableStatus = tr("2FA deshabilitado.", "2FA disabled.", "2FA désactivée.");
       } else {
-        twofaDisableStatus = "2FA actualizado.";
+        twofaDisableStatus = tr("2FA actualizado.", "2FA updated.", "2FA mise à jour.");
       }
       twofaQrCode = "";
       twofaManualCode = "";
@@ -579,7 +778,7 @@
       twofaCode = "";
       void refreshTwoFAStatus();
     } catch (err) {
-      twofaDisableError = err?.message || "No se pudo deshabilitar 2FA.";
+      twofaDisableError = err?.message || tr("No se pudo deshabilitar 2FA.", "Could not disable 2FA.", "Impossible de désactiver la 2FA.");
     } finally {
       twofaDisableLoading = false;
     }
@@ -608,11 +807,11 @@
       const res = await apiFetch("/privacy/mine");
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cargar tu configuración de privacidad.");
+        throw new Error(data.detail || tr("No se pudo cargar tu configuración de privacidad.", "Could not load your privacy settings.", "Impossible de charger tes paramètres de confidentialité."));
       }
       privacySettings = normalizePrivacySettings(data);
     } catch (err) {
-      privacyError = err?.message || "No se pudo cargar tu configuración de privacidad.";
+      privacyError = err?.message || tr("No se pudo cargar tu configuración de privacidad.", "Could not load your privacy settings.", "Impossible de charger tes paramètres de confidentialité.");
       privacySettings = { ...DEFAULT_PRIVACY_SETTINGS };
     } finally {
       privacyLoading = false;
@@ -657,12 +856,12 @@
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo guardar tu configuración de privacidad.");
+        throw new Error(data.detail || tr("No se pudo guardar tu configuración de privacidad.", "Could not save your privacy settings.", "Impossible d'enregistrer tes paramètres de confidentialité."));
       }
       privacySettings = normalizePrivacySettings(data);
-      privacyStatus = "Privacidad actualizada correctamente.";
+      privacyStatus = tr("Privacidad actualizada correctamente.", "Privacy updated successfully.", "Confidentialité mise à jour avec succès.");
     } catch (err) {
-      privacyError = err?.message || "No se pudo guardar tu configuración de privacidad.";
+      privacyError = err?.message || tr("No se pudo guardar tu configuración de privacidad.", "Could not save your privacy settings.", "Impossible d'enregistrer tes paramètres de confidentialité.");
     } finally {
       privacySaving = false;
     }
@@ -701,15 +900,15 @@
     const otherReason = String(closeAccountOtherReason || "").trim();
 
     if (!reason) {
-      closeAccountError = "Selecciona un motivo para cerrar la cuenta.";
+      closeAccountError = tr("Selecciona un motivo para cerrar la cuenta.", "Select a reason to close the account.", "Sélectionne une raison pour fermer le compte.");
       return;
     }
     if (reason === ACCOUNT_CLOSE_REASON_OTHER && !otherReason) {
-      closeAccountError = "Describe el motivo en la opción “Otro”.";
+      closeAccountError = tr("Describe el motivo en la opción “Otro”.", "Describe the reason in the “Other” option.", "Décris la raison dans l'option « Autre ».");
       return;
     }
     if (!currentPassword.trim()) {
-      closeAccountError = "Digita tu contraseña para confirmar el cierre de cuenta.";
+      closeAccountError = tr("Digita tu contraseña para confirmar el cierre de cuenta.", "Enter your password to confirm account closure.", "Saisis ton mot de passe pour confirmer la fermeture du compte.");
       return;
     }
 
@@ -726,18 +925,20 @@
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cerrar la cuenta.");
+        throw new Error(data.detail || tr("No se pudo cerrar la cuenta.", "Could not close account.", "Impossible de fermer le compte."));
       }
 
       const deadlineDate = new Date(data?.restore_deadline_at || "");
-      closeAccountDeadlineLabel = Number.isNaN(deadlineDate.getTime()) ? "" : deadlineDate.toLocaleString();
+      closeAccountDeadlineLabel = Number.isNaN(deadlineDate.getTime())
+        ? ""
+        : deadlineDate.toLocaleString(isEn ? "en-US" : isFr ? "fr-FR" : "es-CO");
       closeAccountStatus = data?.message || "";
       closeAccountDone = true;
       closeAccountPassword = "";
       closeAccountOtherReason = "";
       showCloseAccountPassword = false;
     } catch (err) {
-      closeAccountError = err?.message || "No se pudo cerrar la cuenta.";
+      closeAccountError = err?.message || tr("No se pudo cerrar la cuenta.", "Could not close account.", "Impossible de fermer le compte.");
     } finally {
       closeAccountLoading = false;
     }
@@ -751,7 +952,7 @@
 <svelte:head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kiadez — Configuración y privacidad</title>
+  <title>{tr("Kiadez — Configuración y privacidad", "Kiadez — Settings and privacy", "Kiadez — Paramètres et confidentialité")}</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
@@ -762,46 +963,46 @@
         <img src="/css/logo-kiadez.webp" alt="Kiadez" />
       </a>
       <form class="topbar-search" role="search" on:submit|preventDefault>
-        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+        <input type="search" placeholder={tr("Buscar en Kiadez", "Search on Kiadez", "Rechercher sur Kiadez")} aria-label={tr("Buscar", "Search", "Rechercher")} />
       </form>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-center">
       <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
-      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-      <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
-      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+      <a class="topbar-btn" href="/gallery.html">🖼️ {tr("Galería", "Gallery", "Galerie")}</a>
+      <a class="topbar-btn" href="/my-public-whishes.html">🌐 {tr("Deseos públicos", "Public wishes", "Souhaits publics")}</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 {tr("Deseos privados", "Private wishes", "Souhaits privés")}</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ {tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis")}</a>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
       <details class="topbar-dropdown" id="profileDropdown">
-        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+        <summary class="topbar-avatar-btn" aria-label={tr("Perfil del usuario", "User profile", "Profil utilisateur")}>
+          <img src="/assets/avatar-default.jpg" alt={tr("Foto de perfil del usuario", "User profile photo", "Photo de profil utilisateur")} />
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
-          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+          <a href="/privacy-and-settings.html" role="menuitem">{tr("Configuración y privacidad", "Settings and privacy", "Paramètres et confidentialité")}</a>
+          <button type="button" role="menuitem" on:click={logout}>{tr("Cerrar sesión", "Sign out", "Se déconnecter")}</button>
         </div>
       </details>
 
-      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+      <button class="topbar-icon" type="button" aria-label={tr("Notificaciones", "Notifications", "Alertes")}>
         🔔
         <span class="topbar-badge">3</span>
       </button>
 
       <details class="topbar-dropdown" id="menuDropdown">
-        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+        <summary class="topbar-menu-btn" aria-label={tr("Abrir menú", "Open menu", "Ouvrir le menu")}>
           <span class="topbar-menu-icon" aria-hidden="true">☰</span>
-          <span class="topbar-menu-label">Menú</span>
+          <span class="topbar-menu-label">{tr("Menú", "Menu", "Navigation")}</span>
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/home_user.html" role="menuitem">Mi Home</a>
-          <a href="/achievements.html" role="menuitem">Logros recientes</a>
-          <a href="/gallery.html" role="menuitem">Galería</a>
-          <a href="/calendar.html" role="menuitem">Calendario</a>
-          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
-          <a href="/messages.html" role="menuitem">Mensajes</a>
+          <a href="/home_user.html" role="menuitem">{tr("Mi Home", "My Home", "Mon Home")}</a>
+          <a href="/achievements.html" role="menuitem">{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+          <a href="/gallery.html" role="menuitem">{tr("Galería", "Gallery", "Galerie")}</a>
+          <a href="/calendar.html" role="menuitem">{tr("Calendario", "Calendar", "Calendrier")}</a>
+          <a href="/my-biography.html" role="menuitem">{tr("Mi Biografía", "My Biography", "Ma biographie")}</a>
+          <a href="/messages.html" role="menuitem">{tr("Mensajes", "Messages", "Messagerie")}</a>
         </div>
       </details>
     </div>
@@ -809,95 +1010,177 @@
 
   <main class="user-home">
     <div class="home-body settings-body">
-      <section class="panel settings-panel" aria-label="Configuración y privacidad">
+      <section class="panel settings-panel" aria-label={tr("Configuración y privacidad", "Settings and privacy", "Paramètres et confidentialité")}>
         <div class="panel-head">
-          <h2 class="panel-title">Configuración y privacidad</h2>
-          <span class="panel-badge">Cuenta</span>
+          <h2 class="panel-title">{tr("Configuración y privacidad", "Settings and privacy", "Paramètres et confidentialité")}</h2>
+          <span class="panel-badge">{tr("Cuenta", "Account", "Compte")}</span>
         </div>
 
         <div class="settings-actions">
           <button class="settings-action" type="button" on:click={openChangePasswordModal}>
             <span class="settings-action-icon" aria-hidden="true">🔑</span>
-            <span class="settings-action-label">Cambiar contraseña</span>
+            <span class="settings-action-label">{tr("Cambiar contraseña", "Change password", "Changer le mot de passe")}</span>
           </button>
 
           <button class="settings-action" type="button" on:click={openChangeEmailModal}>
             <span class="settings-action-icon" aria-hidden="true">📧</span>
-            <span class="settings-action-label">Modificar correo electrónico</span>
+            <span class="settings-action-label">{tr("Modificar correo electrónico", "Change email address", "Changer l'adresse e-mail")}</span>
+          </button>
+
+          <button class="settings-action" type="button" on:click={openChangeNameModal}>
+            <span class="settings-action-icon" aria-hidden="true">🪪</span>
+            <span class="settings-action-label">{tr("Modificar nombre y apellido", "Edit first and last name", "Modifier prénom et nom")}</span>
+          </button>
+
+          <button class="settings-action" type="button" on:click={openLanguageModal}>
+            <span class="settings-action-icon" aria-hidden="true">🌍</span>
+            <span class="settings-action-label">{tr("Idioma de la plataforma", "Platform language", "Langue de la plateforme")}</span>
           </button>
 
           <button class="settings-action" type="button" on:click={openTwoFAModal}>
             <span class="settings-action-icon" aria-hidden="true">🛡️</span>
-            <span class="settings-action-label">Habilitar autenticación 2FA</span>
+            <span class="settings-action-label">{tr("Habilitar autenticación 2FA", "Enable 2FA authentication", "Activer l'authentification 2FA")}</span>
           </button>
 
           <button class="settings-action" type="button" on:click={openPrivacyModal}>
             <span class="settings-action-icon" aria-hidden="true">🔒</span>
-            <span class="settings-action-label">Privacidad</span>
+            <span class="settings-action-label">{tr("Privacidad", "Privacy", "Confidentialité")}</span>
           </button>
 
           <button class="settings-action is-danger" type="button" on:click={openCloseAccountModal}>
             <span class="settings-action-icon" aria-hidden="true">🗑️</span>
-            <span class="settings-action-label">Cerrar cuenta</span>
+            <span class="settings-action-label">{tr("Cerrar cuenta", "Close account", "Fermer le compte")}</span>
           </button>
         </div>
       </section>
     </div>
   </main>
+  <AuthFooter />
 
-  <footer class="kiadez-footer">
-    <div class="footer-main">
-      <div class="footer-column footer-origin">
-        <p class="footer-poem">
-          Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br />
-          No para dominar, sino para orientar.<br />
-          Su luz no deslumbra: acompaña.
+  <div
+    class="modal-overlay"
+    class:hidden={!changeNameModalOpen}
+    aria-hidden={!changeNameModalOpen}
+    on:click={(event) => {
+      if (event.target?.classList?.contains("modal-overlay")) closeChangeNameModal();
+    }}
+  >
+    <div
+      class="modal settings-change-password-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label={tr("Modificar nombre y apellido", "Edit first and last name", "Modifier prénom et nom")}
+    >
+      <div class="modal-head">
+        <h3>{tr("Modificar nombre y apellido", "Edit first and last name", "Modifier prénom et nom")}</h3>
+        <button class="modal-close" type="button" on:click={closeChangeNameModal}>✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="panel-text settings-change-intro">
+          {tr(
+            "Ajusta tu nombre visible como prefieras: puedes corregir apellidos, quitar un segundo nombre o agregar nuevos nombres.",
+            "Adjust your visible name as you prefer: you can correct last names, remove a middle name, or add new given names.",
+            "Ajuste ton nom visible comme tu veux : tu peux corriger des noms de famille, retirer un deuxième prénom ou ajouter de nouveaux prénoms."
+          )}
         </p>
+
+        <label class="modal-label" for="settings-first-name">
+          {tr("Nombre(s)", "First name(s)", "Prénom(s)")}
+        </label>
+        <input
+          class="modal-input"
+          id="settings-first-name"
+          bind:this={firstNameInput}
+          type="text"
+          bind:value={profileFirstName}
+          autocomplete="given-name"
+          maxlength="100"
+          placeholder={tr("Ej: Carlos Andrés", "Ex: Carlos Andrew", "Ex. : Carlos André")}
+        />
+
+        <label class="modal-label" for="settings-last-name">
+          {tr("Apellido(s)", "Last name(s)", "Nom(s)")}
+        </label>
+        <input
+          class="modal-input"
+          id="settings-last-name"
+          type="text"
+          bind:value={profileLastName}
+          autocomplete="family-name"
+          maxlength="100"
+          placeholder={tr("Ej: Jiménez Duarte", "Ex: Johnson Smith", "Ex. : Dupont Martin")}
+        />
+
+        {#if nameChangeError}
+          <p class="settings-form-error" role="alert">{nameChangeError}</p>
+        {/if}
+        {#if nameChangeStatus}
+          <p class="settings-form-success" role="status">{nameChangeStatus}</p>
+        {/if}
       </div>
 
-      <div class="footer-columns">
-        <div class="footer-column">
-          <h4>Sobre nuestra red social</h4>
-          <ul>
-            <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
-            <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
-            <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
-            <li><a href="/contact.html">Contacto</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Idiomas</h4>
-          <ul>
-            <li><a href="/?lang=es">Español</a></li>
-            <li><a href="/?lang=en">English</a></li>
-            <li><a href="/?lang=fr">Français</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Contacto</h4>
-          <ul>
-            <li>info@kiadez.com</li>
-            <li>+57 333 225 6078</li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>Información legal</h4>
-          <ul>
-            <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
-            <li><a href="/terms.html">Términos y condiciones</a></li>
-            <li><a href="/privacy.html">Privacidad</a></li>
-          </ul>
-        </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-compact" type="button" on:click={handleChangeName} disabled={isChangingName}>
+          {isChangingName ? tr("Actualizando...", "Updating...", "Mise à jour...") : tr("Actualizar nombre", "Update name", "Mettre à jour le nom")}
+        </button>
+        <button class="btn btn-outline btn-compact" type="button" on:click={closeChangeNameModal}>
+          {tr("Cerrar", "Close", "Fermer")}
+        </button>
       </div>
     </div>
+  </div>
 
-    <div class="footer-bottom">
-      © 2026 Kiadez — Una red social para cumplir deseos.
+  <div
+    class="modal-overlay"
+    class:hidden={!languageModalOpen}
+    aria-hidden={!languageModalOpen}
+    on:click={(event) => {
+      if (event.target?.classList?.contains("modal-overlay")) closeLanguageModal();
+    }}
+  >
+    <div class="modal settings-language-modal" role="dialog" aria-modal="true" aria-label={tr("Idioma de la plataforma", "Platform language", "Langue de la plateforme")}>
+      <div class="modal-head">
+        <h3>{tr("Idioma de la plataforma", "Platform language", "Langue de la plateforme")}</h3>
+        <button class="modal-close" type="button" on:click={closeLanguageModal}>✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="panel-text settings-close-account-intro">
+          {tr(
+            "Selecciona el idioma de tu interfaz. Al confirmar, recargaremos esta vista para aplicar el cambio completo.",
+            "Select your interface language. When you confirm, we will reload this view to apply the change completely.",
+            "Sélectionne la langue de ton interface. Lors de la confirmation, nous rechargerons cette vue pour appliquer complètement le changement."
+          )}
+        </p>
+
+        <fieldset class="settings-close-account-reasons">
+          <legend class="settings-close-account-legend">{tr("Idiomas disponibles", "Available languages", "Langues disponibles")}</legend>
+
+          <label class="settings-close-account-option">
+            <input type="radio" name="settings-language" checked={locale === "es"} on:change={() => applyLocale("es")} />
+            <span>Español</span>
+          </label>
+
+          <label class="settings-close-account-option">
+            <input type="radio" name="settings-language" checked={locale === "en"} on:change={() => applyLocale("en")} />
+            <span>English</span>
+          </label>
+
+          <label class="settings-close-account-option">
+            <input type="radio" name="settings-language" checked={locale === "fr"} on:change={() => applyLocale("fr")} />
+            <span>Français</span>
+          </label>
+        </fieldset>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-compact" type="button" on:click={closeLanguageModal}>
+          {tr("Cerrar", "Close", "Fermer")}
+        </button>
+      </div>
     </div>
-  </footer>
+  </div>
 
   <div
     class="modal-overlay"
@@ -907,9 +1190,9 @@
       if (event.target?.classList?.contains("modal-overlay") && !closeAccountDone) closeCloseAccountModal();
     }}
   >
-    <div class="modal settings-close-account-modal" role="dialog" aria-modal="true" aria-label="Cerrar cuenta">
+    <div class="modal settings-close-account-modal" role="dialog" aria-modal="true" aria-label={tr("Cerrar cuenta", "Close account", "Fermer le compte")}>
       <div class="modal-head">
-        <h3>Cerrar cuenta</h3>
+        <h3>{tr("Cerrar cuenta", "Close account", "Fermer le compte")}</h3>
         {#if !closeAccountDone}
           <button class="modal-close" type="button" on:click={closeCloseAccountModal}>✕</button>
         {/if}
@@ -918,20 +1201,20 @@
       <div class="modal-body">
         {#if closeAccountDone}
           <p class="panel-text settings-close-account-summary">
-            {closeAccountStatus || "Tu cuenta fue cerrada correctamente."}
+            {closeAccountStatus || tr("Tu cuenta fue cerrada correctamente.", "Your account was closed successfully.", "Ton compte a été fermé avec succès.")}
           </p>
           {#if closeAccountDeadlineLabel}
             <p class="panel-muted">
-              Puedes restaurarla hasta el <strong>{closeAccountDeadlineLabel}</strong> iniciando sesión con tu clave o recuperándola.
+              {tr("Puedes restaurarla hasta el", "You can restore it until", "Tu peux le restaurer jusqu'à")} <strong>{closeAccountDeadlineLabel}</strong> {tr("iniciando sesión con tu clave o recuperándola.", "by signing in with your password or recovering it.", "en te connectant avec ton mot de passe ou en le récupérant.")}
             </p>
           {/if}
         {:else}
           <p class="panel-text settings-close-account-intro">
-            Selecciona el motivo principal por el cual deseas cerrar tu cuenta.
+            {tr("Selecciona el motivo principal por el cual deseas cerrar tu cuenta.", "Select the main reason why you want to close your account.", "Sélectionne la raison principale pour laquelle tu veux fermer ton compte.")}
           </p>
 
           <fieldset class="settings-close-account-reasons">
-            <legend class="settings-close-account-legend">Motivo del cierre</legend>
+            <legend class="settings-close-account-legend">{tr("Motivo del cierre", "Reason for closure", "Raison de fermeture")}</legend>
             {#each ACCOUNT_CLOSE_OPTIONS as option}
               <label class="settings-close-account-option">
                 <input
@@ -951,7 +1234,7 @@
           </fieldset>
 
           {#if closeAccountReason === ACCOUNT_CLOSE_REASON_OTHER}
-            <label class="modal-label" for="close-account-other-reason">Especifica el motivo</label>
+            <label class="modal-label" for="close-account-other-reason">{tr("Especifica el motivo", "Specify the reason", "Précise la raison")}</label>
             <textarea
               id="close-account-other-reason"
               class="modal-textarea"
@@ -963,11 +1246,13 @@
           {/if}
 
           <div class="settings-close-account-warning">
-            Al cerrar la cuenta, tu información quedará inhabilitada para el sistema público. Además, eliminaremos tus deseos públicos y privados,
-            publicaciones, reacciones y comentarios.
+            {tr(
+              "Al cerrar la cuenta, tu información quedará inhabilitada para el sistema público. Además, eliminaremos tus deseos públicos y privados, publicaciones, reacciones y comentarios.",
+              "When closing your account, your information will be disabled for the public system. In addition, we will remove your public and private wishes, posts, reactions, and comments."
+            )}
           </div>
 
-          <label class="modal-label" for="close-account-password">Digita tu contraseña para confirmar</label>
+          <label class="modal-label" for="close-account-password">{tr("Digita tu contraseña para confirmar", "Enter your password to confirm", "Saisis ton mot de passe pour confirmer")}</label>
           <div class="settings-password-row">
             <input
               id="close-account-password"
@@ -980,7 +1265,7 @@
             <button
               class="settings-password-toggle"
               type="button"
-              aria-label={showCloseAccountPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-label={showCloseAccountPassword ? tr("Ocultar contraseña", "Hide password", "Masquer le mot de passe") : tr("Mostrar contraseña", "Show password", "Afficher le mot de passe")}
               on:click={() => (showCloseAccountPassword = !showCloseAccountPassword)}
             >
               👁️
@@ -988,8 +1273,10 @@
           </div>
 
           <p class="panel-muted settings-close-account-window">
-            Después de confirmar, tendrás 30 días para volver con esa misma contraseña o recuperándola si la olvidas. Si no regresas en ese plazo,
-            la cuenta se eliminará permanentemente.
+            {tr(
+              "Después de confirmar, tendrás 30 días para volver con esa misma contraseña o recuperándola si la olvidas. Si no regresas en ese plazo, la cuenta se eliminará permanentemente.",
+              "After confirming, you will have 30 days to return with that same password or recover it if you forget it. If you do not return within that period, the account will be permanently deleted."
+            )}
           </p>
 
           {#if closeAccountError}
@@ -1001,14 +1288,14 @@
       <div class="modal-actions">
         {#if closeAccountDone}
           <button class="btn btn-primary btn-compact" type="button" on:click={() => logout()}>
-            Ir al inicio de sesión
+            {tr("Ir al inicio de sesión", "Go to sign in", "Aller à la connexion")}
           </button>
         {:else}
           <button class="btn btn-primary btn-compact settings-close-account-confirm" type="button" on:click={handleConfirmCloseAccount} disabled={closeAccountLoading}>
-            {closeAccountLoading ? "Cerrando..." : "Confirmar cierre de cuenta"}
+            {closeAccountLoading ? tr("Cerrando...", "Closing...", "Fermeture...") : tr("Confirmar cierre de cuenta", "Confirm account closure", "Confirmer la fermeture du compte")}
           </button>
           <button class="btn btn-outline btn-compact" type="button" on:click={closeCloseAccountModal} disabled={closeAccountLoading}>
-            Cancelar
+            {tr("Cancelar", "Cancel", "Annuler")}
           </button>
         {/if}
       </div>
@@ -1023,19 +1310,22 @@
       if (event.target?.classList?.contains("modal-overlay")) closePrivacyModal();
     }}
   >
-    <div class="modal settings-privacy-modal" role="dialog" aria-modal="true" aria-label="Privacidad del perfil público">
+    <div class="modal settings-privacy-modal" role="dialog" aria-modal="true" aria-label={tr("Privacidad del perfil público", "Public profile privacy", "Confidentialité du profil public")}>
       <div class="modal-head">
-        <h3>Privacidad del perfil público</h3>
+        <h3>{tr("Privacidad del perfil público", "Public profile privacy", "Confidentialité du profil public")}</h3>
         <button class="modal-close" type="button" on:click={closePrivacyModal}>✕</button>
       </div>
 
       <div class="modal-body">
         <p class="panel-text settings-privacy-intro">
-          Decide qué partes de tu perfil estarán visibles para otros usuarios. Estos cambios no afectan lo que tú puedes ver dentro de Kiadez.
+          {tr(
+            "Decide qué partes de tu perfil estarán visibles para otros usuarios. Estos cambios no afectan lo que tú puedes ver dentro de Kiadez.",
+            "Decide which parts of your profile will be visible to other users. These changes do not affect what you can see inside Kiadez."
+          )}
         </p>
 
         {#if privacyLoading}
-          <p class="panel-muted">Cargando configuración de privacidad...</p>
+          <p class="panel-muted">{tr("Cargando configuración de privacidad...", "Loading privacy settings...", "Chargement des paramètres de confidentialité...")}</p>
         {:else}
           <div class="settings-privacy-grid">
             {#each PRIVACY_TOGGLES as toggle}
@@ -1044,7 +1334,7 @@
                   <span class="privacy-label">{toggle.label}</span>
                   <p class="settings-privacy-help">{toggle.description}</p>
                 </div>
-                <label class="switch" aria-label={`Alternar visibilidad de ${toggle.label}`}>
+                <label class="switch" aria-label={`${tr("Alternar visibilidad de", "Toggle visibility of", "Basculer la visibilité de")} ${toggle.label}`}>
                   <input
                     type="checkbox"
                     checked={Boolean(privacySettings[toggle.key])}
@@ -1068,10 +1358,10 @@
 
       <div class="modal-actions">
         <button class="btn btn-primary btn-compact" type="button" on:click={handleSavePrivacy} disabled={privacyLoading || privacySaving}>
-          {privacySaving ? "Guardando..." : "Guardar"}
+          {privacySaving ? tr("Guardando...", "Saving...", "Enregistrement...") : tr("Guardar", "Save", "Enregistrer")}
         </button>
         <button class="btn btn-outline btn-compact" type="button" on:click={closePrivacyModal}>
-          Cerrar
+          {tr("Cerrar", "Close", "Fermer")}
         </button>
       </div>
     </div>
@@ -1089,21 +1379,24 @@
       class="modal settings-change-password-modal"
       role="dialog"
       aria-modal="true"
-      aria-label="Cambiar contraseña"
+      aria-label={tr("Cambiar contraseña", "Change password", "Changer le mot de passe")}
     >
       <div class="modal-head">
-        <h3>{changePasswordMode === "change" ? "Cambiar contraseña" : "Recuperar contraseña"}</h3>
+        <h3>{changePasswordMode === "change" ? tr("Cambiar contraseña", "Change password", "Changer le mot de passe") : tr("Recuperar contraseña", "Recover password", "Récupérer le mot de passe")}</h3>
         <button class="modal-close" type="button" on:click={closeChangePasswordModal}>✕</button>
       </div>
 
       <div class="modal-body">
         {#if changePasswordMode === "change"}
           <p class="panel-text settings-change-intro">
-            Para actualizar tu contraseña, primero confirma tu contraseña de inicio de sesión.
+            {tr(
+              "Para actualizar tu contraseña, primero confirma tu contraseña de inicio de sesión.",
+              "To update your password, first confirm your sign-in password."
+            )}
           </p>
 
           <label class="modal-label" for="settings-current-password">
-            Digita tu contraseña actual
+            {tr("Digita tu contraseña actual", "Enter your current password", "Saisis ton mot de passe actuel")}
           </label>
           <div class="settings-password-row">
             <input
@@ -1117,7 +1410,7 @@
             <button
               class="settings-password-toggle"
               type="button"
-              aria-label={showCurrentPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-label={showCurrentPassword ? tr("Ocultar contraseña", "Hide password", "Masquer le mot de passe") : tr("Mostrar contraseña", "Show password", "Afficher le mot de passe")}
               on:click={() => (showCurrentPassword = !showCurrentPassword)}
             >
               👁️
@@ -1125,10 +1418,10 @@
           </div>
 
           <div class="settings-change-section">
-            <h4 class="settings-change-section-title">Cambiar contraseña</h4>
+            <h4 class="settings-change-section-title">{tr("Cambiar contraseña", "Change password", "Changer le mot de passe")}</h4>
 
             <label class="modal-label" for="settings-new-password">
-              Digita tu nueva contraseña
+              {tr("Digita tu nueva contraseña", "Enter your new password", "Saisis ton nouveau mot de passe")}
             </label>
             <div class="settings-password-row">
               <input
@@ -1141,30 +1434,30 @@
               <button
                 class="settings-password-toggle"
                 type="button"
-                aria-label={showNewPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                aria-label={showNewPassword ? tr("Ocultar contraseña", "Hide password", "Masquer le mot de passe") : tr("Mostrar contraseña", "Show password", "Afficher le mot de passe")}
                 on:click={() => (showNewPassword = !showNewPassword)}
               >
                 👁️
               </button>
             </div>
 
-            <div class="settings-password-rules" aria-label="Normativa de contraseña">
+            <div class="settings-password-rules" aria-label={tr("Normativa de contraseña", "Password policy", "Politique de mot de passe")}>
               <div class:ok={newPasswordRules.length} class="settings-password-rule">
-                {newPasswordRules.length ? "✔" : "•"} Mínimo {PASSWORD_MIN_LENGTH} caracteres
+                {newPasswordRules.length ? "✔" : "•"} {tr("Mínimo", "Minimum", "Minimum")} {PASSWORD_MIN_LENGTH} {tr("caracteres", "characters", "caractères")}
               </div>
               <div class:ok={newPasswordRules.upper} class="settings-password-rule">
-                {newPasswordRules.upper ? "✔" : "•"} Al menos 1 mayúscula
+                {newPasswordRules.upper ? "✔" : "•"} {tr("Al menos 1 mayúscula", "At least 1 uppercase letter", "Au moins 1 majuscule")}
               </div>
               <div class:ok={newPasswordRules.digit} class="settings-password-rule">
-                {newPasswordRules.digit ? "✔" : "•"} Al menos 1 número
+                {newPasswordRules.digit ? "✔" : "•"} {tr("Al menos 1 número", "At least 1 number", "Au moins 1 chiffre")}
               </div>
               <div class:ok={newPasswordRules.special} class="settings-password-rule">
-                {newPasswordRules.special ? "✔" : "•"} Al menos 1 caracter especial
+                {newPasswordRules.special ? "✔" : "•"} {tr("Al menos 1 caracter especial", "At least 1 special character", "Au moins 1 caractère spécial")}
               </div>
             </div>
 
             <label class="modal-label" for="settings-new-password-confirm">
-              Confirma tu nueva contraseña
+              {tr("Confirma tu nueva contraseña", "Confirm your new password", "Confirme ton nouveau mot de passe")}
             </label>
             <div class="settings-password-row">
               <input
@@ -1177,7 +1470,7 @@
               <button
                 class="settings-password-toggle"
                 type="button"
-                aria-label={showNewPasswordConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
+                aria-label={showNewPasswordConfirm ? tr("Ocultar contraseña", "Hide password", "Masquer le mot de passe") : tr("Mostrar contraseña", "Show password", "Afficher le mot de passe")}
                 on:click={() => (showNewPasswordConfirm = !showNewPasswordConfirm)}
               >
                 👁️
@@ -1186,7 +1479,7 @@
 
             <div class="settings-change-section-actions">
               <button class="btn btn-primary btn-compact" type="button" on:click={handleChangePassword} disabled={isChangingPassword}>
-                {isChangingPassword ? "Confirmando..." : "Actualizar contraseña"}
+                {isChangingPassword ? tr("Confirmando...", "Confirming...", "Confirmation...") : tr("Actualizar contraseña", "Update password", "Mettre à jour le mot de passe")}
               </button>
             </div>
 
@@ -1199,7 +1492,7 @@
                 changePasswordStatus = "";
               }}
             >
-              ¿Olvidaste tu contraseña?
+              {tr("¿Olvidaste tu contraseña?", "Forgot your password?", "Mot de passe oublié ?")}
             </button>
 
             {#if changePasswordError}
@@ -1211,12 +1504,15 @@
           </div>
         {:else}
           <p class="panel-text settings-reset-text">
-            Si ya no recuerdas tu contraseña, te enviaremos un enlace seguro para restablecerla.
+            {tr(
+              "Si ya no recuerdas tu contraseña, te enviaremos un enlace seguro para restablecerla.",
+              "If you no longer remember your password, we will send you a secure link to reset it."
+            )}
           </p>
 
           {#if meEmail}
             <p class="panel-muted settings-reset-meta">
-              Enviaremos el enlace a: <strong>{meEmail}</strong>
+              {tr("Enviaremos el enlace a:", "We will send the link to:", "Nous enverrons le lien à :")} <strong>{meEmail}</strong>
             </p>
           {/if}
 
@@ -1232,14 +1528,14 @@
       <div class="modal-actions">
         {#if changePasswordMode === "change"}
           <button class="btn btn-outline btn-compact" type="button" on:click={closeChangePasswordModal}>
-            Cerrar
+            {tr("Cerrar", "Close", "Fermer")}
           </button>
         {:else}
           <button class="btn btn-primary btn-compact" type="button" on:click={handleSendPasswordReset} disabled={isSendingReset}>
-            {isSendingReset ? "Enviando..." : "Enviar enlace"}
+            {isSendingReset ? tr("Enviando...", "Sending...", "Envoi...") : tr("Enviar enlace", "Send link", "Envoyer le lien")}
           </button>
           <button class="btn btn-outline btn-compact" type="button" on:click={() => (changePasswordMode = "change")}>
-            Volver
+            {tr("Volver", "Back", "Retour")}
           </button>
         {/if}
       </div>
@@ -1258,20 +1554,23 @@
       class="modal settings-change-password-modal"
       role="dialog"
       aria-modal="true"
-      aria-label="Modificar correo electrónico"
+      aria-label={tr("Modificar correo electrónico", "Change email address", "Changer l'adresse e-mail")}
     >
       <div class="modal-head">
-        <h3>Modificar correo electrónico</h3>
+        <h3>{tr("Modificar correo electrónico", "Change email address", "Changer l'adresse e-mail")}</h3>
         <button class="modal-close" type="button" on:click={closeChangeEmailModal}>✕</button>
       </div>
 
       <div class="modal-body">
         <p class="panel-text settings-change-intro">
-          Para actualizar tu correo, primero confirma tu contraseña de inicio de sesión.
+          {tr(
+            "Para actualizar tu correo, primero confirma tu contraseña de inicio de sesión.",
+            "To update your email, first confirm your sign-in password."
+          )}
         </p>
 
         <label class="modal-label" for="settings-email-current-password">
-          Digita tu contraseña actual
+          {tr("Digita tu contraseña actual", "Enter your current password", "Saisis ton mot de passe actuel")}
         </label>
         <div class="settings-password-row">
           <input
@@ -1285,7 +1584,7 @@
           <button
             class="settings-password-toggle"
             type="button"
-            aria-label={showEmailCurrentPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            aria-label={showEmailCurrentPassword ? tr("Ocultar contraseña", "Hide password", "Masquer le mot de passe") : tr("Mostrar contraseña", "Show password", "Afficher le mot de passe")}
             on:click={() => (showEmailCurrentPassword = !showEmailCurrentPassword)}
           >
             👁️
@@ -1293,16 +1592,16 @@
         </div>
 
         <div class="settings-change-section">
-          <h4 class="settings-change-section-title">Cambiar correo electrónico</h4>
+          <h4 class="settings-change-section-title">{tr("Cambiar correo electrónico", "Change email address", "Changer l'adresse e-mail")}</h4>
 
           {#if meEmail}
             <p class="panel-muted settings-change-current-email">
-              Correo actual: <strong>{meEmail}</strong>
+              {tr("Correo actual:", "Current email:", "E-mail actuel :")} <strong>{meEmail}</strong>
             </p>
           {/if}
 
           <label class="modal-label" for="settings-new-email">
-            Digita tu nuevo correo electrónico
+            {tr("Digita tu nuevo correo electrónico", "Enter your new email address", "Saisis ta nouvelle adresse e-mail")}
           </label>
           <input
             class="modal-input"
@@ -1310,12 +1609,12 @@
             type="email"
             bind:value={newEmail}
             autocomplete="email"
-            placeholder="nuevo-correo@ejemplo.com"
+            placeholder={tr("nuevo-correo@ejemplo.com", "new-email@example.com", "nouvel-email@exemple.com")}
           />
 
           <div class="settings-change-section-actions">
             <button class="btn btn-primary btn-compact" type="button" on:click={handleChangeEmail} disabled={isChangingEmail}>
-              {isChangingEmail ? "Actualizando..." : "Actualizar correo"}
+              {isChangingEmail ? tr("Actualizando...", "Updating...", "Mise à jour...") : tr("Actualizar correo", "Update email", "Mettre à jour l'e-mail")}
             </button>
           </div>
 
@@ -1330,7 +1629,7 @@
 
       <div class="modal-actions">
         <button class="btn btn-outline btn-compact" type="button" on:click={closeChangeEmailModal}>
-          Cerrar
+          {tr("Cerrar", "Close", "Fermer")}
         </button>
       </div>
     </div>
@@ -1344,29 +1643,32 @@
       if (event.target?.classList?.contains("modal-overlay")) closeTwoFAModal();
     }}
   >
-    <div class="modal settings-twofa-modal" role="dialog" aria-modal="true" aria-label="Autenticación 2FA">
+    <div class="modal settings-twofa-modal" role="dialog" aria-modal="true" aria-label={tr("Autenticación 2FA", "2FA authentication", "Authentification 2FA")}>
       <div class="modal-head">
-        <h3>Autenticación 2FA</h3>
+        <h3>{tr("Autenticación 2FA", "2FA authentication", "Authentification 2FA")}</h3>
         <button class="modal-close" type="button" on:click={closeTwoFAModal}>✕</button>
       </div>
 
       <div class="modal-body">
         <p class="panel-text settings-twofa-intro">
-          Protege tu cuenta con un segundo factor (TOTP). Al iniciar sesión, además de tu contraseña, se te pedirá un código de 6 dígitos.
+          {tr(
+            "Protege tu cuenta con un segundo factor (TOTP). Al iniciar sesión, además de tu contraseña, se te pedirá un código de 6 dígitos.",
+            "Protect your account with a second factor (TOTP). When signing in, in addition to your password, you will be asked for a 6-digit code."
+          )}
         </p>
 
         {#if twofaStatusLoading}
-          <p class="panel-muted">Cargando estado de 2FA...</p>
+          <p class="panel-muted">{tr("Cargando estado de 2FA...", "Loading 2FA status...", "Chargement de l'état 2FA...")}</p>
         {:else if twofaStatusError}
           <p class="settings-form-error" role="alert">{twofaStatusError}</p>
         {:else}
           <div class="settings-twofa-status">
             <span class="panel-badge">
-              Estado: {twofaStatus?.is_enabled ? "Activo" : "Inactivo"}
+              {tr("Estado:", "Status:", "Statut :")} {twofaStatus?.is_enabled ? tr("Activo", "Active", "Actif") : tr("Inactivo", "Inactive", "Inactif")}
             </span>
             {#if twofaStatus?.is_enabled && twofaStatus?.confirmed_at}
               <span class="panel-muted settings-twofa-date">
-                Activado el {new Date(twofaStatus.confirmed_at).toLocaleDateString("es-CO")}
+                {tr("Activado el", "Enabled on", "Activé le")} {new Date(twofaStatus.confirmed_at).toLocaleDateString(isEn ? "en-US" : isFr ? "fr-FR" : "es-CO")}
               </span>
             {/if}
           </div>
@@ -1382,7 +1684,7 @@
         {#if twofaStatus?.is_enabled}
           <div class="settings-twofa-actions">
             <button class="btn btn-outline btn-compact" type="button" on:click={handleTwoFADisable} disabled={twofaDisableLoading}>
-              {twofaDisableLoading ? "Deshabilitando..." : "Deshabilitar 2FA"}
+              {twofaDisableLoading ? tr("Deshabilitando...", "Disabling...", "Désactivation...") : tr("Deshabilitar 2FA", "Disable 2FA", "Désactiver la 2FA")}
             </button>
             <button
               class="btn btn-primary btn-compact"
@@ -1395,13 +1697,13 @@
               }}
               disabled={twofaDisableLoading || twofaSetupLoading}
             >
-              {twofaSetupLoading ? "Generando..." : "Generar nuevo 2FA"}
+              {twofaSetupLoading ? tr("Generando...", "Generating...", "Génération...") : tr("Generar nuevo 2FA", "Generate new 2FA", "Générer une nouvelle 2FA")}
             </button>
           </div>
         {:else}
           <div class="settings-twofa-actions">
             <button class="btn btn-primary btn-compact" type="button" on:click={handleTwoFASetup} disabled={twofaSetupLoading}>
-              {twofaSetupLoading ? "Generando..." : twofaQrCode ? "Regenerar QR" : "Generar QR"}
+              {twofaSetupLoading ? tr("Generando...", "Generating...", "Génération...") : twofaQrCode ? tr("Regenerar QR", "Regenerate QR", "Régénérer le QR") : tr("Generar QR", "Generate QR", "Générer le QR")}
             </button>
           </div>
         {/if}
@@ -1413,29 +1715,29 @@
         {#if twofaQrCode}
           <div class="settings-twofa-setup">
             <div class="settings-twofa-qr">
-              <img src={twofaQrCode} alt="QR de autenticación 2FA" />
+              <img src={twofaQrCode} alt={tr("QR de autenticación 2FA", "2FA authentication QR", "QR d'authentification 2FA")} />
             </div>
 
             <div class="settings-twofa-manual">
               <div class="panel-muted settings-twofa-manual-label">
-                Código manual (para apps como KeePassXC):
+                {tr("Código manual (para apps como KeePassXC):", "Manual code (for apps like KeePassXC):", "Code manuel (pour des apps comme KeePassXC) :")}
               </div>
               <div class="settings-twofa-manual-row">
                 <code class="settings-twofa-manual-code">{twofaManualCode}</code>
                 <button class="btn btn-outline btn-compact settings-twofa-copy" type="button" on:click={copyTwoFAManualCode}>
-                  Copiar
+                  {tr("Copiar", "Copy", "Copier")}
                 </button>
               </div>
               {#if twofaIssuer}
                 <div class="panel-muted settings-twofa-issuer">
-                  Emisor: <strong>{twofaIssuer}</strong>
+                  {tr("Emisor:", "Issuer:", "Émetteur :")} <strong>{twofaIssuer}</strong>
                 </div>
               {/if}
             </div>
           </div>
 
           <label class="modal-label" for="settings-twofa-code">
-            Digita el código de 6 dígitos de tu app autenticadora
+            {tr("Digita el código de 6 dígitos de tu app autenticadora", "Enter the 6-digit code from your authenticator app", "Saisis le code à 6 chiffres de ton application d'authentification")}
           </label>
           <input
             class="modal-input"
@@ -1467,11 +1769,11 @@
       <div class="modal-actions">
         {#if twofaQrCode}
           <button class="btn btn-primary btn-compact" type="button" on:click={handleTwoFAConfirm} disabled={twofaConfirmLoading}>
-            {twofaConfirmLoading ? "Confirmando..." : "Confirmar"}
+            {twofaConfirmLoading ? tr("Confirmando...", "Confirming...", "Confirmation...") : tr("Confirmar", "Confirm", "Confirmer")}
           </button>
         {/if}
         <button class="btn btn-outline btn-compact" type="button" on:click={closeTwoFAModal}>
-          Cerrar
+          {tr("Cerrar", "Close", "Fermer")}
         </button>
       </div>
     </div>

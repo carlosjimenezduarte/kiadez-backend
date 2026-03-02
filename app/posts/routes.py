@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from sqlalchemy import and_, delete, func, or_, select, tuple_, update
 from sqlalchemy.exc import IntegrityError
@@ -13,6 +13,7 @@ from app.auth.minor_accreditation import is_minor_protected
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.core.config import settings
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.core.storage import S3NotConfiguredError, generate_presigned_get_url
 from app.db.database import get_db
 from app.db.models.media import Media
@@ -59,53 +60,127 @@ from app.posts.schemas import (
 router = APIRouter(prefix="/posts", tags=["posts"])
 
 PUBLICATION_STAR_ACHIEVEMENTS: list[tuple[str, str, int, str]] = [
-    ("astral_1a", "Alumbramiento", 1, "/css/AKI/Astral/Star1/1a.webp"),
-    ("astral_1b", "Estelar", 5, "/css/AKI/Astral/Star1/1b.webp"),
+    ("astral_1a", "Illumination", 1, "/css/AKI/Astral/Star1/1a.webp"),
+    ("astral_1b", "Stellar", 5, "/css/AKI/Astral/Star1/1b.webp"),
     ("astral_1c", "Astral", 10, "/css/AKI/Astral/Star1/1c.webp"),
-    ("astral_1d", "Coleccionista de Estrellas", 30, "/css/AKI/Astral/Star1/1d.webp"),
-    ("astral_1e", "Astrónomo", 100, "/css/AKI/Astral/Star1/1e.webp"),
-    ("astral_2a", "Cartógrafo del Cielo", 200, "/css/AKI/Astral/Star2/2a.webp"),
-    ("astral_2b", "Vigilante del Firmamento", 300, "/css/AKI/Astral/Star2/2b.webp"),
-    ("astral_2c", "Tejedor de Constelaciones", 500, "/css/AKI/Astral/Star2/2c.webp"),
-    ("astral_2d", "Cronista Celeste", 800, "/css/AKI/Astral/Star2/2d.webp"),
-    ("astral_2e", "Intérprete de las Estrellas", 1000, "/css/AKI/Astral/Star2/2e.webp"),
-    ("astral_3a", "Arquitecto de Constelaciones", 1500, "/css/AKI/Astral/Star3/3a.webp"),
-    ("astral_3b", "Guardián del Cielo Nocturno", 2000, "/css/AKI/Astral/Star3/3b.webp"),
-    ("astral_3c", "Sabio del Firmamento", 2500, "/css/AKI/Astral/Star3/3c.webp"),
-    ("astral_3d", "Navegante Astral", 3000, "/css/AKI/Astral/Star3/3d.webp"),
-    ("astral_3e", "Custodio de la Luz", 4000, "/css/AKI/Astral/Star3/3e.webp"),
-    ("astral_4a", "Heraldo Estelar", 5000, "/css/AKI/Astral/Star4/4a.webp"),
-    ("astral_4b", "Señor de las Constelaciones", 10000, "/css/AKI/Astral/Star4/4b.webp"),
-    ("astral_4c", "Maestro del Cielo Profundo", 20000, "/css/AKI/Astral/Star4/4c.webp"),
-    ("astral_4d", "Orquestador de Astros", 30000, "/css/AKI/Astral/Star4/4d.webp"),
-    ("astral_4e", "Regente del Firmamento", 50000, "/css/AKI/Astral/Star4/4e.webp"),
-    ("astral_5a", "Forjador de Universos", 70000, "/css/AKI/Astral/Star5/5a.webp"),
-    ("astral_5b", "Portador del Cielo", 100000, "/css/AKI/Astral/Star5/5b.webp"),
-    ("astral_5c", "Soberano de las Estrellas", 150000, "/css/AKI/Astral/Star5/5c.webp"),
-    ("astral_5d", "Arquitecto del Cosmos", 200000, "/css/AKI/Astral/Star5/5d.webp"),
-    ("astral_5e", "Vigía del Infinito", 300000, "/css/AKI/Astral/Star5/5e.webp"),
-    ("astral_6a", "Hijo del Cosmos", 600000, "/css/AKI/Astral/Star6/6a.webp"),
-    ("astral_6b", "Conciencia Estelar", 1000000, "/css/AKI/Astral/Star6/6b.webp"),
-    ("astral_6c", "Alma del Firmamento", 1500000, "/css/AKI/Astral/Star6/6c.webp"),
-    ("astral_6d", "Trono de las Estrellas", 2000000, "/css/AKI/Astral/Star6/6d.webp"),
-    ("astral_6e", "Estrella Eterna", 5000000, "/css/AKI/Astral/Star6/6e.webp"),
+    ("astral_1d", "Star Collector", 30, "/css/AKI/Astral/Star1/1d.webp"),
+    ("astral_1e", "Astronomer", 100, "/css/AKI/Astral/Star1/1e.webp"),
+    ("astral_2a", "Sky Cartographer", 200, "/css/AKI/Astral/Star2/2a.webp"),
+    ("astral_2b", "Skywatcher", 300, "/css/AKI/Astral/Star2/2b.webp"),
+    ("astral_2c", "Constellation Weaver", 500, "/css/AKI/Astral/Star2/2c.webp"),
+    ("astral_2d", "Celestial Chronicler", 800, "/css/AKI/Astral/Star2/2d.webp"),
+    ("astral_2e", "Star Interpreter", 1000, "/css/AKI/Astral/Star2/2e.webp"),
+    ("astral_3a", "Constellation Architect", 1500, "/css/AKI/Astral/Star3/3a.webp"),
+    ("astral_3b", "Guardian of the Night Sky", 2000, "/css/AKI/Astral/Star3/3b.webp"),
+    ("astral_3c", "Sage of the Firmament", 2500, "/css/AKI/Astral/Star3/3c.webp"),
+    ("astral_3d", "Astral Navigator", 3000, "/css/AKI/Astral/Star3/3d.webp"),
+    ("astral_3e", "Keeper of the Light", 4000, "/css/AKI/Astral/Star3/3e.webp"),
+    ("astral_4a", "Stellar Herald", 5000, "/css/AKI/Astral/Star4/4a.webp"),
+    ("astral_4b", "Lord of Constellations", 10000, "/css/AKI/Astral/Star4/4b.webp"),
+    ("astral_4c", "Master of the Deep Sky", 20000, "/css/AKI/Astral/Star4/4c.webp"),
+    ("astral_4d", "Orchestrator of Stars", 30000, "/css/AKI/Astral/Star4/4d.webp"),
+    ("astral_4e", "Regent of the Firmament", 50000, "/css/AKI/Astral/Star4/4e.webp"),
+    ("astral_5a", "Forger of Universes", 70000, "/css/AKI/Astral/Star5/5a.webp"),
+    ("astral_5b", "Bearer of the Sky", 100000, "/css/AKI/Astral/Star5/5b.webp"),
+    ("astral_5c", "Sovereign of the Stars", 150000, "/css/AKI/Astral/Star5/5c.webp"),
+    ("astral_5d", "Architect of the Cosmos", 200000, "/css/AKI/Astral/Star5/5d.webp"),
+    ("astral_5e", "Sentinel of Infinity", 300000, "/css/AKI/Astral/Star5/5e.webp"),
+    ("astral_6a", "Child of the Cosmos", 600000, "/css/AKI/Astral/Star6/6a.webp"),
+    ("astral_6b", "Stellar Consciousness", 1000000, "/css/AKI/Astral/Star6/6b.webp"),
+    ("astral_6c", "Soul of the Firmament", 1500000, "/css/AKI/Astral/Star6/6c.webp"),
+    ("astral_6d", "Throne of the Stars", 2000000, "/css/AKI/Astral/Star6/6d.webp"),
+    ("astral_6e", "Eternal Star", 5000000, "/css/AKI/Astral/Star6/6e.webp"),
 ]
 
 DONATION_STAR_ACHIEVEMENTS: list[tuple[str, str, int, str]] = [
-    ("donation_1", "Explorador del Misterio", 1000, "/css/AKI/Donation/1.webp"),
-    ("donation_2", "Confiado en el Universo", 5000, "/css/AKI/Donation/2.webp"),
-    ("donation_3", "Creyente de las Nebulosas", 10000, "/css/AKI/Donation/3.webp"),
-    ("donation_4", "Guardián del Flujo Estelar", 20000, "/css/AKI/Donation/4.webp"),
-    ("donation_5", "Portador del Vacío Fértil", 50000, "/css/AKI/Donation/5.webp"),
-    ("donation_6", "Custodio del Fondo Común", 100000, "/css/AKI/Donation/6.webp"),
-    ("donation_7", "Tejedor de Constelaciones", 200000, "/css/AKI/Donation/7.webp"),
-    ("donation_8", "Voz del Silencio Cósmico", 300000, "/css/AKI/Donation/8.webp"),
-    ("donation_9", "Arquitecto del Bien Común", 500000, "/css/AKI/Donation/9.webp"),
-    ("donation_10", "Semilla del Infinito", 1000000, "/css/AKI/Donation/10.webp"),
+    ("donation_1", "Explorer of Mystery", 1000, "/css/AKI/Donation/1.webp"),
+    ("donation_2", "Trusting the Universe", 5000, "/css/AKI/Donation/2.webp"),
+    ("donation_3", "Believer in Nebulae", 10000, "/css/AKI/Donation/3.webp"),
+    ("donation_4", "Guardian of Stellar Flow", 20000, "/css/AKI/Donation/4.webp"),
+    ("donation_5", "Bearer of the Fertile Void", 50000, "/css/AKI/Donation/5.webp"),
+    ("donation_6", "Keeper of the Common Pool", 100000, "/css/AKI/Donation/6.webp"),
+    ("donation_7", "Constellation Weaver", 200000, "/css/AKI/Donation/7.webp"),
+    ("donation_8", "Voice of Cosmic Silence", 300000, "/css/AKI/Donation/8.webp"),
+    ("donation_9", "Architect of the Common Good", 500000, "/css/AKI/Donation/9.webp"),
+    ("donation_10", "Seed of Infinity", 1000000, "/css/AKI/Donation/10.webp"),
 ]
 
 MENTION_PATTERN = re.compile(r"(?<![A-Za-z0-9._])@([A-Za-z0-9._]{4,30})(?![A-Za-z0-9._])")
 HASHTAG_PATTERN = re.compile(r"(?<![A-Za-z0-9_])#([A-Za-z0-9_]{2,50})(?![A-Za-z0-9_])")
+
+
+def _locale(request: Request | None) -> str:
+    return locale_from_request(request, default="en")
+
+
+def _td(locale: str, en: str, **fmt: object) -> str:
+    translations: dict[str, tuple[str, str]] = {
+        "Could not tag: {users}.": (
+            "No se pudo etiquetar a: {users}.",
+            "Impossible de taguer : {users}.",
+        ),
+        "You can only tag users with mutual follow status. Please review: {users}.": (
+            "Solo puedes etiquetar usuarios con seguimiento mutuo. Revisa: {users}.",
+            "Vous ne pouvez taguer que des utilisateurs avec suivi mutuel. Vérifiez : {users}.",
+        ),
+        "Post not found.": ("Publicación no encontrada.", "Publication introuvable."),
+        "This account is in protected mode and its public posts are not available.": (
+            "Esta cuenta está en modo protegido y sus publicaciones públicas no están disponibles.",
+            "Ce compte est en mode protégé et ses publications publiques ne sont pas disponibles.",
+        ),
+        "This account is in protected mode and does not expose public posts.": (
+            "Esta cuenta está en modo protegido y no expone publicaciones públicas.",
+            "Ce compte est en mode protégé et n'expose pas de publications publiques.",
+        ),
+        "This profile personal posts are hidden for privacy.": (
+            "Las publicaciones personales de este perfil están ocultas por privacidad.",
+            "Les publications personnelles de ce profil sont masquées pour des raisons de confidentialité.",
+        ),
+        "Type text to search.": ("Escribe texto para buscar.", "Saisissez du texte à rechercher."),
+        "User not found.": ("Usuario no encontrado.", "Utilisateur introuvable."),
+        "Media not found.": ("Medio no encontrado.", "Média introuvable."),
+        "Not authorized to use this media.": ("No autorizado para usar este medio.", "Non autorisé à utiliser ce média."),
+        "Media not available yet.": ("El medio aún no está disponible.", "Le média n'est pas encore disponible."),
+        "Not authorized to edit this post.": (
+            "No autorizado para editar esta publicación.",
+            "Non autorisé à modifier cette publication.",
+        ),
+        "Post text cannot be empty.": (
+            "El texto de la publicación no puede estar vacío.",
+            "Le texte de la publication ne peut pas être vide.",
+        ),
+        "Not authorized to delete this post.": (
+            "No autorizado para eliminar esta publicación.",
+            "Non autorisé à supprimer cette publication.",
+        ),
+        "You cannot donate stars to yourself.": (
+            "No puedes donar estrellas a ti mismo.",
+            "Vous ne pouvez pas donner des étoiles à vous-même.",
+        ),
+        "You already donated a star to this post. Donation is irreversible.": (
+            "Ya donaste una estrella a esta publicación. La donación es irreversible.",
+            "Vous avez déjà donné une étoile à cette publication. Le don est irréversible.",
+        ),
+        "You cannot report your own post.": (
+            "No puedes reportar tu propia publicación.",
+            "Vous ne pouvez pas signaler votre propre publication.",
+        ),
+        "You already reported this post.": (
+            "Ya reportaste esta publicación.",
+            "Vous avez déjà signalé cette publication.",
+        ),
+    }
+    english = en.format(**fmt) if fmt else en
+    pair = translations.get(en)
+    if not pair:
+        return english
+    es, fr = pair
+    return i18n_tr(
+        locale,
+        es=(es.format(**fmt) if fmt else es),
+        en=english,
+        fr=(fr.format(**fmt) if fmt else fr),
+    )
 
 
 def _build_profile_url(username: str | None, *, user_id: int) -> str:
@@ -224,7 +299,7 @@ def _search_users(
     return [
         PostSearchUserOut(
             user_id=int(user.id),
-            full_name=f"{(user.first_name or '').strip()} {(user.last_name or '').strip()}".strip() or f"Usuario {user.id}",
+            full_name=f"{(user.first_name or '').strip()} {(user.last_name or '').strip()}".strip() or f"User {user.id}",
             username=(user.username or "").strip() or None,
             handle=_build_handle(username=(user.username or "").strip() or None, user_id=int(user.id)),
             profile_url=_build_profile_url((user.username or "").strip() or None, user_id=int(user.id)),
@@ -315,6 +390,7 @@ def _resolve_post_mentions_payload(
     db: Session,
     author_id: int,
     text: str | None,
+    locale: str,
 ) -> list[dict[str, int]]:
     extracted = _extract_mentions_from_text(text)
     if not extracted:
@@ -335,7 +411,7 @@ def _resolve_post_mentions_payload(
         suffix = "..." if len(missing) > 5 else ""
         raise HTTPException(
             status_code=400,
-            detail=f"No se pudo etiquetar: {formatted}{suffix}.",
+            detail=_td(locale, "Could not tag: {users}.", users=f"{formatted}{suffix}"),
         )
 
     mentioned_user_ids = sorted({int(user_by_username[username].id) for username in usernames})
@@ -366,9 +442,10 @@ def _resolve_post_mentions_payload(
         suffix = "..." if len(disallowed_usernames) > 5 else ""
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Solo puedes etiquetar usuarios con seguimiento mutuo. "
-                f"Revisa: {formatted}{suffix}."
+            detail=_td(
+                locale,
+                "You can only tag users with mutual follow status. Please review: {users}.",
+                users=f"{formatted}{suffix}",
             ),
         )
 
@@ -387,11 +464,11 @@ def _resolve_post_mentions_payload(
 
 
 def _publication_achievement_description(threshold: int) -> str:
-    return f"Has alcanzado {threshold:,} estrellas por tus publicaciones".replace(",", ".")
+    return f"You reached {threshold:,} stars from your posts".replace(",", ".")
 
 
 def _donation_achievement_description(threshold: int) -> str:
-    base = f"Has acumulado una donación de más de {threshold:,} estrellas al Fondo Común de Estrellas"
+    base = f"You accumulated a donation of more than {threshold:,} stars to the Common Star Pool"
     return base.replace(",", ".")
 
 
@@ -463,23 +540,23 @@ def _author_out(user: User) -> PostAuthorOut:
     )
 
 
-def _ensure_post_access(post: Post, current_user_id: int) -> None:
+def _ensure_post_access(post: Post, current_user_id: int, locale: str) -> None:
     if post.visibility == PostVisibility.private and post.author_id != current_user_id:
-        raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Post not found."))
 
 
-def _ensure_author_posts_visibility(author: User, viewer_user_id: int) -> None:
+def _ensure_author_posts_visibility(author: User, viewer_user_id: int, locale: str) -> None:
     if int(author.id) == int(viewer_user_id):
         return
     if is_minor_protected(author):
         raise HTTPException(
             status_code=403,
-            detail="Esta cuenta está en modo protegido y sus publicaciones públicas no están disponibles.",
+            detail=_td(locale, "This account is in protected mode and its public posts are not available."),
         )
     if not bool(author.public_profile_show_personal_posts):
         raise HTTPException(
             status_code=403,
-            detail="Las publicaciones personales de este perfil están ocultas por privacidad.",
+            detail=_td(locale, "This profile personal posts are hidden for privacy."),
         )
 
 
@@ -749,6 +826,7 @@ def get_feed(
 
 @router.get("/search", response_model=PostSearchOut)
 def search_posts_and_people(
+    request: Request,
     q: str = Query(..., min_length=1, max_length=80),
     user_limit: int = Query(default=8, ge=1, le=20),
     hashtag_limit: int = Query(default=10, ge=1, le=20),
@@ -756,9 +834,10 @@ def search_posts_and_people(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     normalized_query = _normalize_search_query(q)
     if not normalized_query:
-        raise HTTPException(status_code=400, detail="Digita un texto para buscar.")
+        raise HTTPException(status_code=400, detail=_td(locale, "Type text to search."))
 
     normalized_user_query = normalized_query
     while normalized_user_query.startswith("@"):
@@ -824,12 +903,14 @@ def list_my_posts(
 
 @router.get("/user/{user_id}", response_model=list[PostOut])
 def list_user_posts(
+    request: Request,
     user_id: int,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     current_user_id = current.user_number
     target = db.execute(
         select(User).where(
@@ -838,18 +919,18 @@ def list_user_posts(
         )
     ).scalar_one_or_none()
     if target is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     is_owner = int(user_id) == int(current_user_id)
     if not is_owner and is_minor_protected(target):
         raise HTTPException(
             status_code=403,
-            detail="Esta cuenta está en modo protegido y no expone publicaciones públicas.",
+            detail=_td(locale, "This account is in protected mode and does not expose public posts."),
         )
     if not is_owner and not bool(target.public_profile_show_personal_posts):
         raise HTTPException(
             status_code=403,
-            detail="Las publicaciones personales de este perfil están ocultas por privacidad.",
+            detail=_td(locale, "This profile personal posts are hidden for privacy."),
         )
 
     filters = [Post.author_id == user_id]
@@ -927,15 +1008,17 @@ def donate_stars_to_pool(
 
 @router.post("", response_model=PostOut)
 def create_post(
+    request: Request,
     payload: PostCreateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     author = db.execute(
         select(User).where(User.id == current.user_number, User.is_active.is_(True))
     ).scalar_one_or_none()
     if author is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     text = (payload.text or "").strip() or None
     media: Media | None = None
@@ -943,11 +1026,11 @@ def create_post(
     if payload.media_id is not None:
         media = db.execute(select(Media).where(Media.id == payload.media_id)).scalar_one_or_none()
         if media is None:
-            raise HTTPException(status_code=404, detail="Media no encontrada.")
+            raise HTTPException(status_code=404, detail=_td(locale, "Media not found."))
         if media.owner_id != current.user_number:
-            raise HTTPException(status_code=403, detail="No autorizado para usar esta media.")
+            raise HTTPException(status_code=403, detail=_td(locale, "Not authorized to use this media."))
         if media.status != "ready":
-            raise HTTPException(status_code=409, detail="Media aún no disponible.")
+            raise HTTPException(status_code=409, detail=_td(locale, "Media not available yet."))
 
     media_kind = payload.media_kind
     if media and media_kind is None and media.mime_type:
@@ -965,6 +1048,7 @@ def create_post(
         db=db,
         author_id=int(current.user_number),
         text=text,
+        locale=locale,
     )
 
     post = Post(
@@ -1017,26 +1101,28 @@ def create_post(
 
 @router.patch("/{post_id}", response_model=PostOut)
 def update_post_text(
+    request: Request,
     post_id: int,
     payload: PostUpdateTextRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     row = db.execute(
         select(Post, User)
         .join(User, User.id == Post.author_id)
         .where(Post.id == post_id)
     ).one_or_none()
     if row is None:
-        raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Post not found."))
 
     post, author = row
     if int(post.author_id) != int(current.user_number):
-        raise HTTPException(status_code=403, detail="No autorizado para editar esta publicación.")
+        raise HTTPException(status_code=403, detail=_td(locale, "Not authorized to edit this post."))
 
     text = (payload.text or "").strip()
     if not text:
-        raise HTTPException(status_code=400, detail="El texto de la publicación no puede estar vacío.")
+        raise HTTPException(status_code=400, detail=_td(locale, "Post text cannot be empty."))
 
     post.text = text
 
@@ -1048,6 +1134,7 @@ def update_post_text(
         db=db,
         author_id=int(current.user_number),
         text=text,
+        locale=locale,
     )
     for mention in mentions_payload:
         db.add(
@@ -1099,15 +1186,17 @@ def update_post_text(
 
 @router.delete("/{post_id}", response_model=PostDeleteResponse)
 def delete_post(
+    request: Request,
     post_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     post = db.execute(select(Post).where(Post.id == post_id)).scalar_one_or_none()
     if not post:
-        raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Post not found."))
     if post.author_id != current.user_number:
-        raise HTTPException(status_code=403, detail="No autorizado para eliminar esta publicación.")
+        raise HTTPException(status_code=403, detail=_td(locale, "Not authorized to delete this post."))
 
     report_case = db.execute(
         select(PostReportCase).where(PostReportCase.post_id == post.id)
@@ -1140,23 +1229,25 @@ def delete_post(
 
 @router.post("/{post_id}/stars", response_model=PostStarResponse)
 def donate_star(
+    request: Request,
     post_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     row = db.execute(
         select(Post, User)
         .join(User, User.id == Post.author_id)
         .where(Post.id == post_id)
     ).one_or_none()
     if row is None:
-        raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Post not found."))
     post, author = row
-    _ensure_post_access(post, current.user_number)
-    _ensure_author_posts_visibility(author, current.user_number)
+    _ensure_post_access(post, current.user_number, locale)
+    _ensure_author_posts_visibility(author, current.user_number, locale)
 
     if post.author_id == current.user_number:
-        raise HTTPException(status_code=400, detail="No puedes donarte estrellas a ti mismo.")
+        raise HTTPException(status_code=400, detail=_td(locale, "You cannot donate stars to yourself."))
 
     db.add(PostStar(post_id=post_id, user_id=current.user_number))
     try:
@@ -1165,7 +1256,7 @@ def donate_star(
         db.rollback()
         raise HTTPException(
             status_code=409,
-            detail="Ya donaste una estrella a esta publicación. La donación es irreversible.",
+            detail=_td(locale, "You already donated a star to this post. Donation is irreversible."),
         )
 
     post.star_count = (post.star_count or 0) + 1
@@ -1190,20 +1281,22 @@ def donate_star(
 
 @router.post("/{post_id}/share", response_model=PostShareResponse)
 def share_post(
+    request: Request,
     post_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     row = db.execute(
         select(Post, User)
         .join(User, User.id == Post.author_id)
         .where(Post.id == post_id)
     ).one_or_none()
     if row is None:
-        raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Post not found."))
     post, author = row
-    _ensure_post_access(post, current.user_number)
-    _ensure_author_posts_visibility(author, current.user_number)
+    _ensure_post_access(post, current.user_number, locale)
+    _ensure_author_posts_visibility(author, current.user_number, locale)
 
     post.share_count = (post.share_count or 0) + 1
     db.commit()
@@ -1212,22 +1305,24 @@ def share_post(
 
 @router.get("/{post_id}/comments", response_model=list[PostCommentOut])
 def list_comments(
+    request: Request,
     post_id: int,
     limit: int = Query(default=100, ge=1, le=300),
     offset: int = Query(default=0, ge=0),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     row = db.execute(
         select(Post, User)
         .join(User, User.id == Post.author_id)
         .where(Post.id == post_id)
     ).one_or_none()
     if row is None:
-        raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Post not found."))
     post, author = row
-    _ensure_post_access(post, current.user_number)
-    _ensure_author_posts_visibility(author, current.user_number)
+    _ensure_post_access(post, current.user_number, locale)
+    _ensure_author_posts_visibility(author, current.user_number, locale)
 
     rows = db.execute(
         select(PostComment, User)
@@ -1252,21 +1347,23 @@ def list_comments(
 
 @router.post("/{post_id}/comments", response_model=PostCommentOut)
 def create_comment(
+    request: Request,
     post_id: int,
     payload: PostCommentCreateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     row = db.execute(
         select(Post, User)
         .join(User, User.id == Post.author_id)
         .where(Post.id == post_id)
     ).one_or_none()
     if row is None:
-        raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Post not found."))
     post, author = row
-    _ensure_post_access(post, current.user_number)
-    _ensure_author_posts_visibility(author, current.user_number)
+    _ensure_post_access(post, current.user_number, locale)
+    _ensure_author_posts_visibility(author, current.user_number, locale)
 
     comment = PostComment(
         post_id=post.id,
@@ -1290,23 +1387,25 @@ def create_comment(
 
 @router.post("/{post_id}/reports", response_model=PostReportResponse)
 def report_post(
+    request: Request,
     post_id: int,
     payload: PostReportCreateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     row = db.execute(
         select(Post, User)
         .join(User, User.id == Post.author_id)
         .where(Post.id == post_id)
     ).one_or_none()
     if row is None:
-        raise HTTPException(status_code=404, detail="Publicación no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Post not found."))
     post, author = row
-    _ensure_post_access(post, current.user_number)
-    _ensure_author_posts_visibility(author, current.user_number)
+    _ensure_post_access(post, current.user_number, locale)
+    _ensure_author_posts_visibility(author, current.user_number, locale)
     if post.author_id == current.user_number:
-        raise HTTPException(status_code=400, detail="No puedes reportar tu propia publicación.")
+        raise HTTPException(status_code=400, detail=_td(locale, "You cannot report your own post."))
 
     now = datetime.now(timezone.utc)
     report_case = db.execute(
@@ -1355,6 +1454,6 @@ def report_post(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Ya reportaste esta publicación.")
+        raise HTTPException(status_code=409, detail=_td(locale, "You already reported this post."))
 
     return PostReportResponse(reported=True, post_id=post.id, reason=payload.reason)

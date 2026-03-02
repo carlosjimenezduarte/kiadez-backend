@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from math import ceil
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import asc, case, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.core.config import settings
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.core.storage import S3NotConfiguredError, generate_presigned_get_url
 from app.db.database import get_db
 from app.db.models.media import Media, MediaVisibility
@@ -33,6 +34,42 @@ PAGE_SIZE_MAX = 25
 SUGGESTIONS_MAX_PAGES = 20
 SUGGESTIONS_RECENT_DAYS = 90
 GUARDIANS_MIN_RANK = 3
+
+
+def _locale(request: Request | None) -> str:
+    return locale_from_request(request, default="en")
+
+
+def _td(locale: str, en: str) -> str:
+    translations: dict[str, tuple[str, str]] = {
+        "You must send exactly one: user_id or username.": (
+            "Debes enviar exactamente uno: user_id o username.",
+            "Vous devez envoyer exactement un seul champ : user_id ou username.",
+        ),
+        "Invalid username.": ("Nombre de usuario inválido.", "Nom d'utilisateur invalide."),
+        "User not found.": ("Usuario no encontrado.", "Utilisateur introuvable."),
+        "You cannot report your own profile.": (
+            "No puedes reportar tu propio perfil.",
+            "Vous ne pouvez pas signaler votre propre profil.",
+        ),
+        "You already reported this profile.": (
+            "Ya reportaste este perfil.",
+            "Vous avez déjà signalé ce profil.",
+        ),
+        "You cannot follow yourself.": (
+            "No puedes seguirte a ti mismo.",
+            "Vous ne pouvez pas vous suivre vous-même.",
+        ),
+        "You cannot unfollow yourself.": (
+            "No puedes dejar de seguirte a ti mismo.",
+            "Vous ne pouvez pas arrêter de vous suivre vous-même.",
+        ),
+    }
+    pair = translations.get(en)
+    if not pair:
+        return en
+    es, fr = pair
+    return i18n_tr(locale, es=es, en=en, fr=fr)
 
 
 def _build_profile_url(username: str | None, *, user_id: int) -> str:
@@ -156,7 +193,7 @@ def _rows_to_items(
         username = (payload["username"] or "").strip() or None
         first_name = (payload["first_name"] or "").strip()
         last_name = (payload["last_name"] or "").strip()
-        full_name = f"{first_name} {last_name}".strip() or f"Usuario {user_id}"
+        full_name = f"{first_name} {last_name}".strip() or f"User {user_id}"
         show_followers_count = user_id == int(current_user_id) or bool(payload.get("public_profile_show_followers", True))
         show_stars_total = user_id == int(current_user_id) or bool(payload.get("public_profile_show_stars", True))
 
@@ -230,15 +267,17 @@ def _fetch_follows_me_ids(db: Session, *, current_user_id: int, target_ids: list
 
 @router.get("/profile", response_model=FollowUserOut)
 def get_user_profile(
+    request: Request,
     user_id: int | None = Query(default=None, ge=1),
     username: str | None = Query(default=None),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     if bool(user_id) == bool(username):
         raise HTTPException(
             status_code=400,
-            detail="Debes enviar exactamente uno: user_id o username.",
+            detail=_td(locale, "You must send exactly one: user_id or username."),
         )
 
     current_user_id = current.user_number
@@ -256,7 +295,7 @@ def get_user_profile(
         while normalized.startswith("@"):
             normalized = normalized[1:]
         if not normalized:
-            raise HTTPException(status_code=400, detail="Username inválido.")
+            raise HTTPException(status_code=400, detail=_td(locale, "Invalid username."))
 
         target_user = db.execute(
             select(User).where(
@@ -266,7 +305,7 @@ def get_user_profile(
         ).scalar_one_or_none()
 
     if target_user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     media: Media | None = None
     if target_user.profile_photo_media_id is not None:
@@ -286,7 +325,7 @@ def get_user_profile(
     )
 
     normalized_username = (target_user.username or "").strip() or None
-    full_name = f"{(target_user.first_name or '').strip()} {(target_user.last_name or '').strip()}".strip() or f"Usuario {target_user.id}"
+    full_name = f"{(target_user.first_name or '').strip()} {(target_user.last_name or '').strip()}".strip() or f"User {target_user.id}"
     is_owner = int(target_user.id) == int(current_user_id)
     followers_count = _count_followers(db, user_id=int(target_user.id)) if is_owner or bool(target_user.public_profile_show_followers) else 0
     received_stars_total = max(0, int(target_user.received_stars_total or 0)) if is_owner or bool(target_user.public_profile_show_stars) else 0
@@ -579,14 +618,16 @@ def list_my_following(
 
 @router.post("/profile/{target_user_id}/reports", response_model=ProfileReportResponse)
 def report_profile(
+    request: Request,
     target_user_id: int,
     payload: ProfileReportCreateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     current_user_id = int(current.user_number)
     if int(target_user_id) == current_user_id:
-        raise HTTPException(status_code=400, detail="No puedes reportar tu propio perfil.")
+        raise HTTPException(status_code=400, detail=_td(locale, "You cannot report your own profile."))
 
     target_user = db.execute(
         select(User).where(
@@ -595,7 +636,7 @@ def report_profile(
         )
     ).scalar_one_or_none()
     if target_user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     now = datetime.now(timezone.utc)
     report_case = db.execute(
@@ -636,20 +677,22 @@ def report_profile(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Ya reportaste este perfil.")
+        raise HTTPException(status_code=409, detail=_td(locale, "You already reported this profile."))
 
     return ProfileReportResponse(reported=True, target_user_id=int(target_user_id), reason=payload.reason)
 
 
 @router.post("/{target_user_id}", response_model=FollowActionResponse, status_code=status.HTTP_200_OK)
 def follow_user(
+    request: Request,
     target_user_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     current_user_id = current.user_number
     if target_user_id == current_user_id:
-        raise HTTPException(status_code=400, detail="No puedes seguirte a ti mismo.")
+        raise HTTPException(status_code=400, detail=_td(locale, "You cannot follow yourself."))
 
     target_user = db.execute(
         select(User).where(
@@ -658,7 +701,7 @@ def follow_user(
         )
     ).scalar_one_or_none()
     if target_user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     relation = db.execute(
         select(UserFollow).where(
@@ -693,13 +736,15 @@ def follow_user(
 
 @router.delete("/{target_user_id}", response_model=FollowActionResponse)
 def unfollow_user(
+    request: Request,
     target_user_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     current_user_id = current.user_number
     if target_user_id == current_user_id:
-        raise HTTPException(status_code=400, detail="No puedes dejar de seguirte a ti mismo.")
+        raise HTTPException(status_code=400, detail=_td(locale, "You cannot unfollow yourself."))
 
     relation = db.execute(
         select(UserFollow).where(

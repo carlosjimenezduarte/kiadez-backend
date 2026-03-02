@@ -19,5 +19,4 @@ with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
     server.login(SMTP_USER, SMTP_PASS)
     server.send_message(msg)
 
-print("✅ Correo enviado correctamente")
-
+print("Email sent successfully")

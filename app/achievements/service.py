@@ -323,32 +323,32 @@ def _format_int_es(value: int) -> str:
 
 def _achievement_description(*, category: str, threshold: int, title: str) -> str:
     if category == CATEGORY_PUBLICATION_STARS:
-        return f"Has alcanzado {_format_int_es(threshold)} estrellas por tus publicaciones"
+        return f"You reached {_format_int_es(threshold)} stars from your posts"
     if category == CATEGORY_DONATION_STARS:
         return (
-            "Has acumulado una donación de más de "
-            f"{_format_int_es(threshold)} estrellas al Fondo Común de Estrellas"
+            "You accumulated a donation of more than "
+            f"{_format_int_es(threshold)} stars to the Common Star Pool"
         )
     if category == CATEGORY_FULFILLED_WISHES:
-        noun = "deseo" if int(threshold) == 1 else "deseos"
-        return f"Has cumplido {_format_int_es(threshold)} {noun}"
+        noun = "wish" if int(threshold) == 1 else "wishes"
+        return f"You fulfilled {_format_int_es(threshold)} {noun}"
     if category == CATEGORY_GRANTED_WISHES:
-        noun = "deseo" if int(threshold) == 1 else "deseos"
-        return f"Has ayudado a cumplir {_format_int_es(threshold)} {noun}"
+        noun = "wish" if int(threshold) == 1 else "wishes"
+        return f"You helped fulfill {_format_int_es(threshold)} {noun}"
     if category == CATEGORY_CALENDAR_STREAK:
         if int(threshold) == 1:
-            return "Has hecho tu 1° publicación en el calendario"
+            return "You made your 1st calendar post"
         if int(threshold) == 3:
-            return "Has publicado 3 días consecutivos"
+            return "You posted for 3 consecutive days"
         if int(threshold) == 7:
-            return "Has tenido una racha de 7 días de publicaciones"
+            return "You reached a 7-day posting streak"
         return (
-            "Has publicado activamente en esta red social, manteniendo una racha de "
-            f"{_format_int_es(threshold)} días"
+            "You have posted actively on this social network, maintaining a streak of "
+            f"{_format_int_es(threshold)} days"
         )
     if category == CATEGORY_GUARDIAN_RANK:
-        return f"Has ascendido al Rango {_format_int_es(threshold)} de la Jerarquía de Guardianes: ¡Ahora eres {title}!"
-    return "Logro desbloqueado."
+        return f"You were promoted to Rank {_format_int_es(threshold)} in the Guardian hierarchy: now you are {title}!"
+    return "Achievement unlocked."
 
 
 def _fallback_unlock_time_for_category(*, category: str, user: User, now_utc: datetime) -> datetime:

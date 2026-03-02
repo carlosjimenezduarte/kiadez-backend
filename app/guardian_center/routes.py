@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from math import ceil
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import case, delete, desc, func, select, update
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,7 @@ from app.auth.minor_accreditation import is_minor_protected
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.core.config import settings
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.core.storage import S3NotConfiguredError, generate_presigned_get_url
 from app.db.database import get_db
 from app.db.models.guardian_wish_message import GuardianWishMessage, GuardianWishMessageKind
@@ -48,16 +49,40 @@ router = APIRouter(prefix="/guardian-center", tags=["guardian-center"])
 
 GUARDIANS_MIN_RANK = 3
 GUARDIANS_MAX_RANK = 8
-GUARDIAN_RANK_NAMES: dict[int, str] = {
-    0: "Sin rango",
-    1: "Aspirante",
-    2: "Aprendiz",
-    3: "Guardián",
-    4: "Guardián Consagrado",
-    5: "Guardián Mayor",
-    6: "Guardián del Logos",
-    7: "Guardián del Umbral",
-    8: "Guardián de Guardianes",
+GUARDIAN_RANK_NAMES: dict[str, dict[int, str]] = {
+    "es": {
+        0: "Sin rango",
+        1: "Aspirante",
+        2: "Aprendiz",
+        3: "Guardián",
+        4: "Guardián consagrado",
+        5: "Guardián sénior",
+        6: "Guardián del Logos",
+        7: "Guardián del Umbral",
+        8: "Guardián de Guardianes",
+    },
+    "en": {
+        0: "No rank",
+        1: "Aspirant",
+        2: "Apprentice",
+        3: "Guardian",
+        4: "Consecrated Guardian",
+        5: "Senior Guardian",
+        6: "Guardian of the Logos",
+        7: "Guardian of the Threshold",
+        8: "Guardian of Guardians",
+    },
+    "fr": {
+        0: "Sans rang",
+        1: "Aspirant",
+        2: "Apprenti",
+        3: "Gardien",
+        4: "Gardien consacré",
+        5: "Gardien senior",
+        6: "Gardien du Logos",
+        7: "Gardien du Seuil",
+        8: "Gardien des Gardiens",
+    },
 }
 ACCOUNT_MODERATION_STATUS_ACTIVE = "active"
 ACCOUNT_MODERATION_STATUS_SUSPENDED = "suspended"
@@ -72,10 +97,26 @@ REPORTED_PROFILE_POSTS_PAGE_SIZE_DEFAULT = 10
 REPORTED_PROFILE_POSTS_PAGE_SIZE_MAX = 25
 
 
-def _require_guardian(current: UserPublic) -> None:
+def _locale(request: Request | None) -> str:
+    return locale_from_request(request, default="en")
+
+
+def _tr(locale: str, *, es: str, en: str, fr: str) -> str:
+    return i18n_tr(locale, es=es, en=en, fr=fr)
+
+
+def _require_guardian(current: UserPublic, locale: str) -> None:
     rank = int(current.guardian_rank or 0)
     if rank < GUARDIANS_MIN_RANK:
-        raise HTTPException(status_code=403, detail="Acceso restringido (rango de Guardián requerido).")
+        raise HTTPException(
+            status_code=403,
+            detail=_tr(
+                locale,
+                es="Acceso restringido (se requiere rango de Guardián).",
+                en="Restricted access (Guardian rank required).",
+                fr="Accès restreint (rang de Gardien requis).",
+            ),
+        )
 
 
 def _build_profile_url(username: str | None, *, user_id: int) -> str:
@@ -92,8 +133,10 @@ def _build_handle(*, username: str | None, user_id: int) -> str:
     return f"@id{int(user_id)}"
 
 
-def _guardian_rank_name(rank: int) -> str:
-    return GUARDIAN_RANK_NAMES.get(int(rank), f"Rango {int(rank)}")
+def _guardian_rank_name(rank: int, locale: str) -> str:
+    localized_names = GUARDIAN_RANK_NAMES.get(locale, GUARDIAN_RANK_NAMES["en"])
+    fallback_en = GUARDIAN_RANK_NAMES["en"]
+    return localized_names.get(int(rank), fallback_en.get(int(rank), f"Rank {int(rank)}"))
 
 
 def _normalize_account_moderation_status(raw: str | None) -> str:
@@ -118,16 +161,32 @@ def _set_profile_case_reviewed(
     item.updated_at = now
 
 
-def _parse_rank_lookup_query(raw: str) -> tuple[int | None, str | None]:
+def _parse_rank_lookup_query(raw: str, locale: str) -> tuple[int | None, str | None]:
     normalized = str(raw or "").strip()
     if not normalized:
-        raise HTTPException(status_code=400, detail="Debes escribir un @id o @username.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="Debes ingresar un @id o @username.",
+                en="You must enter an @id or @username.",
+                fr="Tu dois saisir un @id ou @username.",
+            ),
+        )
 
     while normalized.startswith("@"):
         normalized = normalized[1:]
     normalized = normalized.strip().lower()
     if not normalized:
-        raise HTTPException(status_code=400, detail="Debes escribir un @id o @username.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="Debes ingresar un @id o @username.",
+                en="You must enter an @id or @username.",
+                fr="Tu dois saisir un @id ou @username.",
+            ),
+        )
 
     if normalized.startswith("id"):
         suffix = normalized[2:].strip()
@@ -138,7 +197,7 @@ def _parse_rank_lookup_query(raw: str) -> tuple[int | None, str | None]:
     return None, normalized
 
 
-def _rank_user_out(*, user: User, current_user_id: int) -> GuardianRankUserOut:
+def _rank_user_out(*, user: User, current_user_id: int, locale: str) -> GuardianRankUserOut:
     base = _user_out(user)
     current_rank = max(0, int(user.guardian_rank or 0))
     next_rank = current_rank + 1 if current_rank < GUARDIANS_MAX_RANK else None
@@ -150,9 +209,9 @@ def _rank_user_out(*, user: User, current_user_id: int) -> GuardianRankUserOut:
         profile_url=base.profile_url,
         role=str(user.role or "user"),
         guardian_rank=current_rank,
-        guardian_rank_name=_guardian_rank_name(current_rank),
+        guardian_rank_name=_guardian_rank_name(current_rank, locale),
         next_guardian_rank=next_rank,
-        next_guardian_rank_name=(_guardian_rank_name(next_rank) if next_rank is not None else None),
+        next_guardian_rank_name=(_guardian_rank_name(next_rank, locale) if next_rank is not None else None),
         can_promote=(next_rank is not None),
         is_self=(int(user.id) == int(current_user_id)),
     )
@@ -198,14 +257,33 @@ def _build_media_url(media: Media | None) -> str | None:
         return None
 
 
-def _resolve_owned_media(*, db: Session, media_id: int, user_id: int) -> Media:
+def _resolve_owned_media(*, db: Session, media_id: int, user_id: int, locale: str) -> Media:
     media = db.execute(select(Media).where(Media.id == media_id)).scalar_one_or_none()
     if media is None:
-        raise HTTPException(status_code=404, detail="Media no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Medio no encontrado.", en="Media not found.", fr="Média introuvable."),
+        )
     if int(media.owner_id) != int(user_id):
-        raise HTTPException(status_code=403, detail="No autorizado para usar esta media.")
+        raise HTTPException(
+            status_code=403,
+            detail=_tr(
+                locale,
+                es="No autorizado para usar este medio.",
+                en="Not authorized to use this media.",
+                fr="Non autorisé à utiliser ce média.",
+            ),
+        )
     if media.status != "ready":
-        raise HTTPException(status_code=409, detail="Media aún no disponible.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="El medio aún no está disponible.",
+                en="Media not available yet.",
+                fr="Le média n'est pas encore disponible.",
+            ),
+        )
     return media
 
 
@@ -214,20 +292,40 @@ def _resolve_wish_request_for_guardian_action(
     db: Session,
     request_id: int,
     guardian_user_id: int,
+    locale: str,
     allow_closed: bool = False,
 ) -> GuardianWishRequest:
     req = db.execute(
         select(GuardianWishRequest).where(GuardianWishRequest.id == request_id)
     ).scalar_one_or_none()
     if req is None:
-        raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Solicitud no encontrada.", en="Request not found.", fr="Demande introuvable."),
+        )
 
     assigned_guardian_id = int(req.guardian_id) if req.guardian_id else None
     if assigned_guardian_id is not None and assigned_guardian_id != int(guardian_user_id):
-        raise HTTPException(status_code=409, detail="Esta solicitud ya fue asumida por otro Guardián.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="Esta solicitud ya fue tomada por otro Guardián.",
+                en="This request has already been taken by another Guardian.",
+                fr="Cette demande a déjà été prise par un autre Gardien.",
+            ),
+        )
 
     if not allow_closed and req.status == GuardianWishRequestStatus.closed:
-        raise HTTPException(status_code=409, detail="Esta solicitud ya está cerrada.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="Esta solicitud ya está cerrada.",
+                en="This request is already closed.",
+                fr="Cette demande est déjà fermée.",
+            ),
+        )
 
     if req.guardian_id is None:
         req.guardian_id = int(guardian_user_id)
@@ -265,7 +363,7 @@ def _load_related_maps_for_request(
 def _user_out(user: User) -> GuardianWishRequestUserOut:
     first_name = (user.first_name or "").strip()
     last_name = (user.last_name or "").strip()
-    full_name = f"{first_name} {last_name}".strip() or f"Usuario {user.id}"
+    full_name = f"{first_name} {last_name}".strip() or f"User {user.id}"
     username = (user.username or "").strip() or None
     return GuardianWishRequestUserOut(
         user_id=int(user.id),
@@ -281,11 +379,20 @@ def _request_out(
     req: GuardianWishRequest,
     users: dict[int, User],
     medias: dict[int, Media],
+    locale: str,
 ) -> GuardianWishRequestOut:
     requester = users.get(int(req.requester_id))
     wish_owner = users.get(int(req.wish_owner_id))
     if requester is None or wish_owner is None:
-        raise HTTPException(status_code=500, detail="No se pudo construir la respuesta (usuarios faltantes).")
+        raise HTTPException(
+            status_code=500,
+            detail=_tr(
+                locale,
+                es="No se pudo construir la respuesta (faltan usuarios).",
+                en="Could not build response (missing users).",
+                fr="Impossible de construire la réponse (utilisateurs manquants).",
+            ),
+        )
 
     guardian = users.get(int(req.guardian_id)) if req.guardian_id else None
     evidence_media = medias.get(int(req.evidence_media_id)) if req.evidence_media_id else None
@@ -367,10 +474,19 @@ def _reported_post_out(
     users: dict[int, User],
     medias: dict[int, Media],
     reports_map: dict[int, list[GuardianReportedPostReportOut]],
+    locale: str,
 ) -> GuardianReportedPostOut:
     author = users.get(int(item.post_author_id)) if item.post_author_id else None
     if author is None:
-        raise HTTPException(status_code=500, detail="No se pudo construir el reporte (autor faltante).")
+        raise HTTPException(
+            status_code=500,
+            detail=_tr(
+                locale,
+                es="No se pudo construir el reporte (falta el autor).",
+                en="Could not build report (missing author).",
+                fr="Impossible de construire le signalement (auteur manquant).",
+            ),
+        )
 
     resolver = users.get(int(item.resolved_by_guardian_id)) if item.resolved_by_guardian_id else None
     media = medias.get(int(item.post_media_id_snapshot)) if item.post_media_id_snapshot else None
@@ -565,10 +681,19 @@ def _reported_profile_out(
     users: dict[int, User],
     reports_map: dict[int, list[GuardianReportedProfileReportOut]],
     current_user_id: int,
+    locale: str,
 ) -> GuardianReportedProfileOut:
     reported_user = users.get(int(item.reported_user_id)) if item.reported_user_id else None
     if reported_user is None:
-        raise HTTPException(status_code=500, detail="No se pudo construir el reporte (usuario faltante).")
+        raise HTTPException(
+            status_code=500,
+            detail=_tr(
+                locale,
+                es="No se pudo construir el reporte (falta el usuario).",
+                en="Could not build report (missing user).",
+                fr="Impossible de construire le signalement (utilisateur manquant).",
+            ),
+        )
     resolver = users.get(int(item.resolved_by_guardian_id)) if item.resolved_by_guardian_id else None
     moderation_status = _normalize_account_moderation_status(reported_user.guardian_moderation_status)
     account_moderated_by_guardian = (
@@ -634,30 +759,64 @@ def _mirror_guardian_message_in_inbox(*, db: Session, msg: GuardianWishMessage) 
 
 @router.post("/wish-requests", response_model=GuardianWishRequestOut)
 def create_wish_request(
+    request: Request,
     payload: GuardianWishRequestCreate,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     requester = db.execute(
         select(User).where(User.id == current.user_number, User.is_active.is_(True))
     ).scalar_one_or_none()
     if requester is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable."),
+        )
     if is_minor_protected(requester):
         raise HTTPException(
             status_code=403,
-            detail="Tu cuenta está en modo protegido. No puedes formalizar acuerdos hasta completar la acreditación.",
+            detail=_tr(
+                locale,
+                es="Tu cuenta está en modo protegido. No puedes formalizar acuerdos hasta completar la acreditación.",
+                en="Your account is in protected mode. You cannot formalize agreements until accreditation is completed.",
+                fr="Ton compte est en mode protégé. Tu ne peux pas formaliser d'accords tant que l'accréditation n'est pas complétée.",
+            ),
         )
 
     reason = (payload.reason or "").strip()
     phone = (payload.phone or "").strip()
     email = str(payload.email or "").strip().lower()
     if not reason:
-        raise HTTPException(status_code=400, detail="Debes describir el motivo.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="Debes describir la razón.",
+                en="You must describe the reason.",
+                fr="Tu dois décrire la raison.",
+            ),
+        )
     if not phone:
-        raise HTTPException(status_code=400, detail="Debes indicar un número telefónico.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="Debes proporcionar un número de teléfono.",
+                en="You must provide a phone number.",
+                fr="Tu dois fournir un numéro de téléphone.",
+            ),
+        )
     if not email:
-        raise HTTPException(status_code=400, detail="Debes indicar un e-mail válido.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="Debes proporcionar un correo válido.",
+                en="You must provide a valid email.",
+                fr="Tu dois fournir un e-mail valide.",
+            ),
+        )
 
     wish = db.execute(
         select(PublicPersonalWish)
@@ -665,17 +824,44 @@ def create_wish_request(
         .where(PublicPersonalWish.status == PublicPersonalWishStatus.active)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo no encontrado o ya no está activo.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(
+                locale,
+                es="Deseo no encontrado o ya no está activo.",
+                en="Wish not found or no longer active.",
+                fr="Souhait introuvable ou plus actif.",
+            ),
+        )
     if int(wish.user_id) == int(current.user_number):
-        raise HTTPException(status_code=400, detail="No puedes solicitar un Guardián para tu propio deseo.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="No puedes solicitar un Guardián para tu propio deseo.",
+                en="You cannot request a Guardian for your own wish.",
+                fr="Tu ne peux pas demander un Gardien pour ton propre souhait.",
+            ),
+        )
 
     wish_owner = db.execute(
         select(User).where(User.id == wish.user_id, User.is_active.is_(True))
     ).scalar_one_or_none()
     if wish_owner is None:
-        raise HTTPException(status_code=404, detail="El usuario dueño del deseo no existe.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(
+                locale,
+                es="El usuario propietario del deseo no existe.",
+                en="The wish owner user does not exist.",
+                fr="L'utilisateur propriétaire du souhait n'existe pas.",
+            ),
+        )
     if not bool(wish_owner.public_profile_show_public_wishes):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+        raise HTTPException(
+            status_code=403,
+            detail=_tr(locale, es="Este módulo es privado.", en="This module is private.", fr="Ce module est privé."),
+        )
 
     guardian: User | None = None
     if payload.guardian_user_id is not None:
@@ -683,11 +869,27 @@ def create_wish_request(
             select(User).where(User.id == payload.guardian_user_id, User.is_active.is_(True))
         ).scalar_one_or_none()
         if guardian is None:
-            raise HTTPException(status_code=404, detail="Guardián no encontrado.")
+            raise HTTPException(
+                status_code=404,
+                detail=_tr(locale, es="Guardián no encontrado.", en="Guardian not found.", fr="Gardien introuvable."),
+            )
         if int(guardian.guardian_rank or 0) < GUARDIANS_MIN_RANK:
-            raise HTTPException(status_code=400, detail="El usuario seleccionado no es un Guardián válido.")
+            raise HTTPException(
+                status_code=400,
+                detail=_tr(
+                    locale,
+                    es="El usuario seleccionado no es un Guardián válido.",
+                    en="The selected user is not a valid Guardian.",
+                    fr="L'utilisateur sélectionné n'est pas un Gardien valide.",
+                ),
+            )
 
-    evidence = _resolve_owned_media(db=db, media_id=int(payload.evidence_media_id), user_id=current.user_number)
+    evidence = _resolve_owned_media(
+        db=db,
+        media_id=int(payload.evidence_media_id),
+        user_id=current.user_number,
+        locale=locale,
+    )
 
     req = GuardianWishRequest(
         requester_id=current.user_number,
@@ -715,17 +917,19 @@ def create_wish_request(
         users[int(guardian.id)] = guardian
     medias = {int(evidence.id): evidence} if evidence is not None else {}
 
-    return _request_out(req=req, users=users, medias=medias)
+    return _request_out(req=req, users=users, medias=medias, locale=locale)
 
 
 @router.get("/wish-requests", response_model=GuardianWishRequestListOut)
 def list_wish_requests(
+    request: Request,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=PAGE_SIZE_DEFAULT, ge=1, le=PAGE_SIZE_MAX),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     total = int(db.execute(select(func.count(GuardianWishRequest.id))).scalar_one() or 0)
     normalized_size = max(1, min(int(page_size), PAGE_SIZE_MAX))
@@ -760,7 +964,7 @@ def list_wish_requests(
         medias = db.execute(select(Media).where(Media.id.in_(sorted(media_ids)))).scalars().all()
         medias_map = {int(media.id): media for media in medias}
 
-    items = [_request_out(req=req, users=users_map, medias=medias_map) for req in rows]
+    items = [_request_out(req=req, users=users_map, medias=medias_map, locale=locale) for req in rows]
 
     range_start = offset + 1 if total > 0 and items else 0
     range_end = offset + len(items) if total > 0 and items else 0
@@ -778,13 +982,15 @@ def list_wish_requests(
 
 @router.get("/rank-management/user", response_model=GuardianRankUserOut)
 def get_rank_management_user(
+    request: Request,
     query: str = Query(..., min_length=1, max_length=80),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
-    user_id, username = _parse_rank_lookup_query(query)
+    user_id, username = _parse_rank_lookup_query(query, locale)
     target: User | None = None
     if user_id is not None:
         target = db.execute(
@@ -796,29 +1002,42 @@ def get_rank_management_user(
         ).scalar_one_or_none()
 
     if target is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
-    return _rank_user_out(user=target, current_user_id=current.user_number)
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable."),
+        )
+    return _rank_user_out(user=target, current_user_id=current.user_number, locale=locale)
 
 
 @router.post("/rank-management/users/{user_id}/promote", response_model=GuardianRankPromotionOut)
 def promote_user_guardian_rank(
+    request: Request,
     user_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     target = db.execute(
         select(User).where(User.id == int(user_id), User.is_active.is_(True))
     ).scalar_one_or_none()
     if target is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable."),
+        )
 
     previous_rank = max(0, int(target.guardian_rank or 0))
     if previous_rank >= GUARDIANS_MAX_RANK:
         raise HTTPException(
             status_code=409,
-            detail=f"Este usuario ya está en el rango máximo ({GUARDIANS_MAX_RANK}).",
+            detail=_tr(
+                locale,
+                es=f"Este usuario ya está en el rango máximo ({GUARDIANS_MAX_RANK}).",
+                en=f"This user is already at the maximum rank ({GUARDIANS_MAX_RANK}).",
+                fr=f"Cet utilisateur est déjà au rang maximum ({GUARDIANS_MAX_RANK}).",
+            ),
         )
 
     target.guardian_rank = previous_rank + 1
@@ -831,19 +1050,21 @@ def promote_user_guardian_rank(
     return GuardianRankPromotionOut(
         promoted=True,
         previous_guardian_rank=previous_rank,
-        previous_guardian_rank_name=_guardian_rank_name(previous_rank),
-        target=_rank_user_out(user=target, current_user_id=current.user_number),
+        previous_guardian_rank_name=_guardian_rank_name(previous_rank, locale),
+        target=_rank_user_out(user=target, current_user_id=current.user_number, locale=locale),
     )
 
 
 @router.get("/reported-posts", response_model=GuardianReportedPostListOut)
 def list_reported_posts(
+    request: Request,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=REPORTED_POSTS_PAGE_SIZE_DEFAULT, ge=1, le=REPORTED_POSTS_PAGE_SIZE_MAX),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     total = int(db.execute(select(func.count(PostReportCase.id))).scalar_one() or 0)
     normalized_size = max(1, min(int(page_size), REPORTED_POSTS_PAGE_SIZE_MAX))
@@ -865,7 +1086,7 @@ def list_reported_posts(
 
     users_map, medias_map, reports_map = _load_related_maps_for_report_cases(db=db, items=rows)
     items = [
-        _reported_post_out(item=item, users=users_map, medias=medias_map, reports_map=reports_map)
+        _reported_post_out(item=item, users=users_map, medias=medias_map, reports_map=reports_map, locale=locale)
         for item in rows
     ]
 
@@ -885,12 +1106,14 @@ def list_reported_posts(
 
 @router.get("/reported-profiles", response_model=GuardianReportedProfileListOut)
 def list_reported_profiles(
+    request: Request,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=REPORTED_PROFILES_PAGE_SIZE_DEFAULT, ge=1, le=REPORTED_PROFILES_PAGE_SIZE_MAX),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     total = int(db.execute(select(func.count(ProfileReportCase.id))).scalar_one() or 0)
     normalized_size = max(1, min(int(page_size), REPORTED_PROFILES_PAGE_SIZE_MAX))
@@ -917,6 +1140,7 @@ def list_reported_profiles(
             users=users_map,
             reports_map=reports_map,
             current_user_id=int(current.user_number),
+            locale=locale,
         )
         for item in rows
     ]
@@ -936,6 +1160,7 @@ def list_reported_profiles(
 
 @router.get("/reported-profiles/{case_id}/reported-posts", response_model=GuardianReportedProfilePostListOut)
 def list_reported_posts_for_profile_case(
+    request: Request,
     case_id: int,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(
@@ -946,19 +1171,36 @@ def list_reported_posts_for_profile_case(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     profile_case = db.execute(
         select(ProfileReportCase).where(ProfileReportCase.id == int(case_id))
     ).scalar_one_or_none()
     if profile_case is None:
-        raise HTTPException(status_code=404, detail="Reporte de perfil no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(
+                locale,
+                es="Reporte de perfil no encontrado.",
+                en="Profile report not found.",
+                fr="Signalement de profil introuvable.",
+            ),
+        )
 
     reported_user = db.execute(
         select(User).where(User.id == int(profile_case.reported_user_id))
     ).scalar_one_or_none()
     if reported_user is None:
-        raise HTTPException(status_code=404, detail="Usuario reportado no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(
+                locale,
+                es="Usuario reportado no encontrado.",
+                en="Reported user not found.",
+                fr="Utilisateur signalé introuvable.",
+            ),
+        )
 
     return _load_reported_posts_for_profile(
         db=db,
@@ -973,20 +1215,45 @@ def _resolve_profile_case_and_target_user(
     db: Session,
     case_id: int,
     guardian_user_id: int,
+    locale: str,
 ) -> tuple[ProfileReportCase, User]:
     item = db.execute(
         select(ProfileReportCase).where(ProfileReportCase.id == int(case_id))
     ).scalar_one_or_none()
     if item is None:
-        raise HTTPException(status_code=404, detail="Reporte de perfil no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(
+                locale,
+                es="Reporte de perfil no encontrado.",
+                en="Profile report not found.",
+                fr="Signalement de profil introuvable.",
+            ),
+        )
 
     target_user = db.execute(
         select(User).where(User.id == int(item.reported_user_id))
     ).scalar_one_or_none()
     if target_user is None:
-        raise HTTPException(status_code=404, detail="Usuario reportado no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(
+                locale,
+                es="Usuario reportado no encontrado.",
+                en="Reported user not found.",
+                fr="Utilisateur signalé introuvable.",
+            ),
+        )
     if int(target_user.id) == int(guardian_user_id):
-        raise HTTPException(status_code=400, detail="No puedes moderar tu propia cuenta.")
+        raise HTTPException(
+            status_code=400,
+            detail=_tr(
+                locale,
+                es="No puedes moderar tu propia cuenta.",
+                en="You cannot moderate your own account.",
+                fr="Tu ne peux pas modérer ton propre compte.",
+            ),
+        )
 
     return item, target_user
 
@@ -996,6 +1263,7 @@ def _build_reported_profile_case_response(
     db: Session,
     item: ProfileReportCase,
     current_user_id: int,
+    locale: str,
 ) -> GuardianReportedProfileOut:
     users_map, reports_map = _load_related_maps_for_profile_report_cases(db=db, items=[item])
     return _reported_profile_out(
@@ -1004,28 +1272,48 @@ def _build_reported_profile_case_response(
         users=users_map,
         reports_map=reports_map,
         current_user_id=current_user_id,
+        locale=locale,
     )
 
 
 @router.post("/reported-profiles/{case_id}/suspend-account", response_model=GuardianReportedProfileOut)
 def suspend_reported_profile_account(
+    request: Request,
     case_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     item, target_user = _resolve_profile_case_and_target_user(
         db=db,
         case_id=case_id,
         guardian_user_id=int(current.user_number),
+        locale=locale,
     )
 
     current_status = _normalize_account_moderation_status(target_user.guardian_moderation_status)
     if current_status == ACCOUNT_MODERATION_STATUS_CLOSED:
-        raise HTTPException(status_code=409, detail="La cuenta ya está cerrada de forma definitiva.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="La cuenta ya está cerrada permanentemente.",
+                en="The account is already permanently closed.",
+                fr="Le compte est déjà fermé définitivement.",
+            ),
+        )
     if current_status == ACCOUNT_MODERATION_STATUS_SUSPENDED:
-        raise HTTPException(status_code=409, detail="La cuenta ya está suspendida.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="La cuenta ya está suspendida.",
+                en="The account is already suspended.",
+                fr="Le compte est déjà suspendu.",
+            ),
+        )
 
     now = datetime.now(timezone.utc)
     target_user.guardian_moderation_status = ACCOUNT_MODERATION_STATUS_SUSPENDED
@@ -1046,28 +1334,48 @@ def suspend_reported_profile_account(
         db=db,
         item=item,
         current_user_id=int(current.user_number),
+        locale=locale,
     )
 
 
 @router.post("/reported-profiles/{case_id}/enable-account", response_model=GuardianReportedProfileOut)
 def enable_reported_profile_account(
+    request: Request,
     case_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     item, target_user = _resolve_profile_case_and_target_user(
         db=db,
         case_id=case_id,
         guardian_user_id=int(current.user_number),
+        locale=locale,
     )
 
     current_status = _normalize_account_moderation_status(target_user.guardian_moderation_status)
     if current_status == ACCOUNT_MODERATION_STATUS_CLOSED:
-        raise HTTPException(status_code=409, detail="La cuenta cerrada de forma definitiva no se puede habilitar.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="Una cuenta cerrada permanentemente no puede volver a habilitarse.",
+                en="A permanently closed account cannot be re-enabled.",
+                fr="Un compte fermé définitivement ne peut pas être réactivé.",
+            ),
+        )
     if current_status != ACCOUNT_MODERATION_STATUS_SUSPENDED:
-        raise HTTPException(status_code=409, detail="Solo una cuenta suspendida puede volver a habilitarse.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="Solo una cuenta suspendida puede volver a habilitarse.",
+                en="Only a suspended account can be re-enabled.",
+                fr="Seul un compte suspendu peut être réactivé.",
+            ),
+        )
 
     now = datetime.now(timezone.utc)
     target_user.guardian_moderation_status = ACCOUNT_MODERATION_STATUS_ACTIVE
@@ -1088,26 +1396,38 @@ def enable_reported_profile_account(
         db=db,
         item=item,
         current_user_id=int(current.user_number),
+        locale=locale,
     )
 
 
 @router.post("/reported-profiles/{case_id}/close-account", response_model=GuardianReportedProfileOut)
 def close_reported_profile_account(
+    request: Request,
     case_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     item, target_user = _resolve_profile_case_and_target_user(
         db=db,
         case_id=case_id,
         guardian_user_id=int(current.user_number),
+        locale=locale,
     )
 
     current_status = _normalize_account_moderation_status(target_user.guardian_moderation_status)
     if current_status == ACCOUNT_MODERATION_STATUS_CLOSED:
-        raise HTTPException(status_code=409, detail="La cuenta ya fue cerrada de forma definitiva.")
+        raise HTTPException(
+            status_code=409,
+            detail=_tr(
+                locale,
+                es="La cuenta ya fue cerrada permanentemente.",
+                en="The account has already been permanently closed.",
+                fr="Le compte a déjà été fermé définitivement.",
+            ),
+        )
 
     now = datetime.now(timezone.utc)
     target_user.guardian_moderation_status = ACCOUNT_MODERATION_STATUS_CLOSED
@@ -1128,22 +1448,28 @@ def close_reported_profile_account(
         db=db,
         item=item,
         current_user_id=int(current.user_number),
+        locale=locale,
     )
 
 
 @router.post("/reported-posts/{case_id}/delete-post", response_model=GuardianReportedPostOut)
 def delete_reported_post(
+    request: Request,
     case_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     item = db.execute(
         select(PostReportCase).where(PostReportCase.id == case_id)
     ).scalar_one_or_none()
     if item is None:
-        raise HTTPException(status_code=404, detail="Reporte no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Reporte no encontrado.", en="Report not found.", fr="Signalement introuvable."),
+        )
 
     now = datetime.now(timezone.utc)
     post = None
@@ -1185,22 +1511,27 @@ def delete_reported_post(
     db.refresh(item)
 
     users_map, medias_map, reports_map = _load_related_maps_for_report_cases(db=db, items=[item])
-    return _reported_post_out(item=item, users=users_map, medias=medias_map, reports_map=reports_map)
+    return _reported_post_out(item=item, users=users_map, medias=medias_map, reports_map=reports_map, locale=locale)
 
 
 @router.post("/reported-posts/{case_id}/keep-post", response_model=GuardianReportedPostOut)
 def keep_reported_post(
+    request: Request,
     case_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     item = db.execute(
         select(PostReportCase).where(PostReportCase.id == case_id)
     ).scalar_one_or_none()
     if item is None:
-        raise HTTPException(status_code=404, detail="Reporte no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Reporte no encontrado.", en="Report not found.", fr="Signalement introuvable."),
+        )
 
     if item.post_id:
         post = db.execute(select(Post).where(Post.id == item.post_id)).scalar_one_or_none()
@@ -1219,21 +1550,24 @@ def keep_reported_post(
     db.refresh(item)
 
     users_map, medias_map, reports_map = _load_related_maps_for_report_cases(db=db, items=[item])
-    return _reported_post_out(item=item, users=users_map, medias=medias_map, reports_map=reports_map)
+    return _reported_post_out(item=item, users=users_map, medias=medias_map, reports_map=reports_map, locale=locale)
 
 
 @router.post("/wish-requests/{request_id}/seal-commitment", response_model=GuardianWishRequestOut)
 def seal_wish_request_commitment(
+    request: Request,
     request_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     req = _resolve_wish_request_for_guardian_action(
         db=db,
         request_id=request_id,
         guardian_user_id=current.user_number,
+        locale=locale,
         allow_closed=False,
     )
 
@@ -1247,22 +1581,25 @@ def seal_wish_request_commitment(
     db.refresh(req)
 
     users_map, medias_map = _load_related_maps_for_request(db=db, req=req)
-    return _request_out(req=req, users=users_map, medias=medias_map)
+    return _request_out(req=req, users=users_map, medias=medias_map, locale=locale)
 
 
 @router.post("/wish-requests/{request_id}/deny", response_model=GuardianWishRequestOut)
 def deny_wish_request(
+    request: Request,
     request_id: int,
     payload: GuardianWishRequestDenyInput,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     req = _resolve_wish_request_for_guardian_action(
         db=db,
         request_id=request_id,
         guardian_user_id=current.user_number,
+        locale=locale,
         allow_closed=False,
     )
 
@@ -1270,7 +1607,10 @@ def deny_wish_request(
         select(User).where(User.id == req.requester_id, User.is_active.is_(True))
     ).scalar_one_or_none()
     if requester is None:
-        raise HTTPException(status_code=404, detail="Solicitante no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(locale, es="Solicitante no encontrado.", en="Requester not found.", fr="Demandeur introuvable."),
+        )
 
     msg = GuardianWishMessage(
         wish_request_id=int(req.id),
@@ -1291,22 +1631,25 @@ def deny_wish_request(
     db.refresh(req)
 
     users_map, medias_map = _load_related_maps_for_request(db=db, req=req)
-    return _request_out(req=req, users=users_map, medias=medias_map)
+    return _request_out(req=req, users=users_map, medias=medias_map, locale=locale)
 
 
 @router.post("/wish-requests/{request_id}/message-owner", response_model=GuardianWishMessageOut)
 def message_wish_owner(
+    request: Request,
     request_id: int,
     payload: GuardianWishRequestOwnerMessageInput,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     req = _resolve_wish_request_for_guardian_action(
         db=db,
         request_id=request_id,
         guardian_user_id=current.user_number,
+        locale=locale,
         allow_closed=False,
     )
 
@@ -1314,7 +1657,15 @@ def message_wish_owner(
         select(User).where(User.id == req.wish_owner_id, User.is_active.is_(True))
     ).scalar_one_or_none()
     if wish_owner is None:
-        raise HTTPException(status_code=404, detail="Dueño del deseo no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail=_tr(
+                locale,
+                es="Propietario del deseo no encontrado.",
+                en="Wish owner not found.",
+                fr="Propriétaire du souhait introuvable.",
+            ),
+        )
 
     msg = GuardianWishMessage(
         wish_request_id=int(req.id),

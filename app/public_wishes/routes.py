@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from app.auth.minor_accreditation import is_minor_protected
 from app.auth.models import UserPublic
 from app.auth.routes import get_current_user
 from app.core.config import settings
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.core.storage import S3NotConfiguredError, generate_presigned_get_url
 from app.db.database import get_db
 from app.db.models.guardian_wish_request import GuardianWishRequest, GuardianWishRequestStatus
@@ -53,10 +54,169 @@ router = APIRouter(prefix="/public-wishes", tags=["public-wishes"])
 PERSONAL_ACTIVE_LIMIT = 50
 COOPERATIVE_ACTIVE_LIMIT = 20
 GUARDIAN_REQUIRED_RANK = 3
-FULFILLMENT_SECRET_MESSAGE = "Quien cumplió el deseo decidió obrar desde lo secreto."
-MINOR_PUBLIC_ACTION_BLOCK_DETAIL = (
-    "Tu cuenta está en modo protegido. Debes completar la acreditación para habilitar acciones públicas."
-)
+
+
+def _locale(request: Request | None) -> str:
+    return locale_from_request(request, default="en")
+
+
+def _td(locale: str, en: str, **fmt: object) -> str:
+    translations: dict[str, tuple[str, str]] = {
+        "Media not found.": ("Medio no encontrado.", "Média introuvable."),
+        "Not authorized to use this media.": ("No autorizado para usar este medio.", "Non autorisé à utiliser ce média."),
+        "Media not available yet.": ("El medio aún no está disponible.", "Le média n'est pas encore disponible."),
+        "User not found.": ("Usuario no encontrado.", "Utilisateur introuvable."),
+        "This module is private.": ("Este módulo es privado.", "Ce module est privé."),
+        "Restricted access (Guardian rank required).": (
+            "Acceso restringido (se requiere rango de Guardián).",
+            "Accès restreint (rang de Gardien requis).",
+        ),
+        "Cooperative wish not found.": ("Deseo cooperativo no encontrado.", "Souhait coopératif introuvable."),
+        "This cooperative wish has already been marked as fulfilled.": (
+            "Este deseo cooperativo ya fue marcado como cumplido.",
+            "Ce souhait coopératif a déjà été marqué comme accompli.",
+        ),
+        "You cannot register participation in your own cooperative wish.": (
+            "No puedes registrar participación en tu propio deseo cooperativo.",
+            "Tu ne peux pas enregistrer une participation à ton propre souhait coopératif.",
+        ),
+        "Invalid security code.": ("Código de seguridad inválido.", "Code de sécurité invalide."),
+        "Your participation has already been validated by the creator and cannot be edited.": (
+            "Tu participación ya fue validada por el creador y no puede editarse.",
+            "Ta participation a déjà été validée par le créateur et ne peut pas être modifiée.",
+        ),
+        "You cannot cancel participation in your own cooperative wish.": (
+            "No puedes cancelar la participación en tu propio deseo cooperativo.",
+            "Tu ne peux pas annuler une participation à ton propre souhait coopératif.",
+        ),
+        "You have no registered participation in this wish.": (
+            "No tienes participación registrada en este deseo.",
+            "Tu n'as aucune participation enregistrée dans ce souhait.",
+        ),
+        "Your participation has already been validated by the creator and cannot be canceled.": (
+            "Tu participación ya fue validada por el creador y no puede cancelarse.",
+            "Ta participation a déjà été validée par le créateur et ne peut pas être annulée.",
+        ),
+        "You must first register your participation.": (
+            "Primero debes registrar tu participación.",
+            "Tu dois d'abord enregistrer ta participation.",
+        ),
+        "Your participation has already been validated by the creator and cannot be modified.": (
+            "Tu participación ya fue validada por el creador y no puede modificarse.",
+            "Ta participation a déjà été validée par le créateur et ne peut pas être modifiée.",
+        ),
+        "Participation not found.": ("Participación no encontrada.", "Participation introuvable."),
+        "This participation still has no evidence to validate.": (
+            "Esta participación aún no tiene evidencia para validar.",
+            "Cette participation n'a pas encore de preuve à valider.",
+        ),
+        "The participation did not accept the required oath for its evidence.": (
+            "La participación no aceptó el juramento requerido para su evidencia.",
+            "La participation n'a pas accepté le serment requis pour sa preuve.",
+        ),
+        "There is participation evidence without a valid oath. It must be submitted again.": (
+            "Hay evidencia de participación sin un juramento válido. Debe enviarse nuevamente.",
+            "Il existe une preuve de participation sans serment valide. Elle doit être soumise à nouveau.",
+        ),
+        "There is still no participation evidence to close this cooperative wish.": (
+            "Aún no hay evidencia de participación para cerrar este deseo cooperativo.",
+            "Il n'y a toujours pas de preuve de participation pour clôturer ce souhait coopératif.",
+        ),
+        "You must validate all participations with evidence before marking this wish as fulfilled.": (
+            "Debes validar todas las participaciones con evidencia antes de marcar este deseo como cumplido.",
+            "Tu dois valider toutes les participations avec preuve avant de marquer ce souhait comme accompli.",
+        ),
+        "You cannot delete a cooperative wish that is already fulfilled.": (
+            "No puedes eliminar un deseo cooperativo que ya está cumplido.",
+            "Tu ne peux pas supprimer un souhait coopératif déjà accompli.",
+        ),
+        "Personal wish not found.": ("Deseo personal no encontrado.", "Souhait personnel introuvable."),
+        "This wish is no longer active.": ("Este deseo ya no está activo.", "Ce souhait n'est plus actif."),
+        "This wish is not frozen.": ("Este deseo no está congelado.", "Ce souhait n'est pas gelé."),
+        "Only the guardian who froze the wish can mark it as fulfilled.": (
+            "Solo el guardián que congeló el deseo puede marcarlo como cumplido.",
+            "Seul le gardien qui a gelé le souhait peut le marquer comme accompli.",
+        ),
+        "You must provide the commitment code.": (
+            "Debes proporcionar el código de compromiso.",
+            "Tu dois fournir le code d'engagement.",
+        ),
+        "This commitment code has already been used.": (
+            "Este código de compromiso ya fue usado.",
+            "Ce code d'engagement a déjà été utilisé.",
+        ),
+        "Commitment code not found.": ("Código de compromiso no encontrado.", "Code d'engagement introuvable."),
+        "The commitment code does not match this wish.": (
+            "El código de compromiso no coincide con este deseo.",
+            "Le code d'engagement ne correspond pas à ce souhait.",
+        ),
+        "The commitment code has not been sealed yet.": (
+            "El código de compromiso aún no ha sido sellado.",
+            "Le code d'engagement n'a pas encore été scellé.",
+        ),
+        "This request was denied and cannot be closed as fulfilled.": (
+            "Esta solicitud fue denegada y no puede cerrarse como cumplida.",
+            "Cette demande a été refusée et ne peut pas être clôturée comme accomplie.",
+        ),
+        "This commitment is assigned to another guardian.": (
+            "Este compromiso está asignado a otro guardián.",
+            "Cet engagement est attribué à un autre gardien.",
+        ),
+        "Could not find the user who granted the wish.": (
+            "No se pudo encontrar al usuario que concedió el deseo.",
+            "Impossible de trouver l'utilisateur qui a accordé le souhait.",
+        ),
+        "This wish is already frozen.": ("Este deseo ya está congelado.", "Ce souhait est déjà gelé."),
+        "Only the guardian who froze the wish can unfreeze it.": (
+            "Solo el guardián que congeló el deseo puede descongelarlo.",
+            "Seul le gardien qui a gelé le souhait peut le dégeler.",
+        ),
+        "Your account is in protected mode. You must complete accreditation to enable public actions.": (
+            "Tu cuenta está en modo protegido. Debes completar la acreditación para habilitar acciones públicas.",
+            "Ton compte est en mode protégé. Tu dois terminer l'accréditation pour activer les actions publiques.",
+        ),
+        "You already reached the maximum of {limit} active cooperative wishes.": (
+            "Ya alcanzaste el máximo de {limit} deseos cooperativos activos.",
+            "Tu as déjà atteint le maximum de {limit} souhaits coopératifs actifs.",
+        ),
+        "This wish already reached the maximum of {limit} participants.": (
+            "Este deseo ya alcanzó el máximo de {limit} participantes.",
+            "Ce souhait a déjà atteint le maximum de {limit} participants.",
+        ),
+        "You already reached the maximum of {limit} active personal wishes.": (
+            "Ya alcanzaste el máximo de {limit} deseos personales activos.",
+            "Tu as déjà atteint le maximum de {limit} souhaits personnels actifs.",
+        ),
+    }
+    english = en.format(**fmt) if fmt else en
+    pair = translations.get(en)
+    if not pair:
+        return english
+    es, fr = pair
+    return i18n_tr(
+        locale,
+        es=(es.format(**fmt) if fmt else es),
+        en=english,
+        fr=(fr.format(**fmt) if fmt else fr),
+    )
+
+
+def _msg_fulfillment_secret(locale: str) -> str:
+    return i18n_tr(
+        locale,
+        es="La persona que cumplió el deseo eligió actuar desde el secreto.",
+        en="The person who fulfilled the wish chose to act from secrecy.",
+        fr="La personne qui a accompli le souhait a choisi d'agir dans le secret.",
+    )
+
+
+def _msg_fulfillment_public(locale: str, handle: str) -> str:
+    return i18n_tr(
+        locale,
+        es=f"Deseo cumplido gracias a {handle}",
+        en=f"Wish fulfilled thanks to {handle}",
+        fr=f"Souhait accompli grâce à {handle}",
+    )
 
 
 def _build_media_url(media: Media | None) -> str | None:
@@ -117,6 +277,7 @@ def _load_fulfillment_maps_for_wishes(
 def _wish_out(
     *,
     wish: PublicPersonalWish,
+    locale: str,
     media_map: dict[int, Media],
     user_map: dict[int, User] | None = None,
     fulfillment_map: dict[int, PublicWishFulfillment] | None = None,
@@ -133,7 +294,7 @@ def _wish_out(
     if frozen_by_user is not None:
         frozen_full_name = f"{(frozen_by_user.first_name or '').strip()} {(frozen_by_user.last_name or '').strip()}".strip()
         if not frozen_full_name:
-            frozen_full_name = f"Usuario {frozen_by_user.id}"
+            frozen_full_name = f"User {frozen_by_user.id}"
         username = (frozen_by_user.username or "").strip()
         if username:
             frozen_profile_url = f"/home_user.html?u={username}"
@@ -159,7 +320,7 @@ def _wish_out(
         )
         if mode_value == PublicWishFulfillmentAttributionMode.secret.value:
             fulfillment_attribution_mode = "secret"
-            fulfillment_message = FULFILLMENT_SECRET_MESSAGE
+            fulfillment_message = _msg_fulfillment_secret(locale)
         elif mode_value == PublicWishFulfillmentAttributionMode.public.value:
             fulfillment_attribution_mode = "public"
             fulfilled_by_user_id = int(fulfillment_row.fulfiller_user_id)
@@ -184,7 +345,7 @@ def _wish_out(
                     None,
                     user_id=int(fulfillment_row.fulfiller_user_id),
                 )
-            fulfillment_message = f"Deseo cumplido gracias a {fulfilled_by_handle}"
+            fulfillment_message = _msg_fulfillment_public(locale, fulfilled_by_handle)
 
     return PublicPersonalWishOut(
         id=wish.id,
@@ -214,26 +375,32 @@ def _wish_out(
     )
 
 
-def _resolve_owned_media(*, db: Session, media_id: int | None, user_id: int) -> Media | None:
+def _resolve_owned_media(*, db: Session, media_id: int | None, user_id: int, locale: str) -> Media | None:
     if media_id is None:
         return None
 
     media = db.execute(select(Media).where(Media.id == media_id)).scalar_one_or_none()
     if media is None:
-        raise HTTPException(status_code=404, detail="Media no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Media not found."))
     if media.owner_id != user_id:
-        raise HTTPException(status_code=403, detail="No autorizado para usar esta media.")
+        raise HTTPException(status_code=403, detail=_td(locale, "Not authorized to use this media."))
     if media.status != "ready":
-        raise HTTPException(status_code=409, detail="Media aún no disponible.")
+        raise HTTPException(status_code=409, detail=_td(locale, "Media not available yet."))
     return media
 
 
-def _require_public_actions_allowed(*, db: Session, user_id: int) -> User:
+def _require_public_actions_allowed(*, db: Session, user_id: int, locale: str) -> User:
     user = db.execute(select(User).where(User.id == user_id, User.is_active.is_(True))).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
     if is_minor_protected(user):
-        raise HTTPException(status_code=403, detail=MINOR_PUBLIC_ACTION_BLOCK_DETAIL)
+        raise HTTPException(
+            status_code=403,
+            detail=_td(
+                locale,
+                "Your account is in protected mode. You must complete accreditation to enable public actions.",
+            ),
+        )
     return user
 
 
@@ -251,13 +418,14 @@ def _ensure_cooperative_visibility(
     *,
     owner: User,
     viewer_user_id: int,
+    locale: str,
 ) -> None:
     if int(owner.id) == int(viewer_user_id):
         return
     if is_minor_protected(owner):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+        raise HTTPException(status_code=403, detail=_td(locale, "This module is private."))
     if not bool(owner.public_profile_show_cooperative_wishes):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+        raise HTTPException(status_code=403, detail=_td(locale, "This module is private."))
 
 
 def _load_cooperative_participations_map(
@@ -371,6 +539,7 @@ def _cooperative_participation_status(
 def _cooperative_wish_out(
     *,
     wish: PublicCooperativeWish,
+    locale: str,
     media_map: dict[int, Media],
     current_user_id: int,
     participants_count_map: dict[int, int] | None = None,
@@ -470,6 +639,7 @@ def _cooperative_wish_out(
 def _cooperative_fulfilled_wish_out(
     *,
     wish: PublicCooperativeWish,
+    locale: str,
     fulfillment: PublicCooperativeWishFulfillment,
     media_map: dict[int, Media],
     participants_count_map: dict[int, int] | None = None,
@@ -504,12 +674,12 @@ def _cooperative_fulfilled_wish_out(
     )
 
 
-def _resolve_guardian_user(*, db: Session, user_id: int) -> User:
+def _resolve_guardian_user(*, db: Session, user_id: int, locale: str) -> User:
     user = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
     if int(user.guardian_rank or 0) < GUARDIAN_REQUIRED_RANK:
-        raise HTTPException(status_code=403, detail="Acceso restringido (rango de Guardián requerido).")
+        raise HTTPException(status_code=403, detail=_td(locale, "Restricted access (Guardian rank required)."))
     return user
 
 
@@ -527,12 +697,14 @@ def _load_frozen_guardians_map(*, db: Session, wishes: list[PublicPersonalWish])
 
 @router.get("/personal", response_model=PublicPersonalWishListOut)
 def list_personal_wishes(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     wishes = db.execute(
         select(PublicPersonalWish)
@@ -560,7 +732,7 @@ def list_personal_wishes(
     guardian_map = _load_frozen_guardians_map(db=db, wishes=wishes)
 
     return PublicPersonalWishListOut(
-        items=[_wish_out(wish=wish, media_map=media_map, user_map=guardian_map) for wish in wishes],
+        items=[_wish_out(locale=locale, wish=wish, media_map=media_map, user_map=guardian_map) for wish in wishes],
         active_count=len(wishes),
         active_limit=PERSONAL_ACTIVE_LIMIT,
         fulfilled_total=fulfilled_total or 0,
@@ -569,21 +741,23 @@ def list_personal_wishes(
 
 @router.get("/user/{user_id}/personal", response_model=PublicPersonalWishListOut)
 def list_user_personal_wishes(
+    request: Request,
     user_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     target = db.execute(
         select(User).where(User.id == user_id, User.is_active.is_(True))
     ).scalar_one_or_none()
     if target is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     is_owner = int(current.user_number) == int(user_id)
     if not is_owner and is_minor_protected(target):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+        raise HTTPException(status_code=403, detail=_td(locale, "This module is private."))
     if not is_owner and not bool(target.public_profile_show_public_wishes):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+        raise HTTPException(status_code=403, detail=_td(locale, "This module is private."))
 
     wishes = db.execute(
         select(PublicPersonalWish)
@@ -611,7 +785,7 @@ def list_user_personal_wishes(
     guardian_map = _load_frozen_guardians_map(db=db, wishes=wishes)
 
     return PublicPersonalWishListOut(
-        items=[_wish_out(wish=wish, media_map=media_map, user_map=guardian_map) for wish in wishes],
+        items=[_wish_out(locale=locale, wish=wish, media_map=media_map, user_map=guardian_map) for wish in wishes],
         active_count=len(wishes),
         active_limit=PERSONAL_ACTIVE_LIMIT,
         fulfilled_total=fulfilled_total or 0,
@@ -620,12 +794,14 @@ def list_user_personal_wishes(
 
 @router.get("/cooperative", response_model=PublicCooperativeWishListOut)
 def list_cooperative_wishes(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     wishes = db.execute(
         select(PublicCooperativeWish)
@@ -652,7 +828,7 @@ def list_cooperative_wishes(
 
     return PublicCooperativeWishListOut(
         items=[
-            _cooperative_wish_out(
+            _cooperative_wish_out(locale=locale, 
                 wish=wish,
                 media_map=media_map,
                 current_user_id=current.user_number,
@@ -671,17 +847,19 @@ def list_cooperative_wishes(
 
 @router.get("/user/{user_id}/cooperative", response_model=PublicCooperativeWishListOut)
 def list_user_cooperative_wishes(
+    request: Request,
     user_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     target = db.execute(
         select(User).where(User.id == user_id, User.is_active.is_(True))
     ).scalar_one_or_none()
     if target is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
-    _ensure_cooperative_visibility(owner=target, viewer_user_id=current.user_number)
+    _ensure_cooperative_visibility(owner=target, viewer_user_id=current.user_number, locale=locale)
 
     wishes = db.execute(
         select(PublicCooperativeWish)
@@ -708,7 +886,7 @@ def list_user_cooperative_wishes(
 
     return PublicCooperativeWishListOut(
         items=[
-            _cooperative_wish_out(
+            _cooperative_wish_out(locale=locale, 
                 wish=wish,
                 media_map=media_map,
                 current_user_id=current.user_number,
@@ -727,11 +905,13 @@ def list_user_cooperative_wishes(
 
 @router.post("/cooperative", response_model=PublicCooperativeWishOut)
 def create_cooperative_wish(
+    request: Request,
     payload: PublicCooperativeWishUpsertRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_public_actions_allowed(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    _require_public_actions_allowed(db=db, user_id=current.user_number, locale=locale)
 
     active_count = db.execute(
         select(func.count(PublicCooperativeWish.id))
@@ -746,10 +926,10 @@ def create_cooperative_wish(
     if int(active_count or 0) >= COOPERATIVE_ACTIVE_LIMIT:
         raise HTTPException(
             status_code=409,
-            detail=f"Ya alcanzaste el máximo de {COOPERATIVE_ACTIVE_LIMIT} deseos cooperativos activos.",
+            detail=_td(locale, "You already reached the maximum of {limit} active cooperative wishes.", limit=COOPERATIVE_ACTIVE_LIMIT),
         )
 
-    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number)
+    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number, locale=locale)
     wish = PublicCooperativeWish(
         user_id=current.user_number,
         wish_text=payload.wish_text,
@@ -775,7 +955,7 @@ def create_cooperative_wish(
     participations_map = render_context["participations_map"]
     participant_user_map = render_context["participant_user_map"]
 
-    return _cooperative_wish_out(
+    return _cooperative_wish_out(locale=locale, 
         wish=wish,
         media_map=media_map,
         current_user_id=current.user_number,
@@ -789,12 +969,14 @@ def create_cooperative_wish(
 
 @router.put("/cooperative/{wish_id}", response_model=PublicCooperativeWishOut)
 def update_cooperative_wish(
+    request: Request,
     wish_id: int,
     payload: PublicCooperativeWishUpsertRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_public_actions_allowed(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    _require_public_actions_allowed(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(
         select(PublicCooperativeWish)
@@ -802,11 +984,11 @@ def update_cooperative_wish(
         .where(PublicCooperativeWish.user_id == current.user_number)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Cooperative wish not found."))
     if _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id)) is not None:
-        raise HTTPException(status_code=409, detail="Este deseo cooperativo ya fue marcado como cumplido.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This cooperative wish has already been marked as fulfilled."))
 
-    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number)
+    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number, locale=locale)
     wish.wish_text = payload.wish_text
     wish.wish_type = payload.wish_type
     wish.participants_goal = payload.participants_goal
@@ -829,7 +1011,7 @@ def update_cooperative_wish(
     participations_map = render_context["participations_map"]
     participant_user_map = render_context["participant_user_map"]
 
-    return _cooperative_wish_out(
+    return _cooperative_wish_out(locale=locale, 
         wish=wish,
         media_map=media_map,
         current_user_id=current.user_number,
@@ -843,29 +1025,31 @@ def update_cooperative_wish(
 
 @router.post("/cooperative/{wish_id}/participate", response_model=PublicCooperativeWishOut)
 def participate_in_cooperative_wish(
+    request: Request,
     wish_id: int,
     payload: PublicCooperativeWishParticipationUpsertRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_public_actions_allowed(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    _require_public_actions_allowed(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(select(PublicCooperativeWish).where(PublicCooperativeWish.id == wish_id)).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Cooperative wish not found."))
     if _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id)) is not None:
-        raise HTTPException(status_code=409, detail="Este deseo cooperativo ya fue marcado como cumplido.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This cooperative wish has already been marked as fulfilled."))
 
     owner = db.execute(
         select(User).where(User.id == int(wish.user_id), User.is_active.is_(True))
     ).scalar_one_or_none()
     if owner is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     if int(current.user_number) == int(wish.user_id):
-        raise HTTPException(status_code=409, detail="No puedes registrar participación en tu propio deseo cooperativo.")
+        raise HTTPException(status_code=409, detail=_td(locale, "You cannot register participation in your own cooperative wish."))
 
-    _ensure_cooperative_visibility(owner=owner, viewer_user_id=current.user_number)
+    _ensure_cooperative_visibility(owner=owner, viewer_user_id=current.user_number, locale=locale)
 
     participation = db.execute(
         select(PublicCooperativeWishParticipation)
@@ -876,7 +1060,7 @@ def participate_in_cooperative_wish(
         expected_code = (wish.security_code or "").strip()
         provided_code = (payload.security_code or "").strip()
         if not expected_code or expected_code != provided_code:
-            raise HTTPException(status_code=403, detail="Código de seguridad inválido.")
+            raise HTTPException(status_code=403, detail=_td(locale, "Invalid security code."))
 
         participants_current = db.execute(
             select(func.count(PublicCooperativeWishParticipation.id))
@@ -885,7 +1069,11 @@ def participate_in_cooperative_wish(
         if int(participants_current or 0) >= int(wish.participants_goal or 0):
             raise HTTPException(
                 status_code=409,
-                detail=f"Este deseo ya alcanzó el máximo de {int(wish.participants_goal or 0)} participantes.",
+                detail=_td(
+                    locale,
+                    "This wish already reached the maximum of {limit} participants.",
+                    limit=int(wish.participants_goal or 0),
+                ),
             )
 
         participation = PublicCooperativeWishParticipation(
@@ -898,7 +1086,10 @@ def participate_in_cooperative_wish(
         if participation.owner_validated_at is not None:
             raise HTTPException(
                 status_code=409,
-                detail="Tu participación ya fue validada por el creador y no puede editarse.",
+                detail=_td(
+                    locale,
+                    "Your participation has already been validated by the creator and cannot be edited.",
+                ),
             )
         participation.participation_text = payload.participation_text
 
@@ -917,7 +1108,7 @@ def participate_in_cooperative_wish(
     participations_map = render_context["participations_map"]
     participant_user_map = render_context["participant_user_map"]
 
-    return _cooperative_wish_out(
+    return _cooperative_wish_out(locale=locale, 
         wish=wish,
         media_map=media_map,
         current_user_id=current.user_number,
@@ -931,27 +1122,29 @@ def participate_in_cooperative_wish(
 
 @router.delete("/cooperative/{wish_id}/participation/mine", response_model=PublicCooperativeWishOut)
 def cancel_my_cooperative_participation(
+    request: Request,
     wish_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_public_actions_allowed(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    _require_public_actions_allowed(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(select(PublicCooperativeWish).where(PublicCooperativeWish.id == wish_id)).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Cooperative wish not found."))
     if _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id)) is not None:
-        raise HTTPException(status_code=409, detail="Este deseo cooperativo ya fue marcado como cumplido.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This cooperative wish has already been marked as fulfilled."))
 
     if int(current.user_number) == int(wish.user_id):
-        raise HTTPException(status_code=409, detail="No puedes cancelar participación en tu propio deseo cooperativo.")
+        raise HTTPException(status_code=409, detail=_td(locale, "You cannot cancel participation in your own cooperative wish."))
 
     owner = db.execute(
         select(User).where(User.id == int(wish.user_id), User.is_active.is_(True))
     ).scalar_one_or_none()
     if owner is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
-    _ensure_cooperative_visibility(owner=owner, viewer_user_id=current.user_number)
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
+    _ensure_cooperative_visibility(owner=owner, viewer_user_id=current.user_number, locale=locale)
 
     participation = db.execute(
         select(PublicCooperativeWishParticipation)
@@ -959,11 +1152,14 @@ def cancel_my_cooperative_participation(
         .where(PublicCooperativeWishParticipation.participant_user_id == int(current.user_number))
     ).scalar_one_or_none()
     if participation is None:
-        raise HTTPException(status_code=404, detail="No tienes participación registrada en este deseo.")
+        raise HTTPException(status_code=404, detail=_td(locale, "You have no registered participation in this wish."))
     if participation.owner_validated_at is not None:
         raise HTTPException(
             status_code=409,
-            detail="Tu participación ya fue validada por el creador y no puede cancelarse.",
+            detail=_td(
+                locale,
+                "Your participation has already been validated by the creator and cannot be canceled.",
+            ),
         )
 
     db.delete(participation)
@@ -982,7 +1178,7 @@ def cancel_my_cooperative_participation(
     participations_map = render_context["participations_map"]
     participant_user_map = render_context["participant_user_map"]
 
-    return _cooperative_wish_out(
+    return _cooperative_wish_out(locale=locale, 
         wish=wish,
         media_map=media_map,
         current_user_id=current.user_number,
@@ -996,28 +1192,30 @@ def cancel_my_cooperative_participation(
 
 @router.post("/cooperative/{wish_id}/participation/complete", response_model=PublicCooperativeWishOut)
 def complete_my_cooperative_participation(
+    request: Request,
     wish_id: int,
     payload: PublicCooperativeWishParticipationCompleteRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_public_actions_allowed(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    _require_public_actions_allowed(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(select(PublicCooperativeWish).where(PublicCooperativeWish.id == wish_id)).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Cooperative wish not found."))
     if _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id)) is not None:
-        raise HTTPException(status_code=409, detail="Este deseo cooperativo ya fue marcado como cumplido.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This cooperative wish has already been marked as fulfilled."))
 
     if int(current.user_number) == int(wish.user_id):
-        raise HTTPException(status_code=409, detail="No puedes registrar participación en tu propio deseo cooperativo.")
+        raise HTTPException(status_code=409, detail=_td(locale, "You cannot register participation in your own cooperative wish."))
 
     owner = db.execute(
         select(User).where(User.id == int(wish.user_id), User.is_active.is_(True))
     ).scalar_one_or_none()
     if owner is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
-    _ensure_cooperative_visibility(owner=owner, viewer_user_id=current.user_number)
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
+    _ensure_cooperative_visibility(owner=owner, viewer_user_id=current.user_number, locale=locale)
 
     participation = db.execute(
         select(PublicCooperativeWishParticipation)
@@ -1025,17 +1223,21 @@ def complete_my_cooperative_participation(
         .where(PublicCooperativeWishParticipation.participant_user_id == int(current.user_number))
     ).scalar_one_or_none()
     if participation is None:
-        raise HTTPException(status_code=404, detail="Primero debes registrar tu participación.")
+        raise HTTPException(status_code=404, detail=_td(locale, "You must first register your participation."))
     if participation.owner_validated_at is not None:
         raise HTTPException(
             status_code=409,
-            detail="Tu participación ya fue validada por el creador y no puede modificarse.",
+            detail=_td(
+                locale,
+                "Your participation has already been validated by the creator and cannot be modified.",
+            ),
         )
 
     evidence_media = _resolve_owned_media(
         db=db,
         media_id=int(payload.evidence_media_id),
         user_id=int(current.user_number),
+        locale=locale,
     )
     participation.evidence_media_id = int(evidence_media.id)
     participation.evidence_submitted_at = datetime.now(timezone.utc)
@@ -1056,7 +1258,7 @@ def complete_my_cooperative_participation(
     participations_map = render_context["participations_map"]
     participant_user_map = render_context["participant_user_map"]
 
-    return _cooperative_wish_out(
+    return _cooperative_wish_out(locale=locale, 
         wish=wish,
         media_map=media_map,
         current_user_id=current.user_number,
@@ -1070,12 +1272,14 @@ def complete_my_cooperative_participation(
 
 @router.post("/cooperative/{wish_id}/participation/{participation_id}/validate", response_model=PublicCooperativeWishOut)
 def validate_cooperative_participation(
+    request: Request,
     wish_id: int,
     participation_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_public_actions_allowed(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    _require_public_actions_allowed(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(
         select(PublicCooperativeWish)
@@ -1083,9 +1287,9 @@ def validate_cooperative_participation(
         .where(PublicCooperativeWish.user_id == current.user_number)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Cooperative wish not found."))
     if _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id)) is not None:
-        raise HTTPException(status_code=409, detail="Este deseo cooperativo ya fue marcado como cumplido.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This cooperative wish has already been marked as fulfilled."))
 
     participation = db.execute(
         select(PublicCooperativeWishParticipation)
@@ -1093,13 +1297,13 @@ def validate_cooperative_participation(
         .where(PublicCooperativeWishParticipation.wish_id == int(wish.id))
     ).scalar_one_or_none()
     if participation is None:
-        raise HTTPException(status_code=404, detail="Participación no encontrada.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Participation not found."))
     if participation.evidence_submitted_at is None or participation.evidence_media_id is None:
-        raise HTTPException(status_code=409, detail="Esta participación aún no tiene evidencia para validar.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This participation still has no evidence to validate."))
     if participation.oath_accepted is not True:
         raise HTTPException(
             status_code=409,
-            detail="La participación no aceptó el juramento obligatorio para su evidencia.",
+            detail=_td(locale, "The participation did not accept the required oath for its evidence."),
         )
 
     if participation.owner_validated_at is None:
@@ -1122,7 +1326,7 @@ def validate_cooperative_participation(
     participations_map = render_context["participations_map"]
     participant_user_map = render_context["participant_user_map"]
 
-    return _cooperative_wish_out(
+    return _cooperative_wish_out(locale=locale, 
         wish=wish,
         media_map=media_map,
         current_user_id=current.user_number,
@@ -1136,12 +1340,14 @@ def validate_cooperative_participation(
 
 @router.post("/cooperative/{wish_id}/fulfill", response_model=PublicCooperativeWishOut)
 def fulfill_cooperative_wish(
+    request: Request,
     wish_id: int,
     payload: PublicCooperativeWishFulfillRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_public_actions_allowed(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    _require_public_actions_allowed(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(
         select(PublicCooperativeWish)
@@ -1149,10 +1355,10 @@ def fulfill_cooperative_wish(
         .where(PublicCooperativeWish.user_id == current.user_number)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Cooperative wish not found."))
     existing_fulfillment = _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id))
     if existing_fulfillment is not None:
-        raise HTTPException(status_code=409, detail="Este deseo cooperativo ya fue marcado como cumplido.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This cooperative wish has already been marked as fulfilled."))
 
     invalid_oath_count = db.execute(
         select(func.count(PublicCooperativeWishParticipation.id))
@@ -1164,7 +1370,7 @@ def fulfill_cooperative_wish(
     if int(invalid_oath_count or 0) > 0:
         raise HTTPException(
             status_code=409,
-            detail="Hay evidencias de participación sin juramento válido. Deben volver a enviarse.",
+            detail=_td(locale, "There is participation evidence without a valid oath. It must be submitted again."),
         )
 
     participation_rows = db.execute(
@@ -1177,20 +1383,21 @@ def fulfill_cooperative_wish(
     if not participation_rows:
         raise HTTPException(
             status_code=409,
-            detail="Aún no hay evidencias de participación para cerrar este deseo cooperativo.",
+            detail=_td(locale, "There is still no participation evidence to close this cooperative wish."),
         )
 
     pending_validation_exists = any(row.owner_validated_at is None for row in participation_rows)
     if pending_validation_exists:
         raise HTTPException(
             status_code=409,
-            detail="Debes validar todas las participaciones con evidencia antes de marcar este deseo como cumplido.",
+            detail=_td(locale, "You must validate all participations with evidence before marking this wish as fulfilled."),
         )
 
     evidence_media = _resolve_owned_media(
         db=db,
         media_id=int(payload.evidence_media_id),
         user_id=int(current.user_number),
+        locale=locale,
     )
 
     fulfillment = PublicCooperativeWishFulfillment(
@@ -1218,7 +1425,7 @@ def fulfill_cooperative_wish(
     participations_map = render_context["participations_map"]
     participant_user_map = render_context["participant_user_map"]
 
-    return _cooperative_wish_out(
+    return _cooperative_wish_out(locale=locale, 
         wish=wish,
         media_map=media_map,
         current_user_id=current.user_number,
@@ -1232,11 +1439,13 @@ def fulfill_cooperative_wish(
 
 @router.delete("/cooperative/{wish_id}", response_model=PublicPersonalWishDeleteResponse)
 def delete_cooperative_wish(
+    request: Request,
     wish_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_public_actions_allowed(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    _require_public_actions_allowed(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(
         select(PublicCooperativeWish)
@@ -1244,9 +1453,9 @@ def delete_cooperative_wish(
         .where(PublicCooperativeWish.user_id == current.user_number)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo cooperativo no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Cooperative wish not found."))
     if _load_cooperative_fulfillment_for_wish(db=db, wish_id=int(wish.id)) is not None:
-        raise HTTPException(status_code=409, detail="No puedes borrar un deseo cooperativo ya cumplido.")
+        raise HTTPException(status_code=409, detail=_td(locale, "You cannot delete a cooperative wish that is already fulfilled."))
 
     db.delete(wish)
     db.commit()
@@ -1255,14 +1464,16 @@ def delete_cooperative_wish(
 
 @router.get("/cooperative/fulfilled/list", response_model=PublicCooperativeWishFulfilledListOut)
 def list_fulfilled_cooperative_wishes(
+    request: Request,
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     total = db.execute(
         select(func.count(PublicCooperativeWishFulfillment.id))
@@ -1312,7 +1523,7 @@ def list_fulfilled_cooperative_wishes(
 
     return PublicCooperativeWishFulfilledListOut(
         items=[
-            _cooperative_fulfilled_wish_out(
+            _cooperative_fulfilled_wish_out(locale=locale, 
                 wish=wish,
                 fulfillment=fulfillments_map[int(wish.id)],
                 media_map=media_map,
@@ -1328,25 +1539,27 @@ def list_fulfilled_cooperative_wishes(
 
 @router.get("/user/{user_id}/cooperative/fulfilled", response_model=PublicCooperativeWishFulfilledListOut)
 def list_user_fulfilled_cooperative_wishes(
+    request: Request,
     user_id: int,
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     target = db.execute(
         select(User).where(User.id == user_id, User.is_active.is_(True))
     ).scalar_one_or_none()
     if target is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     is_owner = int(current.user_number) == int(user_id)
     if not is_owner and is_minor_protected(target):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+        raise HTTPException(status_code=403, detail=_td(locale, "This module is private."))
     if not is_owner and not bool(target.public_profile_show_fulfilled_wishes):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+        raise HTTPException(status_code=403, detail=_td(locale, "This module is private."))
     if not is_owner and not bool(target.public_profile_show_cooperative_wishes):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+        raise HTTPException(status_code=403, detail=_td(locale, "This module is private."))
 
     total = db.execute(
         select(func.count(PublicCooperativeWishFulfillment.id))
@@ -1396,7 +1609,7 @@ def list_user_fulfilled_cooperative_wishes(
 
     return PublicCooperativeWishFulfilledListOut(
         items=[
-            _cooperative_fulfilled_wish_out(
+            _cooperative_fulfilled_wish_out(locale=locale, 
                 wish=wish,
                 fulfillment=fulfillments_map[int(wish.id)],
                 media_map=media_map,
@@ -1412,14 +1625,16 @@ def list_user_fulfilled_cooperative_wishes(
 
 @router.get("/personal/fulfilled", response_model=PublicPersonalWishFulfilledListOut)
 def list_fulfilled_personal_wishes(
+    request: Request,
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     total = db.execute(
         select(func.count(PublicPersonalWish.id))
@@ -1451,7 +1666,7 @@ def list_fulfilled_personal_wishes(
 
     return PublicPersonalWishFulfilledListOut(
         items=[
-            _wish_out(
+            _wish_out(locale=locale, 
                 wish=wish,
                 media_map=media_map,
                 user_map=guardian_map,
@@ -1468,23 +1683,25 @@ def list_fulfilled_personal_wishes(
 
 @router.get("/user/{user_id}/personal/fulfilled", response_model=PublicPersonalWishFulfilledListOut)
 def list_user_fulfilled_personal_wishes(
+    request: Request,
     user_id: int,
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     target = db.execute(
         select(User).where(User.id == user_id, User.is_active.is_(True))
     ).scalar_one_or_none()
     if target is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "User not found."))
 
     is_owner = int(current.user_number) == int(user_id)
     if not is_owner and is_minor_protected(target):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+        raise HTTPException(status_code=403, detail=_td(locale, "This module is private."))
     if not is_owner and not bool(target.public_profile_show_fulfilled_wishes):
-        raise HTTPException(status_code=403, detail="Este módulo es privado.")
+        raise HTTPException(status_code=403, detail=_td(locale, "This module is private."))
 
     total = db.execute(
         select(func.count(PublicPersonalWish.id))
@@ -1516,7 +1733,7 @@ def list_user_fulfilled_personal_wishes(
 
     return PublicPersonalWishFulfilledListOut(
         items=[
-            _wish_out(
+            _wish_out(locale=locale, 
                 wish=wish,
                 media_map=media_map,
                 user_map=guardian_map,
@@ -1533,11 +1750,13 @@ def list_user_fulfilled_personal_wishes(
 
 @router.post("/personal", response_model=PublicPersonalWishOut)
 def create_personal_wish(
+    request: Request,
     payload: PublicPersonalWishUpsertRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_public_actions_allowed(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    _require_public_actions_allowed(db=db, user_id=current.user_number, locale=locale)
 
     active_count = db.execute(
         select(func.count(PublicPersonalWish.id))
@@ -1547,10 +1766,10 @@ def create_personal_wish(
     if active_count >= PERSONAL_ACTIVE_LIMIT:
         raise HTTPException(
             status_code=409,
-            detail=f"Ya alcanzaste el máximo de {PERSONAL_ACTIVE_LIMIT} deseos personales activos.",
+            detail=_td(locale, "You already reached the maximum of {limit} active personal wishes.", limit=PERSONAL_ACTIVE_LIMIT),
         )
 
-    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number)
+    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number, locale=locale)
 
     wish = PublicPersonalWish(
         user_id=current.user_number,
@@ -1566,17 +1785,19 @@ def create_personal_wish(
     db.refresh(wish)
 
     media_map = {media.id: media} if media else {}
-    return _wish_out(wish=wish, media_map=media_map, user_map={})
+    return _wish_out(locale=locale, wish=wish, media_map=media_map, user_map={})
 
 
 @router.put("/personal/{wish_id}", response_model=PublicPersonalWishOut)
 def update_personal_wish(
+    request: Request,
     wish_id: int,
     payload: PublicPersonalWishUpsertRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_public_actions_allowed(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    _require_public_actions_allowed(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(
         select(PublicPersonalWish)
@@ -1585,9 +1806,9 @@ def update_personal_wish(
         .where(PublicPersonalWish.status == PublicPersonalWishStatus.active)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo personal no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Personal wish not found."))
 
-    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number)
+    media = _resolve_owned_media(db=db, media_id=payload.media_id, user_id=current.user_number, locale=locale)
 
     wish.wish_text = payload.wish_text
     wish.wish_type = payload.wish_type
@@ -1597,17 +1818,19 @@ def update_personal_wish(
     db.refresh(wish)
 
     media_map = {media.id: media} if media else {}
-    return _wish_out(wish=wish, media_map=media_map, user_map={})
+    return _wish_out(locale=locale, wish=wish, media_map=media_map, user_map={})
 
 
 @router.post("/personal/{wish_id}/fulfill", response_model=PublicPersonalWishOut)
 def fulfill_personal_wish(
+    request: Request,
     wish_id: int,
     payload: PublicPersonalWishFulfillRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_public_actions_allowed(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    _require_public_actions_allowed(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(
         select(PublicPersonalWish)
@@ -1616,12 +1839,13 @@ def fulfill_personal_wish(
         .where(PublicPersonalWish.status == PublicPersonalWishStatus.active)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo personal no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Personal wish not found."))
 
     evidence_media = _resolve_owned_media(
         db=db,
         media_id=payload.evidence_media_id,
         user_id=current.user_number,
+        locale=locale,
     )
 
     wish.status = PublicPersonalWishStatus.fulfilled
@@ -1638,34 +1862,36 @@ def fulfill_personal_wish(
         media_map = {media.id: media for media in medias}
 
     guardian_map = _load_frozen_guardians_map(db=db, wishes=[wish])
-    return _wish_out(wish=wish, media_map=media_map, user_map=guardian_map)
+    return _wish_out(locale=locale, wish=wish, media_map=media_map, user_map=guardian_map)
 
 
 @router.post("/personal/{wish_id}/guardian-fulfill", response_model=PublicPersonalWishOut)
 def guardian_fulfill_personal_wish(
+    request: Request,
     wish_id: int,
     payload: PublicPersonalWishGuardianFulfillRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    guardian_user = _resolve_guardian_user(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    guardian_user = _resolve_guardian_user(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(
         select(PublicPersonalWish).where(PublicPersonalWish.id == wish_id)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo personal no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Personal wish not found."))
     if wish.status != PublicPersonalWishStatus.active:
-        raise HTTPException(status_code=409, detail="Este deseo ya no está activo.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This wish is no longer active."))
 
     if not (wish.frozen_by_guardian_id and wish.frozen_at):
-        raise HTTPException(status_code=409, detail="Este deseo no está congelado.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This wish is not frozen."))
     if int(wish.frozen_by_guardian_id) != int(guardian_user.id):
-        raise HTTPException(status_code=403, detail="Solo el guardián que congeló el deseo puede marcarlo como cumplido.")
+        raise HTTPException(status_code=403, detail=_td(locale, "Only the guardian who froze the wish can mark it as fulfilled."))
 
     commitment_code = (payload.commitment_code or "").strip().upper()
     if not commitment_code:
-        raise HTTPException(status_code=400, detail="Debes indicar el código de compromiso.")
+        raise HTTPException(status_code=400, detail=_td(locale, "You must provide the commitment code."))
 
     existing_by_wish = db.execute(
         select(PublicWishFulfillment).where(PublicWishFulfillment.wish_id == int(wish.id))
@@ -1674,32 +1900,33 @@ def guardian_fulfill_personal_wish(
         select(PublicWishFulfillment).where(PublicWishFulfillment.commitment_code == commitment_code)
     ).scalar_one_or_none()
     if existing_by_wish is not None or existing_by_code is not None:
-        raise HTTPException(status_code=409, detail="Este código de compromiso ya fue utilizado.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This commitment code has already been used."))
 
     wish_request = db.execute(
         select(GuardianWishRequest).where(GuardianWishRequest.commitment_code == commitment_code)
     ).scalar_one_or_none()
     if wish_request is None:
-        raise HTTPException(status_code=404, detail="Código de compromiso no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Commitment code not found."))
     if int(wish_request.public_wish_id) != int(wish.id):
-        raise HTTPException(status_code=409, detail="El código de compromiso no corresponde a este deseo.")
+        raise HTTPException(status_code=409, detail=_td(locale, "The commitment code does not match this wish."))
     if wish_request.commitment_sealed_at is None:
-        raise HTTPException(status_code=409, detail="El código de compromiso no ha sido sellado todavía.")
+        raise HTTPException(status_code=409, detail=_td(locale, "The commitment code has not been sealed yet."))
     if wish_request.denied_at is not None:
-        raise HTTPException(status_code=409, detail="Esta petición fue denegada y no puede cerrarse como cumplida.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This request was denied and cannot be closed as fulfilled."))
     if wish_request.guardian_id is not None and int(wish_request.guardian_id) != int(guardian_user.id):
-        raise HTTPException(status_code=409, detail="Este compromiso está asignado a otro guardián.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This commitment is assigned to another guardian."))
 
     fulfiller_user = db.execute(
         select(User).where(User.id == wish_request.requester_id, User.is_active.is_(True))
     ).scalar_one_or_none()
     if fulfiller_user is None:
-        raise HTTPException(status_code=404, detail="No se encontró al usuario que concedió el deseo.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Could not find the user who granted the wish."))
 
     evidence_media = _resolve_owned_media(
         db=db,
         media_id=payload.evidence_media_id,
         user_id=current.user_number,
+        locale=locale,
     )
 
     wish.status = PublicPersonalWishStatus.fulfilled
@@ -1734,7 +1961,7 @@ def guardian_fulfill_personal_wish(
 
     guardian_map = _load_frozen_guardians_map(db=db, wishes=[wish])
     fulfillment_map, fulfiller_map = _load_fulfillment_maps_for_wishes(db=db, wishes=[wish])
-    return _wish_out(
+    return _wish_out(locale=locale, 
         wish=wish,
         media_map=media_map,
         user_map=guardian_map,
@@ -1745,11 +1972,13 @@ def guardian_fulfill_personal_wish(
 
 @router.post("/personal/{wish_id}/freeze", response_model=PublicPersonalWishOut)
 def freeze_personal_wish(
+    request: Request,
     wish_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    guardian_user = _resolve_guardian_user(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    guardian_user = _resolve_guardian_user(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(
         select(PublicPersonalWish)
@@ -1757,10 +1986,10 @@ def freeze_personal_wish(
         .where(PublicPersonalWish.status == PublicPersonalWishStatus.active)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo personal no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Personal wish not found."))
 
     if wish.frozen_by_guardian_id and wish.frozen_at:
-        raise HTTPException(status_code=409, detail="Este deseo ya está congelado.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This wish is already frozen."))
 
     wish.frozen_by_guardian_id = int(guardian_user.id)
     wish.frozen_at = datetime.now(timezone.utc)
@@ -1785,17 +2014,19 @@ def freeze_personal_wish(
         media_map = {media.id: media for media in medias}
 
     guardian_map = _load_frozen_guardians_map(db=db, wishes=[wish])
-    return _wish_out(wish=wish, media_map=media_map, user_map=guardian_map)
+    return _wish_out(locale=locale, wish=wish, media_map=media_map, user_map=guardian_map)
 
 
 @router.post("/personal/{wish_id}/unfreeze", response_model=PublicPersonalWishOut)
 def unfreeze_personal_wish(
+    request: Request,
     wish_id: int,
     payload: PublicPersonalWishUnfreezeRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    guardian_user = _resolve_guardian_user(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    guardian_user = _resolve_guardian_user(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(
         select(PublicPersonalWish)
@@ -1803,13 +2034,13 @@ def unfreeze_personal_wish(
         .where(PublicPersonalWish.status == PublicPersonalWishStatus.active)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo personal no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Personal wish not found."))
 
     if not (wish.frozen_by_guardian_id and wish.frozen_at):
-        raise HTTPException(status_code=409, detail="Este deseo no está congelado.")
+        raise HTTPException(status_code=409, detail=_td(locale, "This wish is not frozen."))
 
     if int(wish.frozen_by_guardian_id) != int(guardian_user.id):
-        raise HTTPException(status_code=403, detail="Solo el guardián que congeló el deseo puede descongelarlo.")
+        raise HTTPException(status_code=403, detail=_td(locale, "Only the guardian who froze the wish can unfreeze it."))
 
     reason_type = (
         PublicWishUnfreezeReasonType.error
@@ -1841,16 +2072,18 @@ def unfreeze_personal_wish(
         media_map = {media.id: media for media in medias}
 
     guardian_map = _load_frozen_guardians_map(db=db, wishes=[wish])
-    return _wish_out(wish=wish, media_map=media_map, user_map=guardian_map)
+    return _wish_out(locale=locale, wish=wish, media_map=media_map, user_map=guardian_map)
 
 
 @router.delete("/personal/{wish_id}", response_model=PublicPersonalWishDeleteResponse)
 def delete_personal_wish(
+    request: Request,
     wish_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_public_actions_allowed(db=db, user_id=current.user_number)
+    locale = _locale(request)
+    _require_public_actions_allowed(db=db, user_id=current.user_number, locale=locale)
 
     wish = db.execute(
         select(PublicPersonalWish)
@@ -1859,7 +2092,7 @@ def delete_personal_wish(
         .where(PublicPersonalWish.status == PublicPersonalWishStatus.active)
     ).scalar_one_or_none()
     if wish is None:
-        raise HTTPException(status_code=404, detail="Deseo personal no encontrado.")
+        raise HTTPException(status_code=404, detail=_td(locale, "Personal wish not found."))
 
     db.delete(wish)
     db.commit()

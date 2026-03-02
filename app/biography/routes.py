@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -32,6 +32,7 @@ from app.biography.schemas import (
     BiographyPhysicalTraitsOut,
     BiographyPhysicalTraitsUpdateRequest,
 )
+from app.core.i18n import locale_from_request, tr as i18n_tr
 from app.db.database import get_db
 from app.db.models.biography_curiosities import BiographyCuriosities
 from app.db.models.biography_personal_info import BiographyPersonalInfo
@@ -58,26 +59,159 @@ MAX_LIFE_ACHIEVEMENTS_WORDS = 500
 MAX_FAVORITE_QUOTES_WORDS = 500
 DISTINCTIONS_MAX_SLOTS = 10
 GUARDIANS_MIN_RANK = 3
-DEFAULT_DREAM_TITLE = "Sobre su mayor sueño"
-DEFAULT_PRO_ACHIEVEMENTS_TITLE = "Logros profesionales"
-DEFAULT_LIFE_ACHIEVEMENTS_TITLE = "Logros alcanzados"
-DEFAULT_FAVORITE_QUOTES_TITLE = "Frases favoritas"
+DEFAULT_DREAM_TITLES = {
+    "es": "Sobre su mayor sueño",
+    "en": "About their greatest dream",
+    "fr": "À propos de leur plus grand rêve",
+}
+DEFAULT_PRO_ACHIEVEMENTS_TITLES = {
+    "es": "Logros profesionales",
+    "en": "Professional achievements",
+    "fr": "Réalisations professionnelles",
+}
+DEFAULT_LIFE_ACHIEVEMENTS_TITLES = {
+    "es": "Logros de vida",
+    "en": "Life achievements",
+    "fr": "Réalisations de vie",
+}
+DEFAULT_FAVORITE_QUOTES_TITLES = {
+    "es": "Frases favoritas",
+    "en": "Favorite quotes",
+    "fr": "Citations favorites",
+}
 
-MONTH_NAMES_ES = (
-    "",
-    "enero",
-    "febrero",
-    "marzo",
-    "abril",
-    "mayo",
-    "junio",
-    "julio",
-    "agosto",
-    "septiembre",
-    "octubre",
-    "noviembre",
-    "diciembre",
-)
+MONTH_NAMES = {
+    "en": (
+        "",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ),
+    "es": (
+        "",
+        "enero",
+        "febrero",
+        "marzo",
+        "abril",
+        "mayo",
+        "junio",
+        "julio",
+        "agosto",
+        "septiembre",
+        "octubre",
+        "noviembre",
+        "diciembre",
+    ),
+    "fr": (
+        "",
+        "janvier",
+        "février",
+        "mars",
+        "avril",
+        "mai",
+        "juin",
+        "juillet",
+        "août",
+        "septembre",
+        "octobre",
+        "novembre",
+        "décembre",
+    ),
+}
+
+
+def _locale(request: Request) -> str:
+    return locale_from_request(request, default="en")
+
+
+def _title_for_locale(locale: str, titles: dict[str, str]) -> str:
+    return titles.get(locale, titles["en"])
+
+
+def _msg_user_not_found(locale: str) -> str:
+    return i18n_tr(locale, es="Usuario no encontrado.", en="User not found.", fr="Utilisateur introuvable.")
+
+
+def _msg_guardian_only(locale: str) -> str:
+    return i18n_tr(
+        locale,
+        es="Esta sección solo puede ser actualizada por Guardianes de Kiadez.com.",
+        en="This section can only be updated by Kiadez.com Guardians.",
+        fr="Cette section ne peut être mise à jour que par les Gardiens de Kiadez.com.",
+    )
+
+
+def _msg_biography_hidden(locale: str) -> str:
+    return i18n_tr(
+        locale,
+        es="Esta biografía de perfil está oculta por configuración de privacidad.",
+        en="This profile biography is hidden by privacy settings.",
+        fr="Cette biographie de profil est masquée par les paramètres de confidentialité.",
+    )
+
+
+def _msg_about_hidden(locale: str) -> str:
+    return i18n_tr(
+        locale,
+        es='La sección "Sobre mí" está oculta por configuración de privacidad.',
+        en='The "About me" section is hidden by privacy settings.',
+        fr='La section "À propos de moi" est masquée par les paramètres de confidentialité.',
+    )
+
+
+def _msg_birth_date_future(locale: str) -> str:
+    return i18n_tr(
+        locale,
+        es="La fecha de nacimiento no puede estar en el futuro.",
+        en="Birth date cannot be in the future.",
+        fr="La date de naissance ne peut pas être dans le futur.",
+    )
+
+
+def _msg_word_limit(locale: str, *, section: str, max_words: int) -> str:
+    if section == "biography":
+        return i18n_tr(
+            locale,
+            es=f"La biografía permite un máximo de {max_words} palabras.",
+            en=f"Biography allows a maximum of {max_words} words.",
+            fr=f"La biographie autorise un maximum de {max_words} mots.",
+        )
+    if section == "dream":
+        return i18n_tr(
+            locale,
+            es=f"El mayor sueño permite un máximo de {max_words} palabras.",
+            en=f"Greatest dream allows a maximum of {max_words} words.",
+            fr=f"Le plus grand rêve autorise un maximum de {max_words} mots.",
+        )
+    if section == "professional_achievements":
+        return i18n_tr(
+            locale,
+            es=f"Los logros profesionales permiten un máximo de {max_words} palabras.",
+            en=f"Professional achievements allow a maximum of {max_words} words.",
+            fr=f"Les réalisations professionnelles autorisent un maximum de {max_words} mots.",
+        )
+    if section == "life_achievements":
+        return i18n_tr(
+            locale,
+            es=f"Los logros de vida permiten un máximo de {max_words} palabras.",
+            en=f"Life achievements allow a maximum of {max_words} words.",
+            fr=f"Les réalisations de vie autorisent un maximum de {max_words} mots.",
+        )
+    return i18n_tr(
+        locale,
+        es=f"Las citas favoritas permiten un máximo de {max_words} palabras.",
+        en=f"Favorite quotes allow a maximum of {max_words} words.",
+        fr=f"Les citations favorites autorisent un maximum de {max_words} mots.",
+    )
 
 
 def _calculate_age(birth_date: date) -> int:
@@ -87,6 +221,7 @@ def _calculate_age(birth_date: date) -> int:
 
 def _compose_birth_display(
     *,
+    locale: str,
     birth_date: date | None,
     birth_city: str | None,
     birth_region: str | None,
@@ -96,17 +231,25 @@ def _compose_birth_display(
         return None
 
     age = _calculate_age(birth_date)
-    month = MONTH_NAMES_ES[birth_date.month]
-    formatted_date = f"{birth_date.day} de {month} de {birth_date.year}"
+    normalized_locale = locale if locale in MONTH_NAMES else "en"
+    month = MONTH_NAMES[normalized_locale][birth_date.month]
+    if normalized_locale == "es":
+        formatted_date = f"{birth_date.day} de {month} de {birth_date.year}"
+    elif normalized_locale == "fr":
+        formatted_date = f"{birth_date.day} {month} {birth_date.year}"
+    else:
+        formatted_date = f"{month} {birth_date.day}, {birth_date.year}"
+    age_label = i18n_tr(locale, es=f"{age} años", en=f"{age} years old", fr=f"{age} ans")
 
     location_parts = [part for part in (birth_city, birth_region, birth_country) if part]
     if location_parts:
-        return f"{formatted_date} ({age} años); {', '.join(location_parts)}"
-    return f"{formatted_date} ({age} años)"
+        return f"{formatted_date} ({age_label}); {', '.join(location_parts)}"
+    return f"{formatted_date} ({age_label})"
 
 
 def _serialize_personal_info(
     *,
+    locale: str,
     user: User,
     personal_info: BiographyPersonalInfo | None,
 ) -> BiographyPersonalInfoOut:
@@ -128,6 +271,7 @@ def _serialize_personal_info(
         birth_region=birth_region,
         birth_country=birth_country,
         birth_display=_compose_birth_display(
+            locale=locale,
             birth_date=birth_date,
             birth_city=birth_city,
             birth_region=birth_region,
@@ -212,12 +356,13 @@ def _serialize_about(
 
 def _serialize_dream(
     *,
+    locale: str,
     dream: BiographyDream | None,
 ) -> BiographyDreamOut:
     dream_title = dream.dream_title if dream else None
     dream_text = dream.dream_text if dream else None
     return BiographyDreamOut(
-        dream_title=dream_title or DEFAULT_DREAM_TITLE,
+        dream_title=dream_title or _title_for_locale(locale, DEFAULT_DREAM_TITLES),
         dream_text=dream_text,
         word_count=_count_words(dream_text),
     )
@@ -225,12 +370,13 @@ def _serialize_dream(
 
 def _serialize_professional_achievements(
     *,
+    locale: str,
     section: BiographyProfessionalAchievements | None,
 ) -> BiographyProfessionalAchievementsOut:
     section_title = section.section_title if section else None
     section_text = section.section_text if section else None
     return BiographyProfessionalAchievementsOut(
-        section_title=section_title or DEFAULT_PRO_ACHIEVEMENTS_TITLE,
+        section_title=section_title or _title_for_locale(locale, DEFAULT_PRO_ACHIEVEMENTS_TITLES),
         section_text=section_text,
         word_count=_count_words(section_text),
     )
@@ -238,12 +384,13 @@ def _serialize_professional_achievements(
 
 def _serialize_life_achievements(
     *,
+    locale: str,
     section: BiographyLifeAchievements | None,
 ) -> BiographyLifeAchievementsOut:
     section_title = section.section_title if section else None
     section_text = section.section_text if section else None
     return BiographyLifeAchievementsOut(
-        section_title=section_title or DEFAULT_LIFE_ACHIEVEMENTS_TITLE,
+        section_title=section_title or _title_for_locale(locale, DEFAULT_LIFE_ACHIEVEMENTS_TITLES),
         section_text=section_text,
         word_count=_count_words(section_text),
     )
@@ -251,12 +398,13 @@ def _serialize_life_achievements(
 
 def _serialize_favorite_quotes(
     *,
+    locale: str,
     section: BiographyFavoriteQuotes | None,
 ) -> BiographyFavoriteQuotesOut:
     section_title = section.section_title if section else None
     section_text = section.section_text if section else None
     return BiographyFavoriteQuotesOut(
-        section_title=section_title or DEFAULT_FAVORITE_QUOTES_TITLE,
+        section_title=section_title or _title_for_locale(locale, DEFAULT_FAVORITE_QUOTES_TITLES),
         section_text=section_text,
         word_count=_count_words(section_text),
     )
@@ -266,12 +414,12 @@ def _is_guardian(current: UserPublic) -> bool:
     return int(current.guardian_rank or 0) >= GUARDIANS_MIN_RANK
 
 
-def _require_guardian(current: UserPublic) -> None:
+def _require_guardian(current: UserPublic, locale: str) -> None:
     if _is_guardian(current):
         return
     raise HTTPException(
         status_code=403,
-        detail="Esta sección solo puede ser actualizada por los Guardianes de Kiadez.com.",
+        detail=_msg_guardian_only(locale),
     )
 
 
@@ -279,11 +427,12 @@ def _ensure_public_biography_visibility(
     *,
     user: User,
     viewer_user_id: int,
+    locale: str,
 ) -> None:
     if int(user.id) == int(viewer_user_id):
         return
     if not bool(user.public_profile_show_biography):
-        raise HTTPException(status_code=403, detail="La biografía de este perfil está oculta por privacidad.")
+        raise HTTPException(status_code=403, detail=_msg_biography_hidden(locale))
 
 
 def _serialize_distinctions(
@@ -325,10 +474,12 @@ def _apply_distinctions_payload(
 
 @router.get("/activity-stats", response_model=BiographyActivityStatsOut)
 def get_activity_stats(
+    request: Request,
     user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     target_user_id = int(current.user_number)
     requested_user_id = int(user_id) if user_id is not None else None
     show_cooperative_stats = True
@@ -341,14 +492,18 @@ def get_activity_stats(
             )
         ).scalar_one_or_none()
         if target_user is None:
-            raise HTTPException(status_code=404, detail="Usuario no encontrado.")
-        _ensure_public_biography_visibility(user=target_user, viewer_user_id=current.user_number)
+            raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
+        _ensure_public_biography_visibility(
+            user=target_user,
+            viewer_user_id=current.user_number,
+            locale=locale,
+        )
         target_user_id = int(target_user.id)
         show_cooperative_stats = bool(target_user.public_profile_show_cooperative_wishes)
     else:
         current_user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
         if current_user is None:
-            raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+            raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     public_wishes_fulfilled = int(
         db.execute(
@@ -399,32 +554,36 @@ def get_activity_stats(
 
 @router.get("/personal-info", response_model=BiographyPersonalInfoOut)
 def get_personal_info(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     personal_info = db.execute(
         select(BiographyPersonalInfo).where(BiographyPersonalInfo.user_id == current.user_number)
     ).scalar_one_or_none()
 
-    return _serialize_personal_info(user=user, personal_info=personal_info)
+    return _serialize_personal_info(locale=locale, user=user, personal_info=personal_info)
 
 
 @router.put("/personal-info", response_model=BiographyPersonalInfoOut)
 def upsert_personal_info(
+    request: Request,
     payload: BiographyPersonalInfoUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     if payload.birth_date and payload.birth_date > date.today():
-        raise HTTPException(status_code=400, detail="La fecha de nacimiento no puede estar en el futuro.")
+        raise HTTPException(status_code=400, detail=_msg_birth_date_future(locale))
 
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     personal_info = db.execute(
         select(BiographyPersonalInfo).where(BiographyPersonalInfo.user_id == current.user_number)
@@ -446,17 +605,19 @@ def upsert_personal_info(
     db.commit()
     db.refresh(personal_info)
 
-    return _serialize_personal_info(user=user, personal_info=personal_info)
+    return _serialize_personal_info(locale=locale, user=user, personal_info=personal_info)
 
 
 @router.get("/physical-traits", response_model=BiographyPhysicalTraitsOut)
 def get_physical_traits(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     physical_traits = db.execute(
         select(BiographyPhysicalTraits).where(BiographyPhysicalTraits.user_id == current.user_number)
@@ -467,13 +628,15 @@ def get_physical_traits(
 
 @router.put("/physical-traits", response_model=BiographyPhysicalTraitsOut)
 def upsert_physical_traits(
+    request: Request,
     payload: BiographyPhysicalTraitsUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     physical_traits = db.execute(
         select(BiographyPhysicalTraits).where(BiographyPhysicalTraits.user_id == current.user_number)
@@ -495,12 +658,14 @@ def upsert_physical_traits(
 
 @router.get("/education", response_model=BiographyEducationOut)
 def get_education(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     education = db.execute(select(BiographyEducation).where(BiographyEducation.user_id == current.user_number)).scalar_one_or_none()
     return _serialize_education(education=education)
@@ -508,13 +673,15 @@ def get_education(
 
 @router.put("/education", response_model=BiographyEducationOut)
 def upsert_education(
+    request: Request,
     payload: BiographyEducationUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     education = db.execute(select(BiographyEducation).where(BiographyEducation.user_id == current.user_number)).scalar_one_or_none()
     if education is None:
@@ -534,12 +701,14 @@ def upsert_education(
 
 @router.get("/curiosities", response_model=BiographyCuriositiesOut)
 def get_curiosities(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     curiosities = db.execute(select(BiographyCuriosities).where(BiographyCuriosities.user_id == current.user_number)).scalar_one_or_none()
     return _serialize_curiosities(curiosities=curiosities)
@@ -547,13 +716,15 @@ def get_curiosities(
 
 @router.put("/curiosities", response_model=BiographyCuriositiesOut)
 def upsert_curiosities(
+    request: Request,
     payload: BiographyCuriositiesUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     curiosities = db.execute(select(BiographyCuriosities).where(BiographyCuriosities.user_id == current.user_number)).scalar_one_or_none()
     if curiosities is None:
@@ -576,12 +747,14 @@ def upsert_curiosities(
 
 @router.get("/professional-info", response_model=BiographyProfessionalInfoOut)
 def get_professional_info(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     professional_info = db.execute(
         select(BiographyProfessionalInfo).where(BiographyProfessionalInfo.user_id == current.user_number)
@@ -591,13 +764,15 @@ def get_professional_info(
 
 @router.put("/professional-info", response_model=BiographyProfessionalInfoOut)
 def upsert_professional_info(
+    request: Request,
     payload: BiographyProfessionalInfoUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     professional_info = db.execute(
         select(BiographyProfessionalInfo).where(BiographyProfessionalInfo.user_id == current.user_number)
@@ -617,12 +792,14 @@ def upsert_professional_info(
 
 @router.get("/distinctions", response_model=BiographyDistinctionsOut)
 def get_distinctions(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     distinctions = db.execute(
         select(BiographyDistinctions).where(BiographyDistinctions.user_id == current.user_number)
@@ -632,10 +809,12 @@ def get_distinctions(
 
 @router.get("/distinctions/{user_id}", response_model=BiographyDistinctionsOut)
 def get_distinctions_for_user(
+    request: Request,
     user_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(
         select(User).where(
             User.id == user_id,
@@ -643,9 +822,13 @@ def get_distinctions_for_user(
         )
     ).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
-    _ensure_public_biography_visibility(user=user, viewer_user_id=current.user_number)
+    _ensure_public_biography_visibility(
+        user=user,
+        viewer_user_id=current.user_number,
+        locale=locale,
+    )
 
     distinctions = db.execute(
         select(BiographyDistinctions).where(BiographyDistinctions.user_id == user_id)
@@ -655,15 +838,17 @@ def get_distinctions_for_user(
 
 @router.put("/distinctions", response_model=BiographyDistinctionsOut)
 def upsert_distinctions(
+    request: Request,
     payload: BiographyDistinctionsUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     distinctions = db.execute(
         select(BiographyDistinctions).where(BiographyDistinctions.user_id == current.user_number)
@@ -680,12 +865,14 @@ def upsert_distinctions(
 
 @router.put("/distinctions/{user_id}", response_model=BiographyDistinctionsOut)
 def upsert_distinctions_for_user(
+    request: Request,
     user_id: int,
     payload: BiographyDistinctionsUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_guardian(current)
+    locale = _locale(request)
+    _require_guardian(current, locale)
 
     user = db.execute(
         select(User).where(
@@ -694,7 +881,7 @@ def upsert_distinctions_for_user(
         )
     ).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     distinctions = db.execute(
         select(BiographyDistinctions).where(BiographyDistinctions.user_id == user_id)
@@ -711,12 +898,14 @@ def upsert_distinctions_for_user(
 
 @router.get("/about", response_model=BiographyAboutOut)
 def get_about(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     about = db.execute(select(BiographyAbout).where(BiographyAbout.user_id == current.user_number)).scalar_one_or_none()
     return _serialize_about(user=user, about=about)
@@ -724,10 +913,12 @@ def get_about(
 
 @router.get("/about/{user_id}", response_model=BiographyAboutOut)
 def get_about_for_user(
+    request: Request,
     user_id: int,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     # Public profile about section (requires auth, but exposes only non-sensitive fields).
     user = db.execute(
         select(User).where(
@@ -736,13 +927,17 @@ def get_about_for_user(
         )
     ).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
-    _ensure_public_biography_visibility(user=user, viewer_user_id=current.user_number)
+    _ensure_public_biography_visibility(
+        user=user,
+        viewer_user_id=current.user_number,
+        locale=locale,
+    )
 
     is_owner = int(current.user_number) == int(user_id)
     if not is_owner and not bool(user.public_profile_show_about):
-        raise HTTPException(status_code=403, detail='La sección "Acerca de mí" está oculta por privacidad.')
+        raise HTTPException(status_code=403, detail=_msg_about_hidden(locale))
 
     about = db.execute(select(BiographyAbout).where(BiographyAbout.user_id == user_id)).scalar_one_or_none()
     return _serialize_about(user=user, about=about)
@@ -750,16 +945,21 @@ def get_about_for_user(
 
 @router.put("/about", response_model=BiographyAboutOut)
 def upsert_about(
+    request: Request,
     payload: BiographyAboutUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     if _count_words(payload.about_text) > MAX_ABOUT_WORDS:
-        raise HTTPException(status_code=400, detail=f"La biografía permite máximo {MAX_ABOUT_WORDS} palabras.")
+        raise HTTPException(
+            status_code=400,
+            detail=_msg_word_limit(locale, section="biography", max_words=MAX_ABOUT_WORDS),
+        )
 
     about = db.execute(select(BiographyAbout).where(BiographyAbout.user_id == current.user_number)).scalar_one_or_none()
     if about is None:
@@ -777,29 +977,36 @@ def upsert_about(
 
 @router.get("/dream", response_model=BiographyDreamOut)
 def get_dream(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     dream = db.execute(select(BiographyDream).where(BiographyDream.user_id == current.user_number)).scalar_one_or_none()
-    return _serialize_dream(dream=dream)
+    return _serialize_dream(locale=locale, dream=dream)
 
 
 @router.put("/dream", response_model=BiographyDreamOut)
 def upsert_dream(
+    request: Request,
     payload: BiographyDreamUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     if _count_words(payload.dream_text) > MAX_DREAM_WORDS:
-        raise HTTPException(status_code=400, detail=f"El mayor sueño permite máximo {MAX_DREAM_WORDS} palabras.")
+        raise HTTPException(
+            status_code=400,
+            detail=_msg_word_limit(locale, section="dream", max_words=MAX_DREAM_WORDS),
+        )
 
     dream = db.execute(select(BiographyDream).where(BiographyDream.user_id == current.user_number)).scalar_one_or_none()
     if dream is None:
@@ -812,38 +1019,46 @@ def upsert_dream(
     db.commit()
     db.refresh(dream)
 
-    return _serialize_dream(dream=dream)
+    return _serialize_dream(locale=locale, dream=dream)
 
 
 @router.get("/professional-achievements", response_model=BiographyProfessionalAchievementsOut)
 def get_professional_achievements(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     section = db.execute(
         select(BiographyProfessionalAchievements).where(BiographyProfessionalAchievements.user_id == current.user_number)
     ).scalar_one_or_none()
-    return _serialize_professional_achievements(section=section)
+    return _serialize_professional_achievements(locale=locale, section=section)
 
 
 @router.put("/professional-achievements", response_model=BiographyProfessionalAchievementsOut)
 def upsert_professional_achievements(
+    request: Request,
     payload: BiographyProfessionalAchievementsUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     if _count_words(payload.section_text) > MAX_PRO_ACHIEVEMENTS_WORDS:
         raise HTTPException(
             status_code=400,
-            detail=f"Los logros profesionales permiten máximo {MAX_PRO_ACHIEVEMENTS_WORDS} palabras.",
+            detail=_msg_word_limit(
+                locale,
+                section="professional_achievements",
+                max_words=MAX_PRO_ACHIEVEMENTS_WORDS,
+            ),
         )
 
     section = db.execute(
@@ -859,38 +1074,46 @@ def upsert_professional_achievements(
     db.commit()
     db.refresh(section)
 
-    return _serialize_professional_achievements(section=section)
+    return _serialize_professional_achievements(locale=locale, section=section)
 
 
 @router.get("/life-achievements", response_model=BiographyLifeAchievementsOut)
 def get_life_achievements(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     section = db.execute(
         select(BiographyLifeAchievements).where(BiographyLifeAchievements.user_id == current.user_number)
     ).scalar_one_or_none()
-    return _serialize_life_achievements(section=section)
+    return _serialize_life_achievements(locale=locale, section=section)
 
 
 @router.put("/life-achievements", response_model=BiographyLifeAchievementsOut)
 def upsert_life_achievements(
+    request: Request,
     payload: BiographyLifeAchievementsUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     if _count_words(payload.section_text) > MAX_LIFE_ACHIEVEMENTS_WORDS:
         raise HTTPException(
             status_code=400,
-            detail=f"Los logros alcanzados permiten máximo {MAX_LIFE_ACHIEVEMENTS_WORDS} palabras.",
+            detail=_msg_word_limit(
+                locale,
+                section="life_achievements",
+                max_words=MAX_LIFE_ACHIEVEMENTS_WORDS,
+            ),
         )
 
     section = db.execute(
@@ -906,38 +1129,46 @@ def upsert_life_achievements(
     db.commit()
     db.refresh(section)
 
-    return _serialize_life_achievements(section=section)
+    return _serialize_life_achievements(locale=locale, section=section)
 
 
 @router.get("/favorite-quotes", response_model=BiographyFavoriteQuotesOut)
 def get_favorite_quotes(
+    request: Request,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     section = db.execute(
         select(BiographyFavoriteQuotes).where(BiographyFavoriteQuotes.user_id == current.user_number)
     ).scalar_one_or_none()
-    return _serialize_favorite_quotes(section=section)
+    return _serialize_favorite_quotes(locale=locale, section=section)
 
 
 @router.put("/favorite-quotes", response_model=BiographyFavoriteQuotesOut)
 def upsert_favorite_quotes(
+    request: Request,
     payload: BiographyFavoriteQuotesUpdateRequest,
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    locale = _locale(request)
     user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        raise HTTPException(status_code=404, detail=_msg_user_not_found(locale))
 
     if _count_words(payload.section_text) > MAX_FAVORITE_QUOTES_WORDS:
         raise HTTPException(
             status_code=400,
-            detail=f"Las frases favoritas permiten máximo {MAX_FAVORITE_QUOTES_WORDS} palabras.",
+            detail=_msg_word_limit(
+                locale,
+                section="favorite_quotes",
+                max_words=MAX_FAVORITE_QUOTES_WORDS,
+            ),
         )
 
     section = db.execute(
@@ -953,4 +1184,4 @@ def upsert_favorite_quotes(
     db.commit()
     db.refresh(section)
 
-    return _serialize_favorite_quotes(section=section)
+    return _serialize_favorite_quotes(locale=locale, section=section)

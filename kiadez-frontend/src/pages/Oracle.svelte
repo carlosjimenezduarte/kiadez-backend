@@ -1,224 +1,323 @@
 <script>
   import { onMount } from "svelte";
+  import AuthFooter from "../lib/AuthFooter.svelte";
+  import { getLocale } from "../lib/i18n";
   import { logout } from "../lib/logout";
   import { initPurposeCoverModule } from "../lib/purposeCover";
+
+  const locale = getLocale();
+  const isEn = locale === "en";
+  const isFr = locale === "fr";
+  const tr = (es, en, fr = en) => (isEn ? en : isFr ? fr : es);
 
   onMount(() => {
     document.body.dataset.visitor = "false";
     initPurposeCoverModule();
 
     const oracleCards = [
-          {
-            id: 1,
-            name: "El Ciclo",
-            question: "¿Cuál es tu ciclo de las reencarnaciones?",
-            context:
-              "Enfocado en comprender situaciones que perturban tu viaje en este mundo. En tu vida diaria, ¿qué es eso que va y vuelve de la misma manera, por más que intentes evitarlo? Por ejemplo: discusiones repetidas, una adicción, un patrón emocional o el deseo constante de tener más de algo."
-          },
-          {
-            id: 2,
-            name: "La Calma",
-            question: "Si pudieras vivir tu vida desde la calma, ¿qué decisión tomarías hoy?",
-            context:
-              "Enfocado en comprender por qué actúas como actúas actualmente. ¿Qué es lo que realmente te presiona a decidir con prisa? ¿Qué limita tu pensamiento, tu espíritu o tu manera natural de ser en este momento de tu vida?"
-          },
-          {
-            id: 3,
-            name: "El Silencio",
-            question: "¿Te cuesta mantenerte en silencio?",
-            context:
-              "Enfocado en comprender si puedes escuchar tu propio pensamiento o si actúas solo por impulso. ¿Cuál es tu relación con el silencio? ¿Puedes estar diez minutos sin estímulos o sientes la necesidad de llenar ese espacio con música, pantallas o distracciones?"
-          },
-          {
-            id: 4,
-            name: "El Anhelo",
-            question: "¿Cuál sería la vida de tus sueños?",
-            context:
-              "Enfocado en reconocer qué sientes que te falta para sentirte pleno. Si hoy fuera el último día de tu vida, ¿qué considerarías que no viviste? ¿Qué cualidades, experiencias o formas de ser te hubiera gustado manifestar?"
-          },
-          {
-            id: 5,
-            name: "La Elección",
-            question: "Si pudieras cambiar algo del mundo, ¿qué elegirías?",
-            context:
-              "Enfocado en identificar aquello con lo que no estás de acuerdo. ¿Qué crees que no debería existir ni en tu vida ni en la de los demás? Si pudieras eliminarlo, ¿el mundo sería mejor? ¿Tú te sentirías más libre o en paz?"
-          },
-          {
-            id: 6,
-            name: "La Libertad",
-            question: "¿Te consideras una persona libre?",
-            context:
-              "Enfocado en reconocer cómo te sientes con la vida que llevas. ¿Existe algo que percibas como una carga constante? ¿Alguna situación física, emocional o mental que afecte tu día a día? ¿O te sientes realmente cómodo con tu forma de vivir?"
-          },
-          {
-            id: 7,
-            name: "La Sombra",
-            question: "¿Qué es lo que más evitas mirar de ti?",
-            context:
-              "Enfocado en reconocer aquello que prefieres no enfrentar. Puede ser una emoción, un recuerdo, una actitud o una verdad incómoda. A veces lo que evitamos mirar es justamente lo que más necesita atención para poder transformarse."
-          },
-          {
-            id: 8,
-            name: "El Refugio",
-            question: "¿Qué te hace sentir en casa?",
-            context:
-              "Enfocado en identificar aquello que te brinda seguridad y tranquilidad. Puede ser un lugar, una persona, una actividad o un estado interior. Reconocerlo te ayuda a saber dónde recargar tu energía cuando la vida se vuelve exigente."
-          },
-          {
-            id: 9,
-            name: "El Gozo",
-            question: "¿Qué parte de tu día disfrutas más?",
-            context:
-              "Enfocado en observar qué momentos te conectan con el gozo. A veces la felicidad no está en grandes logros, sino en instantes simples que solemos pasar por alto. ¿Qué te dice eso sobre lo que realmente valoras?"
-          },
-          {
-            id: 10,
-            name: "El Desgaste",
-            question: "¿Qué te roba más energía?",
-            context:
-              "Enfocado en reconocer hábitos, personas o pensamientos que te desgastan. Identificar qué te drena es el primer paso para proteger tu bienestar y tomar decisiones más conscientes sobre a qué le entregas tu tiempo y tu atención."
-          },
-          {
-            id: 11,
-            name: "El Aprendiz",
-            question: "¿Qué te gustaría aprender?",
-            context:
-              "Enfocado en conectar con tu curiosidad natural. Aprender no siempre tiene que ver con estudios formales; puede ser una habilidad, una forma de vivir o una manera distinta de relacionarte contigo y con los demás."
-          },
-          {
-            id: 12,
-            name: "El Mérito",
-            question: "¿Cuándo fue la última vez que te sentiste orgulloso de ti?",
-            context:
-              "Enfocado en reconocer tus propios logros, grandes o pequeños. Muchas veces avanzamos sin detenernos a valorar lo que hemos superado. Recordarlo fortalece la autoestima y el respeto por tu propio camino."
-          },
-          {
-            id: 13,
-            name: "El Apego",
-            question: "¿Qué te da miedo perder?",
-            context:
-              "Enfocado en identificar apegos importantes en tu vida. El miedo a perder algo suele revelar cuánto valor le damos y cuánto dependemos de ello. Observarlo con honestidad ayuda a comprender nuestras decisiones."
-          },
-          {
-            id: 14,
-            name: "La Vitalidad",
-            question: "¿Qué te hace sentir vivo?",
-            context:
-              "Enfocado en descubrir aquello que despierta tu entusiasmo. Puede ser crear, ayudar, aprender, moverte o compartir. Reconocerlo te orienta hacia una vida más alineada con lo que te nutre internamente."
-          },
-          {
-            id: 15,
-            name: "La Demora",
-            question: "¿Qué sueles postergar?",
-            context:
-              "Enfocado en observar aquello que dejas para después. A veces no se trata de pereza, sino de miedo, cansancio o falta de claridad. Entender por qué postergas algo puede darte pistas importantes sobre lo que necesitas."
-          },
-          {
-            id: 16,
-            name: "La Gratitud",
-            question: "¿Qué agradeces hoy?",
-            context:
-              "Enfocado en ejercitar la gratitud consciente. Incluso en días difíciles siempre hay algo que reconocer. Agradecer no niega los problemas, pero cambia la forma en que los miras y los atraviesas."
-          },
-          {
-            id: 17,
-            name: "La Voz",
-            question: "¿Qué te gustaría decir y no has dicho?",
-            context:
-              "Enfocado en reconocer palabras retenidas. A veces callamos por miedo a herir, a perder o a exponernos. Identificar lo que no expresas te ayuda a entender qué necesitas comunicar, aunque sea primero contigo mismo."
-          },
-          {
-            id: 18,
-            name: "La Paz",
-            question: "¿Qué te hace sentir en paz?",
-            context:
-              "Enfocado en identificar estados, actividades o relaciones que aquietan tu mente. La paz no siempre llega sola; muchas veces se construye al elegir conscientemente aquello que te devuelve equilibrio."
-          },
-          {
-            id: 19,
-            name: "El Cuidado",
-            question: "¿Qué parte de tu vida necesita más atención?",
-            context:
-              "Enfocado en observar áreas descuidadas. Puede ser tu cuerpo, tus emociones, tus vínculos o tu descanso. Detectarlo a tiempo permite pequeños ajustes antes de que el desequilibrio se haga mayor."
-          },
-          {
-            id: 20,
-            name: "La Lección",
-            question: "¿Qué te enseñó tu último error?",
-            context:
-              "Enfocado en resignificar el error como aprendizaje. Más allá de la culpa o la frustración, cada error deja una lección. Reconocerla te permite avanzar con más claridad y menos peso."
-          },
-          {
-            id: 21,
-            name: "Lo Esencial",
-            question: "¿Qué te gustaría simplificar?",
-            context:
-              "Enfocado en identificar excesos. A veces complicamos nuestra vida más de lo necesario. Simplificar puede significar soltar objetos, compromisos, pensamientos o expectativas que ya no te aportan bienestar."
-          },
-          {
-            id: 22,
-            name: "El Cuerpo",
-            question: "¿Qué te conecta con tu cuerpo?",
-            context:
-              "Enfocado en reconocer cómo habitas tu cuerpo. Puede ser el movimiento, la respiración, el descanso o la alimentación. Escuchar al cuerpo es una forma directa de volver al presente."
-          },
-          {
-            id: 23,
-            name: "El Vínculo",
-            question: "¿Qué te hace sentir acompañado?",
-            context:
-              "Enfocado en identificar vínculos reales. No siempre se trata de estar rodeado de gente, sino de sentir comprensión y presencia. Reconocerlo te ayuda a cuidar mejor tus relaciones."
-          },
-          {
-            id: 24,
-            name: "La Liberación",
-            question: "¿Qué te gustaría soltar?",
-            context:
-              "Enfocado en observar cargas innecesarias. Puede ser un resentimiento, una culpa, una expectativa o un hábito. Soltar no es olvidar, es liberar espacio para algo nuevo."
-          },
-          {
-            id: 25,
-            name: "El Futuro",
-            question: "¿Qué te entusiasma del futuro?",
-            context:
-              "Enfocado en conectar con la esperanza. Pensar en lo que viene no como ansiedad, sino como posibilidad. Reconocer qué te ilusiona te da dirección y energía para el presente."
-          },
-          {
-            id: 26,
-            name: "El Aporte",
-            question: "¿Qué te hace sentir útil?",
-            context:
-              "Enfocado en reconocer tu aporte al mundo. Sentirte útil no depende de grandes logros, sino de saber que lo que haces tiene sentido para ti o para otros."
-          },
-          {
-            id: 27,
-            name: "El Reposo",
-            question: "¿Qué necesitas descansar?",
-            context:
-              "Enfocado en identificar cansancios acumulados. A veces no es solo el cuerpo, sino la mente o el corazón. Reconocerlo es el primer paso para darte permiso de pausar."
-          },
-          {
-            id: 28,
-            name: "La Protección",
-            question: "¿Qué te gustaría cuidar más?",
-            context:
-              "Enfocado en reconocer aquello que valoras. Puede ser tu salud, una relación, un sueño o tu tiempo. Cuidar algo implica presencia y decisiones conscientes."
-          },
-          {
-            id: 29,
-            name: "La Identidad",
-            question: "¿Qué te recuerda quién eres?",
-            context:
-              "Enfocado en identificar anclas personales. Puede ser una actividad, una persona, un recuerdo o un valor. Reconocerlo te ayuda a no perderte cuando todo alrededor cambia."
-          },
-          {
-            id: 30,
-            name: "La Intención",
-            question: "¿Qué intención eliges para hoy?",
-            context:
-              "Enfocado en cerrar el ciclo con conciencia. Elegir una intención no es imponer un resultado, sino orientar tu forma de estar en el día. Una pequeña intención puede transformar toda una jornada."
-          }
-        ];
+      {
+        id: 1,
+        name: tr("El Ciclo", "The Cycle", "Le Cycle"),
+        question: tr(
+          "¿Cuál es tu ciclo de las reencarnaciones?",
+          "What recurring cycle keeps returning in your life?",
+          "Quel cycle récurrent revient sans cesse dans ta vie?"
+        ),
+        context: tr(
+          "Enfocado en comprender situaciones que perturban tu viaje en este mundo. En tu vida diaria, ¿qué es eso que va y vuelve de la misma manera, por más que intentes evitarlo? Por ejemplo: discusiones repetidas, una adicción, un patrón emocional o el deseo constante de tener más de algo.",
+          "Focused on understanding situations that disturb your journey in this world. In your daily life, what keeps coming back in the same way even when you try to avoid it? For example: repeated arguments, an addiction, an emotional pattern, or the constant desire for more."
+        ),
+      },
+      {
+        id: 2,
+        name: tr("La Calma", "Calm", "Le Calme"),
+        question: tr(
+          "Si pudieras vivir tu vida desde la calma, ¿qué decisión tomarías hoy?",
+          "If you could live your life from calm, what decision would you make today?",
+          "Si tu pouvais vivre ta vie depuis le calme, quelle décision prendrais-tu aujourd'hui?"
+        ),
+        context: tr(
+          "Enfocado en comprender por qué actúas como actúas actualmente. ¿Qué es lo que realmente te presiona a decidir con prisa? ¿Qué limita tu pensamiento, tu espíritu o tu manera natural de ser en este momento de tu vida?",
+          "Focused on understanding why you act the way you do right now. What truly pressures you to decide in a hurry? What limits your thinking, your spirit, or your natural way of being in this season of your life?"
+        ),
+      },
+      {
+        id: 3,
+        name: tr("El Silencio", "Silence", "Le Silence"),
+        question: tr("¿Te cuesta mantenerte en silencio?", "Is it hard for you to stay in silence?", "As-tu du mal à rester en silence ?"),
+        context: tr(
+          "Enfocado en comprender si puedes escuchar tu propio pensamiento o si actúas solo por impulso. ¿Cuál es tu relación con el silencio? ¿Puedes estar diez minutos sin estímulos o sientes la necesidad de llenar ese espacio con música, pantallas o distracciones?",
+          "Focused on understanding whether you can listen to your own thoughts or if you act only on impulse. What is your relationship with silence? Can you spend ten minutes without stimuli, or do you feel the need to fill that space with music, screens, or distractions?"
+        ),
+      },
+      {
+        id: 4,
+        name: tr("El Anhelo", "Longing", "Le Désir"),
+        question: tr("¿Cuál sería la vida de tus sueños?", "What would the life of your dreams look like?", "À quoi ressemblerait la vie de tes rêves ?"),
+        context: tr(
+          "Enfocado en reconocer qué sientes que te falta para sentirte pleno. Si hoy fuera el último día de tu vida, ¿qué considerarías que no viviste? ¿Qué cualidades, experiencias o formas de ser te hubiera gustado manifestar?",
+          "Focused on recognizing what you feel is missing to feel fulfilled. If today were the last day of your life, what would you feel you did not live? What qualities, experiences, or ways of being would you have liked to express?"
+        ),
+      },
+      {
+        id: 5,
+        name: tr("La Elección", "The Choice", "Le Choix"),
+        question: tr(
+          "Si pudieras cambiar algo del mundo, ¿qué elegirías?",
+          "If you could change something in the world, what would you choose?",
+          "Si tu pouvais changer quelque chose du monde, que choisirais-tu ?"
+        ),
+        context: tr(
+          "Enfocado en identificar aquello con lo que no estás de acuerdo. ¿Qué crees que no debería existir ni en tu vida ni en la de los demás? Si pudieras eliminarlo, ¿el mundo sería mejor? ¿Tú te sentirías más libre o en paz?",
+          "Focused on identifying what you disagree with. What do you believe should not exist in your life or in others' lives? If you could remove it, would the world be better? Would you feel freer or more at peace?"
+        ),
+      },
+      {
+        id: 6,
+        name: tr("La Libertad", "Freedom", "La Liberté"),
+        question: tr("¿Te consideras una persona libre?", "Do you consider yourself a free person?", "Te considères-tu comme une personne libre ?"),
+        context: tr(
+          "Enfocado en reconocer cómo te sientes con la vida que llevas. ¿Existe algo que percibas como una carga constante? ¿Alguna situación física, emocional o mental que afecte tu día a día? ¿O te sientes realmente cómodo con tu forma de vivir?",
+          "Focused on recognizing how you feel about the life you are living. Is there something you perceive as a constant burden? Any physical, emotional, or mental situation affecting your day-to-day life? Or do you truly feel comfortable with your way of living?"
+        ),
+      },
+      {
+        id: 7,
+        name: tr("La Sombra", "The Shadow", "L'Ombre"),
+        question: tr(
+          "¿Qué es lo que más evitas mirar de ti?",
+          "What do you avoid seeing in yourself the most?",
+          "Qu'est-ce que tu évites le plus de regarder en toi ?"
+        ),
+        context: tr(
+          "Enfocado en reconocer aquello que prefieres no enfrentar. Puede ser una emoción, un recuerdo, una actitud o una verdad incómoda. A veces lo que evitamos mirar es justamente lo que más necesita atención para poder transformarse.",
+          "Focused on recognizing what you prefer not to face. It can be an emotion, a memory, an attitude, or an uncomfortable truth. Sometimes what we avoid seeing is exactly what most needs attention to be transformed."
+        ),
+      },
+      {
+        id: 8,
+        name: tr("El Refugio", "Refuge", "Le Refuge"),
+        question: tr("¿Qué te hace sentir en casa?", "What makes you feel at home?", "Qu'est-ce qui te fait te sentir chez toi ?"),
+        context: tr(
+          "Enfocado en identificar aquello que te brinda seguridad y tranquilidad. Puede ser un lugar, una persona, una actividad o un estado interior. Reconocerlo te ayuda a saber dónde recargar tu energía cuando la vida se vuelve exigente.",
+          "Focused on identifying what gives you safety and calm. It can be a place, a person, an activity, or an inner state. Recognizing it helps you know where to recharge your energy when life becomes demanding."
+        ),
+      },
+      {
+        id: 9,
+        name: tr("El Gozo", "Joy", "La Joie"),
+        question: tr(
+          "¿Qué parte de tu día disfrutas más?",
+          "Which part of your day do you enjoy the most?",
+          "Quelle partie de ta journée apprécies-tu le plus ?"
+        ),
+        context: tr(
+          "Enfocado en observar qué momentos te conectan con el gozo. A veces la felicidad no está en grandes logros, sino en instantes simples que solemos pasar por alto. ¿Qué te dice eso sobre lo que realmente valoras?",
+          "Focused on observing which moments connect you with joy. Happiness is not always in big achievements, but in simple moments we often overlook. What does that tell you about what you truly value?"
+        ),
+      },
+      {
+        id: 10,
+        name: tr("El Desgaste", "Drain", "L'Épuisement"),
+        question: tr("¿Qué te roba más energía?", "What drains your energy the most?", "Qu'est-ce qui te vole le plus d'énergie ?"),
+        context: tr(
+          "Enfocado en reconocer hábitos, personas o pensamientos que te desgastan. Identificar qué te drena es el primer paso para proteger tu bienestar y tomar decisiones más conscientes sobre a qué le entregas tu tiempo y tu atención.",
+          "Focused on recognizing habits, people, or thoughts that wear you down. Identifying what drains you is the first step to protecting your well-being and making more conscious decisions about where your time and attention go."
+        ),
+      },
+      {
+        id: 11,
+        name: tr("El Aprendiz", "The Learner", "L'Apprenant"),
+        question: tr("¿Qué te gustaría aprender?", "What would you like to learn?", "Qu'aimerais-tu apprendre ?"),
+        context: tr(
+          "Enfocado en conectar con tu curiosidad natural. Aprender no siempre tiene que ver con estudios formales; puede ser una habilidad, una forma de vivir o una manera distinta de relacionarte contigo y con los demás.",
+          "Focused on connecting with your natural curiosity. Learning is not always about formal studies; it can be a skill, a way of living, or a different way of relating to yourself and others."
+        ),
+      },
+      {
+        id: 12,
+        name: tr("El Mérito", "Merit", "Le Mérite"),
+        question: tr(
+          "¿Cuándo fue la última vez que te sentiste orgulloso de ti?",
+          "When was the last time you felt proud of yourself?",
+          "Quand t'es-tu senti fier de toi pour la dernière fois ?"
+        ),
+        context: tr(
+          "Enfocado en reconocer tus propios logros, grandes o pequeños. Muchas veces avanzamos sin detenernos a valorar lo que hemos superado. Recordarlo fortalece la autoestima y el respeto por tu propio camino.",
+          "Focused on recognizing your own achievements, big or small. Many times we move forward without stopping to value what we have overcome. Remembering it strengthens self-esteem and respect for your own path."
+        ),
+      },
+      {
+        id: 13,
+        name: tr("El Apego", "Attachment", "L'Attachement"),
+        question: tr("¿Qué te da miedo perder?", "What are you afraid of losing?", "Qu'as-tu peur de perdre ?"),
+        context: tr(
+          "Enfocado en identificar apegos importantes en tu vida. El miedo a perder algo suele revelar cuánto valor le damos y cuánto dependemos de ello. Observarlo con honestidad ayuda a comprender nuestras decisiones.",
+          "Focused on identifying important attachments in your life. Fear of losing something often reveals how much value we assign to it and how dependent we are on it. Looking at it honestly helps us understand our decisions."
+        ),
+      },
+      {
+        id: 14,
+        name: tr("La Vitalidad", "Vitality", "La Vitalité"),
+        question: tr("¿Qué te hace sentir vivo?", "What makes you feel alive?", "Qu'est-ce qui te fait te sentir vivant ?"),
+        context: tr(
+          "Enfocado en descubrir aquello que despierta tu entusiasmo. Puede ser crear, ayudar, aprender, moverte o compartir. Reconocerlo te orienta hacia una vida más alineada con lo que te nutre internamente.",
+          "Focused on discovering what awakens your enthusiasm. It can be creating, helping, learning, moving, or sharing. Recognizing it guides you toward a life more aligned with what nourishes you internally."
+        ),
+      },
+      {
+        id: 15,
+        name: tr("La Demora", "Delay", "Le Report"),
+        question: tr("¿Qué sueles postergar?", "What do you usually postpone?", "Qu'as-tu tendance à remettre à plus tard ?"),
+        context: tr(
+          "Enfocado en observar aquello que dejas para después. A veces no se trata de pereza, sino de miedo, cansancio o falta de claridad. Entender por qué postergas algo puede darte pistas importantes sobre lo que necesitas.",
+          "Focused on observing what you leave for later. Sometimes it is not laziness, but fear, exhaustion, or lack of clarity. Understanding why you postpone something can give you important clues about what you need."
+        ),
+      },
+      {
+        id: 16,
+        name: tr("La Gratitud", "Gratitude", "La Gratitude"),
+        question: tr("¿Qué agradeces hoy?", "What are you grateful for today?", "De quoi es-tu reconnaissant aujourd'hui ?"),
+        context: tr(
+          "Enfocado en ejercitar la gratitud consciente. Incluso en días difíciles siempre hay algo que reconocer. Agradecer no niega los problemas, pero cambia la forma en que los miras y los atraviesas.",
+          "Focused on practicing conscious gratitude. Even on difficult days there is always something to acknowledge. Being grateful does not deny problems, but it changes the way you look at and move through them."
+        ),
+      },
+      {
+        id: 17,
+        name: tr("La Voz", "Voice", "La Voix"),
+        question: tr(
+          "¿Qué te gustaría decir y no has dicho?",
+          "What would you like to say that you have not said yet?",
+          "Qu'aimerais-tu dire que tu n'as pas encore dit ?"
+        ),
+        context: tr(
+          "Enfocado en reconocer palabras retenidas. A veces callamos por miedo a herir, a perder o a exponernos. Identificar lo que no expresas te ayuda a entender qué necesitas comunicar, aunque sea primero contigo mismo.",
+          "Focused on recognizing words held back. Sometimes we stay silent out of fear of hurting, losing, or exposing ourselves. Identifying what you do not express helps you understand what you need to communicate, even if first only to yourself."
+        ),
+      },
+      {
+        id: 18,
+        name: tr("La Paz", "Peace", "La Paix"),
+        question: tr("¿Qué te hace sentir en paz?", "What makes you feel at peace?", "Qu'est-ce qui te fait te sentir en paix ?"),
+        context: tr(
+          "Enfocado en identificar estados, actividades o relaciones que aquietan tu mente. La paz no siempre llega sola; muchas veces se construye al elegir conscientemente aquello que te devuelve equilibrio.",
+          "Focused on identifying states, activities, or relationships that quiet your mind. Peace does not always arrive on its own; often it is built by consciously choosing what brings you back to balance."
+        ),
+      },
+      {
+        id: 19,
+        name: tr("El Cuidado", "Care", "Le Soin"),
+        question: tr(
+          "¿Qué parte de tu vida necesita más atención?",
+          "Which part of your life needs more attention?",
+          "Quelle partie de ta vie a le plus besoin d'attention ?"
+        ),
+        context: tr(
+          "Enfocado en observar áreas descuidadas. Puede ser tu cuerpo, tus emociones, tus vínculos o tu descanso. Detectarlo a tiempo permite pequeños ajustes antes de que el desequilibrio se haga mayor.",
+          "Focused on observing neglected areas. It can be your body, your emotions, your relationships, or your rest. Detecting it in time allows small adjustments before imbalance grows."
+        ),
+      },
+      {
+        id: 20,
+        name: tr("La Lección", "Lesson", "La Leçon"),
+        question: tr("¿Qué te enseñó tu último error?", "What did your last mistake teach you?", "Qu'est-ce que ta dernière erreur t'a appris ?"),
+        context: tr(
+          "Enfocado en resignificar el error como aprendizaje. Más allá de la culpa o la frustración, cada error deja una lección. Reconocerla te permite avanzar con más claridad y menos peso.",
+          "Focused on reframing mistakes as learning. Beyond guilt or frustration, every mistake leaves a lesson. Recognizing it allows you to move forward with greater clarity and less weight."
+        ),
+      },
+      {
+        id: 21,
+        name: tr("Lo Esencial", "The Essential", "L'Essentiel"),
+        question: tr("¿Qué te gustaría simplificar?", "What would you like to simplify?", "Qu'aimerais-tu simplifier ?"),
+        context: tr(
+          "Enfocado en identificar excesos. A veces complicamos nuestra vida más de lo necesario. Simplificar puede significar soltar objetos, compromisos, pensamientos o expectativas que ya no te aportan bienestar.",
+          "Focused on identifying excess. Sometimes we complicate our lives more than necessary. Simplifying can mean letting go of objects, commitments, thoughts, or expectations that no longer support your well-being."
+        ),
+      },
+      {
+        id: 22,
+        name: tr("El Cuerpo", "The Body", "Le Corps"),
+        question: tr("¿Qué te conecta con tu cuerpo?", "What connects you with your body?", "Qu'est-ce qui te connecte à ton corps ?"),
+        context: tr(
+          "Enfocado en reconocer cómo habitas tu cuerpo. Puede ser el movimiento, la respiración, el descanso o la alimentación. Escuchar al cuerpo es una forma directa de volver al presente.",
+          "Focused on recognizing how you inhabit your body. It can be movement, breathing, rest, or nourishment. Listening to your body is a direct way to return to the present."
+        ),
+      },
+      {
+        id: 23,
+        name: tr("El Vínculo", "The Bond", "Le Lien"),
+        question: tr("¿Qué te hace sentir acompañado?", "What makes you feel accompanied?", "Qu'est-ce qui te fait te sentir accompagné ?"),
+        context: tr(
+          "Enfocado en identificar vínculos reales. No siempre se trata de estar rodeado de gente, sino de sentir comprensión y presencia. Reconocerlo te ayuda a cuidar mejor tus relaciones.",
+          "Focused on identifying real bonds. It is not always about being surrounded by people, but about feeling understanding and presence. Recognizing it helps you care for your relationships better."
+        ),
+      },
+      {
+        id: 24,
+        name: tr("La Liberación", "Release", "Le Lâcher-prise"),
+        question: tr("¿Qué te gustaría soltar?", "What would you like to let go of?", "Qu'aimerais-tu lâcher ?"),
+        context: tr(
+          "Enfocado en observar cargas innecesarias. Puede ser un resentimiento, una culpa, una expectativa o un hábito. Soltar no es olvidar, es liberar espacio para algo nuevo.",
+          "Focused on observing unnecessary burdens. It can be resentment, guilt, an expectation, or a habit. Letting go is not forgetting; it is creating room for something new."
+        ),
+      },
+      {
+        id: 25,
+        name: tr("El Futuro", "The Future", "Le Futur"),
+        question: tr("¿Qué te entusiasma del futuro?", "What excites you about the future?", "Qu'est-ce qui t'enthousiasme dans l'avenir ?"),
+        context: tr(
+          "Enfocado en conectar con la esperanza. Pensar en lo que viene no como ansiedad, sino como posibilidad. Reconocer qué te ilusiona te da dirección y energía para el presente.",
+          "Focused on connecting with hope. Thinking about what comes next not as anxiety, but as possibility. Recognizing what excites you gives you direction and energy for the present."
+        ),
+      },
+      {
+        id: 26,
+        name: tr("El Aporte", "Contribution", "La Contribution"),
+        question: tr("¿Qué te hace sentir útil?", "What makes you feel useful?", "Qu'est-ce qui te fait te sentir utile ?"),
+        context: tr(
+          "Enfocado en reconocer tu aporte al mundo. Sentirte útil no depende de grandes logros, sino de saber que lo que haces tiene sentido para ti o para otros.",
+          "Focused on recognizing your contribution to the world. Feeling useful does not depend on big achievements, but on knowing that what you do has meaning for you or for others."
+        ),
+      },
+      {
+        id: 27,
+        name: tr("El Reposo", "Rest", "Le Repos"),
+        question: tr("¿Qué necesitas descansar?", "What do you need to let rest?", "Qu'as-tu besoin de laisser au repos ?"),
+        context: tr(
+          "Enfocado en identificar cansancios acumulados. A veces no es solo el cuerpo, sino la mente o el corazón. Reconocerlo es el primer paso para darte permiso de pausar.",
+          "Focused on identifying accumulated fatigue. Sometimes it is not only the body, but also the mind or the heart. Recognizing it is the first step to giving yourself permission to pause."
+        ),
+      },
+      {
+        id: 28,
+        name: tr("La Protección", "Protection", "La Protection"),
+        question: tr("¿Qué te gustaría cuidar más?", "What would you like to protect more?", "Qu'aimerais-tu protéger davantage ?"),
+        context: tr(
+          "Enfocado en reconocer aquello que valoras. Puede ser tu salud, una relación, un sueño o tu tiempo. Cuidar algo implica presencia y decisiones conscientes.",
+          "Focused on recognizing what you value. It can be your health, a relationship, a dream, or your time. Caring for something requires presence and conscious decisions."
+        ),
+      },
+      {
+        id: 29,
+        name: tr("La Identidad", "Identity", "L'Identité"),
+        question: tr("¿Qué te recuerda quién eres?", "What reminds you of who you are?", "Qu'est-ce qui te rappelle qui tu es ?"),
+        context: tr(
+          "Enfocado en identificar anclas personales. Puede ser una actividad, una persona, un recuerdo o un valor. Reconocerlo te ayuda a no perderte cuando todo alrededor cambia.",
+          "Focused on identifying personal anchors. It can be an activity, a person, a memory, or a value. Recognizing it helps you not lose yourself when everything around you changes."
+        ),
+      },
+      {
+        id: 30,
+        name: tr("La Intención", "Intention", "L'Intention"),
+        question: tr("¿Qué intención eliges para hoy?", "What intention do you choose for today?", "Quelle intention choisis-tu pour aujourd'hui ?"),
+        context: tr(
+          "Enfocado en cerrar el ciclo con conciencia. Elegir una intención no es imponer un resultado, sino orientar tu forma de estar en el día. Una pequeña intención puede transformar toda una jornada.",
+          "Focused on closing the cycle with awareness. Choosing an intention is not imposing an outcome, but guiding how you show up in your day. A small intention can transform an entire day."
+        ),
+      },
+    ];
 
     const API = "http://127.0.0.1:8000";
     const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
@@ -234,7 +333,7 @@
     let activeProfileUserId = null;
     let activeProfileUsername = "";
     let activeProfileFullName = "";
-    let oracleUserName = "Usuario Kiadez";
+    let oracleUserName = tr("Usuario Kiadez", "Kiadez User", "Utilisateur Kiadez");
 
     const oracleDeck = document.getElementById("oracleDeck");
     const oracleStatus = document.getElementById("oracleStatus");
@@ -318,7 +417,10 @@
     const updateWordCounter = () => {
       if (!oracleWordCounter) return 0;
       const words = countWords(oracleCardResponse?.value || "");
-      oracleWordCounter.textContent = `${words}/${MAX_RESPONSE_WORDS} palabras`;
+      oracleWordCounter.textContent = tr(
+        `${words}/${MAX_RESPONSE_WORDS} palabras`,
+        `${words}/${MAX_RESPONSE_WORDS} words`
+      );
       oracleWordCounter.classList.toggle("is-exceeded", words > MAX_RESPONSE_WORDS);
       return words;
     };
@@ -388,7 +490,7 @@
       const token = getAccessToken();
       if (!token) {
         window.location.href = "/login.html";
-        throw new Error("No hay sesión activa.");
+        throw new Error(tr("No hay sesión activa.", "No active session.", "Aucune session active."));
       }
       const headers = {
         ...(options.headers || {}),
@@ -401,7 +503,7 @@
         localStorage.removeItem("refresh_token");
         localStorage.removeItem("kiadez_access_token");
         window.location.href = "/login.html";
-        throw new Error("Sesión expirada.");
+        throw new Error(tr("Sesión expirada.", "Session expired.", "Session expirée."));
       }
       return res;
     };
@@ -416,7 +518,7 @@
       const res = await apiFetch("/auth/me");
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo cargar tu perfil.");
+        throw new Error(data.detail || tr("No se pudo cargar tu perfil.", "Could not load your profile.", "Impossible de charger ton profil."));
       }
       const userId = Number(data?.user_number);
       return {
@@ -431,16 +533,16 @@
       if (Number.isFinite(idValue) && idValue > 0) {
         const res = await apiFetch(`/follows/profile?user_id=${encodeURIComponent(String(idValue))}`);
         const data = await parseResponseJson(res);
-        if (!res.ok) throw new Error(data.detail || "No se pudo cargar el perfil.");
+        if (!res.ok) throw new Error(data.detail || tr("No se pudo cargar el perfil.", "Could not load profile.", "Impossible de charger le profil."));
         return data;
       }
       if (usernameValue) {
         const res = await apiFetch(`/follows/profile?username=${encodeURIComponent(usernameValue)}`);
         const data = await parseResponseJson(res);
-        if (!res.ok) throw new Error(data.detail || "No se pudo cargar el perfil.");
+        if (!res.ok) throw new Error(data.detail || tr("No se pudo cargar el perfil.", "Could not load profile.", "Impossible de charger le profil."));
         return data;
       }
-      throw new Error("Parámetros inválidos para cargar perfil.");
+      throw new Error(tr("Parámetros inválidos para cargar perfil.", "Invalid parameters to load profile.", "Paramètres invalides pour charger le profil."));
     };
 
     const buildViewerHomeUrl = () => {
@@ -508,20 +610,39 @@
       const title = document.querySelector(".oracle-title");
       if (title) {
         title.textContent = isViewingOwnProfile
-          ? "El Oráculo"
-          : `Oráculo de ${activeProfileFullName || "usuario"}`;
+          ? tr("El Oráculo", "The Oracle", "L'Oracle")
+          : tr(
+              `Oráculo de ${activeProfileFullName || "usuario"}`,
+              `Oracle of ${activeProfileFullName || "user"}`,
+              `Oracle de ${activeProfileFullName || "utilisateur"}`
+            );
       }
       const subtitle = document.querySelector(".oracle-subtitle");
       if (subtitle) {
         subtitle.textContent = isViewingOwnProfile
-          ? "Selecciona una carta para comprender tu presente. Solo una carta cada 3 días."
-          : "Solo podrás ver las respuestas públicas de este usuario.";
+          ? tr(
+            "Selecciona una carta para comprender tu presente. Solo una carta cada 3 días.",
+            "Select a card to understand your present. Only one card every 3 days."
+          )
+          : tr(
+              "Solo podrás ver las respuestas públicas de este usuario.",
+              "You can only view this user's public answers.",
+              "Tu peux seulement voir les réponses publiques de cet utilisateur."
+            );
       }
       document.title = isViewingOwnProfile
-        ? "Kiadez — Oráculo"
-        : `Kiadez — Oráculo de ${activeProfileFullName || "usuario"}`;
+        ? tr("Kiadez — Oráculo", "Kiadez — Oracle", "Kiadez — Oracle")
+        : tr(
+            `Kiadez — Oráculo de ${activeProfileFullName || "usuario"}`,
+            `Kiadez — Oracle of ${activeProfileFullName || "user"}`,
+            `Kiadez — Oracle de ${activeProfileFullName || "utilisateur"}`
+          );
       if (!isViewingOwnProfile && oracleRevealedEmpty) {
-        oracleRevealedEmpty.textContent = "Aún no hay cartas públicas reveladas.";
+        oracleRevealedEmpty.textContent = tr(
+          "Aún no hay cartas públicas reveladas.",
+          "No public cards have been revealed yet.",
+          "Aucune carte publique n'a encore été révélée."
+        );
       }
     };
 
@@ -562,7 +683,7 @@
         }
       }
 
-      oracleUserName = activeProfileFullName || "Este usuario";
+      oracleUserName = activeProfileFullName || tr("Este usuario", "This user", "Cet utilisateur");
       applyOracleHeader();
       setMyHomeLinks(buildViewerHomeUrl());
       syncProfileModuleLinks();
@@ -589,7 +710,7 @@
       const vaultRes = await apiFetch("/vault/record");
       const vaultData = await parseResponseJson(vaultRes);
       if (!vaultRes.ok) {
-        throw new Error(vaultData.detail || "No se pudo leer el vault.");
+        throw new Error(vaultData.detail || tr("No se pudo leer el vault.", "Could not read the vault.", "Impossible de lire le coffre-fort."));
       }
 
       const kdfSalt = hexToBuf(vaultData.kdf_salt_b64 || "");
@@ -692,27 +813,25 @@
     const getCardImage = (cardId) => `/css/oracle/Oracle${cardId}.webp`;
 
     const formatDate = (date) => {
-      const months = [
-        "enero", "febrero", "marzo", "abril", "mayo", "junio",
-        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
-      ];
-      const day = date.getDate();
-      const month = months[date.getMonth()];
-      let hours = date.getHours();
-      const minutes = date.getMinutes().toString().padStart(2, "0");
-      const isPm = hours >= 12;
-      hours = hours % 12;
-      hours = hours === 0 ? 12 : hours;
-      const suffix = isPm ? "p.m." : "a.m.";
-      return `${day} de ${month} a las ${hours}:${minutes} ${suffix}`;
+      return new Intl.DateTimeFormat(isEn ? "en-US" : isFr ? "fr-FR" : "es-CO", {
+        day: "numeric",
+        month: "long",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }).format(date);
     };
 
     const formatCooldown = (remainingMs) => {
       const daysLeft = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
       if (daysLeft <= 1) {
-        return "En 1 día podrás elegir una nueva carta.";
+        return tr("En 1 día podrás elegir una nueva carta.", "In 1 day you can choose a new card.", "Dans 1 jour, tu pourras choisir une nouvelle carte.");
       }
-      return `En ${daysLeft} días podrás elegir una nueva carta.`;
+      return tr(
+        `En ${daysLeft} días podrás elegir una nueva carta.`,
+        `In ${daysLeft} days you can choose a new card.`,
+        `Dans ${daysLeft} jours, tu pourras choisir une nouvelle carte.`
+      );
     };
 
     const getCardHistory = (cardId) => {
@@ -752,10 +871,10 @@
       const cycleComplete = Boolean(oracleState.cycleComplete || oracleState.revealedThisCycle.length >= TOTAL_CARDS);
 
       if (!cooldownActive && !cycleComplete) {
-        oracleStatus.textContent = "Selecciona una carta";
+        oracleStatus.textContent = tr("Selecciona una carta", "Select a card", "Sélectionne une carte");
         oracleCooldown.textContent = "";
       } else {
-        oracleStatus.textContent = "Carta bloqueada temporalmente";
+        oracleStatus.textContent = tr("Carta bloqueada temporalmente", "Card temporarily locked", "Carte temporairement verrouillée");
         oracleCooldown.textContent = formatCooldown(remainingMs || cooldownMs);
       }
 
@@ -763,14 +882,21 @@
     };
 
     const summarizeEntry = (entry) => {
-      if (!entry) return "Carta revelada.";
+      if (!entry) return tr("Carta revelada.", "Card revealed.", "Carte révélée.");
       if (entry.type === "heart") {
-        return `${oracleUserName} decidió no responder inmediatamente y dejó esta respuesta asentándose en su corazón.`;
+        return tr(
+          `${oracleUserName} decidió no responder inmediatamente y dejó esta respuesta asentándose en su corazón.`,
+          `${oracleUserName} chose not to answer immediately and left this response settling in their heart.`
+        );
       }
       if (entry.type === "secret") {
-        return "Respuesta secreta cifrada en tu vault privado.";
+        return tr(
+          "Respuesta secreta cifrada en tu vault privado.",
+          "Secret response encrypted in your private vault.",
+          "Réponse secrète chiffrée dans ton coffre-fort privé."
+        );
       }
-      return entry.text || "Respuesta registrada.";
+      return entry.text || tr("Respuesta registrada.", "Response recorded.", "Réponse enregistrée.");
     };
 
     const renderOracleDeck = (cards, cooldownActive, cycleComplete, remainingMs) => {
@@ -782,7 +908,7 @@
       if (remainingCards.length === 0) {
         oracleDeckEmpty.textContent = cooldownActive
           ? formatCooldown(remainingMs || COOLDOWN_MS)
-          : "En 3 días podrás elegir una nueva carta.";
+          : tr("En 3 días podrás elegir una nueva carta.", "In 3 days you can choose a new card.", "Dans 3 jours, tu pourras choisir une nouvelle carte.");
         oracleDeckEmpty.classList.remove("hidden");
         return;
       }
@@ -796,7 +922,7 @@
           button.classList.add("is-locked");
           button.disabled = true;
         }
-        button.innerHTML = `<img src="/css/oracle/carta.webp" alt="Carta del Oráculo" />`;
+        button.innerHTML = `<img src="/css/oracle/carta.webp" alt=\"${tr("Carta del Oráculo", "Oracle card", "Carte de l'Oracle")}\" />`;
         button.addEventListener("click", () => openOracleModal(card.id));
         oracleDeck.appendChild(button);
       });
@@ -827,20 +953,20 @@
         figure.className = "oracle-revealed-figure";
         const image = document.createElement("img");
         image.src = getCardImage(cardId);
-        image.alt = card?.name || "Carta revelada";
+        image.alt = card?.name || tr("Carta revelada", "Revealed card", "Carte révélée");
         figure.appendChild(image);
 
         const body = document.createElement("div");
         body.className = "oracle-revealed-body";
         const title = document.createElement("strong");
-        title.textContent = card?.name || "Carta revelada";
+        title.textContent = card?.name || tr("Carta revelada", "Revealed card", "Carte révélée");
         const paragraph = document.createElement("p");
         paragraph.textContent = summarizeEntry(latest);
         body.appendChild(title);
         body.appendChild(paragraph);
         if (formattedDate) {
           const dateLabel = document.createElement("span");
-          dateLabel.textContent = `Respuesta del ${formattedDate}`;
+          dateLabel.textContent = tr(`Respuesta del ${formattedDate}`, `Response from ${formattedDate}`, `Réponse du ${formattedDate}`);
           body.appendChild(dateLabel);
         }
 
@@ -868,11 +994,22 @@
         if (sourceType === "year") {
           const hiddenCount = Math.max(0, totalEntries - entries.length);
           oracleHistoryNote.textContent = hiddenCount > 0
-            ? `Mostrando ${entries.length} respuestas (públicas o privadas) del último año. ${hiddenCount} registros más no se muestran aquí.`
-            : "Mostrando hasta 4 respuestas (públicas o privadas) del último año.";
+            ? tr(
+              `Mostrando ${entries.length} respuestas (públicas o privadas) del último año. ${hiddenCount} registros más no se muestran aquí.`,
+              `Showing ${entries.length} responses (public or private) from the last year. ${hiddenCount} additional records are not shown here.`
+            )
+            : tr(
+                "Mostrando hasta 4 respuestas (públicas o privadas) del último año.",
+                "Showing up to 4 responses (public or private) from the last year.",
+                "Affichage de jusqu'à 4 réponses (publiques ou privées) de la dernière année."
+              );
         } else {
           oracleHistoryNote.textContent =
-            "No hay respuestas del último año. Mostrando hasta 4 respuestas previas registradas.";
+            tr(
+              "No hay respuestas del último año. Mostrando hasta 4 respuestas previas registradas.",
+              "There are no responses from the last year. Showing up to 4 previously recorded responses.",
+              "Il n'y a pas de réponses de la dernière année. Affichage de jusqu'à 4 réponses antérieures."
+            );
         }
       }
 
@@ -885,10 +1022,10 @@
         head.className = "oracle-history-head";
         const label = document.createElement("span");
         label.textContent = entry.type === "public"
-          ? "Respuesta pública"
+          ? tr("Respuesta pública", "Public response", "Réponse publique")
           : entry.type === "secret"
-            ? "Respuesta secreta"
-            : "Respuesta";
+            ? tr("Respuesta secreta", "Secret response", "Réponse secrète")
+            : tr("Respuesta", "Response", "Réponse");
         const dateText = document.createElement("span");
         dateText.textContent = formatDate(new Date(entry.date));
         head.appendChild(label);
@@ -897,7 +1034,11 @@
 
         const body = document.createElement("p");
         if (entry.type === "secret") {
-          body.textContent = "Contenido secreto cifrado. Para visualizarlo debes digitar tu clave privada personal.";
+          body.textContent = tr(
+            "Contenido secreto cifrado. Para visualizarlo debes digitar tu clave privada personal.",
+            "Encrypted secret content. To view it, you must enter your personal private key.",
+            "Contenu secret chiffré. Pour le visualiser, tu dois saisir ta clé privée personnelle."
+          );
           item.appendChild(body);
         } else {
           body.textContent = entry.text || "";
@@ -912,7 +1053,7 @@
           button.type = "button";
           button.className = "btn btn-outline btn-compact oracle-secret-history-btn";
           button.dataset.entryId = `${entry.id}`;
-          button.textContent = "Visualizar respuesta secreta";
+          button.textContent = tr("Visualizar respuesta secreta", "View secret response", "Voir la réponse secrète");
           actions.appendChild(button);
         }
 
@@ -921,8 +1062,8 @@
           deleteButton.type = "button";
           deleteButton.className = "oracle-history-delete-btn";
           deleteButton.dataset.entryId = `${entry.id}`;
-          deleteButton.title = "Borrar respuesta de forma permanente";
-          deleteButton.innerHTML = '<img src="/css/icons/icondelete.webp" alt="Borrar respuesta" />';
+          deleteButton.title = tr("Borrar respuesta de forma permanente", "Delete response permanently", "Supprimer la réponse définitivement");
+          deleteButton.innerHTML = `<img src="/css/icons/icondelete.webp" alt="${tr("Borrar respuesta", "Delete response", "Supprimer la réponse")}" />`;
           actions.appendChild(deleteButton);
         }
 
@@ -964,7 +1105,7 @@
         oracleCardContext.textContent = selectedCard.context;
 
         oracleCardResponse.disabled = true;
-        oracleCardResponse.placeholder = "Sin respuesta pública.";
+        oracleCardResponse.placeholder = tr("Sin respuesta pública.", "No public response.", "Aucune réponse publique.");
         oracleCardResponse.value = latest?.text || "";
         oracleActionRow.style.display = "none";
         oracleConfirm.classList.add("hidden");
@@ -975,8 +1116,11 @@
         if (oracleSecretActions) oracleSecretActions.classList.add("hidden");
 
         oracleModalNote.textContent = latest?.date
-          ? `Respuesta pública registrada el ${formatDate(new Date(latest.date))}.`
-          : "Esta carta no tiene respuesta pública.";
+          ? tr(
+            `Respuesta pública registrada el ${formatDate(new Date(latest.date))}.`,
+            `Public response recorded on ${formatDate(new Date(latest.date))}.`
+          )
+          : tr("Esta carta no tiene respuesta pública.", "This card has no public response.", "Cette carte n'a pas de réponse publique.");
 
         updateWordCounter();
         renderHistory(cardId);
@@ -996,7 +1140,7 @@
       oracleCardContext.textContent = selectedCard.context;
 
       oracleCardResponse.disabled = hasAnswered;
-      oracleCardResponse.placeholder = "Escribe tu respuesta...";
+      oracleCardResponse.placeholder = tr("Escribe tu respuesta...", "Write your response...", "Écris ta réponse...");
       oracleCardResponse.value = "";
       oracleConfirm.classList.add("hidden");
       resetPrivatePasswordUi();
@@ -1009,9 +1153,21 @@
         oracleActionRow.style.display = "none";
         if (answeredEntry?.type === "secret") {
           oracleModalNote.textContent = answeredEntry?.date
-            ? `Respuesta secreta registrada el ${formatDate(new Date(answeredEntry.date))}. Para verla debes digitar tu clave privada.`
-            : "Respuesta secreta registrada. Para verla debes digitar tu clave privada.";
-          oracleCardResponse.placeholder = "Respuesta secreta cifrada en tu vault.";
+            ? tr(
+              `Respuesta secreta registrada el ${formatDate(new Date(answeredEntry.date))}. Para verla debes digitar tu clave privada.`,
+              `Secret response recorded on ${formatDate(new Date(answeredEntry.date))}. To view it, you must enter your private key.`,
+              `Réponse secrète enregistrée le ${formatDate(new Date(answeredEntry.date))}. Pour la voir, tu dois saisir ta clé privée.`
+            )
+            : tr(
+                "Respuesta secreta registrada. Para verla debes digitar tu clave privada.",
+                "Secret response recorded. To view it, you must enter your private key.",
+                "Réponse secrète enregistrée. Pour la voir, tu dois saisir ta clé privée."
+              );
+          oracleCardResponse.placeholder = tr(
+            "Respuesta secreta cifrada en tu vault.",
+            "Secret response encrypted in your vault.",
+            "Réponse secrète chiffrée dans ton coffre-fort."
+          );
           if (oracleSecretActions && oracleRevealSecretBtn && answeredEntry?.id > 0) {
             oracleRevealSecretBtn.dataset.entryId = `${answeredEntry.id}`;
             oracleSecretActions.classList.remove("hidden");
@@ -1019,14 +1175,26 @@
         } else {
           oracleCardResponse.value = answeredEntry?.text || "";
           oracleModalNote.textContent = answeredEntry?.date
-            ? `Respuesta registrada el ${formatDate(new Date(answeredEntry.date))}. Este texto es inmodificable.`
-            : "Respuesta registrada. Este texto es inmodificable.";
+            ? tr(
+              `Respuesta registrada el ${formatDate(new Date(answeredEntry.date))}. Este texto es inmodificable.`,
+              `Response recorded on ${formatDate(new Date(answeredEntry.date))}. This text cannot be modified.`,
+              `Réponse enregistrée le ${formatDate(new Date(answeredEntry.date))}. Ce texte est inmodifiable.`
+            )
+            : tr("Respuesta registrada. Este texto es inmodificable.", "Response recorded. This text cannot be modified.", "Réponse enregistrée. Ce texte est inmodifiable.");
         }
       } else {
         oracleActionRow.style.display = "flex";
         oracleModalNote.textContent = hasHeart
-          ? "Esta carta quedó reposando en tu corazón. Puedes responder cuando lo desees durante este ciclo."
-          : "Puedes responder ahora, en secreto o dejar la pregunta reposando en tu corazón.";
+          ? tr(
+            "Esta carta quedó reposando en tu corazón. Puedes responder cuando lo desees durante este ciclo.",
+            "This card was left resting in your heart. You can answer whenever you want during this cycle.",
+            "Cette carte est restée en repos dans ton coeur. Tu peux répondre quand tu veux pendant ce cycle."
+          )
+          : tr(
+            "Puedes responder ahora, en secreto o dejar la pregunta reposando en tu corazón.",
+            "You can answer now, answer in secret, or leave the question resting in your heart.",
+            "Tu peux répondre maintenant, en secret, ou laisser la question reposer dans ton coeur."
+          );
       }
 
       updateWordCounter();
@@ -1040,15 +1208,23 @@
       pendingDeleteEntryId = null;
       resetSecretUnlockUi();
       if (action === "public") {
-        oracleConfirmText.textContent = "¿Estás seguro de tu respuesta pública?";
+        oracleConfirmText.textContent = tr("¿Estás seguro de tu respuesta pública?", "Are you sure about your public response?", "Es-tu sûr de ta réponse publique ?");
         resetPrivatePasswordUi();
       } else if (action === "secret") {
         oracleConfirmText.textContent =
-          "¿Estás seguro de tu respuesta secreta? Deberás digitar tu clave privada para cifrarla.";
+          tr(
+            "¿Estás seguro de tu respuesta secreta? Deberás digitar tu clave privada para cifrarla.",
+            "Are you sure about your secret response? You must enter your private key to encrypt it.",
+            "Es-tu sûr de ta réponse secrète ? Tu dois saisir ta clé privée pour la chiffrer."
+          );
         showPrivatePasswordUi();
       } else {
         oracleConfirmText.textContent =
-          "¿Deseas dejar esta pregunta reposando en tu corazón?";
+          tr(
+            "¿Deseas dejar esta pregunta reposando en tu corazón?",
+            "Do you want to leave this question resting in your heart?",
+            "Souhaites-tu laisser cette question reposer dans ton coeur ?"
+          );
         resetPrivatePasswordUi();
       }
       oracleConfirm.classList.remove("hidden");
@@ -1070,11 +1246,11 @@
       const id = Number(entryId || 0);
       const entry = oracleEntriesById.get(id);
       if (!entry || entry.type !== "secret") {
-        throw new Error("No se encontró la respuesta secreta.");
+        throw new Error(tr("No se encontró la respuesta secreta.", "Secret response was not found.", "La réponse secrète n'a pas été trouvée."));
       }
 
       if (!String(privatePassword || "").trim()) {
-        throw new Error("Debes digitar tu clave privada personal.");
+        throw new Error(tr("Debes digitar tu clave privada personal.", "You must enter your personal private key.", "Tu dois saisir ta clé privée personnelle."));
       }
 
       const dekKey = await decryptDekFromPassword(String(privatePassword));
@@ -1089,9 +1265,13 @@
       if (renderIntoTextarea) {
         oracleCardResponse.value = secretText;
         updateWordCounter();
-        oracleModalNote.textContent = "Respuesta secreta descifrada localmente en tu navegador.";
+        oracleModalNote.textContent = tr(
+          "Respuesta secreta descifrada localmente en tu navegador.",
+          "Secret response decrypted locally in your browser.",
+          "Réponse secrète déchiffrée localement dans ton navigateur."
+        );
       } else {
-        window.alert(secretText || "La respuesta secreta está vacía.");
+        window.alert(secretText || tr("La respuesta secreta está vacía.", "The secret response is empty.", "La réponse secrète est vide."));
       }
     };
 
@@ -1103,7 +1283,11 @@
       resetPrivatePasswordUi();
       resetSecretUnlockUi();
       oracleConfirmText.textContent =
-        "Vas a borrar esta respuesta de forma permanente. Una vez elimines este recuerdo, no volverás a visualizarlo. ¿Deseas continuar?";
+        tr(
+          "Vas a borrar esta respuesta de forma permanente. Una vez elimines este recuerdo, no volverás a visualizarlo. ¿Deseas continuar?",
+          "You are about to permanently delete this response. Once deleted, this memory will no longer be visible. Do you want to continue?",
+          "Tu es sur le point de supprimer définitivement cette réponse. Une fois supprimé, ce souvenir ne sera plus visible. Souhaites-tu continuer ?"
+        );
       oracleConfirm.classList.remove("hidden");
     };
 
@@ -1115,7 +1299,14 @@
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo registrar la respuesta del Oráculo.");
+        throw new Error(
+          data.detail ||
+            tr(
+              "No se pudo registrar la respuesta del Oráculo.",
+              "Could not register the Oracle response.",
+              "Impossible d'enregistrer la réponse de l'Oracle."
+            )
+        );
       }
       oracleState = normalizeOracleState(data);
     };
@@ -1123,7 +1314,7 @@
     const deleteOracleResponse = async (entryId) => {
       const responseId = Number(entryId || 0);
       if (!Number.isFinite(responseId) || responseId <= 0) {
-        throw new Error("Respuesta inválida para borrar.");
+        throw new Error(tr("Respuesta inválida para borrar.", "Invalid response to delete.", "Réponse invalide à supprimer."));
       }
 
       const res = await apiFetch(`/oracle/responses/${responseId}`, {
@@ -1131,7 +1322,7 @@
       });
       const data = await parseResponseJson(res);
       if (!res.ok) {
-        throw new Error(data.detail || "No se pudo borrar la respuesta.");
+        throw new Error(data.detail || tr("No se pudo borrar la respuesta.", "Could not delete the response.", "Impossible de supprimer la réponse."));
       }
       oracleState = normalizeOracleState(data);
     };
@@ -1160,7 +1351,8 @@
           renderAll();
           openOracleModal(selectedCard.id);
         } catch (err) {
-          oracleModalNote.textContent = err?.message || "No se pudo borrar la respuesta.";
+          oracleModalNote.textContent =
+            err?.message || tr("No se pudo borrar la respuesta.", "Could not delete the response.", "Impossible de supprimer la réponse.");
         } finally {
           isSubmitting = false;
           oracleConfirmYes.disabled = false;
@@ -1171,7 +1363,11 @@
 
       const responseText = oracleCardResponse.value.trim();
       if (pendingAction !== "heart" && !responseText) {
-        oracleModalNote.textContent = "Escribe una respuesta antes de confirmar esta acción.";
+        oracleModalNote.textContent = tr(
+          "Escribe una respuesta antes de confirmar esta acción.",
+          "Write a response before confirming this action.",
+          "Écris une réponse avant de confirmer cette action."
+        );
         updateWordCounter();
         return;
       }
@@ -1180,7 +1376,11 @@
         const words = countWords(responseText);
         updateWordCounter();
         if (words > MAX_RESPONSE_WORDS) {
-          oracleModalNote.textContent = `Tu respuesta supera el máximo permitido de ${MAX_RESPONSE_WORDS} palabras.`;
+          oracleModalNote.textContent = tr(
+            `Tu respuesta supera el máximo permitido de ${MAX_RESPONSE_WORDS} palabras.`,
+            `Your response exceeds the maximum allowed of ${MAX_RESPONSE_WORDS} words.`,
+            `Ta réponse dépasse le maximum autorisé de ${MAX_RESPONSE_WORDS} mots.`
+          );
           return;
         }
       } else {
@@ -1196,7 +1396,7 @@
       if (pendingAction === "secret") {
         privatePassword = String(oraclePrivatePasswordInput?.value || "");
         if (!privatePassword.trim()) {
-          setPrivatePasswordError("Digita tu clave privada personal");
+          setPrivatePasswordError(tr("Digita tu clave privada personal", "Enter your personal private key", "Saisis ta clé privée personnelle"));
           oraclePrivatePasswordInput?.focus();
           return;
         }
@@ -1229,7 +1429,8 @@
         closeModal();
         renderAll();
       } catch (err) {
-        const message = err?.message || "No se pudo registrar la respuesta.";
+        const message =
+          err?.message || tr("No se pudo registrar la respuesta.", "Could not register the response.", "Impossible d'enregistrer la réponse.");
         if (pendingAction === "secret") {
           setPrivatePasswordError(message);
         } else {
@@ -1255,7 +1456,7 @@
 
     const loadOracleState = async () => {
       try {
-        oracleStatus.textContent = "Cargando cartas...";
+        oracleStatus.textContent = tr("Cargando cartas...", "Loading cards...", "Chargement des cartes...");
         const profileId = Number(activeProfileUserId);
         const endpoint =
           !isViewingOwnProfile && Number.isFinite(profileId) && profileId > 0
@@ -1264,16 +1465,18 @@
         const res = await apiFetch(endpoint);
         const data = await parseResponseJson(res);
         if (!res.ok) {
-          throw new Error(data.detail || "No se pudo cargar el estado del Oráculo.");
+          throw new Error(
+            data.detail || tr("No se pudo cargar el estado del Oráculo.", "Could not load Oracle state.", "Impossible de charger l'état de l'Oracle.")
+          );
         }
         oracleState = normalizeOracleState(data);
         renderAll();
       } catch (err) {
-        oracleStatus.textContent = "No se pudo cargar el Oráculo";
-        oracleCooldown.textContent = err?.message || "Inténtalo de nuevo.";
+        oracleStatus.textContent = tr("No se pudo cargar el Oráculo", "Could not load Oracle", "Impossible de charger l'Oracle");
+        oracleCooldown.textContent = err?.message || tr("Inténtalo de nuevo.", "Try again.", "Réessaie.");
         if (!isViewingOwnProfile && oracleRevealedEmpty) {
           oracleRevealed.innerHTML = "";
-          oracleRevealedEmpty.textContent = err?.message || "Este módulo es privado.";
+          oracleRevealedEmpty.textContent = err?.message || tr("Este módulo es privado.", "This module is private.", "Ce module est privé.");
           oracleRevealedEmpty.style.display = "block";
         }
       }
@@ -1339,7 +1542,7 @@
       oracleSecretUnlockConfirm.addEventListener("click", async () => {
         const password = String(oracleSecretUnlockPassword?.value || "");
         if (!password.trim()) {
-          setSecretUnlockError("Digita tu clave privada personal");
+          setSecretUnlockError(tr("Digita tu clave privada personal", "Enter your personal private key", "Saisis ta clé privée personnelle"));
           oracleSecretUnlockPassword?.focus();
           return;
         }
@@ -1348,7 +1551,9 @@
           await revealSecretEntry(pendingSecretRevealEntryId, password, { renderIntoTextarea: true });
           resetSecretUnlockUi();
         } catch (err) {
-          setSecretUnlockError(err?.message || "No se pudo descifrar la respuesta secreta.");
+          setSecretUnlockError(
+            err?.message || tr("No se pudo descifrar la respuesta secreta.", "Could not decrypt the secret response.", "Impossible de déchiffrer la réponse secrète.")
+          );
         }
       });
     }
@@ -1390,7 +1595,7 @@
 <svelte:head>
 <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kiadez — Oráculo</title>
+  <title>{tr("Kiadez — Oráculo", "Kiadez — Oracle", "Kiadez — Oracle")}</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
@@ -1401,46 +1606,50 @@
         <img src="/css/logo-kiadez.webp" alt="Kiadez" />
       </a>
       <form class="topbar-search" role="search" on:submit|preventDefault>
-        <input type="search" placeholder="Buscar en Kiadez" aria-label="Buscar" />
+        <input
+          type="search"
+          placeholder={tr("Buscar en Kiadez", "Search on Kiadez", "Rechercher sur Kiadez")}
+          aria-label={tr("Buscar", "Search", "Rechercher")}
+        />
       </form>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-center">
       <a class="topbar-btn" href="/home_user.html" data-profile-module="home">🏠 Home</a>
-      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-      <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 Deseos públicos</a>
-      <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-      <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ Deseos cumplidos</a>
+      <a class="topbar-btn" href="/gallery.html">🖼️ {tr("Galería", "Gallery", "Galerie")}</a>
+      <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 {tr("Deseos públicos", "Public wishes", "Souhaits publics")}</a>
+      <a class="topbar-btn" href="/my-private-whishes.html">🔒 {tr("Deseos privados", "Private wishes", "Souhaits privés")}</a>
+      <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ {tr("Deseos cumplidos", "Fulfilled wishes", "Souhaits accomplis")}</a>
     </div>
 
     <div class="feed-topbar-zone feed-topbar-right">
       <details class="topbar-dropdown" id="profileDropdown">
-        <summary class="topbar-avatar-btn" aria-label="Perfil del usuario">
-          <img src="/assets/avatar-default.jpg" alt="Perfil de Carlos Jiménez Duarte" />
+        <summary class="topbar-avatar-btn" aria-label={tr("Perfil del usuario", "User profile", "Profil utilisateur")}>
+          <img src="/assets/avatar-default.jpg" alt={tr("Perfil de Carlos Jiménez Duarte", "Carlos Jiménez Duarte profile", "Profil de Carlos Jiménez Duarte")} />
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/privacy-and-settings.html" role="menuitem">Configuración y privacidad</a>
-          <button type="button" role="menuitem" on:click={logout}>Cerrar sesión</button>
+          <a href="/privacy-and-settings.html" role="menuitem">{tr("Configuración y privacidad", "Settings and privacy", "Paramètres et confidentialité")}</a>
+          <button type="button" role="menuitem" on:click={logout}>{tr("Cerrar sesión", "Sign out", "Se déconnecter")}</button>
         </div>
       </details>
 
-      <button class="topbar-icon" type="button" aria-label="Notificaciones">
+      <button class="topbar-icon" type="button" aria-label={tr("Notificaciones", "Notifications", "Alertes")}>
         🔔
         <span class="topbar-badge">3</span>
       </button>
 
       <details class="topbar-dropdown" id="menuDropdown">
-        <summary class="topbar-menu-btn" aria-label="Abrir menú">
+        <summary class="topbar-menu-btn" aria-label={tr("Abrir menú", "Open menu", "Ouvrir le menu")}>
           <span class="topbar-menu-icon" aria-hidden="true">☰</span>
-          <span class="topbar-menu-label">Menú</span>
+          <span class="topbar-menu-label">{tr("Menú", "Menu", "Navigation")}</span>
         </summary>
         <div class="dropdown-menu" role="menu">
-          <a href="/home_user.html" role="menuitem" data-my-home>Mi Home</a>
-          <a href="/achievements.html" role="menuitem">Logros recientes</a>
-          <a href="/gallery.html" role="menuitem">Galería</a>
-          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
-          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
-          <a href="/messages.html" role="menuitem">Mensajes</a>
+          <a href="/home_user.html" role="menuitem" data-my-home>{tr("Mi Home", "My Home", "Mon Home")}</a>
+          <a href="/achievements.html" role="menuitem">{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+          <a href="/gallery.html" role="menuitem">{tr("Galería", "Gallery", "Galerie")}</a>
+          <a href="/calendar.html" role="menuitem" data-profile-module="calendar">{tr("Calendario", "Calendar", "Calendrier")}</a>
+          <a href="/my-biography.html" role="menuitem">{tr("Mi Biografía", "My Biography", "Ma biographie")}</a>
+          <a href="/messages.html" role="menuitem">{tr("Mensajes", "Messages", "Messagerie")}</a>
         </div>
       </details>
     </div>
@@ -1453,25 +1662,25 @@
        *  ========================= -->
       <section class="cover" id="cover">
         <div class="cover-media" id="coverMedia">
-          <img id="coverImg" class="cover-img" src="/assets/cover-default.jpg" alt="Portada" />
+          <img id="coverImg" class="cover-img" src="/assets/cover-default.jpg" alt={tr("Portada", "Cover", "Couverture")} />
 
           <div class="cover-actions cover-actions-purpose">
             <details class="cover-menu">
-              <summary class="icon-btn" id="btnChangeCover" title="Editar imagen de portada">
-                Editar imagen de portada
+              <summary class="icon-btn" id="btnChangeCover" title={tr("Editar imagen de portada", "Edit cover image", "Modifier l'image de couverture")}>
+                {tr("Editar imagen de portada", "Edit cover image", "Modifier l'image de couverture")}
               </summary>
               <div class="cover-menu-panel">
                 <button class="cover-menu-item" type="button" id="coverUpload">
-                  Subir imagen
+                  {tr("Subir imagen", "Upload image", "Téléverser une image")}
                 </button>
                 <button class="cover-menu-item" type="button" id="coverMove">
-                  Mover imagen
+                  {tr("Mover imagen", "Move image", "Déplacer l'image")}
                 </button>
               </div>
             </details>
             <button class="icon-btn cover-purpose-btn" id="btnEditPurposes" type="button"
-              title="Editar mi propósito de vida">
-              Editar mi propósito de vida
+              title={tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier mon objectif de vie")}>
+              {tr("Editar mi propósito de vida", "Edit my life purpose", "Modifier mon objectif de vie")}
             </button>
 
             <input id="coverFile" type="file" accept="image/*" class="hidden" />
@@ -1479,54 +1688,54 @@
 
           <div class="cover-save-actions hidden" id="coverSaveActions">
             <button class="btn btn-primary btn-compact" type="button" id="coverSaveBtn">
-              Guardar cambios
+              {tr("Guardar cambios", "Save changes", "Enregistrer les modifications")}
             </button>
             <button class="btn btn-outline btn-compact" type="button" id="coverCancelBtn">
-              Cancelar
+              {tr("Cancelar", "Cancel", "Annuler")}
             </button>
           </div>
 
-          <div class="purpose-stack purpose-stack-modern" aria-label="Deseos de propósito">
+          <div class="purpose-stack purpose-stack-modern" aria-label={tr("Deseos de propósito", "Purpose wishes", "Souhaits de finalité")}>
             <div class="purpose-list">
               <div class="purpose-pill-row">
                 <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="1"
-                  title="Marcar deseo 1 como cumplido">
-                  <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+                  title={tr("Marcar deseo 1 como cumplido", "Mark wish 1 as fulfilled", "Marquer le souhait 1 comme accompli")}>
+                  <img src="/css/icons/iconfulfill.webp" alt={tr("Marcar deseo cumplido", "Mark fulfilled wish", "Marquer souhait accompli")} />
                 </button>
                 <button class="purpose-pill" type="button" id="purpose1">
-                  Deseo #1: Secreto
+                  {tr("Deseo #1: Secreto", "Wish #1: Secret", "Souhait #1 : Secret")}
                 </button>
                 <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock1"
-                  data-slot="1" title="Desbloquear deseo 1">
-                  <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+                  data-slot="1" title={tr("Desbloquear deseo 1", "Unlock wish 1", "Déverrouiller le souhait 1")}>
+                  <img src="/css/icons/iconkey.webp" alt={tr("Desbloquear deseo secreto", "Unlock secret wish", "Déverrouiller souhait secret")} />
                 </button>
               </div>
 
               <div class="purpose-pill-row">
                 <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="2"
-                  title="Marcar deseo 2 como cumplido">
-                  <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+                  title={tr("Marcar deseo 2 como cumplido", "Mark wish 2 as fulfilled", "Marquer le souhait 2 comme accompli")}>
+                  <img src="/css/icons/iconfulfill.webp" alt={tr("Marcar deseo cumplido", "Mark fulfilled wish", "Marquer souhait accompli")} />
                 </button>
                 <button class="purpose-pill" type="button" id="purpose2">
-                  Deseo de propósito sin definir
+                  {tr("Deseo de propósito sin definir", "Undefined purpose wish", "Souhait de finalité non défini")}
                 </button>
                 <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock2"
-                  data-slot="2" title="Desbloquear deseo 2">
-                  <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+                  data-slot="2" title={tr("Desbloquear deseo 2", "Unlock wish 2", "Déverrouiller le souhait 2")}>
+                  <img src="/css/icons/iconkey.webp" alt={tr("Desbloquear deseo secreto", "Unlock secret wish", "Déverrouiller souhait secret")} />
                 </button>
               </div>
 
               <div class="purpose-pill-row">
                 <button class="purpose-side-btn purpose-fulfill-btn" type="button" data-slot="3"
-                  title="Marcar deseo 3 como cumplido">
-                  <img src="/css/icons/iconfulfill.webp" alt="Marcar deseo cumplido" />
+                  title={tr("Marcar deseo 3 como cumplido", "Mark wish 3 as fulfilled", "Marquer le souhait 3 comme accompli")}>
+                  <img src="/css/icons/iconfulfill.webp" alt={tr("Marcar deseo cumplido", "Mark fulfilled wish", "Marquer souhait accompli")} />
                 </button>
                 <button class="purpose-pill" type="button" id="purpose3">
-                  Deseo estar unido a Jesús
+                  {tr("Deseo estar unido a Jesús", "I wish to be united with Jesus", "Je souhaite être uni à Jésus")}
                 </button>
                 <button class="purpose-side-btn purpose-unlock-btn hidden" type="button" id="purposeUnlock3"
-                  data-slot="3" title="Desbloquear deseo 3">
-                  <img src="/css/icons/iconkey.webp" alt="Desbloquear deseo secreto" />
+                  data-slot="3" title={tr("Desbloquear deseo 3", "Unlock wish 3", "Déverrouiller le souhait 3")}>
+                  <img src="/css/icons/iconkey.webp" alt={tr("Desbloquear deseo secreto", "Unlock secret wish", "Déverrouiller souhait secret")} />
                 </button>
               </div>
             </div>
@@ -1538,69 +1747,73 @@
         <!-- =========================
          *  NAV / LINKS
          *  ========================= -->
-        <nav class="profile-nav" aria-label="Navegación de perfil">
+        <nav class="profile-nav" aria-label={tr("Navegación de perfil", "Profile navigation", "Navigation du profil")}>
           <a class="nav-pill" href="/home_user.html" title="Home" data-profile-module="home">Home</a>
-          <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+          <a class="nav-pill" href="/star-pool-found.html" title={tr("Estrellas", "Stars", "Étoiles")}>
             <span class="nav-icon">⭐</span>
-            <span><strong>5.000.000</strong> estrellas</span>
+            <span><strong>5.000.000</strong> {tr("estrellas", "stars", "étoiles")}</span>
           </a>
-          <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-          <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-          <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-          <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
-          <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
-        <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
+          <a class="nav-pill" href="/followers.html" title={tr("Seguidores", "Followers", "Abonnés")}>{tr("Seguidores", "Followers", "Abonnés")}</a>
+          <a class="nav-pill" href="/achievements.html" title={tr("Logros recientes", "Recent achievements", "Réalisations récentes")}>{tr("Logros recientes", "Recent achievements", "Réalisations récentes")}</a>
+          <a class="nav-pill" href="/gallery.html" title={tr("Galería", "Gallery", "Galerie")}>{tr("Galería", "Gallery", "Galerie")}</a>
+          <a class="nav-pill" href="/calendar.html" title={tr("Calendario", "Calendar", "Calendrier")} data-profile-module="calendar">{tr("Calendario", "Calendar", "Calendrier")}</a>
+          <a class="nav-pill" href="/my-biography.html" title={tr("Mi biografía", "My biography", "Ma biographie")}>{tr("Mi biografía", "My biography", "Ma biographie")}</a>
+        <a class="nav-pill" href="/messages.html" title={tr("Mensajes", "Messages", "Messagerie")}>{tr("Mensajes", "Messages", "Messagerie")}</a>
         </nav>
 
         <!-- =========================
          *  ORACULO
          *  ========================= -->
-        <section class="oracle-shell" aria-label="Oráculo">
+        <section class="oracle-shell" aria-label={tr("Oráculo", "Oracle", "Oracle")}>
           <header class="oracle-head">
             <div>
-              <h2 class="oracle-title">El Oráculo</h2>
+              <h2 class="oracle-title">{tr("El Oráculo", "The Oracle", "L'Oracle")}</h2>
               <p class="oracle-subtitle">
-                Selecciona una carta para comprender tu presente. Solo una carta cada 3 días.
+                {tr(
+                  "Selecciona una carta para comprender tu presente. Solo una carta cada 3 días.",
+                  "Select a card to understand your present. Only one card every 3 days."
+                )}
               </p>
             </div>
           </header>
 
-          <section class="panel oracle-intro" aria-label="¿Qué es el Oráculo?">
+          <section class="panel oracle-intro" aria-label={tr("¿Qué es el Oráculo?", "What is the Oracle?", "Qu'est-ce que l'Oracle ?")}>
             <div class="panel-head">
-              <h3 class="panel-title">¿Qué es el Oráculo?</h3>
+              <h3 class="panel-title">{tr("¿Qué es el Oráculo?", "What is the Oracle?", "Qu'est-ce que l'Oracle ?")}</h3>
             </div>
             <p class="panel-text">
-              El Oráculo es una herramienta de reflexión de Kiadez.com. Eliges una carta, no para adivinar tu futuro,
-              sino para comprender tu presente. Actualmente el Oráculo está compuesto de 30 cartas y solo puedes
-              seleccionar una sola cada 3 días. La carta te planteará una pregunta, que puedes responder inmediatamente
-              o dejar reposando en tu corazón. Si eres juicioso y disciplinado, responderás la pregunta que te propone
-              la carta hasta 4 veces a lo largo de un solo año. Eso te permitirá reconocer cuánto has progresado en el
-              camino de conocerte a ti mismo.
+              {tr(
+                "El Oráculo es una herramienta de reflexión de Kiadez.com. Eliges una carta, no para adivinar tu futuro, sino para comprender tu presente. Actualmente el Oráculo está compuesto de 30 cartas y solo puedes seleccionar una sola cada 3 días. La carta te planteará una pregunta, que puedes responder inmediatamente o dejar reposando en tu corazón. Si eres juicioso y disciplinado, responderás la pregunta que te propone la carta hasta 4 veces a lo largo de un solo año. Eso te permitirá reconocer cuánto has progresado en el camino de conocerte a ti mismo.",
+                "The Oracle is a reflection tool from Kiadez.com. You choose a card not to predict your future, but to understand your present. The Oracle currently contains 30 cards, and you can select only one every 3 days. The card poses a question that you can answer immediately or leave resting in your heart. If you are disciplined, you can answer the card's question up to 4 times over a single year. This helps you recognize how much progress you have made on the path of self-knowledge."
+              )}
             </p>
           </section>
 
-          <section class="panel oracle-deck" aria-label="Cartas no reveladas">
+          <section class="panel oracle-deck" aria-label={tr("Cartas no reveladas", "Unrevealed cards", "Cartes non révélées")}>
             <div class="oracle-deck-head">
               <div>
-                <h3>Cartas no reveladas</h3>
-                <p class="oracle-status" id="oracleStatus">Selecciona una carta</p>
+                <h3>{tr("Cartas no reveladas", "Unrevealed cards", "Cartes non révélées")}</h3>
+                <p class="oracle-status" id="oracleStatus">{tr("Selecciona una carta", "Select a card", "Sélectionne une carte")}</p>
               </div>
               <div class="oracle-deck-note" id="oracleCooldown"></div>
             </div>
             <div class="oracle-grid" id="oracleDeck"></div>
             <div class="oracle-empty hidden" id="oracleDeckEmpty">
-              En 3 días podrás elegir una nueva carta.
+              {tr("En 3 días podrás elegir una nueva carta.", "In 3 days you can choose a new card.", "Dans 3 jours, tu pourras choisir une nouvelle carte.")}
             </div>
           </section>
 
-          <section class="panel oracle-revealed" aria-label="Cartas reveladas">
+          <section class="panel oracle-revealed" aria-label={tr("Cartas reveladas", "Revealed cards", "Cartes révélées")}>
             <div class="panel-head">
-              <h3 class="panel-title">Cartas reveladas</h3>
-              <span class="panel-badge">Respuestas registradas</span>
+              <h3 class="panel-title">{tr("Cartas reveladas", "Revealed cards", "Cartes révélées")}</h3>
+              <span class="panel-badge">{tr("Respuestas registradas", "Recorded responses", "Réponses enregistrées")}</span>
             </div>
             <div class="oracle-revealed-grid" id="oracleRevealed"></div>
             <div class="oracle-empty" id="oracleRevealedEmpty">
-              Aún no has revelado cartas. Cuando selecciones una, aparecerá aquí.
+              {tr(
+                "Aún no has revelado cartas. Cuando selecciones una, aparecerá aquí.",
+                "You have not revealed cards yet. When you select one, it will appear here."
+              )}
             </div>
           </section>
         </section>
@@ -1608,65 +1821,17 @@
 
     </main>
 
-    <!-- FOOTER reutilizado -->
-    <footer class="kiadez-footer">
-      <div class="footer-main">
-
-        <div class="footer-column footer-origin">
-          <p class="footer-poem">
-            Kiadez fue llamado por una estrella a subir el Monte Manjaro.<br>
-            No para dominar, sino para orientar.<br>
-            Su luz no deslumbra: acompaña.
-          </p>
-        </div>
-
-        <div class="footer-columns">
-          <div class="footer-column">
-            <h4>Sobre nuestra red social</h4>
-            <ul>
-              <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
-              <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
-              <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
-              <li><a href="/contact.html">Contacto</a></li>
-            </ul>
-          </div>
-
-          <div class="footer-column">
-            <h4>Idiomas</h4>
-            <ul>
-              <li><a href="/?lang=es">Español</a></li>
-              <li><a href="/?lang=en">English</a></li>
-              <li><a href="/?lang=fr">Français</a></li>
-              <li><a href="/?lang=pt">Português</a></li>
-            </ul>
-          </div>
-
-          <div class="footer-column">
-            <h4>Información legal</h4>
-            <ul>
-              <li><a href="/mygamerules.html">Mis reglas de juego</a></li>
-              <li><a href="/terms.html">Términos y condiciones</a></li>
-              <li><a href="/privacy.html">Privacidad</a></li>
-            </ul>
-          </div>
-        </div>
-
-      </div>
-
-      <div class="footer-bottom">
-        © 2026 Kiadez — Una red social para cumplir deseos.
-      </div>
-    </footer>
+    <AuthFooter />
   </div>
 
   <!-- =========================
    *  MODAL: CARTA SELECCIONADA
    *  ========================= -->
   <div class="modal-overlay hidden" id="oracleModalOverlay" aria-hidden="true">
-    <div class="modal modal-wide oracle-modal" role="dialog" aria-modal="true" aria-label="Carta seleccionada">
+    <div class="modal modal-wide oracle-modal" role="dialog" aria-modal="true" aria-label={tr("Carta seleccionada", "Selected card", "Carte sélectionnée")}>
       <div class="modal-head">
         <div>
-          <h3 id="oracleCardName">Nombre de la carta</h3>
+          <h3 id="oracleCardName">{tr("Nombre de la carta", "Card name", "Nom de la carte")}</h3>
           <p class="oracle-card-question" id="oracleCardQuestion"></p>
         </div>
         <button class="modal-close" type="button" id="closeOracleModal">✕</button>
@@ -1675,51 +1840,52 @@
       <div class="modal-body">
         <div class="oracle-modal-top">
           <div class="oracle-card-figure">
-            <img id="oracleCardImage" src="/css/oracle/Oracle9.png" alt="Carta del Oráculo" />
+            <img id="oracleCardImage" src="/css/oracle/Oracle9.png" alt={tr("Carta del Oráculo", "Oracle card", "Carte de l'Oracle")} />
           </div>
           <div class="oracle-card-context">
-            <h4>Contexto</h4>
+            <h4>{tr("Contexto", "Context", "Contexte")}</h4>
             <p id="oracleCardContext"></p>
           </div>
         </div>
 
         <textarea class="modal-textarea" id="oracleCardResponse" rows="6"
-          placeholder="Escribe tu respuesta..."></textarea>
-        <p class="oracle-word-counter" id="oracleWordCounter">0/500 palabras</p>
+          placeholder={tr("Escribe tu respuesta...", "Write your response...", "Écris ta réponse...")}></textarea>
+        <p class="oracle-word-counter" id="oracleWordCounter">{tr("0/500 palabras", "0/500 words", "0/500 mots")}</p>
         <div class="oracle-modal-note" id="oracleModalNote"></div>
         <div class="oracle-action-row hidden" id="oracleSecretActions">
           <button class="btn btn-outline btn-compact" type="button" id="oracleRevealSecretBtn">
-            Digitar clave privada para visualizar respuesta secreta
+            {tr("Digitar clave privada para visualizar respuesta secreta", "Enter private key to view secret response", "Saisir la clé privée pour visualiser la réponse secrète")}
           </button>
         </div>
         <div class="oracle-secret-unlock hidden" id="oracleSecretUnlock">
           <p class="oracle-secret-unlock-text">
-            Digita tu clave privada personal para visualizar esta respuesta secreta.
+            {tr(
+              "Digita tu clave privada personal para visualizar esta respuesta secreta.",
+              "Enter your personal private key to view this secret response."
+            )}
           </p>
           <input
             class="oracle-private-password-input"
             id="oracleSecretUnlockPassword"
             type="password"
-            placeholder="Digita tu clave privada personal"
+            placeholder={tr("Digita tu clave privada personal", "Enter your personal private key", "Saisis ta clé privée personnelle")}
             autocomplete="current-password"
           />
           <p class="oracle-private-password-error" id="oracleSecretUnlockError"></p>
           <div class="oracle-confirm-actions">
             <button class="btn btn-primary btn-compact" type="button" id="oracleSecretUnlockConfirm">
-              Visualizar
+              {tr("Visualizar", "View", "Visualiser")}
             </button>
             <button class="btn btn-outline btn-compact" type="button" id="oracleSecretUnlockCancel">
-              Cancelar
+              {tr("Cancelar", "Cancel", "Annuler")}
             </button>
           </div>
         </div>
 
         <div class="oracle-action-row" id="oracleActionRow">
-          <button class="btn btn-primary btn-compact" type="button" id="oraclePublishBtn">Responder ahora y
-            publicar</button>
-          <button class="btn btn-outline btn-compact" type="button" id="oracleSecretBtn">Responder en secreto</button>
-          <button class="btn btn-outline btn-compact" type="button" id="oracleHeartBtn">Dejar esta pregunta reposando
-            en mi corazón</button>
+          <button class="btn btn-primary btn-compact" type="button" id="oraclePublishBtn">{tr("Responder ahora y publicar", "Answer now and publish", "Répondre maintenant et publier")}</button>
+          <button class="btn btn-outline btn-compact" type="button" id="oracleSecretBtn">{tr("Responder en secreto", "Answer in secret", "Répondre en secret")}</button>
+          <button class="btn btn-outline btn-compact" type="button" id="oracleHeartBtn">{tr("Dejar esta pregunta reposando en mi corazón", "Let this question rest in my heart", "Laisser cette question reposer dans mon coeur")}</button>
         </div>
 
         <div class="oracle-confirm hidden" id="oracleConfirm">
@@ -1729,19 +1895,19 @@
               class="oracle-private-password-input"
               id="oraclePrivatePassword"
               type="password"
-              placeholder="Digita tu clave privada personal"
+              placeholder={tr("Digita tu clave privada personal", "Enter your personal private key", "Saisis ta clé privée personnelle")}
               autocomplete="current-password"
             />
             <p class="oracle-private-password-error" id="oraclePrivatePasswordError"></p>
           </div>
           <div class="oracle-confirm-actions">
-            <button class="btn btn-primary btn-compact" type="button" id="oracleConfirmYes">Sí</button>
-            <button class="btn btn-outline btn-compact" type="button" id="oracleConfirmNo">No</button>
+            <button class="btn btn-primary btn-compact" type="button" id="oracleConfirmYes">{tr("Sí", "Yes", "Oui")}</button>
+            <button class="btn btn-outline btn-compact" type="button" id="oracleConfirmNo">{tr("No", "No", "Non")}</button>
           </div>
         </div>
 
         <div class="oracle-history" id="oracleHistory">
-          <h4>Respuestas anteriores</h4>
+          <h4>{tr("Respuestas anteriores", "Previous responses", "Réponses précédentes")}</h4>
           <p class="oracle-history-note" id="oracleHistoryNote"></p>
           <div class="oracle-history-list" id="oracleHistoryList"></div>
         </div>
