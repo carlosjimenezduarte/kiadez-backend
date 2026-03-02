@@ -3020,8 +3020,6 @@
               <h4>Idiomas</h4>
               <ul>
                 <li><a href="/?lang=es">Español</a></li>
-                <li><a href="/?lang=en">English</a></li>
-                <li><a href="/?lang=fr">Français</a></li>
               </ul>
             </div>
 
