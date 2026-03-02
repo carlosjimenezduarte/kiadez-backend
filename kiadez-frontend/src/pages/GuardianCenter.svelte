@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import GuardianMessagingCenter from "../lib/GuardianMessagingCenter.svelte";
   import { logout } from "../lib/logout";
 
   const API = "http://127.0.0.1:8000";
@@ -1571,9 +1572,7 @@
                 {/if}
               </section>
             {:else if activeModuleKey === "messaging"}
-              <div class="guardian-center-empty">
-                Aquí aparecerán conversaciones y coordinación entre Guardianes y usuarios.
-              </div>
+              <GuardianMessagingCenter />
             {/if}
           </section>
         {/if}
@@ -1997,6 +1996,7 @@
           <h4>Sobre nuestra red social</h4>
           <ul>
             <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
+            <li><a href="/downloadapp.html">Descarga la app</a></li>
             <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
             <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
             <li><a href="/contact.html">Contacto</a></li>

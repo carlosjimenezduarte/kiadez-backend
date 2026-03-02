@@ -92,6 +92,8 @@ from .models import (
     PasswordResetConfirm,
     PasswordChangeRequest,
     EmailChangeRequest,
+    ProfileNameOut,
+    ProfileNameUpdateRequest,
     AccountClosureRequest,
     AccountClosureResponse,
     UsernameState,
@@ -183,6 +185,10 @@ def _normalize_username(raw: str) -> str:
     while username.startswith("@"):
         username = username[1:]
     return username
+
+
+def _normalize_human_name(value: str) -> str:
+    return " ".join(str(value or "").strip().split())
 
 
 def _to_utc(dt: datetime) -> datetime:
@@ -793,6 +799,48 @@ def refresh(
 @router.get("/me", response_model=UserPublic)
 def me(current: UserPublic = Depends(get_current_user)):
     return current
+
+
+@router.get("/profile/name", response_model=ProfileNameOut)
+def get_profile_name(
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == current.user_number).one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    return ProfileNameOut(
+        first_name=_normalize_human_name(user.first_name),
+        last_name=_normalize_human_name(user.last_name),
+    )
+
+
+@router.put("/profile/name", response_model=ProfileNameOut)
+def update_profile_name(
+    payload: ProfileNameUpdateRequest,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == current.user_number).one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    first_name = _normalize_human_name(payload.first_name)
+    last_name = _normalize_human_name(payload.last_name)
+    if not first_name or not last_name:
+        raise HTTPException(status_code=400, detail="Debes ingresar nombre y apellido.")
+
+    if first_name != user.first_name or last_name != user.last_name:
+        user.first_name = first_name
+        user.last_name = last_name
+        db.commit()
+        db.refresh(user)
+
+    return ProfileNameOut(
+        first_name=_normalize_human_name(user.first_name),
+        last_name=_normalize_human_name(user.last_name),
+    )
 
 
 @router.get("/minor-accreditation/status", response_model=MinorAccreditationStatusOut)

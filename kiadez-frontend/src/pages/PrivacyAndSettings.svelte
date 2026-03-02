@@ -10,18 +10,24 @@
 
   let changePasswordModalOpen = false;
   let changeEmailModalOpen = false;
+  let changeNameModalOpen = false;
   let changePasswordMode = "change"; // change | reset
   let changePasswordStatus = "";
   let changePasswordError = "";
   let emailChangeStatus = "";
   let emailChangeError = "";
+  let nameChangeStatus = "";
+  let nameChangeError = "";
   let resetStatus = "";
   let resetError = "";
   let isChangingPassword = false;
   let isChangingEmail = false;
+  let isChangingName = false;
   let isSendingReset = false;
 
   let meEmail = "";
+  let profileFirstName = "";
+  let profileLastName = "";
 
   let currentPassword = "";
   let emailCurrentPassword = "";
@@ -36,6 +42,7 @@
 
   let currentPasswordInput;
   let emailCurrentPasswordInput;
+  let firstNameInput;
 
   // -------------------------
   // 2FA
@@ -217,6 +224,18 @@
     return meEmail;
   };
 
+  const normalizeHumanName = (value) => String(value || "").trim().replace(/\s+/g, " ");
+
+  const loadProfileName = async () => {
+    const res = await apiFetch("/auth/profile/name");
+    const data = await parseResponseJson(res);
+    if (!res.ok) {
+      throw new Error(data.detail || "No se pudo cargar tu nombre actual.");
+    }
+    profileFirstName = normalizeHumanName(data?.first_name || "");
+    profileLastName = normalizeHumanName(data?.last_name || "");
+  };
+
   const resetChangePasswordState = () => {
     changePasswordStatus = "";
     changePasswordError = "";
@@ -242,6 +261,30 @@
     emailCurrentPassword = "";
     newEmail = "";
     showEmailCurrentPassword = false;
+  };
+
+  const resetChangeNameState = () => {
+    nameChangeStatus = "";
+    nameChangeError = "";
+    isChangingName = false;
+  };
+
+  const openChangeNameModal = async () => {
+    resetChangeNameState();
+    changeNameModalOpen = true;
+    try {
+      await loadProfileName();
+    } catch (err) {
+      nameChangeError = err?.message || "No se pudo cargar tu nombre actual.";
+    }
+
+    await tick();
+    firstNameInput?.focus();
+  };
+
+  const closeChangeNameModal = () => {
+    changeNameModalOpen = false;
+    resetChangeNameState();
   };
 
   const openChangePasswordModal = async () => {
@@ -427,6 +470,48 @@
       emailChangeError = err?.message || "No se pudo actualizar el correo.";
     } finally {
       isChangingEmail = false;
+    }
+  };
+
+  const handleChangeName = async () => {
+    nameChangeError = "";
+    nameChangeStatus = "";
+
+    const firstName = normalizeHumanName(profileFirstName);
+    const lastName = normalizeHumanName(profileLastName);
+
+    if (!firstName) {
+      nameChangeError = "Debes digitar al menos un nombre.";
+      return;
+    }
+
+    if (!lastName) {
+      nameChangeError = "Debes digitar al menos un apellido.";
+      return;
+    }
+
+    isChangingName = true;
+    try {
+      const res = await apiFetch("/auth/profile/name", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          first_name: firstName,
+          last_name: lastName,
+        }),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo actualizar tu nombre.");
+      }
+
+      profileFirstName = normalizeHumanName(data?.first_name || firstName);
+      profileLastName = normalizeHumanName(data?.last_name || lastName);
+      nameChangeStatus = "Nombre y apellido actualizados correctamente.";
+    } catch (err) {
+      nameChangeError = err?.message || "No se pudo actualizar tu nombre.";
+    } finally {
+      isChangingName = false;
     }
   };
 
@@ -826,6 +911,11 @@
             <span class="settings-action-label">Modificar correo electrónico</span>
           </button>
 
+          <button class="settings-action" type="button" on:click={openChangeNameModal}>
+            <span class="settings-action-icon" aria-hidden="true">🪪</span>
+            <span class="settings-action-label">Modificar nombre y apellido</span>
+          </button>
+
           <button class="settings-action" type="button" on:click={openTwoFAModal}>
             <span class="settings-action-icon" aria-hidden="true">🛡️</span>
             <span class="settings-action-label">Habilitar autenticación 2FA</span>
@@ -860,6 +950,7 @@
           <h4>Sobre nuestra red social</h4>
           <ul>
             <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
+            <li><a href="/downloadapp.html">Descarga la app</a></li>
             <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
             <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
             <li><a href="/contact.html">Contacto</a></li>
@@ -1071,6 +1162,67 @@
           {privacySaving ? "Guardando..." : "Guardar"}
         </button>
         <button class="btn btn-outline btn-compact" type="button" on:click={closePrivacyModal}>
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal-overlay"
+    class:hidden={!changeNameModalOpen}
+    aria-hidden={!changeNameModalOpen}
+    on:click={(event) => {
+      if (event.target?.classList?.contains("modal-overlay")) closeChangeNameModal();
+    }}
+  >
+    <div class="modal settings-change-password-modal" role="dialog" aria-modal="true" aria-label="Modificar nombre y apellido">
+      <div class="modal-head">
+        <h3>Modificar nombre y apellido</h3>
+        <button class="modal-close" type="button" on:click={closeChangeNameModal}>✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="panel-text settings-change-intro">
+          Ajusta tu nombre visible como prefieras: puedes corregir apellidos, quitar un segundo nombre o agregar nuevos nombres.
+        </p>
+
+        <label class="modal-label" for="settings-first-name">Nombre(s)</label>
+        <input
+          class="modal-input"
+          id="settings-first-name"
+          bind:this={firstNameInput}
+          type="text"
+          bind:value={profileFirstName}
+          autocomplete="given-name"
+          maxlength="100"
+          placeholder="Ej: Carlos Andrés"
+        />
+
+        <label class="modal-label" for="settings-last-name">Apellido(s)</label>
+        <input
+          class="modal-input"
+          id="settings-last-name"
+          type="text"
+          bind:value={profileLastName}
+          autocomplete="family-name"
+          maxlength="100"
+          placeholder="Ej: Jiménez Duarte"
+        />
+
+        {#if nameChangeError}
+          <p class="settings-form-error" role="alert">{nameChangeError}</p>
+        {/if}
+        {#if nameChangeStatus}
+          <p class="settings-form-success" role="status">{nameChangeStatus}</p>
+        {/if}
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-compact" type="button" on:click={handleChangeName} disabled={isChangingName}>
+          {isChangingName ? "Actualizando..." : "Actualizar nombre"}
+        </button>
+        <button class="btn btn-outline btn-compact" type="button" on:click={closeChangeNameModal}>
           Cerrar
         </button>
       </div>
