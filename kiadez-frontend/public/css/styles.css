@@ -3478,6 +3478,84 @@ body {
     gap: 10px;
 }
 
+/* KIadez UI feedback (toast + dialogs replacing native alert/confirm/prompt) */
+.kiadez-feedback-toast-host {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 11000;
+    pointer-events: none;
+}
+
+.kiadez-feedback-toast {
+    min-width: min(360px, 88vw);
+    max-width: min(440px, 92vw);
+    padding: 12px 14px;
+    border-radius: 14px;
+    color: #103324;
+    background: linear-gradient(180deg, rgba(221, 243, 233, 0.98), rgba(197, 233, 216, 0.96));
+    border: 1px solid rgba(11, 95, 42, 0.24);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+    transform: translateY(-8px);
+    opacity: 0;
+    transition: opacity .18s ease, transform .18s ease;
+    pointer-events: auto;
+}
+
+.kiadez-feedback-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.kiadez-feedback-toast.is-error {
+    color: #4f1111;
+    background: linear-gradient(180deg, rgba(255, 233, 233, 0.98), rgba(255, 215, 215, 0.96));
+    border-color: rgba(156, 33, 33, 0.35);
+}
+
+.kiadez-feedback-toast.is-success {
+    color: #0f3927;
+    background: linear-gradient(180deg, rgba(224, 247, 236, 0.98), rgba(195, 237, 214, 0.96));
+    border-color: rgba(24, 122, 68, 0.32);
+}
+
+.kiadez-feedback-overlay {
+    z-index: 11000;
+}
+
+.kiadez-feedback-modal .modal-head {
+    background: rgba(11, 95, 42, 0.12);
+}
+
+.kiadez-feedback-modal .modal-body .panel-text {
+    color: rgba(0, 0, 0, 0.78);
+    line-height: 1.45;
+}
+
+.kiadez-feedback-input {
+    margin-top: 12px;
+}
+
+.kiadez-feedback-danger-btn {
+    background: linear-gradient(180deg, #8f2929, #741e1e);
+}
+
+@media (max-width: 720px) {
+    .kiadez-feedback-toast-host {
+        left: 12px;
+        right: 12px;
+        top: 12px;
+    }
+
+    .kiadez-feedback-toast {
+        min-width: 0;
+        max-width: 100%;
+    }
+}
+
 .modal.wish-modal.purpose-unlock-modal {
     width: min(60vw, 980px);
 }
@@ -9194,6 +9272,22 @@ body[data-visitor="true"] .visitor-only {
 
 .wish-modal {
     width: 100%;
+}
+
+.modal.wish-modal.guardian-center-owner-mail-modal {
+    width: clamp(360px, 38vw, 680px);
+    max-height: 82vh;
+}
+
+.modal.wish-modal.guardian-center-owner-mail-modal .guardian-center-mail-textarea {
+    min-height: 120px;
+}
+
+@media (max-width: 720px) {
+    .modal.wish-modal.guardian-center-owner-mail-modal {
+        width: min(92vw, 520px);
+        max-height: 90vh;
+    }
 }
 
 .modal.wish-modal.guardian-rank-promote-modal {

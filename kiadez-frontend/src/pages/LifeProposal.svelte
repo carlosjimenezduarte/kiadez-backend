@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { getDekSessionHex } from "../lib/dekSession";
+  import { showUiAlert } from "../lib/uiFeedback";
 
   onMount(() => {
     const API = "http://127.0.0.1:8000";
@@ -261,7 +262,7 @@
             try {
               dekKey = await importDekFromSession();
             } catch (err) {
-              alert(err.message);
+              showUiAlert(err.message, { type: "error" });
               return;
             }
           }
@@ -271,7 +272,7 @@
             const textarea = groupEl.querySelector("textarea");
             const text = textarea.value.trim();
             if (!text) {
-              alert("Completa los tres propósitos.");
+              showUiAlert("Completa los tres propósitos.", { type: "error" });
               return;
             }
     
@@ -316,7 +317,7 @@
             const data = await res.json();
     
             if (!res.ok) {
-              alert(data.detail || "No se pudo guardar el propósito.");
+              showUiAlert(data.detail || "No se pudo guardar el propósito.", { type: "error" });
               return;
             }
     
@@ -324,7 +325,7 @@
     
           } catch (err) {
             console.error(err);
-            alert("Error de conexión con el servidor.");
+            showUiAlert("Error de conexión con el servidor.", { type: "error" });
           }
         });
   });

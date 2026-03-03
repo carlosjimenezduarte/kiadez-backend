@@ -1,9 +1,114 @@
+import base64
 import smtplib
 import html
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from app.core.config import settings
+
+
+def _send_email(*, to_email: str, subject: str, html_body: str, reply_to: str | None = None) -> None:
+    provider = (settings.EMAIL_PROVIDER or "smtp").strip().lower()
+    if provider == "mailgun":
+        _send_email_via_mailgun(
+            to_email=to_email,
+            subject=subject,
+            html_body=html_body,
+            reply_to=reply_to,
+        )
+        return
+
+    _send_email_via_smtp(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+        reply_to=reply_to,
+    )
+
+
+def send_html_email(*, to_email: str, subject: str, html_body: str, reply_to: str | None = None) -> None:
+    _send_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+        reply_to=reply_to,
+    )
+
+
+def _send_email_via_smtp(*, to_email: str, subject: str, html_body: str, reply_to: str | None = None) -> None:
+    if not settings.SMTP_HOST or not settings.SMTP_PORT or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        raise RuntimeError("SMTP is not configured correctly.")
+
+    msg = MIMEMultipart("alternative")
+    msg["From"] = settings.SMTP_FROM
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    if reply_to:
+        msg.add_header("Reply-To", reply_to)
+    msg.attach(MIMEText(html_body, "html"))
+
+    timeout_seconds = int(settings.EMAIL_SEND_TIMEOUT_SECONDS)
+    if settings.SMTP_USE_SSL:
+        with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=timeout_seconds) as server:
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.send_message(msg)
+        return
+
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=timeout_seconds) as server:
+        if settings.SMTP_USE_TLS:
+            server.starttls()
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        server.send_message(msg)
+
+
+def _send_email_via_mailgun(*, to_email: str, subject: str, html_body: str, reply_to: str | None = None) -> None:
+    api_key = (settings.MAILGUN_API_KEY or "").strip()
+    domain = (settings.MAILGUN_DOMAIN or "").strip()
+    if not api_key or not domain:
+        raise RuntimeError("Mailgun is not configured correctly.")
+
+    base_url = (settings.MAILGUN_API_BASE_URL or "https://api.mailgun.net/v3").rstrip("/")
+    endpoint = f"{base_url}/{domain}/messages"
+    from_value = (settings.MAILGUN_FROM or settings.SMTP_FROM).strip() or settings.SMTP_FROM
+
+    payload: dict[str, str] = {
+        "from": from_value,
+        "to": to_email,
+        "subject": subject,
+        "html": html_body,
+    }
+    if reply_to:
+        payload["h:Reply-To"] = reply_to
+
+    auth_token = base64.b64encode(f"api:{api_key}".encode("utf-8")).decode("ascii")
+    data = urlencode(payload).encode("utf-8")
+    request = Request(
+        endpoint,
+        data=data,
+        headers={
+            "Authorization": f"Basic {auth_token}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+
+    timeout_seconds = int(settings.EMAIL_SEND_TIMEOUT_SECONDS)
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            status_code = int(getattr(response, "status", response.getcode()))
+            if status_code >= 400:
+                raise RuntimeError(f"Mailgun returned HTTP {status_code}.")
+    except HTTPError as exc:
+        raw_detail = exc.read().decode("utf-8", errors="ignore").strip()
+        detail = raw_detail[:500] + ("..." if len(raw_detail) > 500 else "")
+        raise RuntimeError(
+            f"Mailgun send failed with HTTP {exc.code}: {detail or exc.reason}"
+        ) from exc
+    except URLError as exc:
+        raise RuntimeError(f"Mailgun connection failed: {exc.reason}") from exc
 
 
 def send_verification_email(to_email: str, token: str) -> None:
@@ -99,17 +204,11 @@ def send_verification_email(to_email: str, token: str) -> None:
     </html>
     """
 
-
-    msg = MIMEMultipart("alternative")
-    msg["From"] = settings.SMTP_FROM
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(html_body, "html"))
-
-    # SSL directo (Hostinger suele ser 465)
-    with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as server:
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        server.send_message(msg)
+    _send_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+    )
 
 
 def send_password_reset_email(to_email: str, token: str) -> None:
@@ -209,15 +308,11 @@ def send_password_reset_email(to_email: str, token: str) -> None:
     </html>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["From"] = settings.SMTP_FROM
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(html_body, "html"))
-
-    with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as server:
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        server.send_message(msg)
+    _send_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+    )
 
 
 def send_email_change_confirmation_email(*, to_email: str, previous_email: str) -> None:
@@ -295,15 +390,11 @@ def send_email_change_confirmation_email(*, to_email: str, previous_email: str) 
     </html>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["From"] = settings.SMTP_FROM
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(html_body, "html"))
-
-    with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as server:
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        server.send_message(msg)
+    _send_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+    )
 
 
 def send_email_change_security_alert_email(*, to_email: str, new_email: str) -> None:
@@ -380,15 +471,11 @@ def send_email_change_security_alert_email(*, to_email: str, new_email: str) -> 
     </html>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["From"] = settings.SMTP_FROM
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(html_body, "html"))
-
-    with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as server:
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        server.send_message(msg)
+    _send_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+    )
 
 
 def send_minor_account_accreditation_email(
@@ -513,15 +600,11 @@ def send_minor_account_accreditation_email(
     </html>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["From"] = settings.SMTP_FROM
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(html_body, "html"))
-
-    with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as server:
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        server.send_message(msg)
+    _send_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+    )
 
 
 def send_contact_email(*, name: str, email: str, message: str) -> None:
@@ -544,13 +627,9 @@ def send_contact_email(*, name: str, email: str, message: str) -> None:
     </html>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["From"] = settings.SMTP_FROM
-    msg["To"] = settings.SUPPORT_EMAIL
-    msg["Subject"] = subject
-    msg.add_header("Reply-To", email)
-    msg.attach(MIMEText(html_body, "html"))
-
-    with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as server:
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        server.send_message(msg)
+    _send_email(
+        to_email=settings.SUPPORT_EMAIL,
+        subject=subject,
+        html_body=html_body,
+        reply_to=email,
+    )

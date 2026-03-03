@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { logout } from "../lib/logout";
   import { syncTopbarAvatar } from "../lib/topbarAvatar";
+  import { showUiPrompt } from "../lib/uiFeedback";
 
   const API = "http://127.0.0.1:8000";
   const FEED_LIMIT = 40;
@@ -905,7 +906,12 @@
     const postId = Number(post?.id || 0);
     if (!postId || isPostBusy(postId)) return;
 
-    const text = window.prompt("Escribe tu comentario:");
+    const text = await showUiPrompt("Escribe tu comentario:", {
+      title: "Comentar publicación",
+      placeholder: "Tu comentario...",
+      confirmLabel: "Publicar",
+      cancelLabel: "Cancelar",
+    });
     if (text === null) return;
 
     const normalizedText = String(text || "").trim();

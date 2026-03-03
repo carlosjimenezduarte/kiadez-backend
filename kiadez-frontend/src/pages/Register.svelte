@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { showUiAlert } from "../lib/uiFeedback";
 
   onMount(() => {
     const form = document.getElementById("register-form");
@@ -120,7 +121,7 @@
         const result = await response.json();
     
         if (!response.ok) {
-          alert(result.detail || "Error al registrar usuario.");
+          showUiAlert(result.detail || "Error al registrar usuario.", { type: "error" });
           return;
         }
     
@@ -130,7 +131,7 @@
     
       } catch (error) {
         console.error(error);
-        alert("No se pudo conectar con el servidor.");
+        showUiAlert("No se pudo conectar con el servidor.", { type: "error" });
       }
     };
 

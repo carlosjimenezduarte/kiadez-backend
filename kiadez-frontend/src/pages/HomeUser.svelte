@@ -1881,11 +1881,7 @@
 	      const displayPosts = buildDisplayPosts(posts);
 
       if (!Array.isArray(displayPosts) || displayPosts.length === 0) {
-        postsList.innerHTML = `
-          <article class="panel post post-empty">
-            <p class="post-text">Aun no hay publicaciones. Crea la primera desde el boton "Que estas pensando?".</p>
-          </article>
-        `;
+        postsList.innerHTML = '';
         return;
       }
 
@@ -3387,7 +3383,7 @@
 	            <div class="composer-row">
 	              <img class="avatar avatar-sm composer-avatar" src="/assets/avatar-default.jpg" alt="Avatar" data-viewer-avatar />
 	              <button class="composer-input" id="openPostModal" type="button">
-	                ¿Qué estás pensando?
+	                ¿Cómo va tu día?
 	              </button>
 	            </div>
 	          </article>

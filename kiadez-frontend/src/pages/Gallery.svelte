@@ -4,10 +4,13 @@
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
   import { syncTopbarAvatar } from "../lib/topbarAvatar";
+  import { showUiConfirm } from "../lib/uiFeedback";
 
   const API = "http://127.0.0.1:8000";
   const RECENT_LIMIT = 20;
   const POSTS_FETCH_LIMIT = 100;
+  const SHOW_ALBUMS_PANEL = false;
+  const SHOW_ALBUM_CREATION_UI = false;
 
   let isLoading = true;
   let loadError = "";
@@ -668,8 +671,14 @@
       return;
     }
 
-    const confirmed = window.confirm(
-      "¿Deseas eliminar este álbum? Sus asociaciones de media se perderán."
+    const confirmed = await showUiConfirm(
+      "¿Deseas eliminar este álbum? Sus asociaciones de media se perderán.",
+      {
+        title: "Eliminar álbum",
+        confirmLabel: "Eliminar",
+        cancelLabel: "Cancelar",
+        danger: true,
+      }
     );
     if (!confirmed) return;
 
@@ -1108,120 +1117,124 @@
           {/if}
         </section>
 
-        <section class="panel">
-          <div class="panel-head">
-            <h3 class="panel-title">Álbumes</h3>
-            <span class="panel-badge">{folders.length} álbumes</span>
-          </div>
+        {#if SHOW_ALBUMS_PANEL}
+          <section class="panel">
+            <div class="panel-head">
+              <h3 class="panel-title">Álbumes</h3>
+              <span class="panel-badge">{folders.length} álbumes</span>
+            </div>
 
-          <div class="gallery-folders-layout">
-            <aside class="gallery-folders-sidebar">
-              <button class="gallery-album-create-card" type="button" on:click={openCreateAlbumModal}>
-                <span class="gallery-album-create-plus">+</span>
-                <span>Crear álbum</span>
-              </button>
-
-              {#if folders.length === 0}
-                <p class="panel-muted">Aún no tienes álbumes. Crea el primero para publicar contenido agrupado.</p>
-              {:else}
-                <div class="gallery-folder-list" aria-label="Lista de álbumes">
-                  {#each folders as folder (folder.id)}
-                    <button
-                      class={`gallery-folder-item ${String(folder.id) === String(activeFolderId) ? "is-active" : ""}`}
-                      type="button"
-                      on:click={() => selectFolder(folder.id)}
-                    >
-                      <strong>{folder.name}</strong>
-                      <span>
-                        {folder.images_count} archivo(s) · {folder.visibility === "private" ? "Privado" : "Público"}
-                      </span>
-                    </button>
-                  {/each}
-                </div>
-              {/if}
-            </aside>
-
-            <div class="gallery-folder-detail">
-              {#if !activeFolderId}
-                <div class="gallery-folder-placeholder">
-                  <p class="panel-muted">Selecciona o crea un álbum para ver su contenido.</p>
-                </div>
-              {:else if folderDetailLoading}
-                <div class="gallery-folder-placeholder">
-                  <p class="panel-muted">Cargando álbum...</p>
-                </div>
-              {:else if activeFolderDetail}
-                <div class="gallery-folder-head">
-                  <div>
-                    <h4>{activeFolderDetail.name}</h4>
-                    <p>
-                      {activeFolderDetail.images_count} archivo(s) en este álbum ·
-                      {activeFolderDetail.visibility === "private" ? "Privado" : "Público"}
-                    </p>
-                  </div>
-                </div>
-
-                <form class="gallery-rename-form" on:submit|preventDefault={handleRenameFolderSubmit}>
-                  <input
-                    class="modal-input"
-                    type="text"
-                    maxlength="120"
-                    placeholder="Nombre del álbum"
-                    bind:value={renameFolderName}
-                  />
-                  <button class="btn btn-outline" type="submit" disabled={renameLoading}>
-                    {renameLoading ? "Guardando..." : "Renombrar"}
+            <div class="gallery-folders-layout">
+              <aside class="gallery-folders-sidebar">
+                {#if SHOW_ALBUM_CREATION_UI}
+                  <button class="gallery-album-create-card" type="button" on:click={openCreateAlbumModal}>
+                    <span class="gallery-album-create-plus">+</span>
+                    <span>Crear álbum</span>
                   </button>
-                  <button
-                    class="btn btn-outline gallery-delete-folder-btn"
-                    type="button"
-                    on:click={deleteFolder}
-                    disabled={deletingFolder}
-                  >
-                    {deletingFolder ? "Eliminando..." : "Eliminar álbum"}
-                  </button>
-                </form>
+                {/if}
 
-                {#if !activeFolderDetail.images || activeFolderDetail.images.length === 0}
-                  <p class="panel-muted">
-                    Este álbum está vacío.
-                  </p>
+                {#if folders.length === 0}
+                  <p class="panel-muted">Aún no tienes álbumes.</p>
                 {:else}
-                  <div class="gallery-folder-grid" aria-label="Archivos del álbum">
-                    {#each activeFolderDetail.images as image (image.media_id)}
-                      <article class="gallery-folder-card">
-                        {#if image.media_kind === "video"}
-                          <video src={image.url} controls preload="metadata">
-                            <track kind="captions" />
-                          </video>
-                        {:else}
-                          <img src={image.url} alt={`Media ${image.media_id}`} loading="lazy" />
-                        {/if}
-                        <button
-                          class="gallery-folder-remove"
-                          type="button"
-                          title="Quitar del álbum"
-                          on:click={() => removeImageFromFolder(image.media_id)}
-                        >
-                          ✕
-                        </button>
-                      </article>
+                  <div class="gallery-folder-list" aria-label="Lista de álbumes">
+                    {#each folders as folder (folder.id)}
+                      <button
+                        class={`gallery-folder-item ${String(folder.id) === String(activeFolderId) ? "is-active" : ""}`}
+                        type="button"
+                        on:click={() => selectFolder(folder.id)}
+                      >
+                        <strong>{folder.name}</strong>
+                        <span>
+                          {folder.images_count} archivo(s) · {folder.visibility === "private" ? "Privado" : "Público"}
+                        </span>
+                      </button>
                     {/each}
                   </div>
                 {/if}
-              {:else}
-                <div class="gallery-folder-placeholder">
-                  <p class="panel-muted">No se pudo cargar el contenido del álbum seleccionado.</p>
-                </div>
-              {/if}
+              </aside>
+
+              <div class="gallery-folder-detail">
+                {#if !activeFolderId}
+                  <div class="gallery-folder-placeholder">
+                    <p class="panel-muted">Selecciona un álbum para ver su contenido.</p>
+                  </div>
+                {:else if folderDetailLoading}
+                  <div class="gallery-folder-placeholder">
+                    <p class="panel-muted">Cargando álbum...</p>
+                  </div>
+                {:else if activeFolderDetail}
+                  <div class="gallery-folder-head">
+                    <div>
+                      <h4>{activeFolderDetail.name}</h4>
+                      <p>
+                        {activeFolderDetail.images_count} archivo(s) en este álbum ·
+                        {activeFolderDetail.visibility === "private" ? "Privado" : "Público"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <form class="gallery-rename-form" on:submit|preventDefault={handleRenameFolderSubmit}>
+                    <input
+                      class="modal-input"
+                      type="text"
+                      maxlength="120"
+                      placeholder="Nombre del álbum"
+                      bind:value={renameFolderName}
+                    />
+                    <button class="btn btn-outline" type="submit" disabled={renameLoading}>
+                      {renameLoading ? "Guardando..." : "Renombrar"}
+                    </button>
+                    <button
+                      class="btn btn-outline gallery-delete-folder-btn"
+                      type="button"
+                      on:click={deleteFolder}
+                      disabled={deletingFolder}
+                    >
+                      {deletingFolder ? "Eliminando..." : "Eliminar álbum"}
+                    </button>
+                  </form>
+
+                  {#if !activeFolderDetail.images || activeFolderDetail.images.length === 0}
+                    <p class="panel-muted">
+                      Este álbum está vacío.
+                    </p>
+                  {:else}
+                    <div class="gallery-folder-grid" aria-label="Archivos del álbum">
+                      {#each activeFolderDetail.images as image (image.media_id)}
+                        <article class="gallery-folder-card">
+                          {#if image.media_kind === "video"}
+                            <video src={image.url} controls preload="metadata">
+                              <track kind="captions" />
+                            </video>
+                          {:else}
+                            <img src={image.url} alt={`Media ${image.media_id}`} loading="lazy" />
+                          {/if}
+                          <button
+                            class="gallery-folder-remove"
+                            type="button"
+                            title="Quitar del álbum"
+                            on:click={() => removeImageFromFolder(image.media_id)}
+                          >
+                            ✕
+                          </button>
+                        </article>
+                      {/each}
+                    </div>
+                  {/if}
+                {:else}
+                  <div class="gallery-folder-placeholder">
+                    <p class="panel-muted">No se pudo cargar el contenido del álbum seleccionado.</p>
+                  </div>
+                {/if}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        {/if}
       {/if}
     </div>
   </main>
 
-  {#if showCreateAlbumModal}
+  {#if SHOW_ALBUM_CREATION_UI && showCreateAlbumModal}
     <div class="modal-overlay gallery-album-modal-overlay" aria-hidden="false">
       <button
         class="gallery-album-modal-backdrop"

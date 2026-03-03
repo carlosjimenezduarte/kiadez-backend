@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import GuardianMessagingCenter from "../lib/GuardianMessagingCenter.svelte";
   import { logout } from "../lib/logout";
+  import { showUiAlert } from "../lib/uiFeedback";
 
   const API = "http://127.0.0.1:8000";
   const GUARDIAN_REQUIRED_RANK = 3;
@@ -677,7 +678,7 @@
       if (!res.ok) {
         throw new Error(data.detail || "No se pudo enviar el mensaje.");
       }
-      window.alert(`Mensaje enviado a ${data?.recipient_handle || ownerMessageToHandle}.`);
+      showUiAlert(`Mensaje enviado a ${data?.recipient_handle || ownerMessageToHandle}.`, { type: "success" });
       closeOwnerMessageModal();
     } catch (err) {
       actionError = err?.message || "No se pudo enviar el mensaje.";
@@ -1678,7 +1679,7 @@
       if (event.target === event.currentTarget && !actionLoading) closeOwnerMessageModal();
     }}
   >
-    <div class="modal wish-modal guardian-center-modal guardian-center-mail-modal" role="dialog" aria-modal="true" aria-label="Mensaje al dueño del deseo">
+    <div class="modal wish-modal guardian-center-modal guardian-center-mail-modal guardian-center-owner-mail-modal" role="dialog" aria-modal="true" aria-label="Mensaje al dueño del deseo">
       <div class="modal-head guardian-center-modal-head">
         <h3>Mensaje al dueño del deseo</h3>
       </div>

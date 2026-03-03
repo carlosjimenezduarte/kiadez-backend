@@ -4,6 +4,7 @@
   import { clearDekSession, getDekSessionHex, setDekSessionHex } from "../lib/dekSession";
   import { logout } from "../lib/logout";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
+  import { showUiAlert } from "../lib/uiFeedback";
 
   const PRIVATE_FULFILLED_VISIBLE_SLOTS = 10;
   const PLACEHOLDER_PRIVATE_FULFILLED_MESSAGE =
@@ -1791,7 +1792,7 @@
             } catch (error) {
               console.error(error);
               if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) return;
-              window.alert(error?.message || "No se pudo borrar el deseo privado.");
+              showUiAlert(error?.message || "No se pudo borrar el deseo privado.", { type: "error" });
               return;
             }
           }
@@ -1808,7 +1809,7 @@
       const epoch = privateUiEpoch;
       const wishId = parsePositiveId(activeFulfillSlot.dataset.wishId);
       if (!wishId) {
-        window.alert("Primero debes guardar el deseo antes de marcarlo como cumplido.");
+        showUiAlert("Primero debes guardar el deseo antes de marcarlo como cumplido.", { type: "error" });
         return;
       }
 
@@ -1826,7 +1827,7 @@
       } catch (error) {
         console.error(error);
         if (epoch !== privateUiEpoch || privateLockRoot?.classList.contains("private-locked")) return;
-        window.alert(error?.message || "No se pudo marcar el deseo como cumplido.");
+        showUiAlert(error?.message || "No se pudo marcar el deseo como cumplido.", { type: "error" });
       }
     };
 
