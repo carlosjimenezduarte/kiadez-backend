@@ -825,6 +825,7 @@ def list_my_posts(
 @router.get("/user/{user_id}", response_model=list[PostOut])
 def list_user_posts(
     user_id: int,
+    context: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current: UserPublic = Depends(get_current_user),
@@ -841,12 +842,22 @@ def list_user_posts(
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
     is_owner = int(user_id) == int(current_user_id)
+    normalized_context = str(context or "").strip().lower()
     if not is_owner and is_minor_protected(target):
         raise HTTPException(
             status_code=403,
             detail="Esta cuenta está en modo protegido y no expone publicaciones públicas.",
         )
-    if not is_owner and not bool(target.public_profile_show_personal_posts):
+    if not is_owner and normalized_context == "gallery" and not bool(target.public_profile_show_gallery):
+        raise HTTPException(
+            status_code=403,
+            detail="La galería de este perfil está oculta por privacidad.",
+        )
+    if (
+        not is_owner
+        and normalized_context != "gallery"
+        and not bool(target.public_profile_show_personal_posts)
+    ):
         raise HTTPException(
             status_code=403,
             detail="Las publicaciones personales de este perfil están ocultas por privacidad.",
@@ -889,6 +900,31 @@ def star_pool_state(
 ):
     me = db.execute(select(User).where(User.id == current.user_number)).scalar_one()
     return _build_star_pool_state(user=me, db=db)
+
+
+@router.get("/star-pool/user/{user_id}", response_model=StarPoolStateOut)
+def user_star_pool_state(
+    user_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    target = db.execute(
+        select(User).where(
+            User.id == user_id,
+            User.is_active.is_(True),
+        )
+    ).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = int(target.id) == int(current.user_number)
+    if not is_owner and not bool(target.public_profile_show_stars):
+        raise HTTPException(status_code=403, detail="Las estrellas de este perfil son privadas.")
+
+    state = _build_star_pool_state(user=target, db=db)
+    if not is_owner:
+        state = state.model_copy(update={"my_donatable_stars_total": 0})
+    return state
 
 
 @router.post("/star-pool/donate", response_model=StarPoolDonateResponse)

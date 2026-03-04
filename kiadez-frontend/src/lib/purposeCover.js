@@ -1042,8 +1042,11 @@ export const initPurposeCoverModule = (options = {}) => {
   if (isReadOnlyProfile) {
     btnEditPurposes?.classList.add("hidden");
     purposeFulfillBtns?.forEach((btn) => {
-      btn.classList.add("hidden");
+      btn.classList.remove("hidden");
+      btn.classList.add("is-vanished");
       btn.disabled = true;
+      btn.setAttribute("aria-hidden", "true");
+      btn.tabIndex = -1;
     });
   }
 
@@ -1143,12 +1146,37 @@ export const initPurposeCoverModule = (options = {}) => {
       if (!slot) {
         pill.classList.remove("is-undefined");
         pill.textContent = defaultPurposeTextBySlot[slotNumber];
-        unlockBtn?.classList.add("hidden");
+        if (unlockBtn) {
+          if (isReadOnlyProfile) {
+            unlockBtn.classList.remove("hidden");
+            unlockBtn.classList.add("is-vanished");
+            unlockBtn.disabled = true;
+            unlockBtn.setAttribute("aria-hidden", "true");
+            unlockBtn.tabIndex = -1;
+          } else {
+            unlockBtn.classList.add("hidden");
+            unlockBtn.classList.remove("is-vanished");
+            unlockBtn.disabled = false;
+            unlockBtn.removeAttribute("aria-hidden");
+            unlockBtn.tabIndex = 0;
+          }
+        }
         if (fulfillBtn) {
+          fulfillBtn.classList.remove("hidden");
           fulfillBtn.classList.remove("is-marked");
-          fulfillBtn.classList.remove("is-vanished");
-          fulfillBtn.disabled = true;
-          fulfillBtn.setAttribute("title", "Primero define este propósito para poder marcarlo como cumplido.");
+          if (isReadOnlyProfile) {
+            fulfillBtn.classList.add("is-vanished");
+            fulfillBtn.disabled = true;
+            fulfillBtn.setAttribute("aria-hidden", "true");
+            fulfillBtn.tabIndex = -1;
+            fulfillBtn.setAttribute("title", "Solo el dueño del perfil puede marcar un propósito como cumplido.");
+          } else {
+            fulfillBtn.classList.remove("is-vanished");
+            fulfillBtn.disabled = true;
+            fulfillBtn.removeAttribute("aria-hidden");
+            fulfillBtn.tabIndex = 0;
+            fulfillBtn.setAttribute("title", "Primero define este propósito para poder marcarlo como cumplido.");
+          }
         }
         return;
       }
@@ -1157,13 +1185,39 @@ export const initPurposeCoverModule = (options = {}) => {
       pill.classList.toggle("is-undefined", isFulfilled);
       const view = getPurposePresentation(slot);
       pill.textContent = view.text || defaultPurposeTextBySlot[slotNumber];
-      unlockBtn?.classList.toggle("hidden", isReadOnlyProfile || !view.showUnlock);
+      if (unlockBtn) {
+        if (isReadOnlyProfile) {
+          unlockBtn.classList.remove("hidden");
+          unlockBtn.classList.add("is-vanished");
+          unlockBtn.disabled = true;
+          unlockBtn.setAttribute("aria-hidden", "true");
+          unlockBtn.tabIndex = -1;
+        } else {
+          unlockBtn.classList.toggle("hidden", !view.showUnlock);
+          unlockBtn.classList.remove("is-vanished");
+          unlockBtn.disabled = !view.showUnlock;
+          if (view.showUnlock) {
+            unlockBtn.removeAttribute("aria-hidden");
+            unlockBtn.tabIndex = 0;
+          } else {
+            unlockBtn.tabIndex = -1;
+          }
+        }
+      }
 
       if (fulfillBtn) {
+        fulfillBtn.classList.remove("hidden");
         const hasContent = Boolean(slot.text_public || slot.text_input || slot.ciphertext_hex);
         fulfillBtn.classList.toggle("is-marked", isFulfilled);
-        fulfillBtn.classList.toggle("is-vanished", isFulfilled);
+        fulfillBtn.classList.toggle("is-vanished", isReadOnlyProfile || isFulfilled);
         fulfillBtn.disabled = isReadOnlyProfile || !hasContent || isFulfilled;
+        if (isReadOnlyProfile) {
+          fulfillBtn.setAttribute("aria-hidden", "true");
+          fulfillBtn.tabIndex = -1;
+        } else {
+          fulfillBtn.removeAttribute("aria-hidden");
+          fulfillBtn.tabIndex = 0;
+        }
         if (isFulfilled) {
           fulfillBtn.setAttribute("title", "Propósito cumplido. Define uno nuevo desde 'Editar mi propósito de vida'.");
         } else if (isReadOnlyProfile) {

@@ -802,10 +802,22 @@
       });
 
       if (profilePhotoTrigger) {
-        profilePhotoTrigger.classList.toggle("hidden", !canEditOwnBiography);
+        // Keep image visible for visitors; only disable edit interaction.
+        profilePhotoTrigger.classList.remove("hidden");
+        profilePhotoTrigger.disabled = !canEditOwnBiography;
+        profilePhotoTrigger.setAttribute("aria-disabled", canEditOwnBiography ? "false" : "true");
+        profilePhotoTrigger.title = canEditOwnBiography
+          ? "Gestionar foto de perfil"
+          : "Foto de perfil";
       }
       if (emblemTrigger) {
-        emblemTrigger.classList.toggle("hidden", !canEditOwnBiography);
+        // Keep emblem visible for visitors; only disable edit interaction.
+        emblemTrigger.classList.remove("hidden");
+        emblemTrigger.disabled = !canEditOwnBiography;
+        emblemTrigger.setAttribute("aria-disabled", canEditOwnBiography ? "false" : "true");
+        emblemTrigger.title = canEditOwnBiography
+          ? "Gestionar emblema"
+          : "Emblema";
       }
       if (!canEditOwnBiography) {
         closePhotoMenu();

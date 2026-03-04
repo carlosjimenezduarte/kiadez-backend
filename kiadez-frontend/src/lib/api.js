@@ -148,13 +148,13 @@ export const followApi = {
       token: getAccessToken(),
     });
   },
-  listFollowers({ page = 1, page_size = 25 } = {}) {
-    return request(`/follows/followers${buildQuery({ page, page_size })}`, {
+  listFollowers({ page = 1, page_size = 25, user_id = null } = {}) {
+    return request(`/follows/followers${buildQuery({ page, page_size, user_id })}`, {
       token: getAccessToken(),
     });
   },
-  listFollowing({ page = 1, page_size = 25 } = {}) {
-    return request(`/follows/following${buildQuery({ page, page_size })}`, {
+  listFollowing({ page = 1, page_size = 25, user_id = null } = {}) {
+    return request(`/follows/following${buildQuery({ page, page_size, user_id })}`, {
       token: getAccessToken(),
     });
   },

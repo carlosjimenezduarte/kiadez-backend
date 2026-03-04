@@ -447,12 +447,27 @@ def list_guardians(
 
 @router.get("/followers", response_model=FollowListResponse)
 def list_my_followers(
+    user_id: int | None = Query(default=None, ge=1),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=PAGE_SIZE_DEFAULT, ge=1, le=PAGE_SIZE_MAX),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    current_user_id = current.user_number
+    current_user_id = int(current.user_number)
+    target_user_id = int(user_id) if user_id is not None else current_user_id
+
+    target_user = db.execute(
+        select(User).where(
+            User.id == target_user_id,
+            User.is_active.is_(True),
+        )
+    ).scalar_one_or_none()
+    if target_user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = target_user_id == current_user_id
+    if not is_owner and not bool(target_user.public_profile_show_followers):
+        raise HTTPException(status_code=403, detail="La lista de seguidores de este perfil es privada.")
 
     total = int(
         db.execute(
@@ -460,7 +475,7 @@ def list_my_followers(
             .select_from(UserFollow)
             .join(User, User.id == UserFollow.follower_id)
             .where(
-                UserFollow.followed_id == current_user_id,
+                UserFollow.followed_id == target_user_id,
                 User.is_active.is_(True),
             )
         ).scalar_one()
@@ -487,7 +502,7 @@ def list_my_followers(
         .join(User, User.id == UserFollow.follower_id)
         .outerjoin(followers_count_sq, followers_count_sq.c.user_id == User.id)
         .where(
-            UserFollow.followed_id == current_user_id,
+            UserFollow.followed_id == target_user_id,
             User.is_active.is_(True),
         )
         .order_by(desc(UserFollow.created_at), asc(User.id))
@@ -501,24 +516,46 @@ def list_my_followers(
         current_user_id=current_user_id,
         target_ids=user_ids,
     )
+    follows_me_ids = set(user_ids)
+    if target_user_id != current_user_id:
+        follows_me_ids = _fetch_follows_me_ids(
+            db,
+            current_user_id=current_user_id,
+            target_ids=user_ids,
+        )
     items = _rows_to_items(
         db=db,
         rows=rows,
         current_user_id=current_user_id,
         is_following_ids=is_following_ids,
-        follows_me_ids=set(user_ids),
+        follows_me_ids=follows_me_ids,
     )
     return _build_follow_list_response(page_data=page_data, items=items)
 
 
 @router.get("/following", response_model=FollowListResponse)
 def list_my_following(
+    user_id: int | None = Query(default=None, ge=1),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=PAGE_SIZE_DEFAULT, ge=1, le=PAGE_SIZE_MAX),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    current_user_id = current.user_number
+    current_user_id = int(current.user_number)
+    target_user_id = int(user_id) if user_id is not None else current_user_id
+
+    target_user = db.execute(
+        select(User).where(
+            User.id == target_user_id,
+            User.is_active.is_(True),
+        )
+    ).scalar_one_or_none()
+    if target_user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = target_user_id == current_user_id
+    if not is_owner and not bool(target_user.public_profile_show_followers):
+        raise HTTPException(status_code=403, detail="La lista de usuarios seguidos de este perfil es privada.")
 
     total = int(
         db.execute(
@@ -526,7 +563,7 @@ def list_my_following(
             .select_from(UserFollow)
             .join(User, User.id == UserFollow.followed_id)
             .where(
-                UserFollow.follower_id == current_user_id,
+                UserFollow.follower_id == target_user_id,
                 User.is_active.is_(True),
             )
         ).scalar_one()
@@ -553,7 +590,7 @@ def list_my_following(
         .join(User, User.id == UserFollow.followed_id)
         .outerjoin(followers_count_sq, followers_count_sq.c.user_id == User.id)
         .where(
-            UserFollow.follower_id == current_user_id,
+            UserFollow.follower_id == target_user_id,
             User.is_active.is_(True),
         )
         .order_by(desc(UserFollow.created_at), asc(User.id))
@@ -567,11 +604,18 @@ def list_my_following(
         current_user_id=current_user_id,
         target_ids=user_ids,
     )
+    is_following_ids = set(user_ids)
+    if target_user_id != current_user_id:
+        is_following_ids = _fetch_following_ids(
+            db,
+            current_user_id=current_user_id,
+            target_ids=user_ids,
+        )
     items = _rows_to_items(
         db=db,
         rows=rows,
         current_user_id=current_user_id,
-        is_following_ids=set(user_ids),
+        is_following_ids=is_following_ids,
         follows_me_ids=follows_me_ids,
     )
     return _build_follow_list_response(page_data=page_data, items=items)

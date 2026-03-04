@@ -2,8 +2,17 @@
   import { onMount } from "svelte";
   import { logout } from "../lib/logout";
   import { initPurposeCoverModule } from "../lib/purposeCover";
+  import { syncTopbarAvatar } from "../lib/topbarAvatar";
 
   const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
+  let pageTitle = "Kiadez — Logros";
+  let isViewingOwnProfile = true;
+  let viewerUserId = null;
+  let viewerUsername = "";
+  let activeProfileUserId = null;
+  let activeProfileUsername = "";
+  let activeProfileFullName = "";
+
   let achievementsSyncError = "";
   let weeklySyncError = "";
   let weeklyLoading = true;
@@ -17,7 +26,21 @@
     guardian_rank: "Hacía la conquista del corazón propio.",
   };
 
-  const getAccessToken = () => localStorage.getItem("access_token") || "";
+  const getAccessToken = () =>
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("kiadez_access_token") ||
+    "";
+
+  const parsePositiveId = (value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? Math.trunc(numeric) : null;
+  };
+
+  const normalizeUsername = (value) => {
+    let normalized = String(value || "").trim().toLowerCase();
+    while (normalized.startsWith("@")) normalized = normalized.slice(1);
+    return normalized;
+  };
 
   const normalizeImagePath = (rawSrc) => {
     if (!rawSrc) return "";
@@ -53,10 +76,188 @@
     });
   };
 
+  const resetAllBadgeState = () => {
+    document.querySelectorAll(".badge-item").forEach((badgeItem) => {
+      badgeItem.classList.remove("is-unlocked");
+      badgeItem.classList.add("is-locked");
+    });
+  };
+
   const clearAuthAndRedirectToLogin = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    localStorage.removeItem("kiadez_access_token");
     window.location.href = "/login.html";
+  };
+
+  const parseResponseJson = async (response) => {
+    try {
+      return await response.json();
+    } catch {
+      return {};
+    }
+  };
+
+  const apiFetch = async (path, options = {}) => {
+    const token = getAccessToken();
+    if (!token) {
+      window.location.href = "/login.html";
+      throw new Error("No hay sesión activa.");
+    }
+
+    const headers = {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${token}`,
+    };
+
+    const response = await fetch(`${API}${path}`, {
+      ...options,
+      headers,
+    });
+
+    if (response.status === 401) {
+      clearAuthAndRedirectToLogin();
+      throw new Error("Sesión expirada. Inicia sesión nuevamente.");
+    }
+
+    return response;
+  };
+
+  const fetchViewerIdentity = async () => {
+    const res = await apiFetch("/auth/me");
+    const data = await parseResponseJson(res);
+    if (!res.ok) {
+      throw new Error(data.detail || "No se pudo cargar tu perfil.");
+    }
+    return {
+      user_id: parsePositiveId(data?.user_number),
+      username: normalizeUsername(data?.username || ""),
+    };
+  };
+
+  const fetchFollowProfile = async ({ userId = null, username = null } = {}) => {
+    const idValue = parsePositiveId(userId);
+    const usernameValue = normalizeUsername(username || "");
+    if (idValue) {
+      const res = await apiFetch(`/follows/profile?user_id=${encodeURIComponent(String(idValue))}`);
+      const data = await parseResponseJson(res);
+      if (!res.ok) throw new Error(data.detail || "No se pudo cargar el perfil.");
+      return data;
+    }
+    if (usernameValue) {
+      const res = await apiFetch(`/follows/profile?username=${encodeURIComponent(usernameValue)}`);
+      const data = await parseResponseJson(res);
+      if (!res.ok) throw new Error(data.detail || "No se pudo cargar el perfil.");
+      return data;
+    }
+    throw new Error("Parámetros inválidos para cargar perfil.");
+  };
+
+  const buildProfileQueryParams = () => {
+    if (activeProfileUsername) return { key: "u", value: activeProfileUsername };
+    if (activeProfileUserId) return { key: "id", value: String(activeProfileUserId) };
+    return null;
+  };
+
+  const buildProfileModuleUrl = (path) => {
+    const raw = String(path || "").trim();
+    if (!raw) return "";
+    try {
+      const url = new URL(raw, window.location.origin);
+      const qp = buildProfileQueryParams();
+      url.searchParams.delete("u");
+      url.searchParams.delete("id");
+      if (qp) url.searchParams.set(qp.key, qp.value);
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return raw;
+    }
+  };
+
+  const buildViewerHomeUrl = () => {
+    if (viewerUsername) return `/home_user.html?u=${encodeURIComponent(viewerUsername)}`;
+    if (viewerUserId) return `/home_user.html?id=${encodeURIComponent(String(viewerUserId))}`;
+    return "/home_user.html";
+  };
+
+  const PROFILE_MODULE_ROUTES = {
+    home: "/home_user.html",
+    public_wishes: "/my-public-whishes.html",
+    fulfilled_wishes: "/my-fulfilled-whises.html",
+    followers: "/followers.html",
+    achievements: "/achievements.html",
+    gallery: "/gallery.html",
+    stars: "/star-pool-found.html",
+    calendar: "/calendar.html",
+    biography: "/my-biography.html",
+  };
+
+  const syncProfileModuleLinks = () => {
+    document.querySelectorAll("a[data-profile-module]").forEach((link) => {
+      const key = String(link.getAttribute("data-profile-module") || "").trim();
+      const basePath = PROFILE_MODULE_ROUTES[key] || link.getAttribute("href") || "";
+      const nextHref = buildProfileModuleUrl(basePath);
+      if (nextHref) link.href = nextHref;
+    });
+  };
+
+  const setMyHomeLinks = (href) => {
+    const nextHref = String(href || "").trim();
+    if (!nextHref) return;
+    document.querySelectorAll("a[data-my-home]").forEach((link) => {
+      link.href = nextHref;
+    });
+  };
+
+  const applyReadOnlyProfileMode = () => {
+    document.body.dataset.visitor = "true";
+    document.querySelectorAll('a[href="/my-private-whishes.html"]').forEach((link) => link.classList.add("hidden"));
+    document.getElementById("btnChangeCover")?.classList.add("hidden");
+    document.getElementById("btnEditPurposes")?.classList.add("hidden");
+  };
+
+  const applyPageTitle = () => {
+    pageTitle = isViewingOwnProfile
+      ? "Kiadez — Logros"
+      : `Kiadez — Logros de ${activeProfileFullName || "usuario"}`;
+  };
+
+  const resolveProfileContext = async () => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedUserId = parsePositiveId(params.get("id"));
+    const requestedUsername = normalizeUsername(params.get("u") || "");
+
+    const me = await fetchViewerIdentity();
+    viewerUserId = me.user_id;
+    viewerUsername = me.username;
+
+    activeProfileUserId = viewerUserId;
+    activeProfileUsername = viewerUsername;
+    activeProfileFullName = "";
+    isViewingOwnProfile = true;
+    document.body.dataset.visitor = "false";
+
+    if (requestedUserId || requestedUsername) {
+      const isSelfById = requestedUserId && viewerUserId && requestedUserId === viewerUserId;
+      const isSelfByUsername = requestedUsername && viewerUsername && requestedUsername === viewerUsername;
+      if (!isSelfById && !isSelfByUsername) {
+        const profile = await fetchFollowProfile({
+          userId: requestedUserId,
+          username: requestedUserId ? null : requestedUsername,
+        });
+        activeProfileUserId = parsePositiveId(profile?.user_id) || requestedUserId;
+        activeProfileUsername = normalizeUsername(profile?.username || requestedUsername);
+        activeProfileFullName = String(profile?.full_name || "").trim();
+        isViewingOwnProfile = Boolean(viewerUserId && activeProfileUserId === viewerUserId);
+        if (!isViewingOwnProfile) {
+          applyReadOnlyProfileMode();
+        }
+      }
+    }
+
+    applyPageTitle();
+    setMyHomeLinks(buildViewerHomeUrl());
+    syncProfileModuleLinks();
   };
 
   const weekdayLabel = (isoValue) => {
@@ -78,25 +279,16 @@
 
   const loadAchievementsState = async () => {
     achievementsSyncError = "";
-
-    const token = getAccessToken();
-    if (!token) {
-      window.location.href = "/login.html";
-      return;
-    }
+    resetAllBadgeState();
 
     try {
-      const response = await fetch(`${API}/achievements/mine/state`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-
-      if (response.status === 401) {
-        clearAuthAndRedirectToLogin();
-        return;
-      }
+      const profileId = parsePositiveId(activeProfileUserId);
+      const endpoint =
+        !isViewingOwnProfile && profileId
+          ? `/achievements/user/${encodeURIComponent(String(profileId))}/state`
+          : "/achievements/mine/state";
+      const response = await apiFetch(endpoint);
+      const data = await parseResponseJson(response);
 
       if (!response.ok) {
         throw new Error(data.detail || "No se pudo sincronizar el estado de logros.");
@@ -117,6 +309,7 @@
       ]);
     } catch (error) {
       achievementsSyncError = error.message || "No se pudo sincronizar el estado de logros.";
+      resetAllBadgeState();
     }
   };
 
@@ -125,25 +318,14 @@
     weeklyLoading = true;
     weeklyAchievements = [];
 
-    const token = getAccessToken();
-    if (!token) {
-      weeklyLoading = false;
-      window.location.href = "/login.html";
-      return;
-    }
-
     try {
-      const response = await fetch(`${API}/achievements/mine/weekly`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-
-      if (response.status === 401) {
-        clearAuthAndRedirectToLogin();
-        return;
-      }
+      const profileId = parsePositiveId(activeProfileUserId);
+      const endpoint =
+        !isViewingOwnProfile && profileId
+          ? `/achievements/user/${encodeURIComponent(String(profileId))}/weekly`
+          : "/achievements/mine/weekly";
+      const response = await apiFetch(endpoint);
+      const data = await parseResponseJson(response);
 
       if (!response.ok) {
         throw new Error(data.detail || "No se pudieron cargar los logros de esta semana.");
@@ -158,15 +340,34 @@
   };
 
   onMount(() => {
-    initPurposeCoverModule();
-    void Promise.all([loadAchievementsState(), loadWeeklyAchievements()]);
+    let cleanupPurposeCover = () => {};
+    void syncTopbarAvatar();
+
+    (async () => {
+      try {
+        await resolveProfileContext();
+        cleanupPurposeCover = initPurposeCoverModule({
+          isOwnProfile: isViewingOwnProfile,
+          profileUserId: activeProfileUserId,
+        });
+      } catch (error) {
+        const message = error?.message || "No se pudo resolver el perfil.";
+        achievementsSyncError = message;
+        weeklySyncError = message;
+      }
+      await Promise.all([loadAchievementsState(), loadWeeklyAchievements()]);
+    })();
+
+    return () => {
+      cleanupPurposeCover?.();
+    };
   });
 </script>
 
 <svelte:head>
 <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kiadez — Logros</title>
+  <title>{pageTitle}</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </svelte:head>
 
@@ -182,11 +383,11 @@
       </div>
 
       <div class="feed-topbar-zone feed-topbar-center">
-        <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
-        <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-        <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
+        <a class="topbar-btn" href="/home_user.html" data-profile-module="home">🏠 Home</a>
+        <a class="topbar-btn" href="/gallery.html" data-profile-module="gallery">🖼️ Galería</a>
+        <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 Deseos públicos</a>
       <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-        <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+        <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ Deseos cumplidos</a>
       </div>
 
       <div class="feed-topbar-zone feed-topbar-right">
@@ -211,11 +412,11 @@
             <span class="topbar-menu-label">Menú</span>
           </summary>
           <div class="dropdown-menu" role="menu">
-            <a href="/home_user.html" role="menuitem">Mi Home</a>
-            <a href="/achievements.html" role="menuitem">Logros recientes</a>
-            <a href="/gallery.html" role="menuitem">Galería</a>
-            <a href="/calendar.html" role="menuitem">Calendario</a>
-            <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+            <a href="/home_user.html" role="menuitem" data-profile-module="home" data-my-home="true">Mi Home</a>
+            <a href="/achievements.html" role="menuitem" data-profile-module="achievements">Logros recientes</a>
+            <a href="/gallery.html" role="menuitem" data-profile-module="gallery">Galería</a>
+            <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
+            <a href="/my-biography.html" role="menuitem" data-profile-module="biography">Mi Biografía</a>
           <a href="/messages.html" role="menuitem">Mensajes</a>
           </div>
         </details>
@@ -267,17 +468,17 @@
        *  NAV / LINKS
        *  ========================= -->
       <nav class="profile-nav" aria-label="Navegación de perfil">
-        <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
-        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+        <a class="nav-pill" href="/home_user.html" title="Home" data-profile-module="home">Home</a>
+        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas" data-profile-module="stars">
           <span class="nav-icon">⭐</span>
           <span><strong id="achievementsStarsTotal">0</strong> estrellas</span>
         </a>
 
-        <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-        <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
-        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
+        <a class="nav-pill" href="/followers.html" title="Seguidores" data-profile-module="followers">Seguidores</a>
+        <a class="nav-pill" href="/achievements.html" title="Logros recientes" data-profile-module="achievements">Logros recientes</a>
+        <a class="nav-pill" href="/gallery.html" title="Galería" data-profile-module="gallery">Galería</a>
+        <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
+        <a class="nav-pill" href="/my-biography.html" title="Mi biografía" data-profile-module="biography">Mi biografía</a>
         <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
       </nav>
 
