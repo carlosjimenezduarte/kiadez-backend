@@ -725,6 +725,13 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         gr=user.guardian_rank,
     )
     refresh = create_refresh_token(sub=user.id)
+    refresh_repo = RefreshTokenRepository(db)
+    refresh_repo.create(
+        user_id=user.id,
+        jti=refresh["jti"],
+        expires_at=datetime.now(timezone.utc)
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    )
 
     return {
         "access_token": access,
@@ -1512,6 +1519,13 @@ def verify_2fa(
         gr=user.guardian_rank,
     )
     refresh = create_refresh_token(sub=user.id)
+    refresh_repo = RefreshTokenRepository(db)
+    refresh_repo.create(
+        user_id=user.id,
+        jti=refresh["jti"],
+        expires_at=datetime.now(timezone.utc)
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    )
 
     return {
         "access_token": access,
