@@ -6,7 +6,7 @@
 
   onMount(() => {
     document.body.dataset.visitor = "false";
-    initPurposeCoverModule();
+    let cleanupPurposeCover = () => {};
 
     const oracleCards = [
           {
@@ -1379,12 +1379,20 @@
     (async () => {
       try {
         await resolveProfileContext();
+        cleanupPurposeCover = initPurposeCoverModule({
+          isOwnProfile: isViewingOwnProfile,
+          profileUserId: activeProfileUserId,
+        });
       } catch (error) {
         console.error(error);
       } finally {
         void loadOracleState();
       }
     })();
+
+    return () => {
+      cleanupPurposeCover?.();
+    };
   });
 </script>
 

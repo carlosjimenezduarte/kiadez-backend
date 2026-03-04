@@ -184,6 +184,48 @@ def _cover_photo_response_for_user(
     )
 
 
+def _profile_media_response_for_user(
+    *,
+    user: User,
+    media_id: int | None,
+    current_user_id: int,
+    db: Session,
+    allow_cleanup_attr: str | None = None,
+) -> ProfilePhotoResponse:
+    if media_id is None:
+        return ProfilePhotoResponse()
+
+    media = db.query(Media).filter(Media.id == int(media_id)).one_or_none()
+    if media is None:
+        if allow_cleanup_attr:
+            setattr(user, allow_cleanup_attr, None)
+            db.commit()
+        return ProfilePhotoResponse()
+
+    if media.owner_id != int(user.id):
+        if allow_cleanup_attr:
+            setattr(user, allow_cleanup_attr, None)
+            db.commit()
+        return ProfilePhotoResponse()
+
+    if media.status != "ready":
+        return ProfilePhotoResponse()
+
+    if not (media.mime_type or "").lower().startswith("image/"):
+        if allow_cleanup_attr:
+            setattr(user, allow_cleanup_attr, None)
+            db.commit()
+        return ProfilePhotoResponse()
+
+    if media.visibility == MediaVisibility.private and int(current_user_id) != int(user.id):
+        return ProfilePhotoResponse()
+
+    _ensure_media_storage_ready()
+    expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
+    url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
+    return ProfilePhotoResponse(media_id=media.id, url=url, expires_in=expires_in)
+
+
 @router.post("/presign/upload", response_model=MediaPresignResponse)
 def presign_upload(
     payload: MediaPresignRequest,
@@ -474,25 +516,33 @@ def get_profile_photo(
     user = db.query(User).filter(User.id == current.user_number).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
-    if user.profile_photo_media_id is None:
-        return ProfilePhotoResponse()
+    return _profile_media_response_for_user(
+        user=user,
+        media_id=int(user.profile_photo_media_id) if user.profile_photo_media_id is not None else None,
+        current_user_id=int(current.user_number),
+        db=db,
+        allow_cleanup_attr="profile_photo_media_id",
+    )
 
-    media = db.query(Media).filter(Media.id == user.profile_photo_media_id).one_or_none()
-    if not media:
-        user.profile_photo_media_id = None
-        db.commit()
-        return ProfilePhotoResponse()
-    if media.owner_id != current.user_number:
-        return ProfilePhotoResponse()
-    if media.status != "ready":
-        return ProfilePhotoResponse()
-    if not (media.mime_type or "").lower().startswith("image/"):
-        return ProfilePhotoResponse()
 
-    _ensure_media_storage_ready()
-    expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
-    url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
-    return ProfilePhotoResponse(media_id=media.id, url=url, expires_in=expires_in)
+@router.get("/profile-photo/user/{user_id}", response_model=ProfilePhotoResponse)
+def get_user_profile_photo(
+    user_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == int(user_id), User.is_active.is_(True)).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = int(user.id) == int(current.user_number)
+    return _profile_media_response_for_user(
+        user=user,
+        media_id=int(user.profile_photo_media_id) if user.profile_photo_media_id is not None else None,
+        current_user_id=int(current.user_number),
+        db=db,
+        allow_cleanup_attr="profile_photo_media_id" if is_owner else None,
+    )
 
 
 @router.post("/profile-photo", response_model=ProfilePhotoResponse)
@@ -621,25 +671,33 @@ def get_emblem(
     user = db.query(User).filter(User.id == current.user_number).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
-    if user.emblem_media_id is None:
-        return ProfilePhotoResponse()
+    return _profile_media_response_for_user(
+        user=user,
+        media_id=int(user.emblem_media_id) if user.emblem_media_id is not None else None,
+        current_user_id=int(current.user_number),
+        db=db,
+        allow_cleanup_attr="emblem_media_id",
+    )
 
-    media = db.query(Media).filter(Media.id == user.emblem_media_id).one_or_none()
-    if not media:
-        user.emblem_media_id = None
-        db.commit()
-        return ProfilePhotoResponse()
-    if media.owner_id != current.user_number:
-        return ProfilePhotoResponse()
-    if media.status != "ready":
-        return ProfilePhotoResponse()
-    if not (media.mime_type or "").lower().startswith("image/"):
-        return ProfilePhotoResponse()
 
-    _ensure_media_storage_ready()
-    expires_in = settings.MEDIA_DOWNLOAD_EXPIRE_HOURS * 3600
-    url = generate_presigned_get_url(key=media.object_key, expires_in=expires_in)
-    return ProfilePhotoResponse(media_id=media.id, url=url, expires_in=expires_in)
+@router.get("/emblem/user/{user_id}", response_model=ProfilePhotoResponse)
+def get_user_emblem(
+    user_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == int(user_id), User.is_active.is_(True)).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = int(user.id) == int(current.user_number)
+    return _profile_media_response_for_user(
+        user=user,
+        media_id=int(user.emblem_media_id) if user.emblem_media_id is not None else None,
+        current_user_id=int(current.user_number),
+        db=db,
+        allow_cleanup_attr="emblem_media_id" if is_owner else None,
+    )
 
 
 @router.post("/emblem", response_model=ProfilePhotoResponse)

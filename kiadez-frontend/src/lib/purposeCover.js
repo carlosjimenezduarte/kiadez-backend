@@ -23,6 +23,12 @@ const getAccessToken = () =>
   localStorage.getItem("kiadez_access_token") ||
   "";
 
+const parsePositiveId = (value) => {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized) || normalized <= 0) return null;
+  return Math.trunc(normalized);
+};
+
 const parseResponseJson = async (response) => {
   try {
     return await response.json();
@@ -235,7 +241,7 @@ const ensureCoverLayout = () => {
   };
 };
 
-const initCoverEditor = () => {
+const initCoverEditor = ({ isOwnProfile = true, profileUserId = null } = {}) => {
   const refs = ensureCoverLayout();
   if (!refs) return () => {};
 
@@ -271,6 +277,8 @@ const initCoverEditor = () => {
   let coverPreviewObjectUrl = "";
   let coverSaving = false;
   let coverDirty = false;
+  const readOnlyMode = !isOwnProfile;
+  const targetUserId = parsePositiveId(profileUserId);
 
   const closeCoverMenu = () => {
     if (coverMenu && coverMenu.hasAttribute("open")) {
@@ -367,7 +375,10 @@ const initCoverEditor = () => {
     const token = getAccessToken();
     if (!token) return;
     try {
-      const response = await fetch(`${API}/media/cover-photo`, {
+      const endpoint = !isOwnProfile && targetUserId
+        ? `/media/cover-photo/user/${encodeURIComponent(String(targetUserId))}`
+        : "/media/cover-photo";
+      const response = await fetch(`${API}${endpoint}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -526,6 +537,24 @@ const initCoverEditor = () => {
       coverSavedOffsetY = coverOffsetY;
     }
   };
+
+  if (readOnlyMode) {
+    coverMenu?.classList.add("hidden");
+    coverSaveActions?.classList.add("hidden");
+    coverFile?.classList.add("hidden");
+    coverMedia.classList.remove("is-move-mode");
+    hideCoverActions();
+
+    coverImg.addEventListener("load", handleCoverImageLoad);
+    window.addEventListener("resize", recalcCoverBounds);
+    void loadCoverFromApi();
+
+    return () => {
+      revokeCoverPreviewUrl();
+      coverImg.removeEventListener("load", handleCoverImageLoad);
+      window.removeEventListener("resize", recalcCoverBounds);
+    };
+  }
 
   coverUploadBtn?.addEventListener("click", handleCoverUpload);
   coverFile?.addEventListener("change", handleCoverFileChange);
@@ -984,8 +1013,11 @@ const ensurePurposeLayout = () => {
   };
 };
 
-export const initPurposeCoverModule = () => {
-  const cleanupCoverEditor = initCoverEditor();
+export const initPurposeCoverModule = (options = {}) => {
+  const isOwnProfile = options?.isOwnProfile !== false;
+  const profileUserId = parsePositiveId(options?.profileUserId);
+  const isReadOnlyProfile = !isOwnProfile;
+  const cleanupCoverEditor = initCoverEditor({ isOwnProfile, profileUserId });
   ensurePurposeModals();
   const layout = ensurePurposeLayout();
   if (!layout) return cleanupCoverEditor;
@@ -1006,6 +1038,14 @@ export const initPurposeCoverModule = () => {
   const purposeFulfillBySlot = new Map(
     Array.from(purposeFulfillBtns || []).map((btn) => [Number(btn.dataset.slot || 0), btn])
   );
+
+  if (isReadOnlyProfile) {
+    btnEditPurposes?.classList.add("hidden");
+    purposeFulfillBtns?.forEach((btn) => {
+      btn.classList.add("hidden");
+      btn.disabled = true;
+    });
+  }
 
   const lifeProposalOverlay = document.getElementById("lifeProposalOverlay");
   const lifeProposalClose = document.getElementById("lifeProposalClose");
@@ -1117,15 +1157,17 @@ export const initPurposeCoverModule = () => {
       pill.classList.toggle("is-undefined", isFulfilled);
       const view = getPurposePresentation(slot);
       pill.textContent = view.text || defaultPurposeTextBySlot[slotNumber];
-      unlockBtn?.classList.toggle("hidden", !view.showUnlock);
+      unlockBtn?.classList.toggle("hidden", isReadOnlyProfile || !view.showUnlock);
 
       if (fulfillBtn) {
         const hasContent = Boolean(slot.text_public || slot.text_input || slot.ciphertext_hex);
         fulfillBtn.classList.toggle("is-marked", isFulfilled);
         fulfillBtn.classList.toggle("is-vanished", isFulfilled);
-        fulfillBtn.disabled = !hasContent || isFulfilled;
+        fulfillBtn.disabled = isReadOnlyProfile || !hasContent || isFulfilled;
         if (isFulfilled) {
           fulfillBtn.setAttribute("title", "Propósito cumplido. Define uno nuevo desde 'Editar mi propósito de vida'.");
+        } else if (isReadOnlyProfile) {
+          fulfillBtn.setAttribute("title", "Solo el dueño del perfil puede marcar un propósito como cumplido.");
         } else if (!hasContent) {
           fulfillBtn.setAttribute("title", "Primero define este propósito para poder marcarlo como cumplido.");
         } else {
@@ -1163,8 +1205,11 @@ export const initPurposeCoverModule = () => {
   const fetchPurposeSlotsFromApi = async () => {
     const token = getAccessToken();
     if (!token) return [];
+    const endpoint = isOwnProfile || !profileUserId
+      ? "/life-purpose/mine"
+      : `/life-purpose/user/${encodeURIComponent(String(profileUserId))}`;
     try {
-      const res = await fetch(`${API}/life-purpose/mine`, {
+      const res = await fetch(`${API}${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) return [];
@@ -2107,6 +2152,13 @@ export const initPurposeCoverModule = () => {
     }
   };
 
+  if (isReadOnlyProfile) {
+    void loadPurposeSlots();
+    return () => {
+      cleanupCoverEditor?.();
+    };
+  }
+
   const lifeForm = lifeProposalOverlay.querySelector("#life-form");
 
   lifeConfirmClose?.addEventListener("click", closeConfirmModal);
@@ -2418,5 +2470,7 @@ export const initPurposeCoverModule = () => {
 
   void loadPurposeSlots();
 
-  return () => {};
+  return () => {
+    cleanupCoverEditor?.();
+  };
 };

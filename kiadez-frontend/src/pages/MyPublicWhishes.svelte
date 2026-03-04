@@ -9,7 +9,7 @@
   onMount(() => {
     document.body.dataset.visitor = "false";
     void syncProfileStarsTotal("myPublicWishesStarsTotal");
-    initPurposeCoverModule();
+    let cleanupPurposeCover = () => {};
 
     const prefixInputs = document.querySelectorAll(".wish-prefix-input");
     const suffixInputs = document.querySelectorAll("[data-suffix]");
@@ -4918,6 +4918,10 @@
 	    void (async () => {
 	      try {
 	        await resolveProfileContext();
+          cleanupPurposeCover = initPurposeCoverModule({
+            isOwnProfile: isViewingOwnProfile,
+            profileUserId: activeProfileUserId,
+          });
 	      } catch (error) {
 	        console.error(error);
 	      }
@@ -4927,6 +4931,10 @@
 	      ]);
         scrollToCooperativeSectionIfRequested();
 	    })();
+
+    return () => {
+      cleanupPurposeCover?.();
+    };
 	  });
 </script>
 

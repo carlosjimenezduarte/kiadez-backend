@@ -4,7 +4,7 @@
   import { logout } from '../lib/logout';
 
   onMount(() => {
-    initPurposeCoverModule();
+    let cleanupPurposeCover = () => {};
 
     // POSTS
     const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
@@ -2995,6 +2995,10 @@
       applyProfilePrivacyVisibility(DEFAULT_PROFILE_PRIVACY_VISIBILITY, { isOwner: true });
       try {
         await resolveProfileContext();
+        cleanupPurposeCover = initPurposeCoverModule({
+          isOwnProfile: isViewingOwnProfile,
+          profileUserId: activeProfileUserId
+        });
       } catch (error) {
         console.error(error);
         setPostsStatus(error.message || 'No se pudo cargar el perfil.', true);
@@ -3035,6 +3039,7 @@
 	    })();
 
     return () => {
+      cleanupPurposeCover?.();
       if (selectedFileURL) URL.revokeObjectURL(selectedFileURL);
 
       openPostModal?.removeEventListener('click', openPost);

@@ -286,6 +286,34 @@ def _ensure_public_biography_visibility(
         raise HTTPException(status_code=403, detail="La biografía de este perfil está oculta por privacidad.")
 
 
+def _resolve_biography_read_target(
+    *,
+    requested_user_id: int | None,
+    current: UserPublic,
+    db: Session,
+) -> tuple[User, int, bool]:
+    viewer_user_id = int(current.user_number)
+    target_user_id = int(requested_user_id) if requested_user_id is not None else viewer_user_id
+
+    if target_user_id == viewer_user_id:
+        user = db.execute(select(User).where(User.id == viewer_user_id)).scalar_one_or_none()
+        if user is None:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        return user, viewer_user_id, True
+
+    user = db.execute(
+        select(User).where(
+            User.id == target_user_id,
+            User.is_active.is_(True),
+        )
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    _ensure_public_biography_visibility(user=user, viewer_user_id=viewer_user_id)
+    return user, int(user.id), False
+
+
 def _serialize_distinctions(
     *,
     distinctions: BiographyDistinctions | None,
@@ -399,15 +427,18 @@ def get_activity_stats(
 
 @router.get("/personal-info", response_model=BiographyPersonalInfoOut)
 def get_personal_info(
+    user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    user, target_user_id, _is_owner = _resolve_biography_read_target(
+        requested_user_id=user_id,
+        current=current,
+        db=db,
+    )
 
     personal_info = db.execute(
-        select(BiographyPersonalInfo).where(BiographyPersonalInfo.user_id == current.user_number)
+        select(BiographyPersonalInfo).where(BiographyPersonalInfo.user_id == target_user_id)
     ).scalar_one_or_none()
 
     return _serialize_personal_info(user=user, personal_info=personal_info)
@@ -451,15 +482,18 @@ def upsert_personal_info(
 
 @router.get("/physical-traits", response_model=BiographyPhysicalTraitsOut)
 def get_physical_traits(
+    user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _user, target_user_id, _is_owner = _resolve_biography_read_target(
+        requested_user_id=user_id,
+        current=current,
+        db=db,
+    )
 
     physical_traits = db.execute(
-        select(BiographyPhysicalTraits).where(BiographyPhysicalTraits.user_id == current.user_number)
+        select(BiographyPhysicalTraits).where(BiographyPhysicalTraits.user_id == target_user_id)
     ).scalar_one_or_none()
 
     return _serialize_physical_traits(physical_traits=physical_traits)
@@ -495,14 +529,17 @@ def upsert_physical_traits(
 
 @router.get("/education", response_model=BiographyEducationOut)
 def get_education(
+    user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _user, target_user_id, _is_owner = _resolve_biography_read_target(
+        requested_user_id=user_id,
+        current=current,
+        db=db,
+    )
 
-    education = db.execute(select(BiographyEducation).where(BiographyEducation.user_id == current.user_number)).scalar_one_or_none()
+    education = db.execute(select(BiographyEducation).where(BiographyEducation.user_id == target_user_id)).scalar_one_or_none()
     return _serialize_education(education=education)
 
 
@@ -534,14 +571,17 @@ def upsert_education(
 
 @router.get("/curiosities", response_model=BiographyCuriositiesOut)
 def get_curiosities(
+    user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _user, target_user_id, _is_owner = _resolve_biography_read_target(
+        requested_user_id=user_id,
+        current=current,
+        db=db,
+    )
 
-    curiosities = db.execute(select(BiographyCuriosities).where(BiographyCuriosities.user_id == current.user_number)).scalar_one_or_none()
+    curiosities = db.execute(select(BiographyCuriosities).where(BiographyCuriosities.user_id == target_user_id)).scalar_one_or_none()
     return _serialize_curiosities(curiosities=curiosities)
 
 
@@ -576,15 +616,18 @@ def upsert_curiosities(
 
 @router.get("/professional-info", response_model=BiographyProfessionalInfoOut)
 def get_professional_info(
+    user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _user, target_user_id, _is_owner = _resolve_biography_read_target(
+        requested_user_id=user_id,
+        current=current,
+        db=db,
+    )
 
     professional_info = db.execute(
-        select(BiographyProfessionalInfo).where(BiographyProfessionalInfo.user_id == current.user_number)
+        select(BiographyProfessionalInfo).where(BiographyProfessionalInfo.user_id == target_user_id)
     ).scalar_one_or_none()
     return _serialize_professional_info(professional_info=professional_info)
 
@@ -617,15 +660,18 @@ def upsert_professional_info(
 
 @router.get("/distinctions", response_model=BiographyDistinctionsOut)
 def get_distinctions(
+    user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _user, target_user_id, _is_owner = _resolve_biography_read_target(
+        requested_user_id=user_id,
+        current=current,
+        db=db,
+    )
 
     distinctions = db.execute(
-        select(BiographyDistinctions).where(BiographyDistinctions.user_id == current.user_number)
+        select(BiographyDistinctions).where(BiographyDistinctions.user_id == target_user_id)
     ).scalar_one_or_none()
     return _serialize_distinctions(distinctions=distinctions)
 
@@ -636,21 +682,7 @@ def get_distinctions_for_user(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(
-        select(User).where(
-            User.id == user_id,
-            User.is_active.is_(True),
-        )
-    ).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
-
-    _ensure_public_biography_visibility(user=user, viewer_user_id=current.user_number)
-
-    distinctions = db.execute(
-        select(BiographyDistinctions).where(BiographyDistinctions.user_id == user_id)
-    ).scalar_one_or_none()
-    return _serialize_distinctions(distinctions=distinctions)
+    return get_distinctions(user_id=user_id, current=current, db=db)
 
 
 @router.put("/distinctions", response_model=BiographyDistinctionsOut)
@@ -711,14 +743,20 @@ def upsert_distinctions_for_user(
 
 @router.get("/about", response_model=BiographyAboutOut)
 def get_about(
+    user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    user, target_user_id, is_owner = _resolve_biography_read_target(
+        requested_user_id=user_id,
+        current=current,
+        db=db,
+    )
 
-    about = db.execute(select(BiographyAbout).where(BiographyAbout.user_id == current.user_number)).scalar_one_or_none()
+    if not is_owner and not bool(user.public_profile_show_about):
+        raise HTTPException(status_code=403, detail='La sección "Acerca de mí" está oculta por privacidad.')
+
+    about = db.execute(select(BiographyAbout).where(BiographyAbout.user_id == target_user_id)).scalar_one_or_none()
     return _serialize_about(user=user, about=about)
 
 
@@ -728,24 +766,7 @@ def get_about_for_user(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # Public profile about section (requires auth, but exposes only non-sensitive fields).
-    user = db.execute(
-        select(User).where(
-            User.id == user_id,
-            User.is_active.is_(True),
-        )
-    ).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
-
-    _ensure_public_biography_visibility(user=user, viewer_user_id=current.user_number)
-
-    is_owner = int(current.user_number) == int(user_id)
-    if not is_owner and not bool(user.public_profile_show_about):
-        raise HTTPException(status_code=403, detail='La sección "Acerca de mí" está oculta por privacidad.')
-
-    about = db.execute(select(BiographyAbout).where(BiographyAbout.user_id == user_id)).scalar_one_or_none()
-    return _serialize_about(user=user, about=about)
+    return get_about(user_id=user_id, current=current, db=db)
 
 
 @router.put("/about", response_model=BiographyAboutOut)
@@ -777,14 +798,17 @@ def upsert_about(
 
 @router.get("/dream", response_model=BiographyDreamOut)
 def get_dream(
+    user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _user, target_user_id, _is_owner = _resolve_biography_read_target(
+        requested_user_id=user_id,
+        current=current,
+        db=db,
+    )
 
-    dream = db.execute(select(BiographyDream).where(BiographyDream.user_id == current.user_number)).scalar_one_or_none()
+    dream = db.execute(select(BiographyDream).where(BiographyDream.user_id == target_user_id)).scalar_one_or_none()
     return _serialize_dream(dream=dream)
 
 
@@ -817,15 +841,18 @@ def upsert_dream(
 
 @router.get("/professional-achievements", response_model=BiographyProfessionalAchievementsOut)
 def get_professional_achievements(
+    user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _user, target_user_id, _is_owner = _resolve_biography_read_target(
+        requested_user_id=user_id,
+        current=current,
+        db=db,
+    )
 
     section = db.execute(
-        select(BiographyProfessionalAchievements).where(BiographyProfessionalAchievements.user_id == current.user_number)
+        select(BiographyProfessionalAchievements).where(BiographyProfessionalAchievements.user_id == target_user_id)
     ).scalar_one_or_none()
     return _serialize_professional_achievements(section=section)
 
@@ -864,15 +891,18 @@ def upsert_professional_achievements(
 
 @router.get("/life-achievements", response_model=BiographyLifeAchievementsOut)
 def get_life_achievements(
+    user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _user, target_user_id, _is_owner = _resolve_biography_read_target(
+        requested_user_id=user_id,
+        current=current,
+        db=db,
+    )
 
     section = db.execute(
-        select(BiographyLifeAchievements).where(BiographyLifeAchievements.user_id == current.user_number)
+        select(BiographyLifeAchievements).where(BiographyLifeAchievements.user_id == target_user_id)
     ).scalar_one_or_none()
     return _serialize_life_achievements(section=section)
 
@@ -911,15 +941,18 @@ def upsert_life_achievements(
 
 @router.get("/favorite-quotes", response_model=BiographyFavoriteQuotesOut)
 def get_favorite_quotes(
+    user_id: int | None = Query(default=None, ge=1),
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(select(User).where(User.id == current.user_number)).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    _user, target_user_id, _is_owner = _resolve_biography_read_target(
+        requested_user_id=user_id,
+        current=current,
+        db=db,
+    )
 
     section = db.execute(
-        select(BiographyFavoriteQuotes).where(BiographyFavoriteQuotes.user_id == current.user_number)
+        select(BiographyFavoriteQuotes).where(BiographyFavoriteQuotes.user_id == target_user_id)
     ).scalar_one_or_none()
     return _serialize_favorite_quotes(section=section)
 

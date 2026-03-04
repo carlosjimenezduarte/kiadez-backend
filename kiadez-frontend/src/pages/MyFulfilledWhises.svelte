@@ -430,7 +430,7 @@
   }));
 
   onMount(() => {
-    const cleanup = initPurposeCoverModule();
+    let cleanupPurposeCover = () => {};
     void syncProfileStarsTotal("fulfilledWishesStarsTotal");
     const onFulfilledChanged = (event) => {
       const scope = event?.detail?.scope;
@@ -457,6 +457,10 @@
     (async () => {
       try {
         await resolveProfileContext();
+        cleanupPurposeCover = initPurposeCoverModule({
+          isOwnProfile: isViewingOwnProfile,
+          profileUserId: activeProfileUserId,
+        });
       } catch (error) {
         console.error(error);
       } finally {
@@ -470,7 +474,7 @@
     })();
     return () => {
       window.removeEventListener("kiadez:fulfilled-wishes-changed", onFulfilledChanged);
-      if (typeof cleanup === "function") cleanup();
+      cleanupPurposeCover?.();
     };
   });
 </script>

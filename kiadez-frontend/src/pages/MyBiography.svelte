@@ -5,8 +5,7 @@
   import { syncProfileStarsTotal } from "../lib/starsCounter";
 
   onMount(() => {
-    initPurposeCoverModule();
-    void syncProfileStarsTotal("biographyStarsTotal");
+    let cleanupPurposeCover = () => {};
 
     const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
     const profilePhoto = document.getElementById("profilePhoto");
@@ -339,6 +338,58 @@
       return normalized;
     };
 
+    const PROFILE_MODULE_ROUTES = {
+      home: "/home_user.html",
+      public_wishes: "/my-public-whishes.html",
+      fulfilled_wishes: "/my-fulfilled-whises.html",
+      followers: "/followers.html",
+      achievements: "/achievements.html",
+      gallery: "/gallery.html",
+      stars: "/star-pool-found.html",
+      calendar: "/calendar.html",
+      biography: "/my-biography.html",
+    };
+
+    const buildProfileQueryParams = () => {
+      if (activeProfileUsername) return { key: "u", value: activeProfileUsername };
+      if (activeProfileUserId) return { key: "id", value: String(activeProfileUserId) };
+      return null;
+    };
+
+    const buildProfileModuleUrl = (path) => {
+      const raw = String(path || "").trim();
+      if (!raw) return "";
+      try {
+        const url = new URL(raw, window.location.origin);
+        const qp = buildProfileQueryParams();
+        url.searchParams.delete("u");
+        url.searchParams.delete("id");
+        if (qp) url.searchParams.set(qp.key, qp.value);
+        return `${url.pathname}${url.search}${url.hash}`;
+      } catch {
+        return raw;
+      }
+    };
+
+    const syncProfileModuleLinks = () => {
+      document.querySelectorAll("a[data-profile-module]").forEach((link) => {
+        const key = String(link.getAttribute("data-profile-module") || "").trim();
+        const basePath = PROFILE_MODULE_ROUTES[key] || link.getAttribute("href") || "";
+        const nextHref = buildProfileModuleUrl(basePath);
+        if (nextHref) link.href = nextHref;
+      });
+    };
+
+    const setProfileCanonicalLink = () => {
+      if (window.location.pathname !== "/my-biography.html") return;
+      const target = buildProfileModuleUrl("/my-biography.html");
+      if (!target) return;
+      const current = `${window.location.pathname}${window.location.search}`;
+      if (current !== target) {
+        window.history.replaceState({}, "", target);
+      }
+    };
+
     const isViewerGuardian = () => Number(viewerGuardianRank || 0) >= GUARDIAN_MIN_RANK;
 
     const buildDistinctionsEndpoint = ({ includeTarget = false } = {}) => {
@@ -489,6 +540,8 @@
       }
 
       profileContextResolved = true;
+      setProfileCanonicalLink();
+      syncProfileModuleLinks();
       applyDistinctionsEditorVisibility();
     };
 
@@ -710,6 +763,56 @@
       if (quotesEmptyState) {
         quotesEmptyState.classList.toggle("hidden", Boolean(sectionText));
       }
+    };
+
+    const buildBiographyReadPath = (basePath) => {
+      const profileId = parsePositiveId(activeProfileUserId);
+      if (!isViewingOwnProfile && profileId) {
+        return `${basePath}?user_id=${encodeURIComponent(String(profileId))}`;
+      }
+      return basePath;
+    };
+
+    const buildProfileMediaPath = (basePath) => {
+      const profileId = parsePositiveId(activeProfileUserId);
+      if (!isViewingOwnProfile && profileId) {
+        return `${basePath}/user/${encodeURIComponent(String(profileId))}`;
+      }
+      return basePath;
+    };
+
+    const applyBiographyModeVisibility = () => {
+      const canEditOwnBiography = isViewingOwnProfile;
+
+      [
+        personalInfoEditBtn,
+        physicalTraitsEditBtn,
+        educationEditBtn,
+        curiositiesEditBtn,
+        professionalInfoEditBtn,
+        aboutEditBtn,
+        dreamEditBtn,
+        proAchievementsEditBtn,
+        lifeAchievementsEditBtn,
+        quotesEditBtn,
+      ].forEach((btn) => {
+        if (!btn) return;
+        btn.classList.toggle("hidden", !canEditOwnBiography);
+        btn.disabled = !canEditOwnBiography;
+      });
+
+      if (profilePhotoTrigger) {
+        profilePhotoTrigger.classList.toggle("hidden", !canEditOwnBiography);
+      }
+      if (emblemTrigger) {
+        emblemTrigger.classList.toggle("hidden", !canEditOwnBiography);
+      }
+      if (!canEditOwnBiography) {
+        closePhotoMenu();
+        closeEmblemMenu();
+      }
+
+      applyDistinctionsEditorVisibility();
     };
 
     const updateAboutWordCounter = () => {
@@ -1003,7 +1106,7 @@
     };
 
     const loadPersonalInfo = async () => {
-      const res = await apiFetch("/biography/personal-info");
+      const res = await apiFetch(buildBiographyReadPath("/biography/personal-info"));
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "No se pudo cargar la información personal.");
@@ -1014,7 +1117,7 @@
     };
 
     const loadPhysicalTraits = async () => {
-      const res = await apiFetch("/biography/physical-traits");
+      const res = await apiFetch(buildBiographyReadPath("/biography/physical-traits"));
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "No se pudieron cargar las características físicas.");
@@ -1025,7 +1128,7 @@
     };
 
     const loadEducation = async () => {
-      const res = await apiFetch("/biography/education");
+      const res = await apiFetch(buildBiographyReadPath("/biography/education"));
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "No se pudo cargar Educación.");
@@ -1036,7 +1139,7 @@
     };
 
     const loadCuriosities = async () => {
-      const res = await apiFetch("/biography/curiosities");
+      const res = await apiFetch(buildBiographyReadPath("/biography/curiosities"));
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "No se pudieron cargar las curiosidades.");
@@ -1047,7 +1150,7 @@
     };
 
     const loadProfessionalInfo = async () => {
-      const res = await apiFetch("/biography/professional-info");
+      const res = await apiFetch(buildBiographyReadPath("/biography/professional-info"));
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "No se pudo cargar la información profesional.");
@@ -1058,7 +1161,7 @@
     };
 
     const loadAbout = async () => {
-      const res = await apiFetch("/biography/about");
+      const res = await apiFetch(buildBiographyReadPath("/biography/about"));
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "No se pudo cargar tu biografía.");
@@ -1069,7 +1172,7 @@
     };
 
     const loadDream = async () => {
-      const res = await apiFetch("/biography/dream");
+      const res = await apiFetch(buildBiographyReadPath("/biography/dream"));
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "No se pudo cargar tu mayor sueño.");
@@ -1080,7 +1183,7 @@
     };
 
     const loadProAchievements = async () => {
-      const res = await apiFetch("/biography/professional-achievements");
+      const res = await apiFetch(buildBiographyReadPath("/biography/professional-achievements"));
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "No se pudieron cargar tus logros profesionales.");
@@ -1091,7 +1194,7 @@
     };
 
     const loadLifeAchievements = async () => {
-      const res = await apiFetch("/biography/life-achievements");
+      const res = await apiFetch(buildBiographyReadPath("/biography/life-achievements"));
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "No se pudieron cargar tus logros alcanzados.");
@@ -1102,7 +1205,7 @@
     };
 
     const loadFavoriteQuotes = async () => {
-      const res = await apiFetch("/biography/favorite-quotes");
+      const res = await apiFetch(buildBiographyReadPath("/biography/favorite-quotes"));
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "No se pudieron cargar tus frases favoritas.");
@@ -1236,7 +1339,7 @@
 
     const loadCurrentProfilePhoto = async () => {
       try {
-        const res = await apiFetch("/media/profile-photo");
+        const res = await apiFetch(buildProfileMediaPath("/media/profile-photo"));
         const data = await res.json();
         if (!res.ok) return;
         if (profilePhoto) {
@@ -1267,7 +1370,7 @@
 
     const loadCurrentEmblem = async () => {
       try {
-        const res = await apiFetch("/media/emblem");
+        const res = await apiFetch(buildProfileMediaPath("/media/emblem"));
         const data = await res.json();
         if (!res.ok) return;
         if (emblemImage) {
@@ -1995,28 +2098,38 @@
     emblemFile?.addEventListener("change", handleEmblemFileChange);
     document.addEventListener("click", handlePageClick);
     ensureDistinctionsForm();
-    applyDistinctionsEditorVisibility();
 
-    void loadCurrentProfilePhoto();
-    void loadCurrentEmblem();
-    void loadPersonalInfo().catch((error) => {
-      setPersonalInfoModalStatus(error.message || "No se pudo cargar la información personal.", true);
-    });
-    void loadPhysicalTraits().catch(() => {});
-    void loadEducation().catch(() => {});
-    void loadCuriosities().catch(() => {});
-    void loadProfessionalInfo().catch(() => {});
-    void loadAbout().catch(() => {});
-    void loadDream().catch(() => {});
-    void loadProAchievements().catch(() => {});
-    void loadLifeAchievements().catch(() => {});
-    void loadFavoriteQuotes().catch(() => {});
     void (async () => {
       try {
         await resolveBiographyProfileContext();
       } catch (error) {
         setDistinctionsModalStatus(error?.message || "No se pudo cargar el contexto del perfil.", true);
       }
+      applyBiographyModeVisibility();
+
+      cleanupPurposeCover = initPurposeCoverModule({
+        isOwnProfile: isViewingOwnProfile,
+        profileUserId: activeProfileUserId,
+      });
+
+      if (isViewingOwnProfile) {
+        void syncProfileStarsTotal("biographyStarsTotal");
+      }
+
+      void loadCurrentProfilePhoto();
+      void loadCurrentEmblem();
+      void loadPersonalInfo().catch((error) => {
+        setPersonalInfoModalStatus(error.message || "No se pudo cargar la información personal.", true);
+      });
+      void loadPhysicalTraits().catch(() => {});
+      void loadEducation().catch(() => {});
+      void loadCuriosities().catch(() => {});
+      void loadProfessionalInfo().catch(() => {});
+      void loadAbout().catch(() => {});
+      void loadDream().catch(() => {});
+      void loadProAchievements().catch(() => {});
+      void loadLifeAchievements().catch(() => {});
+      void loadFavoriteQuotes().catch(() => {});
       void loadActivityStats({ userId: activeProfileUserId }).catch(() => {});
       void loadDistinctions().catch((error) => {
         applyDistinctionsToView({ slots: [] });
@@ -2025,6 +2138,7 @@
     })();
 
     return () => {
+      cleanupPurposeCover?.();
       personalInfoEditBtn?.removeEventListener("click", handleOpenPersonalInfoModal);
       closePersonalInfoModal?.removeEventListener("click", closePersonalInfoModalFn);
       cancelPersonalInfoModal?.removeEventListener("click", closePersonalInfoModalFn);
@@ -2115,11 +2229,11 @@
       </div>
 
       <div class="feed-topbar-zone feed-topbar-center">
-        <a class="topbar-btn" href="/home_user.html">🏠 Home</a>
-        <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
-        <a class="topbar-btn" href="/my-public-whishes.html">🌐 Deseos públicos</a>
+        <a class="topbar-btn" href="/home_user.html" data-profile-module="home">🏠 Home</a>
+        <a class="topbar-btn" href="/gallery.html" data-profile-module="gallery">🖼️ Galería</a>
+        <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 Deseos públicos</a>
       <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
-        <a class="topbar-btn" href="/my-fulfilled-whises.html">✅ Deseos cumplidos</a>
+        <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ Deseos cumplidos</a>
       </div>
 
       <div class="feed-topbar-zone feed-topbar-right">
@@ -2144,11 +2258,11 @@
             <span class="topbar-menu-label">Menú</span>
           </summary>
           <div class="dropdown-menu" role="menu">
-            <a href="/home_user.html" role="menuitem">Mi Home</a>
-            <a href="/achievements.html" role="menuitem">Logros recientes</a>
-            <a href="/gallery.html" role="menuitem">Galería</a>
-            <a href="/calendar.html" role="menuitem">Calendario</a>
-            <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+            <a href="/home_user.html" role="menuitem" data-profile-module="home">Mi Home</a>
+            <a href="/achievements.html" role="menuitem" data-profile-module="achievements">Logros recientes</a>
+            <a href="/gallery.html" role="menuitem" data-profile-module="gallery">Galería</a>
+            <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
+            <a href="/my-biography.html" role="menuitem" data-profile-module="biography">Mi Biografía</a>
           <a href="/messages.html" role="menuitem">Mensajes</a>
           </div>
         </details>
@@ -2196,17 +2310,17 @@
       <div class="biography-body">
       <!-- NAV (YA LO TIENES IGUAL) -->
       <nav class="profile-nav" aria-label="Navegación de perfil">
-        <a class="nav-pill" href="/home_user.html" title="Home">Home</a>
-        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+        <a class="nav-pill" href="/home_user.html" title="Home" data-profile-module="home">Home</a>
+        <a class="nav-pill" href="/star-pool-found.html" title="Estrellas" data-profile-module="stars">
           <span class="nav-icon">⭐</span>
           <span><strong id="biographyStarsTotal">0</strong> estrellas</span>
         </a>
 
-        <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-        <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-        <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
-        <a class="nav-pill" href="/calendar.html" title="Calendario">Calendario</a>
-        <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
+        <a class="nav-pill" href="/followers.html" title="Seguidores" data-profile-module="followers">Seguidores</a>
+        <a class="nav-pill" href="/achievements.html" title="Logros recientes" data-profile-module="achievements">Logros recientes</a>
+        <a class="nav-pill" href="/gallery.html" title="Galería" data-profile-module="gallery">Galería</a>
+        <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
+        <a class="nav-pill" href="/my-biography.html" title="Mi biografía" data-profile-module="biography">Mi biografía</a>
         <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
       </nav>
       <!-- ======= CUERPO (3 columnas) ======= -->

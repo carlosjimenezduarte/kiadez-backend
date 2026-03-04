@@ -565,12 +565,16 @@
   $: daySummaryIsClosed = Boolean(daySummaryData?.is_day_closed);
 
   onMount(() => {
-    initPurposeCoverModule();
+    let cleanupPurposeCover = () => {};
     void syncProfileStarsTotal("calendarStarsTotal");
 
     (async () => {
       try {
         await resolveProfileContext();
+        cleanupPurposeCover = initPurposeCoverModule({
+          isOwnProfile: isViewingOwnProfile,
+          profileUserId: activeProfileUserId,
+        });
       } catch (error) {
         console.error(error);
         calendarLoadError = error?.message || "No se pudo resolver el perfil.";
@@ -586,6 +590,7 @@
     window.addEventListener("keydown", onKeyDown);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
+      cleanupPurposeCover?.();
     };
   });
 </script>

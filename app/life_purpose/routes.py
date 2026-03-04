@@ -12,6 +12,7 @@ from app.db.models.life_purpose import LifePurpose
 from app.db.models.media import Media
 from app.db.models.private_personal_wish import PrivatePersonalWish, PrivatePersonalWishStatus
 from app.db.models.public_personal_wish import PublicPersonalWish, PublicPersonalWishStatus
+from app.db.models.user import User
 from app.life_purpose.schemas import (
     LifePurposeFulfillRequest,
     LifePurposeFulfillResponse,
@@ -46,34 +47,88 @@ def _parse_hex_bytes(value: str | None, *, field: str) -> bytes:
         raise HTTPException(status_code=400, detail=f"{field} inválido (hex).") from exc
 
 
+def _serialize_life_purpose_record(
+    *,
+    record: LifePurpose,
+    include_private_payload: bool,
+) -> dict:
+    ciphertext_hex = None
+    nonce_hex = None
+    if include_private_payload:
+        ciphertext_hex = record.ciphertext.hex() if record.ciphertext else None
+        nonce_hex = record.nonce.hex() if record.nonce else None
+
+    return {
+        "slot_number": record.slot_number,
+        "is_private": record.is_private,
+        "status": record.status,
+        "reveal_at": record.reveal_at,
+        "text_public": record.text_public,
+        "ciphertext_hex": ciphertext_hex,
+        "nonce_hex": nonce_hex,
+        "icon_key": record.icon_key,
+    }
+
+
+def _list_life_purpose_slots(
+    *,
+    db: Session,
+    user_id: int,
+    include_private_payload: bool,
+) -> list[dict]:
+    records = (
+        db.query(LifePurpose)
+        .filter(LifePurpose.user_id == int(user_id))
+        .order_by(LifePurpose.slot_number.asc())
+        .all()
+    )
+    return [
+        _serialize_life_purpose_record(
+            record=record,
+            include_private_payload=include_private_payload,
+        )
+        for record in records
+    ]
+
+
 
 @router.get("/mine", response_model=LifePurposeListResponse)
 def get_my_life_purposes(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    records = (
-        db.query(LifePurpose)
-        .filter(LifePurpose.user_id == current.user_number)
-        .order_by(LifePurpose.slot_number.asc())
-        .all()
+    slots = _list_life_purpose_slots(
+        db=db,
+        user_id=int(current.user_number),
+        include_private_payload=True,
     )
 
-    slots = []
-    for record in records:
-        slots.append(
-            {
-                "slot_number": record.slot_number,
-                "is_private": record.is_private,
-                "status": record.status,
-                "reveal_at": record.reveal_at,
-                "text_public": record.text_public,
-                "ciphertext_hex": record.ciphertext.hex() if record.ciphertext else None,
-                "nonce_hex": record.nonce.hex() if record.nonce else None,
-                "icon_key": record.icon_key,
-            }
-        )
+    return {"slots": slots}
 
+
+@router.get("/user/{user_id}", response_model=LifePurposeListResponse)
+def get_user_life_purposes(
+    user_id: int,
+    current: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = (
+        db.query(User)
+        .filter(User.id == int(user_id), User.is_active.is_(True))
+        .one_or_none()
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    is_owner = int(user.id) == int(current.user_number)
+    if not is_owner and not bool(user.public_profile_show_cover_purposes):
+        return {"slots": []}
+
+    slots = _list_life_purpose_slots(
+        db=db,
+        user_id=int(user.id),
+        include_private_payload=is_owner,
+    )
     return {"slots": slots}
 
 
