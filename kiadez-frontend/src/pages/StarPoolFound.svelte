@@ -325,6 +325,7 @@
         cleanupPurposeCover = initPurposeCoverModule({
           isOwnProfile: isViewingOwnProfile,
           profileUserId: activeProfileUserId,
+          profileUsername: activeProfileUsername,
         });
       } catch (error) {
         statusError = error?.message || 'No se pudo resolver el perfil.';

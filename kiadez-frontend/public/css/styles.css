@@ -1466,6 +1466,14 @@ body {
     background: rgba(255, 255, 255, 0.95);
 }
 
+.profile-visit-note-pill {
+    pointer-events: none;
+    background: rgba(255, 248, 228, 0.95);
+    border-color: rgba(184, 137, 0, 0.45);
+    color: #7a5800;
+    font-style: italic;
+}
+
 .profile-nav .nav-pill.is-active,
 .home-user-page .profile-nav .nav-pill[href^="/home_user.html"],
 .star-pool-background .profile-nav .nav-pill[href^="/star-pool-found.html"],

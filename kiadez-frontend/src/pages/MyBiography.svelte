@@ -2122,6 +2122,7 @@
       cleanupPurposeCover = initPurposeCoverModule({
         isOwnProfile: isViewingOwnProfile,
         profileUserId: activeProfileUserId,
+        profileUsername: activeProfileUsername,
       });
 
       if (isViewingOwnProfile) {

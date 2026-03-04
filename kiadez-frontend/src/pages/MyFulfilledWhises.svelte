@@ -460,6 +460,7 @@
         cleanupPurposeCover = initPurposeCoverModule({
           isOwnProfile: isViewingOwnProfile,
           profileUserId: activeProfileUserId,
+          profileUsername: activeProfileUsername,
         });
       } catch (error) {
         console.error(error);

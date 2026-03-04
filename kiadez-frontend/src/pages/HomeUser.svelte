@@ -2997,7 +2997,8 @@
         await resolveProfileContext();
         cleanupPurposeCover = initPurposeCoverModule({
           isOwnProfile: isViewingOwnProfile,
-          profileUserId: activeProfileUserId
+          profileUserId: activeProfileUserId,
+          profileUsername: activeProfileUsername,
         });
       } catch (error) {
         console.error(error);

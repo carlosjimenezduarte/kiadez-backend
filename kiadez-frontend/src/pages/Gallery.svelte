@@ -1139,6 +1139,7 @@
         cleanupPurposeCover = initPurposeCoverModule({
           isOwnProfile: isViewingOwnProfile,
           profileUserId: activeProfileUserId,
+          profileUsername: activeProfileUsername,
         });
         if (isViewingOwnProfile) {
           const stars = await syncProfileStarsTotal("galleryStarsTotal");

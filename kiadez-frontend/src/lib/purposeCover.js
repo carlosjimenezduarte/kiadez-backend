@@ -11,6 +11,19 @@ const PURPOSE_SECRET_TEXT = "Deseo marcado como secreto";
 const PURPOSE_UNDEFINED_TEXT = "Deseo de propósito sin definir";
 const PURPOSE_REVEAL_PREFIX = "Este deseo será revelado";
 const COVER_DEFAULT_IMAGE = "/assets/cover-default.jpg";
+const PROFILE_NAV_PATHS = new Set([
+  "/home_user.html",
+  "/star-pool-found.html",
+  "/followers.html",
+  "/achievements.html",
+  "/gallery.html",
+  "/calendar.html",
+  "/my-biography.html",
+  "/oracle.html",
+  "/my-public-whishes.html",
+  "/my-fulfilled-whises.html",
+]);
+const VISITING_PROFILE_NOTE_CLASS = "profile-visit-note-pill";
 
 const DEFAULT_PURPOSE_TEXT = {
   1: "Deseo #1: Secreto",
@@ -27,6 +40,160 @@ const parsePositiveId = (value) => {
   const normalized = Number(value);
   if (!Number.isFinite(normalized) || normalized <= 0) return null;
   return Math.trunc(normalized);
+};
+
+const normalizeUsername = (value) => {
+  let normalized = String(value || "").trim().toLowerCase();
+  while (normalized.startsWith("@")) normalized = normalized.slice(1);
+  return normalized;
+};
+
+const normalizePathname = (value) => {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "/";
+  return normalized.endsWith("/") && normalized !== "/" ? normalized.slice(0, -1) : normalized;
+};
+
+const getProfileContextFromQuery = () => {
+  try {
+    const search = new URLSearchParams(window.location.search);
+    const username = normalizeUsername(search.get("u") || "");
+    if (username) return { key: "u", value: username };
+    const userId = parsePositiveId(search.get("id"));
+    if (userId) return { key: "id", value: String(userId) };
+  } catch {
+    // no-op
+  }
+  return null;
+};
+
+const resolveProfileContext = ({ isOwnProfile, profileUserId, profileUsername }) => {
+  const normalizedUsername = normalizeUsername(profileUsername || "");
+  const normalizedUserId = parsePositiveId(profileUserId);
+  if (!isOwnProfile) {
+    if (normalizedUsername) return { key: "u", value: normalizedUsername };
+    if (normalizedUserId) return { key: "id", value: String(normalizedUserId) };
+  }
+  return getProfileContextFromQuery();
+};
+
+const isMessagesHref = (href) => {
+  try {
+    const url = new URL(String(href || ""), window.location.origin);
+    return normalizePathname(url.pathname) === "/messages.html";
+  } catch {
+    return false;
+  }
+};
+
+const applyProfileContextToLinks = (context) => {
+  document.querySelectorAll('a[href]').forEach((link) => {
+    const rawHref = String(link.getAttribute("href") || "").trim();
+    if (!rawHref || rawHref.startsWith("#")) return;
+    if (rawHref.startsWith("mailto:") || rawHref.startsWith("tel:")) return;
+    try {
+      const url = new URL(rawHref, window.location.origin);
+      if (url.origin !== window.location.origin) return;
+      const pathname = normalizePathname(url.pathname);
+      if (!PROFILE_NAV_PATHS.has(pathname)) return;
+      url.searchParams.delete("u");
+      url.searchParams.delete("id");
+      if (context) {
+        url.searchParams.set(context.key, context.value);
+      }
+      const nextHref = `${url.pathname}${url.search}${url.hash}`;
+      if (nextHref !== rawHref) {
+        link.setAttribute("href", nextHref);
+      }
+    } catch {
+      // ignore malformed link values
+    }
+  });
+};
+
+const applyVisitorMessagesUi = ({ isOwnProfile, context }) => {
+  const visitorHandle = context
+    ? (context.key === "u" ? `@${context.value}` : `@id${context.value}`)
+    : "@usuario";
+  const noteText = `Estas visitando el perfil de ${visitorHandle}`;
+
+  const navBars = document.querySelectorAll(".profile-nav");
+  navBars.forEach((nav) => {
+    const messageLinks = Array.from(nav.querySelectorAll("a[href]")).filter((link) =>
+      isMessagesHref(link.getAttribute("href"))
+    );
+    const existingNote = nav.querySelector(`.${VISITING_PROFILE_NOTE_CLASS}`);
+    if (isOwnProfile) {
+      messageLinks.forEach((link) => link.classList.remove("hidden"));
+      existingNote?.remove();
+      return;
+    }
+
+    messageLinks.forEach((link) => link.classList.add("hidden"));
+    if (!existingNote) {
+      const noteEl = document.createElement("span");
+      noteEl.className = `nav-pill ${VISITING_PROFILE_NOTE_CLASS}`;
+      noteEl.textContent = noteText;
+      if (messageLinks.length > 0) {
+        messageLinks[messageLinks.length - 1].insertAdjacentElement("afterend", noteEl);
+      } else {
+        nav.appendChild(noteEl);
+      }
+      return;
+    }
+    existingNote.textContent = noteText;
+  });
+
+  document.querySelectorAll(".dropdown-menu a[href]").forEach((link) => {
+    if (!isMessagesHref(link.getAttribute("href"))) return;
+    if (isOwnProfile) {
+      link.classList.remove("hidden");
+    } else {
+      link.classList.add("hidden");
+    }
+  });
+};
+
+const initProfileContextNavigationGuard = ({ isOwnProfile, profileUserId, profileUsername }) => {
+  if (typeof window === "undefined" || !document?.body) return () => {};
+  const apply = () => {
+    const context = resolveProfileContext({ isOwnProfile, profileUserId, profileUsername });
+    applyProfileContextToLinks(context);
+    applyVisitorMessagesUi({ isOwnProfile, context });
+  };
+
+  let frameId = 0;
+  const scheduleApply = () => {
+    if (frameId) return;
+    frameId = window.requestAnimationFrame(() => {
+      frameId = 0;
+      apply();
+    });
+  };
+
+  apply();
+  const observer = new MutationObserver(() => {
+    scheduleApply();
+  });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["href"],
+  });
+
+  window.addEventListener("popstate", scheduleApply);
+  window.addEventListener("hashchange", scheduleApply);
+
+  return () => {
+    if (frameId) {
+      window.cancelAnimationFrame(frameId);
+      frameId = 0;
+    }
+    observer.disconnect();
+    window.removeEventListener("popstate", scheduleApply);
+    window.removeEventListener("hashchange", scheduleApply);
+  };
 };
 
 const parseResponseJson = async (response) => {
@@ -1016,11 +1183,22 @@ const ensurePurposeLayout = () => {
 export const initPurposeCoverModule = (options = {}) => {
   const isOwnProfile = options?.isOwnProfile !== false;
   const profileUserId = parsePositiveId(options?.profileUserId);
+  const profileUsername = normalizeUsername(options?.profileUsername || "");
   const isReadOnlyProfile = !isOwnProfile;
+  const cleanupProfileContextGuard = initProfileContextNavigationGuard({
+    isOwnProfile,
+    profileUserId,
+    profileUsername,
+  });
   const cleanupCoverEditor = initCoverEditor({ isOwnProfile, profileUserId });
   ensurePurposeModals();
   const layout = ensurePurposeLayout();
-  if (!layout) return cleanupCoverEditor;
+  if (!layout) {
+    return () => {
+      cleanupProfileContextGuard?.();
+      cleanupCoverEditor?.();
+    };
+  }
 
   const {
     btnEditPurposes,
@@ -2525,6 +2703,7 @@ export const initPurposeCoverModule = (options = {}) => {
   void loadPurposeSlots();
 
   return () => {
+    cleanupProfileContextGuard?.();
     cleanupCoverEditor?.();
   };
 };

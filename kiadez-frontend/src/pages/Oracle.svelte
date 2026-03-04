@@ -235,6 +235,7 @@
     let activeProfileUserId = null;
     let activeProfileUsername = "";
     let activeProfileFullName = "";
+    let profileStarsTotal = 0;
     let oracleUserName = "Usuario Kiadez";
 
     const oracleDeck = document.getElementById("oracleDeck");
@@ -309,6 +310,23 @@
 
     const getAccessToken = () =>
       localStorage.getItem("access_token") || localStorage.getItem("kiadez_access_token") || "";
+
+    const normalizeStarTotal = (value) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric < 0) return 0;
+      return Math.trunc(numeric);
+    };
+
+    const formatStarsTotal = (value) => normalizeStarTotal(value).toLocaleString("es-CO");
+
+    const fetchOwnStarsTotal = async () => {
+      const res = await apiFetch("/posts/me/stats");
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        throw new Error(data.detail || "No se pudo cargar el total de estrellas.");
+      }
+      return normalizeStarTotal(data?.my_received_stars_total || 0);
+    };
 
     const countWords = (text) => {
       const value = String(text || "").trim();
@@ -475,6 +493,11 @@
       home: "/home_user.html",
       public_wishes: "/my-public-whishes.html",
       fulfilled_wishes: "/my-fulfilled-whises.html",
+      followers: "/followers.html",
+      achievements: "/achievements.html",
+      gallery: "/gallery.html",
+      stars: "/star-pool-found.html",
+      biography: "/my-biography.html",
       calendar: "/calendar.html",
       oracle: "/oracle.html",
     };
@@ -541,6 +564,7 @@
       activeProfileUserId = viewerUserId;
       activeProfileUsername = viewerUsername;
       activeProfileFullName = "";
+      profileStarsTotal = 0;
       isViewingOwnProfile = true;
       document.body.dataset.visitor = "false";
 
@@ -556,10 +580,19 @@
           activeProfileUserId = Number(profile?.user_id) || requestedUserId;
           activeProfileUsername = normalizeUsername(profile?.username || requestedUsername);
           activeProfileFullName = String(profile?.full_name || "").trim();
+          profileStarsTotal = normalizeStarTotal(profile?.received_stars_total || 0);
           isViewingOwnProfile = Boolean(viewerUserId && activeProfileUserId === viewerUserId);
           if (!isViewingOwnProfile) {
             applyReadOnlyProfileMode();
           }
+        }
+      }
+
+      if (isViewingOwnProfile) {
+        try {
+          profileStarsTotal = await fetchOwnStarsTotal();
+        } catch {
+          profileStarsTotal = 0;
         }
       }
 
@@ -1382,6 +1415,7 @@
         cleanupPurposeCover = initPurposeCoverModule({
           isOwnProfile: isViewingOwnProfile,
           profileUserId: activeProfileUserId,
+          profileUsername: activeProfileUsername,
         });
       } catch (error) {
         console.error(error);
@@ -1416,7 +1450,7 @@
 
     <div class="feed-topbar-zone feed-topbar-center">
       <a class="topbar-btn" href="/home_user.html" data-profile-module="home">🏠 Home</a>
-      <a class="topbar-btn" href="/gallery.html">🖼️ Galería</a>
+      <a class="topbar-btn" href="/gallery.html" data-profile-module="gallery">🖼️ Galería</a>
       <a class="topbar-btn" href="/my-public-whishes.html" data-profile-module="public_wishes">🌐 Deseos públicos</a>
       <a class="topbar-btn" href="/my-private-whishes.html">🔒 Deseos privados</a>
       <a class="topbar-btn" href="/my-fulfilled-whises.html" data-profile-module="fulfilled_wishes">✅ Deseos cumplidos</a>
@@ -1445,10 +1479,10 @@
         </summary>
         <div class="dropdown-menu" role="menu">
           <a href="/home_user.html" role="menuitem" data-my-home>Mi Home</a>
-          <a href="/achievements.html" role="menuitem">Logros recientes</a>
-          <a href="/gallery.html" role="menuitem">Galería</a>
+          <a href="/achievements.html" role="menuitem" data-profile-module="achievements">Logros recientes</a>
+          <a href="/gallery.html" role="menuitem" data-profile-module="gallery">Galería</a>
           <a href="/calendar.html" role="menuitem" data-profile-module="calendar">Calendario</a>
-          <a href="/my-biography.html" role="menuitem">Mi Biografía</a>
+          <a href="/my-biography.html" role="menuitem" data-profile-module="biography">Mi Biografía</a>
           <a href="/messages.html" role="menuitem">Mensajes</a>
         </div>
       </details>
@@ -1549,15 +1583,15 @@
          *  ========================= -->
         <nav class="profile-nav" aria-label="Navegación de perfil">
           <a class="nav-pill" href="/home_user.html" title="Home" data-profile-module="home">Home</a>
-          <a class="nav-pill" href="/star-pool-found.html" title="Estrellas">
+          <a class="nav-pill" href="/star-pool-found.html" title="Estrellas" data-profile-module="stars">
             <span class="nav-icon">⭐</span>
-            <span><strong>5.000.000</strong> estrellas</span>
+            <span><strong>{formatStarsTotal(profileStarsTotal)}</strong> estrellas</span>
           </a>
-          <a class="nav-pill" href="/followers.html" title="Seguidores">Seguidores</a>
-          <a class="nav-pill" href="/achievements.html" title="Logros recientes">Logros recientes</a>
-          <a class="nav-pill" href="/gallery.html" title="Galería">Galería</a>
+          <a class="nav-pill" href="/followers.html" title="Seguidores" data-profile-module="followers">Seguidores</a>
+          <a class="nav-pill" href="/achievements.html" title="Logros recientes" data-profile-module="achievements">Logros recientes</a>
+          <a class="nav-pill" href="/gallery.html" title="Galería" data-profile-module="gallery">Galería</a>
           <a class="nav-pill" href="/calendar.html" title="Calendario" data-profile-module="calendar">Calendario</a>
-          <a class="nav-pill" href="/my-biography.html" title="Mi biografía">Mi biografía</a>
+          <a class="nav-pill" href="/my-biography.html" title="Mi biografía" data-profile-module="biography">Mi biografía</a>
         <a class="nav-pill" href="/messages.html" title="Mensajes">Mensajes</a>
         </nav>
 
