@@ -39,14 +39,25 @@ class Settings(BaseSettings):
     # 🧪 Dev tools
     APP_ENV: str = "dev"
 
+    # 📧 Email provider
+    EMAIL_PROVIDER: str = "smtp"  # smtp | mailgun
+    EMAIL_SEND_TIMEOUT_SECONDS: int = 20
+
     # 📧 SMTP
-    SMTP_HOST: str
-    SMTP_PORT: int
-    SMTP_USER: str
-    SMTP_PASSWORD: str
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int | None = None
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
     SMTP_FROM: str = "noreply@kiadez.com"
     SMTP_USE_SSL: bool = True
     SMTP_USE_TLS: bool = False
+
+    # 📧 Mailgun
+    MAILGUN_API_BASE_URL: str = "https://api.mailgun.net/v3"
+    MAILGUN_DOMAIN: str = "kiadez.com"
+    MAILGUN_API_KEY: str | None = None
+    MAILGUN_FROM: str = "Kiadez <noreply@kiadez.com>"
+
     SUPPORT_EMAIL: str = "info@kiadez.com"
 
     # 🔑 Password reset
@@ -91,6 +102,42 @@ class Settings(BaseSettings):
                     "Missing required S3 settings for production: "
                     + ", ".join(missing)
                 )
+        return self
+
+    @model_validator(mode="after")
+    def validate_email_settings(self):
+        provider = (self.EMAIL_PROVIDER or "smtp").strip().lower()
+        if provider not in {"smtp", "mailgun"}:
+            raise ValueError("EMAIL_PROVIDER must be either 'smtp' or 'mailgun'.")
+
+        if self.EMAIL_SEND_TIMEOUT_SECONDS <= 0:
+            raise ValueError("EMAIL_SEND_TIMEOUT_SECONDS must be a positive integer.")
+
+        if provider == "smtp":
+            required = {
+                "SMTP_HOST": self.SMTP_HOST,
+                "SMTP_PORT": self.SMTP_PORT,
+                "SMTP_USER": self.SMTP_USER,
+                "SMTP_PASSWORD": self.SMTP_PASSWORD,
+            }
+            missing = [key for key, value in required.items() if not value]
+            if missing:
+                raise ValueError(
+                    "Missing required SMTP settings for EMAIL_PROVIDER=smtp: "
+                    + ", ".join(missing)
+                )
+        else:
+            required = {
+                "MAILGUN_API_KEY": self.MAILGUN_API_KEY,
+                "MAILGUN_DOMAIN": self.MAILGUN_DOMAIN,
+            }
+            missing = [key for key, value in required.items() if not value]
+            if missing:
+                raise ValueError(
+                    "Missing required Mailgun settings for EMAIL_PROVIDER=mailgun: "
+                    + ", ".join(missing)
+                )
+
         return self
 
 settings = Settings()

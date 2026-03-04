@@ -362,6 +362,7 @@
           <h4>Sobre nuestra red social</h4>
           <ul>
             <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
+            <li><a href="/downloadapp.html">Descarga la app</a></li>
             <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
             <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
             <li><a href="/contact.html">Contacto</a></li>
@@ -372,8 +373,6 @@
           <h4>Idiomas</h4>
           <ul>
             <li><a href="/?lang=es">Español</a></li>
-            <li><a href="/?lang=en">English</a></li>
-            <li><a href="/?lang=fr">Français</a></li>
             <li><a href="/?lang=pt">Português</a></li>
           </ul>
         </div>

@@ -1,6 +1,8 @@
 <script>
   import { onMount } from "svelte";
+  import GuardianMessagingCenter from "../lib/GuardianMessagingCenter.svelte";
   import { logout } from "../lib/logout";
+  import { showUiAlert } from "../lib/uiFeedback";
 
   const API = "http://127.0.0.1:8000";
   const GUARDIAN_REQUIRED_RANK = 3;
@@ -676,7 +678,7 @@
       if (!res.ok) {
         throw new Error(data.detail || "No se pudo enviar el mensaje.");
       }
-      window.alert(`Mensaje enviado a ${data?.recipient_handle || ownerMessageToHandle}.`);
+      showUiAlert(`Mensaje enviado a ${data?.recipient_handle || ownerMessageToHandle}.`, { type: "success" });
       closeOwnerMessageModal();
     } catch (err) {
       actionError = err?.message || "No se pudo enviar el mensaje.";
@@ -1571,9 +1573,7 @@
                 {/if}
               </section>
             {:else if activeModuleKey === "messaging"}
-              <div class="guardian-center-empty">
-                Aquí aparecerán conversaciones y coordinación entre Guardianes y usuarios.
-              </div>
+              <GuardianMessagingCenter />
             {/if}
           </section>
         {/if}
@@ -1679,7 +1679,7 @@
       if (event.target === event.currentTarget && !actionLoading) closeOwnerMessageModal();
     }}
   >
-    <div class="modal wish-modal guardian-center-modal guardian-center-mail-modal" role="dialog" aria-modal="true" aria-label="Mensaje al dueño del deseo">
+    <div class="modal wish-modal guardian-center-modal guardian-center-mail-modal guardian-center-owner-mail-modal" role="dialog" aria-modal="true" aria-label="Mensaje al dueño del deseo">
       <div class="modal-head guardian-center-modal-head">
         <h3>Mensaje al dueño del deseo</h3>
       </div>
@@ -1997,6 +1997,7 @@
           <h4>Sobre nuestra red social</h4>
           <ul>
             <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
+            <li><a href="/downloadapp.html">Descarga la app</a></li>
             <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
             <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
             <li><a href="/contact.html">Contacto</a></li>
@@ -2007,8 +2008,6 @@
           <h4>Idiomas</h4>
           <ul>
             <li><a href="/?lang=es">Español</a></li>
-            <li><a href="/?lang=en">English</a></li>
-            <li><a href="/?lang=fr">Français</a></li>
           </ul>
         </div>
 

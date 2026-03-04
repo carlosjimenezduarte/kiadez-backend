@@ -1,4 +1,5 @@
 import { clearDekSession, getDekSessionHex, setDekSessionHex } from "./dekSession";
+import { showUiAlert } from "./uiFeedback";
 
 const API = "http://127.0.0.1:8000";
 const AAD_PURPOSE = new TextEncoder().encode("kiadez-life-purpose-v1");
@@ -447,7 +448,7 @@ const initCoverEditor = () => {
       updateCoverTransform(coverOffsetX, coverOffsetY);
       window.dispatchEvent(new CustomEvent("kiadez:cover-photo-updated", { detail: data }));
     } catch (error) {
-      window.alert(error?.message || "No se pudo guardar la portada.");
+      showUiAlert(error?.message || "No se pudo guardar la portada.", { type: "error" });
     } finally {
       coverSaving = false;
       if (coverSaveBtn) coverSaveBtn.disabled = false;
@@ -1636,7 +1637,7 @@ export const initPurposeCoverModule = () => {
     const slotMap = getPurposeSlotMap(purposeSlots);
     const slotData = slotMap.get(slotNumber);
     if (!slotData) {
-      window.alert("Primero define este propósito antes de marcarlo como cumplido.");
+      showUiAlert("Primero define este propósito antes de marcarlo como cumplido.", { type: "error" });
       return;
     }
     if (String(slotData.status || "active") === "fulfilled") return;

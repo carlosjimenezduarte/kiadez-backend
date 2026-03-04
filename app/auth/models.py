@@ -65,6 +65,16 @@ class EmailChangeRequest(BaseModel):
     new_email: EmailStr
 
 
+class ProfileNameOut(BaseModel):
+    first_name: str
+    last_name: str
+
+
+class ProfileNameUpdateRequest(BaseModel):
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+
+
 class AccountClosureReason(str, Enum):
     no_support = "no_support"
     prefer_private_space = "prefer_private_space"

@@ -26,6 +26,7 @@
   import Followers from './pages/Followers.svelte';
   import Gallery from './pages/Gallery.svelte';
   import Contact from './pages/Contact.svelte';
+  import DownloadApp from './pages/DownloadApp.svelte';
   import Terms from './pages/Terms.svelte';
   import Privacy from './pages/Privacy.svelte';
   import MyGameRules from './pages/MyGameRules.svelte';
@@ -90,6 +91,8 @@
     '/gallery.html': Gallery,
     '/contact': Contact,
     '/contact.html': Contact,
+    '/downloadapp': DownloadApp,
+    '/downloadapp.html': DownloadApp,
     '/terms': Terms,
     '/terms.html': Terms,
     '/privacy': Privacy,

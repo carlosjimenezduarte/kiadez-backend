@@ -4,6 +4,7 @@
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { logout } from "../lib/logout";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
+  import { showUiAlert } from "../lib/uiFeedback";
 
   onMount(() => {
     document.body.dataset.visitor = "false";
@@ -1753,13 +1754,13 @@
 
 	      const wishId = parsePositiveId(guardianRequestWishId);
 	      if (!wishId) {
-	        window.alert("No se pudo identificar el deseo. Cierra y vuelve a intentarlo.");
+	        showUiAlert("No se pudo identificar el deseo. Cierra y vuelve a intentarlo.", { type: "error" });
 	        return null;
 	      }
 
 	      const guardianId = parsePositiveId(selectedGuardianUserId);
 	      if (!guardianId) {
-	        window.alert("Aún no hay guardianes disponibles para recibir esta solicitud.");
+	        showUiAlert("Aún no hay guardianes disponibles para recibir esta solicitud.", { type: "error" });
 	        return null;
 	      }
 
@@ -1834,11 +1835,11 @@
 	          throw new Error(data.detail || "No se pudo enviar la solicitud.");
 	        }
 
-	        window.alert("Solicitud enviada. Un Guardián la recibirá en el Centro del Guardián.");
+	        showUiAlert("Solicitud enviada. Un Guardián la recibirá en el Centro del Guardián.", { type: "success" });
 	        closeGuardianContactModalFn();
 	      } catch (error) {
 	        console.error(error);
-	        window.alert(error?.message || "No se pudo enviar la solicitud.");
+	        showUiAlert(error?.message || "No se pudo enviar la solicitud.", { type: "error" });
 	      } finally {
 	        guardianSubmitting = false;
 	        if (guardianSendBtn) {
@@ -2045,7 +2046,7 @@
 
       const frozenBy = parsePositiveId(slot?.dataset?.frozenByUserId);
       if (!viewerUserId || !frozenBy || frozenBy !== viewerUserId) {
-        window.alert("Solo el guardián que congeló este deseo puede marcarlo como cumplido.");
+        showUiAlert("Solo el guardián que congeló este deseo puede marcarlo como cumplido.", { type: "error" });
         closeGuardianFulfillWishModalFn();
         return;
       }
@@ -2080,10 +2081,10 @@
         closeGuardianFulfillWishModalFn();
         await loadPersonalWishesFromApi();
         window.dispatchEvent(new CustomEvent("kiadez:fulfilled-wishes-changed", { detail: { scope: "public" } }));
-        window.alert("Deseo marcado como cumplido.");
+        showUiAlert("Deseo marcado como cumplido.", { type: "success" });
       } catch (error) {
         console.error(error);
-        window.alert(error?.message || "No se pudo marcar el deseo como cumplido.");
+        showUiAlert(error?.message || "No se pudo marcar el deseo como cumplido.", { type: "error" });
       } finally {
         guardianFulfillSubmitting = false;
         if (guardianFulfillSubmit) {
@@ -2121,7 +2122,7 @@
         closeFreezeWishConfirmModalFn();
       } catch (error) {
         console.error(error);
-        window.alert(error?.message || "No se pudo congelar el deseo.");
+        showUiAlert(error?.message || "No se pudo congelar el deseo.", { type: "error" });
       } finally {
         guardianFreezeSubmitting = false;
         if (freezeWishConfirmYes) {
@@ -2169,7 +2170,7 @@
         return true;
       } catch (error) {
         console.error(error);
-        window.alert(error?.message || "No se pudo descongelar el deseo.");
+        showUiAlert(error?.message || "No se pudo descongelar el deseo.", { type: "error" });
         return false;
       } finally {
         guardianFreezeSubmitting = false;
@@ -3060,9 +3061,9 @@
           const updatedWish = await cancelCooperativeParticipationRecord(wishId);
           applyCooperativeWishRecordToSlot(slot, updatedWish);
           closeCooperativeCancelParticipationModal();
-          window.alert("Tu participación fue cancelada.");
+          showUiAlert("Tu participación fue cancelada.", { type: "success" });
         } catch (error) {
-          window.alert(error?.message || "No se pudo cancelar tu participación.");
+          showUiAlert(error?.message || "No se pudo cancelar tu participación.", { type: "error" });
         } finally {
           cooperativeCancelParticipationYes.disabled = false;
           cooperativeCancelParticipationYes.textContent = oldLabel;
@@ -4415,7 +4416,7 @@
           userInput: extraText,
         });
         if (!participationText) {
-          window.alert("Debes describir tu participación.");
+          showUiAlert("Debes describir tu participación.", { type: "error" });
           return;
         }
         try {
@@ -4426,7 +4427,7 @@
           applyCooperativeWishRecordToSlot(sourceSlot, updatedWish);
           closeCooperativeParticipateModalFn();
         } catch (error) {
-          window.alert(error?.message || "No se pudo registrar tu participación.");
+          showUiAlert(error?.message || "No se pudo registrar tu participación.", { type: "error" });
         }
       });
     }
@@ -4646,7 +4647,7 @@
                 await deleteCooperativeWishRecord(wishId);
               } catch (error) {
                 console.error(error);
-                window.alert(error?.message || "No se pudo borrar el deseo cooperativo.");
+                showUiAlert(error?.message || "No se pudo borrar el deseo cooperativo.", { type: "error" });
                 return;
               }
             }
@@ -4658,7 +4659,7 @@
                 await deletePersonalWishRecord(wishId);
               } catch (error) {
                 console.error(error);
-                window.alert(error?.message || "No se pudo borrar el deseo personal.");
+                showUiAlert(error?.message || "No se pudo borrar el deseo personal.", { type: "error" });
                 return;
               }
             }
@@ -4704,9 +4705,9 @@
             activePersonalSlot = null;
             activeCooperativeSlot = findCooperativeEditorSlot();
             if (!activeCooperativeSlot) {
-              window.alert(`Ya alcanzaste el máximo de ${cooperativeMax} deseos cooperativos.`);
-              return;
-            }
+	              showUiAlert(`Ya alcanzaste el máximo de ${cooperativeMax} deseos cooperativos.`, { type: "error" });
+	              return;
+	            }
             openCooperativeWishModal();
           }
           return;
@@ -4802,9 +4803,9 @@
             if (!wishId) return;
             const frozenBy = parsePositiveId(slot.dataset.frozenByUserId);
             if (!viewerUserId || !frozenBy || frozenBy !== viewerUserId) {
-              window.alert("Solo el guardián que congeló este deseo puede descongelarlo.");
-              return;
-            }
+	              showUiAlert("Solo el guardián que congeló este deseo puede descongelarlo.", { type: "error" });
+	              return;
+	            }
             openUnfreezeWishReasonModal(slot);
           } else if (actionBtn.dataset.action === "guardian-fulfill") {
             if (!viewerIsGuardian) return;
@@ -4812,9 +4813,9 @@
             if (!wishId) return;
             const frozenBy = parsePositiveId(slot.dataset.frozenByUserId);
             if (!viewerUserId || !frozenBy || frozenBy !== viewerUserId) {
-              window.alert("Solo el guardián que congeló este deseo puede marcarlo como cumplido.");
-              return;
-            }
+	              showUiAlert("Solo el guardián que congeló este deseo puede marcarlo como cumplido.", { type: "error" });
+	              return;
+	            }
             openGuardianFulfillWishModal(slot);
           } else if (actionBtn.dataset.action === "help-coop") {
             if (!isViewingOwnProfile) {
@@ -5952,6 +5953,7 @@
           <h4>Sobre nuestra red social</h4>
           <ul>
             <li><a href="/what-is-kiadez.html">Qué es Kiadez</a></li>
+            <li><a href="/downloadapp.html">Descarga la app</a></li>
             <li><a href="/guardians-rank.html">Rangos de Guardianes</a></li>
             <li><a href="/be-a-guardian.html">Ser Guardián</a></li>
             <li><a href="/contact.html">Contacto</a></li>
@@ -5962,8 +5964,6 @@
           <h4>Idiomas</h4>
           <ul>
             <li><a href="/?lang=es">Español</a></li>
-            <li><a href="/?lang=en">English</a></li>
-            <li><a href="/?lang=fr">Français</a></li>
           </ul>
         </div>
 

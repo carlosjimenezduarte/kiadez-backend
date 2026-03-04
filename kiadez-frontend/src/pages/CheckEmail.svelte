@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { showUiAlert } from "../lib/uiFeedback";
 
   onMount(() => {
     const API_BASE = "http://127.0.0.1:8000";
@@ -12,7 +13,7 @@
             // Reenviar real (con cooldown)
             resendBtn.addEventListener("click", async () => {
                 if (!email) {
-                    alert("No se encontró el correo en la URL.");
+                    showUiAlert("No se encontró el correo en la URL.", { type: "error" });
                     return;
                 }
     
@@ -28,9 +29,9 @@
                     });
     
                     const data = await res.json();
-                    alert(data.message || "Listo.");
+                    showUiAlert(data.message || "Listo.", { type: "success" });
                 } catch (e) {
-                    alert("No se pudo reenviar. Intenta de nuevo.");
+                    showUiAlert("No se pudo reenviar. Intenta de nuevo.", { type: "error" });
                 } finally {
                     let t = 20;
                     const timer = setInterval(() => {
