@@ -538,7 +538,7 @@ def list_personal_wishes(
         select(PublicPersonalWish)
         .where(PublicPersonalWish.user_id == current.user_number)
         .where(PublicPersonalWish.status == PublicPersonalWishStatus.active)
-        .order_by(PublicPersonalWish.created_at.desc(), PublicPersonalWish.id.desc())
+        .order_by(PublicPersonalWish.created_at.asc(), PublicPersonalWish.id.asc())
     ).scalars().all()
 
     fulfilled_total = db.execute(
@@ -589,7 +589,7 @@ def list_user_personal_wishes(
         select(PublicPersonalWish)
         .where(PublicPersonalWish.user_id == user_id)
         .where(PublicPersonalWish.status == PublicPersonalWishStatus.active)
-        .order_by(PublicPersonalWish.created_at.desc(), PublicPersonalWish.id.desc())
+        .order_by(PublicPersonalWish.created_at.asc(), PublicPersonalWish.id.asc())
     ).scalars().all()
 
     fulfilled_total = db.execute(
@@ -635,7 +635,7 @@ def list_cooperative_wishes(
         )
         .where(PublicCooperativeWish.user_id == current.user_number)
         .where(PublicCooperativeWishFulfillment.id.is_(None))
-        .order_by(PublicCooperativeWish.created_at.desc(), PublicCooperativeWish.id.desc())
+        .order_by(PublicCooperativeWish.created_at.asc(), PublicCooperativeWish.id.asc())
     ).scalars().all()
 
     render_context = _build_cooperative_render_context(
@@ -691,7 +691,7 @@ def list_user_cooperative_wishes(
         )
         .where(PublicCooperativeWish.user_id == user_id)
         .where(PublicCooperativeWishFulfillment.id.is_(None))
-        .order_by(PublicCooperativeWish.created_at.desc(), PublicCooperativeWish.id.desc())
+        .order_by(PublicCooperativeWish.created_at.asc(), PublicCooperativeWish.id.asc())
     ).scalars().all()
 
     render_context = _build_cooperative_render_context(

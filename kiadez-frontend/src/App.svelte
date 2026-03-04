@@ -3,6 +3,7 @@
   import { syncTopbarAvatar } from './lib/topbarAvatar';
   import { initTopbarNotifications } from './lib/topbarNotifications';
   import { initTopbarSearch } from './lib/topbarSearch';
+  import { installAuthSessionInterceptor } from './lib/authSession';
   import Landing from './pages/Landing.svelte';
   import StarPoolFound from './pages/StarPoolFound.svelte';
   import HomeUser from './pages/HomeUser.svelte';
@@ -42,6 +43,8 @@
 
   const path = typeof window !== 'undefined' ? window.location.pathname : '/';
   const route = path.replace(/\/+$/, '') || '/';
+
+  installAuthSessionInterceptor();
 
   const routes = {
     '/': Landing,
