@@ -319,6 +319,12 @@
 
     const formatStarsTotal = (value) => normalizeStarTotal(value).toLocaleString("es-CO");
 
+    const syncOracleStarsTotalLabel = () => {
+      const label = document.getElementById("oracleStarsTotal");
+      if (!label) return;
+      label.textContent = formatStarsTotal(profileStarsTotal);
+    };
+
     const fetchOwnStarsTotal = async () => {
       const res = await apiFetch("/posts/me/stats");
       const data = await parseResponseJson(res);
@@ -597,6 +603,7 @@
       }
 
       oracleUserName = activeProfileFullName || "Este usuario";
+      syncOracleStarsTotalLabel();
       applyOracleHeader();
       setMyHomeLinks(buildViewerHomeUrl());
       syncProfileModuleLinks();
@@ -1585,7 +1592,7 @@
           <a class="nav-pill" href="/home_user.html" title="Home" data-profile-module="home">Home</a>
           <a class="nav-pill" href="/star-pool-found.html" title="Estrellas" data-profile-module="stars">
             <span class="nav-icon">⭐</span>
-            <span><strong>{formatStarsTotal(profileStarsTotal)}</strong> estrellas</span>
+            <span><strong id="oracleStarsTotal">0</strong> estrellas</span>
           </a>
           <a class="nav-pill" href="/followers.html" title="Seguidores" data-profile-module="followers">Seguidores</a>
           <a class="nav-pill" href="/achievements.html" title="Logros recientes" data-profile-module="achievements">Logros recientes</a>
