@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     # 🌐 Backend (para armar links en correos)
-    BACKEND_URL: str = "http://127.0.0.1:8000"
+    BACKEND_URL: str = "http://localhost:8000"
 
 
     # 🔐 2FA
@@ -29,7 +29,6 @@ class Settings(BaseSettings):
     # 🌐 CORS
     CORS_ALLOW_ORIGINS: str = (
         "http://localhost,"
-        "http://127.0.0.1,"
         "http://localhost:5173,"
         "http://localhost:3000,"
         "https://kiadez.com,"

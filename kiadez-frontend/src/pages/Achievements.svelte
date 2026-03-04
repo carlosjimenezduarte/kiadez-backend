@@ -3,7 +3,7 @@
   import { logout } from "../lib/logout";
   import { initPurposeCoverModule } from "../lib/purposeCover";
 
-  const API = "http://127.0.0.1:8000";
+  const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
   let achievementsSyncError = "";
   let weeklySyncError = "";
   let weeklyLoading = true;

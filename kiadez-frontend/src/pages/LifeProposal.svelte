@@ -4,7 +4,7 @@
   import { showUiAlert } from "../lib/uiFeedback";
 
   onMount(() => {
-    const API = "http://127.0.0.1:8000";
+    const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
         const token = localStorage.getItem("access_token") || "";
         if (!token) {
           window.location.href = "/login.html";

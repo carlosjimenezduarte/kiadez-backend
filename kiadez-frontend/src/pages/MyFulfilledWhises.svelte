@@ -4,7 +4,7 @@
   import { syncProfileStarsTotal } from "../lib/starsCounter";
   import { logout } from "../lib/logout";
 
-  const API = "http://127.0.0.1:8000";
+  const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
   const FULFILLED_VISIBLE_SLOTS = 10;
   const PLACEHOLDER_FULFILLED_MESSAGE = "Aquí se publicará tu deseo cuando lo marques como cumplido.";
 

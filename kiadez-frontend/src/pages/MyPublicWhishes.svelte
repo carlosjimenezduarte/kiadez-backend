@@ -417,7 +417,7 @@
     const PURPOSE_SECRET_TEXT = "Deseo marcado como secreto";
     const PURPOSE_REVEAL_PREFIX = "Este deseo será revelado";
     const PURPOSE_STORAGE_VERSION = 2;
-    const API = "http://127.0.0.1:8000";
+    const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
     const AAD_PURPOSE = new TextEncoder().encode("kiadez-life-purpose-v1");
     const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
 

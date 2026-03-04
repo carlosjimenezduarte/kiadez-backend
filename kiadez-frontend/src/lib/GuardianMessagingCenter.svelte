@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
 
-  const API = "http://127.0.0.1:8000";
+  const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
   const GUARDIAN_REQUIRED_RANK = 3;
   const SUBJECT_MAX_LENGTH = 180;
   const BODY_MAX_LENGTH = 10000;

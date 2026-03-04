@@ -133,7 +133,7 @@
     initPurposeCoverModule();
     void syncProfileStarsTotal("privateWishesStarsTotal");
 
-    const API = "http://127.0.0.1:8000";
+    const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
     const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
     const AAD_PRIVATE_WISH = new TextEncoder().encode("kiadez-private-wish-v1");
     const PRIVATE_MEDIA_AAD_PREFIX = "kiadez-private-media-v1:";

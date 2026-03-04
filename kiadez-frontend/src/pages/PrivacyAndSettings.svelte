@@ -2,7 +2,7 @@
   import { onMount, tick } from "svelte";
   import { logout } from "../lib/logout";
 
-  const API = "http://127.0.0.1:8000";
+  const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
   const PASSWORD_MIN_LENGTH = 8;
   const PASSWORD_RE_UPPER = /[A-Z]/;
   const PASSWORD_RE_DIGIT = /[0-9]/;

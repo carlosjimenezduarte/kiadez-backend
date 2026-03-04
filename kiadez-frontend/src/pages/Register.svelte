@@ -3,6 +3,8 @@
   import { showUiAlert } from "../lib/uiFeedback";
 
   onMount(() => {
+    const API_BASE_URL =
+      import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
     const form = document.getElementById("register-form");
     if (!form) return;
 
@@ -110,7 +112,7 @@
       };
     
       try {
-        const response = await fetch("http://127.0.0.1:8000/auth/register", {
+        const response = await fetch(`${API_BASE_URL}/auth/register`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
