@@ -8,7 +8,7 @@
     initPurposeCoverModule();
     void syncProfileStarsTotal("biographyStarsTotal");
 
-    const API = "http://127.0.0.1:8000";
+    const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
     const profilePhoto = document.getElementById("profilePhoto");
     const profilePhotoTrigger = document.getElementById("profilePhotoTrigger");
     const profilePhotoMenu = document.getElementById("profilePhotoMenu");

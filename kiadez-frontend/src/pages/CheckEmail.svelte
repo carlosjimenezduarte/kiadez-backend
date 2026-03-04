@@ -3,7 +3,7 @@
   import { showUiAlert } from "../lib/uiFeedback";
 
   onMount(() => {
-    const API_BASE = "http://127.0.0.1:8000";
+    const API_BASE = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
     
             const params = new URLSearchParams(window.location.search);
             const email = params.get("email") || "";

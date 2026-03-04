@@ -6,7 +6,7 @@
   import { syncTopbarAvatar } from "../lib/topbarAvatar";
   import { showUiConfirm } from "../lib/uiFeedback";
 
-  const API = "http://127.0.0.1:8000";
+  const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
   const RECENT_LIMIT = 20;
   const POSTS_FETCH_LIMIT = 100;
   const SHOW_ALBUMS_PANEL = false;

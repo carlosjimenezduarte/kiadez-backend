@@ -1,7 +1,7 @@
 import { clearDekSession, getDekSessionHex, setDekSessionHex } from "./dekSession";
 import { showUiAlert } from "./uiFeedback";
 
-const API = "http://127.0.0.1:8000";
+const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
 const AAD_PURPOSE = new TextEncoder().encode("kiadez-life-purpose-v1");
 const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
 const AAD_PRIVATE_WISH = new TextEncoder().encode("kiadez-private-wish-v1");

@@ -221,7 +221,7 @@
           }
         ];
 
-    const API = "http://127.0.0.1:8000";
+    const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
     const AAD_VAULT = new TextEncoder().encode("kiadez-vault-v1");
     const ORACLE_AAD_PREFIX = "kiadez-oracle-v1";
     const COOLDOWN_MS = 72 * 60 * 60 * 1000;

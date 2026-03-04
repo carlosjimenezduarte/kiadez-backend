@@ -4,7 +4,7 @@
   import { logout } from "../lib/logout";
   import { showUiAlert } from "../lib/uiFeedback";
 
-  const API = "http://127.0.0.1:8000";
+  const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
   const GUARDIAN_REQUIRED_RANK = 3;
   const GUARDIAN_MAX_RANK = 8;
 

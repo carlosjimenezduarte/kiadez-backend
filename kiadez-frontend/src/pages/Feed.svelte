@@ -4,7 +4,7 @@
   import { syncTopbarAvatar } from "../lib/topbarAvatar";
   import { showUiPrompt } from "../lib/uiFeedback";
 
-  const API = "http://127.0.0.1:8000";
+  const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
   const FEED_LIMIT = 40;
   const ORACLE_BACK_CARD_IMAGE = "/css/oracle/carta.webp";
   const DEFAULT_PROFILE_AVATAR = "/assets/avatar-default.jpg";
