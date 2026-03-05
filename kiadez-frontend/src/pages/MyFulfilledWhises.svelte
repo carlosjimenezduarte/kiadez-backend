@@ -694,7 +694,11 @@
                             </div>
                             {#if item.wish.fulfillment_message}
                               {#if item.wish.fulfilled_by_profile_url}
-                                <a class="wish-fulfilled-grant-bubble" href={item.wish.fulfilled_by_profile_url}>
+                                <a
+                                  class="wish-fulfilled-grant-bubble"
+                                  href={item.wish.fulfilled_by_profile_url}
+                                  data-preserve-profile-target="true"
+                                >
                                   {item.wish.fulfillment_message}
                                 </a>
                               {:else}

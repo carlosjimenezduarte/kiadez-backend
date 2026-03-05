@@ -1790,7 +1790,7 @@
                   </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián</div>
-                    <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres
+                    <div class="badge-desc">Has ascendido al Rango 3 de la Jerarquía de Guardianes: ¡Ahora eres
                       Guardián!</div>
                   </div>
                 </div>
@@ -1802,7 +1802,7 @@
                   </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián Consagrado</div>
-                    <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
+                    <div class="badge-desc">Has ascendido al Rango 4 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
                       Consagrado!</div>
                   </div>
                 </div>
@@ -1814,7 +1814,7 @@
                   </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián Mayor</div>
-                    <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
+                    <div class="badge-desc">Has ascendido al Rango 5 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
                       Mayor!</div>
                   </div>
                 </div>
@@ -1826,7 +1826,7 @@
                   </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián del Logos</div>
-                    <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
+                    <div class="badge-desc">Has ascendido al Rango 6 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
                       del Logos!</div>
                   </div>
                 </div>
@@ -1838,7 +1838,7 @@
                   </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián del Umbral</div>
-                    <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
+                    <div class="badge-desc">Has ascendido al Rango 7 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
                       del Umbral!</div>
                   </div>
                 </div>
@@ -1850,7 +1850,7 @@
                   </button>
                   <div class="badge-body">
                     <div class="badge-name">Guardián de Guardianes</div>
-                    <div class="badge-desc">Has ascendido al Rango 1 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
+                    <div class="badge-desc">Has ascendido al Rango 8 de la Jerarquía de Guardianes: ¡Ahora eres Guardián
                       de Guardianes!</div>
                   </div>
                 </div>

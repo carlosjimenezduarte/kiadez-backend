@@ -86,8 +86,26 @@ const isMessagesHref = (href) => {
   }
 };
 
+const shouldRewriteProfileLink = (link) => {
+  if (!link || link.hasAttribute("data-preserve-profile-target")) return false;
+  if (
+    link.hasAttribute("data-profile-module") ||
+    link.hasAttribute("data-my-home") ||
+    link.hasAttribute("data-my-home-link") ||
+    link.hasAttribute("data-profile-link")
+  ) {
+    return true;
+  }
+  return Boolean(
+    link.closest(".feed-topbar") ||
+    link.closest(".profile-nav") ||
+    link.closest(".dropdown-menu")
+  );
+};
+
 const applyProfileContextToLinks = (context) => {
   document.querySelectorAll('a[href]').forEach((link) => {
+    if (!shouldRewriteProfileLink(link)) return;
     const rawHref = String(link.getAttribute("href") || "").trim();
     if (!rawHref || rawHref.startsWith("#")) return;
     if (rawHref.startsWith("mailto:") || rawHref.startsWith("tel:")) return;
