@@ -3418,12 +3418,24 @@
       return button;
     };
 
-    const createVisitorIcon = () => {
+    const MONETARY_WISH_HINT =
+      "Deseos relacionados exclusivamente con metas económicas personales. No pueden ser concedidos por otras personas y funcionan como objetivos de ahorro, disciplina y logro individual. Solo el propio usuario puede cumplirlos.";
+    const isMonetaryWishType = (value) => String(value || "").trim().toLowerCase() === "monetario";
+
+    const createVisitorIcon = ({ disabled = false, disabledMessage = "" } = {}) => {
       const icon = document.createElement("div");
       icon.className = "wish-icon-btn wish-icon-static";
-      icon.dataset.action = "ican";
-      icon.setAttribute("aria-label", "Yo puedo cumplir ese deseo");
-      icon.title = "Yo puedo cumplir ese deseo";
+      if (disabled) {
+        icon.classList.add("wish-icon-disabled", "wish-icon-disabled-tooltip");
+        icon.setAttribute("aria-disabled", "true");
+      } else {
+        icon.dataset.action = "ican";
+      }
+      const iconLabel = disabled && disabledMessage
+        ? disabledMessage
+        : "Yo puedo cumplir ese deseo";
+      icon.setAttribute("aria-label", iconLabel);
+      icon.title = iconLabel;
       const img = document.createElement("img");
       img.src = "/css/icons/iconican.webp";
       img.alt = "Yo puedo cumplir ese deseo";
@@ -3555,7 +3567,12 @@
       actions.className = "wish-slot-actions wish-slot-actions-inline";
       const canUseGuardianActions = Boolean(viewerIsGuardian && wishId);
       if (!isViewingOwnProfile) {
-        actions.appendChild(createVisitorIcon());
+        actions.appendChild(
+          createVisitorIcon({
+            disabled: isMonetaryWishType(selectedType),
+            disabledMessage: MONETARY_WISH_HINT
+          })
+        );
       }
       if (isViewingOwnProfile) {
         actions.appendChild(createWishActionBtn("/css/icons/iconedit.webp", "Editar deseo", "edit"));
@@ -4203,7 +4220,7 @@
     const personalTypeHintMap = {
       "Espiritual": "Deseos relacionados con el sentido de vida, la conciencia, la fe, la paz interior y el crecimiento espiritual. Ejemplo: perseverar en el hábito de la meditación, leer libros sobre espiritualidad, asistir a misa.",
       "Material": "Deseos vinculados a bienes, objetos o condiciones tangibles que mejoran la calidad de vida. Pueden involucrar recursos externos y, en algunos casos, la ayuda o participación de otras personas. Ejemplo: tener una cafetera nueva, un nuevo auto, una nueva computadora.",
-      "Monetario": "Deseos relacionados exclusivamente con metas económicas personales. No pueden ser concedidos por otras personas y funcionan como objetivos de ahorro, disciplina y logro individual. Solo el propio usuario puede cumplirlos.",
+      "Monetario": MONETARY_WISH_HINT,
       "Profesional": "Deseos asociados al desarrollo laboral, académico o creativo. Incluyen proyectos, estudios, reconocimiento, impacto profesional y crecimiento en la vocación personal. Ejemplo: estudiar arquitectura y graduarme de la Universidad Politécnico de Milán.",
       "Salud y cuerpo": "Deseos enfocados en el bienestar físico, la energía vital, la recuperación y la relación consciente con el cuerpo. No sustituyen atención médica ni tratamientos profesionales. Ejemplo: mantener la disciplina de ejercitar tu cuerpo a diario, correr 1 km diario, alimentarte bien.",
       "Relacional": "Deseos relacionados con vínculos humanos: familia, pareja, amistades y comunidad. Incluyen encuentros, reconciliaciones, fortalecimiento de relaciones y construcción de lazos significativos. Ejemplo: tomarse una cerveza con Lars Ulrich, ir a un concierto con tu hermano, disfrutar de un día en familia en el Restaurante La Matriarca.",

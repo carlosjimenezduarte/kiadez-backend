@@ -269,9 +269,13 @@ body {
 
 .footer-columns {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 36px;
     margin-bottom: 12px;
+}
+
+.footer-column {
+    min-width: 0;
 }
 
 .footer-column h4 {
@@ -366,4 +370,39 @@ body {
     margin-top: 12px;
     font-size: 0.9rem;
     font-size: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    .hero {
+        flex-direction: column;
+    }
+
+    .hero-right {
+        display: none;
+    }
+
+    .kiadez-footer {
+        padding: 20px 20px 14px;
+    }
+
+    .footer-main {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .footer-columns {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px 14px;
+    }
+}
+
+@media (max-width: 560px) {
+    .kiadez-footer {
+        padding: 18px 16px 12px;
+    }
+
+    .footer-columns {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
 }

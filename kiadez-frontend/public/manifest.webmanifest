@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "Kiadez",
+  "short_name": "Kiadez",
+  "description": "Una red social para cumplir deseos.",
+  "lang": "es-CO",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#0b5f2a",
+  "background_color": "#0b5f2a",
+  "icons": [
+    {
+      "src": "/logo-kiadez.png",
+      "sizes": "800x800",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "800x800",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
