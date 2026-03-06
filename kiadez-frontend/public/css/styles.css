@@ -11397,9 +11397,87 @@ body[data-visitor="true"] .visitor-only {
     }
 }
 
+@media (max-width: 760px) {
+    .cover-media {
+        height: 360px;
+    }
+
+    .cover-actions,
+    .cover-actions.cover-actions-purpose,
+    .public-wishes-background .cover-actions {
+        top: 12px;
+        left: 12px;
+        right: auto;
+        align-items: flex-start;
+        gap: 6px;
+        max-width: calc(100% - 24px);
+    }
+
+    .cover-actions .icon-btn,
+    .cover-actions.cover-actions-purpose .cover-purpose-btn,
+    .public-wishes-background .cover-purpose-btn {
+        min-width: 0;
+        max-width: min(220px, 58vw);
+        padding: 8px 12px;
+        font-size: 0.78rem;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .purpose-top,
+    .public-wishes-background .purpose-triangle .purpose-top {
+        top: 28%;
+        max-width: min(300px, 66vw);
+    }
+
+    .feed-topbar-right .topbar-dropdown,
+    .feed-topbar-right .topbar-notifications {
+        position: static;
+    }
+
+    .feed-topbar-right .dropdown-menu,
+    .feed-topbar-right .topbar-notifications-panel {
+        left: 50%;
+        right: auto;
+        width: min(340px, calc(100vw - 18px));
+        max-width: calc(100vw - 18px);
+        min-width: 0;
+        z-index: 120;
+    }
+
+    .feed-topbar-right .dropdown-menu {
+        position: fixed;
+        top: calc(env(safe-area-inset-top) + 118px);
+        max-height: min(58vh, 360px);
+        overflow-y: auto;
+        transform: translateX(-50%) translateY(-6px);
+    }
+
+    .feed-topbar-right .topbar-dropdown[open] .dropdown-menu {
+        transform: translateX(-50%) translateY(0);
+    }
+
+    .feed-topbar-right .topbar-notifications-panel {
+        position: fixed;
+        top: calc(env(safe-area-inset-top) + 118px);
+        transform: translateX(-50%);
+        max-height: min(68vh, 520px);
+    }
+
+    .feed-topbar-right .topbar-notifications-list {
+        max-height: min(50vh, 360px);
+    }
+}
+
 @media (max-width: 640px) {
     .feed-background .user-home {
         padding: 12px 3vw 4vh;
+    }
+
+    .cover-media {
+        height: 340px;
     }
 
     .topbar-logo img {
@@ -11421,6 +11499,20 @@ body[data-visitor="true"] .visitor-only {
     .topbar-avatar-btn {
         width: 34px;
         height: 34px;
+    }
+
+    .cover-actions .icon-btn,
+    .cover-actions.cover-actions-purpose .cover-purpose-btn,
+    .public-wishes-background .cover-purpose-btn {
+        max-width: min(200px, 60vw);
+        padding: 7px 10px;
+        font-size: 0.74rem;
+    }
+
+    .purpose-top,
+    .public-wishes-background .purpose-triangle .purpose-top {
+        top: 30%;
+        max-width: min(280px, 70vw);
     }
 
     .home-body,

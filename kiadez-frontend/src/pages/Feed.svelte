@@ -1751,8 +1751,6 @@
               <li><a href="/gallery.html">Galería</a></li>
               <li><a href="/calendar.html">Calendario</a></li>
               <li><a href="/my-biography.html">Mi Biografía</a></li>
-              <li><a href="/messages.html">Mensajería de Guardianes</a></li>
-              <li><a href="/privacy-and-settings.html">Notificaciones</a></li>
             </ul>
           </article>
 
