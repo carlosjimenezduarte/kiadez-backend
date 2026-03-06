@@ -47,6 +47,28 @@ npm run cap:open:android
 - `Build > Build Bundle(s) / APK(s) > Build APK(s)`.
 - Instala la APK en el teléfono.
 
+## Icono de la app (launcher Android)
+
+El icono del APK instalado no sale del `manifest.webmanifest` web; sale de recursos nativos Android (`mipmap-*`).
+
+Para regenerarlo desde el logo actual del proyecto (`public/logo-kiadez.png`):
+
+```bash
+npm run android:icon
+```
+
+Luego compila de nuevo:
+
+```bash
+npm run android:apk:debug
+```
+
+Si quieres usar otra imagen, pásala como argumento:
+
+```bash
+bash scripts/android-icons.sh /ruta/a/tu/icono.png
+```
+
 ## Modo producción web pura (wrapper a kiadez.com)
 
 Este proyecto está configurado para abrir directamente `https://kiadez.com` dentro de la app nativa:

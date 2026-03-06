@@ -11147,3 +11147,330 @@ body[data-visitor="true"] .visitor-only {
         grid-template-columns: 1fr;
     }
 }
+
+/* =========================
+ *  MOBILE RESPONSIVE HARDENING (PWA / APK WRAPPER)
+ *  ========================= */
+
+@media (max-width: 980px) {
+    html,
+    body {
+        overflow-x: hidden;
+    }
+
+    .user-home {
+        width: min(100%, 96vw);
+        margin: 2vh auto 5vh;
+    }
+
+    .feed-background .user-home {
+        padding: 14px 3.5vw 5vh;
+    }
+
+    .feed-topbar {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        height: auto;
+        padding: max(8px, env(safe-area-inset-top)) 3.5vw 10px;
+    }
+
+    .feed-topbar-zone {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .feed-topbar-left,
+    .feed-topbar-right {
+        justify-content: center;
+    }
+
+    .feed-topbar-center {
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        padding-bottom: 2px;
+        gap: 6px;
+    }
+
+    .feed-topbar-center>* {
+        flex: 0 0 auto;
+    }
+
+    .topbar-search {
+        width: min(100%, 560px);
+    }
+
+    .topbar-search input {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .topbar-btn {
+        min-width: 0;
+        height: 38px;
+        padding: 0 10px;
+        font-size: 0.88rem;
+        white-space: nowrap;
+        border-radius: 999px;
+        gap: 6px;
+    }
+
+    .topbar-btn.is-active::after {
+        left: 8px;
+        right: 8px;
+        bottom: -6px;
+    }
+
+    .topbar-nav-icon {
+        width: 28px;
+        height: 28px;
+    }
+
+    .topbar-menu-btn {
+        height: 36px;
+        padding: 0 10px;
+    }
+
+    .topbar-menu-label {
+        font-size: 0.92rem;
+    }
+
+    .topbar-avatar-btn,
+    .topbar-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .dropdown-menu {
+        min-width: min(240px, 90vw);
+        max-width: 90vw;
+    }
+
+    .home-body,
+    .public-wishes-body,
+    .private-wishes-body,
+    .star-pool-body,
+    .oracle-body,
+    .achievements-body,
+    .calendar-body,
+    .biography-body,
+    .messages-page .messages-body,
+    .notifications-page .notifications-body,
+    .gallery-page .gallery-body {
+        border-radius: 18px;
+        padding: 14px 12px 24px;
+        margin-top: 10px;
+    }
+
+    .profile-nav {
+        gap: 8px;
+        margin: 8px 0 14px;
+        justify-content: center;
+    }
+
+    .nav-pill {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+        min-height: 38px;
+        white-space: nowrap;
+        max-width: 100%;
+    }
+
+    .profile-grid {
+        gap: 12px;
+    }
+
+    .panel {
+        border-radius: 18px;
+        padding: 14px;
+    }
+
+    .profile-row {
+        align-items: flex-start;
+    }
+
+    .profile-meta {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .profile-name {
+        margin: 0 0 6px;
+        font-size: 1.15rem;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+
+    .home-username-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .home-username-link {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .home-username-link span {
+        display: block;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .wish-slot {
+        padding: 10px 10px 10px 90px;
+        border-radius: 14px;
+    }
+
+    .wish-slot::before {
+        width: 66px;
+        height: 66px;
+        left: 10px;
+        font-size: 1.2rem;
+    }
+
+    .wish-freeze-overlay {
+        left: 90px;
+        padding: 10px;
+    }
+
+    .wish-add-row {
+        padding-left: 90px;
+    }
+
+    .wish-slot-body {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .wish-slot-left,
+    .wish-slot-right,
+    .wish-slot-description-coop,
+    .wish-security-field {
+        align-items: flex-start;
+        text-align: left;
+    }
+
+    .wish-slot-title {
+        font-size: 1.05rem;
+        text-align: left;
+    }
+
+    .wish-slot-actions-inline {
+        justify-content: flex-start;
+    }
+
+    .wish-slot-category-icon {
+        width: min(150px, 52vw);
+        height: min(150px, 52vw);
+    }
+
+    .wish-icon-btn {
+        width: 74px;
+        height: 74px;
+    }
+
+    .wish-icon-btn img {
+        width: 84px;
+        height: 84px;
+    }
+
+    .wish-lamp-icon {
+        width: 74px;
+        height: 74px;
+    }
+
+    .wish-lamp-btn {
+        width: 68px;
+        height: 68px;
+    }
+
+    .fulfilled-wishes-page .wish-slot-row-fulfilled.has-data {
+        gap: 12px;
+    }
+}
+
+@media (max-width: 640px) {
+    .feed-background .user-home {
+        padding: 12px 3vw 4vh;
+    }
+
+    .topbar-logo img {
+        height: 34px;
+    }
+
+    .topbar-btn {
+        height: 36px;
+        font-size: 0.82rem;
+        padding: 0 8px;
+    }
+
+    .topbar-menu-btn {
+        height: 34px;
+        padding: 0 8px;
+    }
+
+    .topbar-icon,
+    .topbar-avatar-btn {
+        width: 34px;
+        height: 34px;
+    }
+
+    .home-body,
+    .public-wishes-body,
+    .private-wishes-body,
+    .star-pool-body,
+    .oracle-body,
+    .achievements-body,
+    .calendar-body,
+    .biography-body,
+    .messages-page .messages-body,
+    .notifications-page .notifications-body,
+    .gallery-page .gallery-body {
+        border-radius: 16px;
+        padding: 12px 10px 20px;
+    }
+
+    .panel {
+        border-radius: 16px;
+        padding: 12px;
+    }
+
+    .panel-head {
+        flex-wrap: wrap;
+    }
+
+    .wish-slot {
+        padding-left: 76px;
+    }
+
+    .wish-slot::before {
+        width: 54px;
+        height: 54px;
+        left: 8px;
+        font-size: 1.02rem;
+    }
+
+    .wish-freeze-overlay {
+        left: 76px;
+    }
+
+    .wish-add-row {
+        padding-left: 76px;
+    }
+
+    .wish-slot-counter {
+        align-self: flex-start;
+    }
+
+    .fulfilled-wishes-page .wish-slot-fulfilled {
+        padding-right: 10px;
+    }
+}
