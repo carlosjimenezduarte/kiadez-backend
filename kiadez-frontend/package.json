@@ -8,8 +8,10 @@
     "build": "vite build && node scripts/create-route-aliases.mjs",
     "preview": "vite preview",
     "cap:sync": "npx cap sync android",
+    "cap:sync:remote": "npx cap sync android",
     "cap:open:android": "npx cap open android",
     "android:prepare": "npm run build && npm run cap:sync",
+    "android:prepare:remote": "npm run cap:sync:remote",
     "android:apk:debug": "bash scripts/android-gradle.sh assembleDebug",
     "android:apk:release": "bash scripts/android-gradle.sh assembleRelease"
   },

@@ -62,6 +62,20 @@
     }
   };
 
+  const NETWORK_FAILURE_MESSAGE =
+    "No se pudo conectar con el servidor (red, CORS o SSL).";
+
+  const isFetchNetworkError = (error) =>
+    error instanceof TypeError || /failed to fetch/i.test(String(error?.message || ""));
+
+  const logNetworkError = (context, error) => {
+    console.error(`[Landing] ${context}`, {
+      apiBase: API,
+      origin: typeof window !== "undefined" ? window.location.origin : "n/a",
+      error,
+    });
+  };
+
   const checkVault = async (token) => {
     const res = await fetch(`${API}/vault/status`, {
       headers: {
@@ -113,16 +127,22 @@
   };
 
   const login = async (emailValue, passwordValue) => {
-    const res = await fetch(`${API}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: String(emailValue || "").trim(),
-        password: String(passwordValue || ""),
-      }),
-    });
+    let res;
+    try {
+      res = await fetch(`${API}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: String(emailValue || "").trim(),
+          password: String(passwordValue || ""),
+        }),
+      });
+    } catch (error) {
+      logNetworkError("POST /auth/login failed", error);
+      throw new Error(NETWORK_FAILURE_MESSAGE);
+    }
 
     const data = await parseResponseJson(res);
     if (!res.ok) {
@@ -146,14 +166,20 @@
   };
 
   const verify2fa = async (tempToken, code) => {
-    const res = await fetch(`${API}/auth/2fa/verify`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${tempToken}`,
-      },
-      body: JSON.stringify({ code }),
-    });
+    let res;
+    try {
+      res = await fetch(`${API}/auth/2fa/verify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${tempToken}`,
+        },
+        body: JSON.stringify({ code }),
+      });
+    } catch (error) {
+      logNetworkError("POST /auth/2fa/verify failed", error);
+      throw new Error(NETWORK_FAILURE_MESSAGE);
+    }
 
     const data = await parseResponseJson(res);
     if (!res.ok) {
@@ -185,8 +211,13 @@
       closeTwofaModal();
       await continueAfterLogin(token);
     } catch (err) {
-      twofaError = String(err?.message || "Código 2FA incorrecto.");
-      console.error(err);
+      if (isFetchNetworkError(err)) {
+        twofaError = NETWORK_FAILURE_MESSAGE;
+        logNetworkError("2FA confirmation failed", err);
+      } else {
+        twofaError = String(err?.message || "Código 2FA incorrecto.");
+        console.error(err);
+      }
     } finally {
       twofaLoading = false;
     }
@@ -214,12 +245,17 @@
       await continueAfterLogin(result?.access_token);
     } catch (err) {
       const message = String(err?.message || "");
-      if (Number(err?.status) === 401 || /credenciales/i.test(message)) {
+      if (isFetchNetworkError(err)) {
+        authError = NETWORK_FAILURE_MESSAGE;
+        logNetworkError("Login submit failed", err);
+      } else if (Number(err?.status) === 401 || /credenciales/i.test(message)) {
         authError = "Correo electrónico o contraseña inválida";
       } else {
         authError = message || "No se pudo iniciar sesión.";
       }
-      console.error(err);
+      if (!isFetchNetworkError(err)) {
+        console.error(err);
+      }
     } finally {
       loginLoading = false;
     }

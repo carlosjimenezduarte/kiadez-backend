@@ -28,7 +28,12 @@ app = FastAPI(
 )
 
 def _parse_cors_origins(raw: str) -> list[str]:
-    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    # Capacitor Android runs the web app under localhost origin.
+    for required_origin in ("http://localhost", "https://localhost", "capacitor://localhost"):
+        if required_origin not in origins:
+            origins.append(required_origin)
+    return origins
 
 app.add_middleware(
     CORSMiddleware,

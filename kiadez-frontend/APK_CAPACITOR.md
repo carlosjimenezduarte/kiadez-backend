@@ -47,6 +47,20 @@ npm run cap:open:android
 - `Build > Build Bundle(s) / APK(s) > Build APK(s)`.
 - Instala la APK en el teléfono.
 
+## Modo producción web pura (wrapper a kiadez.com)
+
+Este proyecto está configurado para abrir directamente `https://kiadez.com` dentro de la app nativa:
+
+- `capacitor.config.json` usa `server.url = "https://kiadez.com"`.
+- En este modo, la APK no depende del `dist` para renderizar pantallas, sino del sitio en producción.
+
+Flujo recomendado:
+
+```bash
+npm run android:prepare:remote
+npm run android:apk:debug
+```
+
 ## Flujo por terminal (debug APK)
 
 ```bash
