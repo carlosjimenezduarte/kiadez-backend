@@ -1,0 +1,29 @@
+[Unit]
+Description=Kiadez Backend (Gunicorn + Uvicorn worker)
+After=network.target
+
+[Service]
+Type=simple
+User=kiadez
+Group=kiadez
+WorkingDirectory=/srv/kiadez-backend/current
+Environment=PYTHONUNBUFFERED=1
+Environment=APP_ENV=production
+Environment=GUNICORN_BIND=127.0.0.1:8001
+Environment=GUNICORN_WORKERS=3
+Environment=GUNICORN_TIMEOUT=60
+Environment=GUNICORN_KEEPALIVE=5
+Environment=DB_POOL_PRE_PING=true
+Environment=DB_POOL_SIZE=4
+Environment=DB_MAX_OVERFLOW=2
+Environment=DB_POOL_RECYCLE_SECONDS=1800
+Environment=FORWARDED_ALLOW_IPS=127.0.0.1
+ExecStart=/srv/kiadez-backend/current/scripts/run_gunicorn.sh
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGQUIT
+Restart=always
+RestartSec=5
+TimeoutStopSec=45
+
+[Install]
+WantedBy=multi-user.target

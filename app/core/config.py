@@ -19,6 +19,16 @@ class Settings(BaseSettings):
     # 🌐 Backend (para armar links en correos)
     BACKEND_URL: str = "http://localhost:8000"
 
+    # 🗄️ Database
+    DATABASE_URL: str = (
+        "postgresql+psycopg://kiadez_user:Kiadez_DB_Strong_2026!@localhost:5432/kiadez"
+    )
+    DB_ECHO: bool = False
+    DB_POOL_PRE_PING: bool = True
+    DB_POOL_SIZE: int = 4
+    DB_MAX_OVERFLOW: int = 2
+    DB_POOL_TIMEOUT_SECONDS: int = 30
+    DB_POOL_RECYCLE_SECONDS: int = 1800
 
     # 🔐 2FA
     TWO_FA_ENCRYPTION_KEY: str
@@ -137,6 +147,18 @@ class Settings(BaseSettings):
                     + ", ".join(missing)
                 )
 
+        return self
+
+    @model_validator(mode="after")
+    def validate_db_settings(self):
+        if self.DB_POOL_SIZE <= 0:
+            raise ValueError("DB_POOL_SIZE must be a positive integer.")
+        if self.DB_MAX_OVERFLOW < 0:
+            raise ValueError("DB_MAX_OVERFLOW must be zero or a positive integer.")
+        if self.DB_POOL_TIMEOUT_SECONDS <= 0:
+            raise ValueError("DB_POOL_TIMEOUT_SECONDS must be a positive integer.")
+        if self.DB_POOL_RECYCLE_SECONDS < 0:
+            raise ValueError("DB_POOL_RECYCLE_SECONDS must be zero or a positive integer.")
         return self
 
 settings = Settings()
