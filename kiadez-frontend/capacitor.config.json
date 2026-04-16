@@ -1,9 +1,5 @@
 {
   "appId": "com.kiadez.app",
   "appName": "Kiadez",
-  "webDir": "dist",
-  "server": {
-    "url": "https://kiadez.com",
-    "cleartext": false
-  }
+  "webDir": "dist"
 }

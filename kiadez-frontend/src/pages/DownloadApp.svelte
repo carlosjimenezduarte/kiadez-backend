@@ -1,5 +1,5 @@
 <script>
-  const APK_URL = "https://www.kiadez.com/app/KiadezV7.apk";
+  const APK_URL = "https://www.kiadez.com/app/KiadezV8.apk";
 </script>
 
 <svelte:head>

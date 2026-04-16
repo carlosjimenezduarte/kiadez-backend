@@ -48,6 +48,8 @@ pg_dump -Fc -h 127.0.0.1 -U <usuario_db> -d <nombre_db> > /tmp/kiadez-pre-gunico
 
 Ese respaldo es preventivo. Esta migracion no deberia tocar tablas ni registros.
 
+Importante: si tu servicio actual usa `EnvironmentFile`, debes conservar esa linea en el unit file nuevo. No la elimines.
+
 ## Fase 1: instalar dependencias nuevas
 
 En el servidor:
@@ -204,6 +206,7 @@ sudo cp deploy/systemd/kiadez-backend-gunicorn-cutover.service.example /etc/syst
 - `Group`
 - `WorkingDirectory`
 - `ExecStart`
+- `EnvironmentFile`
 
 4. Recarga systemd:
 
@@ -329,3 +332,13 @@ Valores iniciales razonables para tu servidor:
 - `DB_POOL_SIZE=4`
 - `DB_MAX_OVERFLOW=2`
 - `DB_POOL_RECYCLE_SECONDS=1800`
+
+## Nota para servidores con `.venv`
+
+Si tu despliegue usa `.venv` en vez de `venv`, usa:
+
+```bash
+./.venv/bin/pip install -r requirements-production.txt
+```
+
+Los scripts del repo ya intentan detectar ambos nombres.

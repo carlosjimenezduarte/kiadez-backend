@@ -69,20 +69,6 @@ Si quieres usar otra imagen, pásala como argumento:
 bash scripts/android-icons.sh /ruta/a/tu/icono.png
 ```
 
-## Modo producción web pura (wrapper a kiadez.com)
-
-Este proyecto está configurado para abrir directamente `https://kiadez.com` dentro de la app nativa:
-
-- `capacitor.config.json` usa `server.url = "https://kiadez.com"`.
-- En este modo, la APK no depende del `dist` para renderizar pantallas, sino del sitio en producción.
-
-Flujo recomendado:
-
-```bash
-npm run android:prepare:remote
-npm run android:apk:debug
-```
-
 ## Flujo por terminal (debug APK)
 
 ```bash
@@ -99,6 +85,18 @@ La APK queda en:
 - El backend API debe estar accesible desde internet por HTTPS (por ejemplo `https://api.kiadez.com`).
 - CORS del backend debe permitir el origen de Capacitor en Android: `http://localhost`.
 - La app ya usa `VITE_API_BASE_URL` de `.env.production` al hacer `npm run build`.
+- `android:prepare` ahora empaqueta el frontend Svelte local y retira cualquier `.apk` o `.aab` hospedado del `dist` antes del `cap sync`, para que la app Android no arrastre binarios dentro de sí misma.
+
+## Modo wrapper remoto opcional
+
+Si en algún momento quieres una APK que abra directamente `https://kiadez.com` dentro del WebView nativo, puedes usar:
+
+```bash
+npm run android:prepare:remote
+npm run android:apk:debug
+```
+
+Ese flujo escribe temporalmente `server.url = "https://kiadez.com"` en `capacitor.config.json`, ejecuta `cap sync` y luego deja el proyecto otra vez en modo local.
 
 ## Release firmado (producción)
 

@@ -23,6 +23,9 @@
     const postVisibility = document.getElementById('postVisibility');
     const postsList = document.getElementById('homePostsList');
     const postsStatus = document.getElementById('postsStatus');
+    const homeLoadMoreWrap = document.getElementById('homeLoadMoreWrap');
+    const homeLoadMoreBtn = document.getElementById('homeLoadMoreBtn');
+    const homeLoadMoreStatus = document.getElementById('homeLoadMoreStatus');
     const minorProtectedPanel = document.getElementById('minorProtectedPanel');
     const minorProtectedBody = document.getElementById('minorProtectedBody');
     const minorProtectedStateLabel = document.getElementById('minorProtectedStateLabel');
@@ -155,6 +158,10 @@
     let selectedReportPostId = null;
     let selectedReportProfileUserId = null;
     let currentFeedPosts = [];
+    let homeFeedRequestedCount = 0;
+    let homeFeedCanLoadMore = false;
+    let homeFeedBusy = false;
+    let homeFeedLoadingMore = false;
     let profilePhotoMediaId = null;
     let profilePhotoPost = null;
     let profilePhotoPostId = null;
@@ -176,6 +183,7 @@
     let minorProtectedCollapsed = false;
 
     const HOME_ABOUT_MAX_WORDS = 50;
+    const HOME_POSTS_PAGE_SIZE = 30;
     const USERNAME_MIN_LENGTH = 4;
     const USERNAME_MAX_LENGTH = 30;
     const USERNAME_PATTERN = /^[a-z0-9._]{4,30}$/;
@@ -305,6 +313,24 @@
       if (!postsStatus) return;
       postsStatus.textContent = message || '';
       postsStatus.classList.toggle('posts-status-error', Boolean(isError));
+    };
+
+    const setHomeLoadMoreStatus = (message, isError = false) => {
+      if (!homeLoadMoreStatus) return;
+      homeLoadMoreStatus.textContent = message || '';
+      homeLoadMoreStatus.classList.toggle('posts-status-error', Boolean(isError));
+    };
+
+    const syncHomeLoadMoreUi = () => {
+      const hasPosts = Array.isArray(currentFeedPosts) && currentFeedPosts.length > 0;
+      const hasStatus = Boolean(String(homeLoadMoreStatus?.textContent || '').trim());
+      const shouldShowWrap = hasPosts && (homeFeedCanLoadMore || hasStatus);
+      homeLoadMoreWrap?.classList.toggle('hidden', !shouldShowWrap);
+      if (!homeLoadMoreBtn) return;
+      homeLoadMoreBtn.disabled = homeFeedBusy || !homeFeedCanLoadMore;
+      homeLoadMoreBtn.textContent = homeFeedLoadingMore
+        ? 'Cargando publicaciones...'
+        : `Cargar ${HOME_POSTS_PAGE_SIZE} publicaciones más`;
     };
 
     const setMinorAccreditationModalStatus = (message, isError = false) => {
@@ -2007,57 +2033,144 @@
       }
     };
 
-	    const loadFeed = async () => {
-	      try {
-	        const profileId = Number(activeProfileUserId);
-        const endpoint = isViewingOwnProfile
-          ? '/posts/mine?limit=40'
-          : Number.isFinite(profileId) && profileId > 0
-            ? `/posts/user/${encodeURIComponent(String(profileId))}?limit=40`
-            : '/posts/mine?limit=40';
+	    const buildHomeFeedEndpoint = ({ limit = HOME_POSTS_PAGE_SIZE, offset = 0 } = {}) => {
+	      const profileId = Number(activeProfileUserId);
+	      const params = new URLSearchParams();
+	      params.set('limit', String(Math.max(1, Number(limit || HOME_POSTS_PAGE_SIZE))));
+	      params.set('offset', String(Math.max(0, Number(offset || 0))));
+	      if (isViewingOwnProfile) return `/posts/mine?${params.toString()}`;
+	      if (Number.isFinite(profileId) && profileId > 0) {
+	        return `/posts/user/${encodeURIComponent(String(profileId))}?${params.toString()}`;
+	      }
+	      return `/posts/mine?${params.toString()}`;
+	    };
 
-	        const res = await apiFetch(endpoint);
-	        const data = await res.json();
-	        if (!res.ok) {
-	          setPostsStatus(data.detail || 'No se pudo cargar las publicaciones.', true);
-	          return;
+	    const enrichFeedPosts = async (sourcePosts) => {
+	      const uniqueAuthorIds = Array.from(
+	        new Set(
+	          sourcePosts
+	            .map((post) => Number(post?.author?.id || 0))
+	            .filter((id) => Number.isFinite(id) && id > 0)
+	        )
+	      );
+	      const profilesByAuthorId = new Map();
+	      await Promise.all(
+	        uniqueAuthorIds.map(async (authorId) => {
+	          try {
+	            const profile = await fetchFollowProfile({ userId: authorId });
+	            profilesByAuthorId.set(authorId, profile);
+	          } catch {
+	            profilesByAuthorId.set(authorId, null);
+	          }
+	        })
+	      );
+	      return sourcePosts.map((post) => {
+	        const authorId = Number(post?.author?.id || 0);
+	        const profile = profilesByAuthorId.get(authorId);
+	        const authorAvatarUrl = String(profile?.avatar_url || '').trim() || DEFAULT_AVATAR_SRC;
+	        const authorProfileUrl = String(profile?.profile_url || '').trim() || buildAuthorProfileUrl(post?.author);
+	        return {
+	          ...post,
+	          __author_avatar_url: authorAvatarUrl,
+	          __author_profile_url: authorProfileUrl
+	        };
+	      });
+	    };
+
+	    const fetchFeedBatch = async ({ limit = HOME_POSTS_PAGE_SIZE, offset = 0 } = {}) => {
+	      const endpoint = buildHomeFeedEndpoint({ limit, offset });
+	      const res = await apiFetch(endpoint);
+	      const data = await res.json();
+	      if (!res.ok) {
+	        throw new Error(data.detail || 'No se pudo cargar las publicaciones.');
+	      }
+	      const sourcePosts = Array.isArray(data) ? data : [];
+	      return enrichFeedPosts(sourcePosts);
+	    };
+
+	    const applyFeedPosts = (posts) => {
+	      currentFeedPosts = Array.isArray(posts) ? posts : [];
+	      renderPosts(currentFeedPosts);
+	      if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
+	      syncHomeLoadMoreUi();
+	    };
+
+	    const loadFeed = async ({ requestedCount = HOME_POSTS_PAGE_SIZE } = {}) => {
+	      const normalizedRequestedCount = Math.max(
+	        HOME_POSTS_PAGE_SIZE,
+	        Math.ceil(Number(requestedCount || HOME_POSTS_PAGE_SIZE) / HOME_POSTS_PAGE_SIZE) * HOME_POSTS_PAGE_SIZE
+	      );
+	      homeFeedBusy = true;
+	      homeFeedLoadingMore = false;
+	      try {
+	        let pageOffset = 0;
+	        let lastBatchSize = 0;
+	        const aggregatedPosts = [];
+	        while (pageOffset < normalizedRequestedCount) {
+	          const batch = await fetchFeedBatch({ limit: HOME_POSTS_PAGE_SIZE, offset: pageOffset });
+	          aggregatedPosts.push(...batch);
+	          lastBatchSize = batch.length;
+	          if (batch.length < HOME_POSTS_PAGE_SIZE) break;
+	          pageOffset += HOME_POSTS_PAGE_SIZE;
 	        }
-	        const sourcePosts = Array.isArray(data) ? data : [];
-	        const uniqueAuthorIds = Array.from(
-	          new Set(
-	            sourcePosts
-	              .map((post) => Number(post?.author?.id || 0))
-	              .filter((id) => Number.isFinite(id) && id > 0)
-	          )
-	        );
-	        const profilesByAuthorId = new Map();
-	        await Promise.all(
-	          uniqueAuthorIds.map(async (authorId) => {
-	            try {
-	              const profile = await fetchFollowProfile({ userId: authorId });
-	              profilesByAuthorId.set(authorId, profile);
-	            } catch {
-	              profilesByAuthorId.set(authorId, null);
-	            }
-	          })
-	        );
-	        const enrichedPosts = sourcePosts.map((post) => {
-	          const authorId = Number(post?.author?.id || 0);
-	          const profile = profilesByAuthorId.get(authorId);
-	          const authorAvatarUrl = String(profile?.avatar_url || '').trim() || DEFAULT_AVATAR_SRC;
-	          const authorProfileUrl = String(profile?.profile_url || '').trim() || buildAuthorProfileUrl(post?.author);
-	          return {
-	            ...post,
-	            __author_avatar_url: authorAvatarUrl,
-	            __author_profile_url: authorProfileUrl
-	          };
-	        });
-	        currentFeedPosts = enrichedPosts;
-	        renderPosts(enrichedPosts);
-	        if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
+	        homeFeedRequestedCount = normalizedRequestedCount;
+	        homeFeedCanLoadMore =
+	          lastBatchSize === HOME_POSTS_PAGE_SIZE && aggregatedPosts.length >= normalizedRequestedCount;
+	        setHomeLoadMoreStatus('');
+	        applyFeedPosts(aggregatedPosts);
 	        setPostsStatus('');
 	      } catch (error) {
-	        setPostsStatus('No se pudo conectar con el servidor de publicaciones.', true);
+	        homeFeedCanLoadMore = false;
+	        syncHomeLoadMoreUi();
+	        setPostsStatus(error.message || 'No se pudo conectar con el servidor de publicaciones.', true);
+	      } finally {
+	        homeFeedBusy = false;
+	        syncHomeLoadMoreUi();
+	      }
+    };
+
+	    const reloadVisibleFeed = async () => {
+	      const visibleCount = Math.max(HOME_POSTS_PAGE_SIZE, Number(homeFeedRequestedCount || HOME_POSTS_PAGE_SIZE));
+	      await loadFeed({ requestedCount: visibleCount });
+	    };
+
+	    const handleLoadMorePosts = async () => {
+	      if (homeFeedBusy || !homeFeedCanLoadMore) return;
+	      const nextRequestedCount = Math.max(
+	        HOME_POSTS_PAGE_SIZE,
+	        Number(homeFeedRequestedCount || HOME_POSTS_PAGE_SIZE)
+	      ) + HOME_POSTS_PAGE_SIZE;
+	      homeFeedBusy = true;
+	      homeFeedLoadingMore = true;
+	      setHomeLoadMoreStatus('');
+	      syncHomeLoadMoreUi();
+	      try {
+	        const batch = await fetchFeedBatch({
+	          limit: HOME_POSTS_PAGE_SIZE,
+	          offset: Math.max(0, Number(currentFeedPosts?.length || 0))
+	        });
+	        const existingIds = new Set(
+	          (Array.isArray(currentFeedPosts) ? currentFeedPosts : [])
+	            .map((post) => Number(post?.id || 0))
+	            .filter((id) => Number.isFinite(id) && id > 0)
+	        );
+	        const uniqueBatch = batch.filter((post) => !existingIds.has(Number(post?.id || 0)));
+	        homeFeedRequestedCount = nextRequestedCount;
+	        homeFeedCanLoadMore = batch.length === HOME_POSTS_PAGE_SIZE;
+	        if (uniqueBatch.length > 0) {
+	          currentFeedPosts = currentFeedPosts.concat(uniqueBatch);
+	          renderPosts(currentFeedPosts);
+	          if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
+	        }
+	        if (!homeFeedCanLoadMore) {
+	          setHomeLoadMoreStatus('Ya viste todas las publicaciones disponibles.');
+	        }
+	      } catch (error) {
+	        setHomeLoadMoreStatus(error.message || 'No se pudieron cargar más publicaciones.', true);
+	      } finally {
+	        homeFeedBusy = false;
+	        homeFeedLoadingMore = false;
+	        syncHomeLoadMoreUi();
 	      }
     };
 
@@ -2275,7 +2388,7 @@
 
         setPostsStatus('Publicacion creada correctamente.');
         closePost();
-        await Promise.all([loadFeed(), loadMyStats(), loadHomeCalendar()]);
+        await Promise.all([reloadVisibleFeed(), loadMyStats(), loadHomeCalendar()]);
       } catch (error) {
         setPostsStatus(error.message || 'No se pudo publicar.', true);
       } finally {
@@ -2339,7 +2452,7 @@
         media_kind: 'image'
       });
       setProfilePhotoPostId(created.id);
-      await loadFeed();
+      await reloadVisibleFeed();
       await loadHomeCalendar();
       syncProfilePhotoPostFromFeed();
       return Boolean(profilePhotoPostId);
@@ -2552,7 +2665,7 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'No se pudo donar la estrella.');
         setStatus('Estrella donada.');
-        await Promise.all([loadFeed(), loadMyStats()]);
+        await Promise.all([reloadVisibleFeed(), loadMyStats()]);
         if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
       } catch (error) {
         setStatus(error.message || 'No se pudo donar la estrella.', true);
@@ -2576,7 +2689,7 @@
           await navigator.clipboard.writeText(shareUrl);
         }
         setStatus('Publicacion compartida.');
-        await loadFeed();
+        await reloadVisibleFeed();
         if (isViewingOwnProfile) syncProfilePhotoPostFromFeed();
       } catch (error) {
         setStatus(error.message || 'No se pudo compartir.', true);
@@ -2744,7 +2857,7 @@
         if (!res.ok) throw new Error(data.detail || 'No se pudo eliminar la publicacion.');
         setPostsStatus(`Publicacion eliminada. Se restaron ${data.removed_stars || 0} estrellas asociadas.`);
         closeDeleteModal();
-        await Promise.all([loadFeed(), loadMyStats(), loadHomeCalendar()]);
+        await Promise.all([reloadVisibleFeed(), loadMyStats(), loadHomeCalendar()]);
       } catch (error) {
         setPostsStatus(error.message || 'No se pudo eliminar la publicacion.', true);
       }
@@ -2776,7 +2889,7 @@
 
         closeEditModal();
         setPostsStatus('Publicación actualizada.');
-        await Promise.all([loadFeed(), loadMyStats(), loadHomeCalendar()]);
+        await Promise.all([reloadVisibleFeed(), loadMyStats(), loadHomeCalendar()]);
       } catch (error) {
         setEditPostModalStatus(error.message || 'No se pudo editar la publicación.', true);
       } finally {
@@ -2901,7 +3014,7 @@
         if (!res.ok) throw new Error(data.detail || 'No se pudo crear el comentario.');
         if (commentInput) commentInput.value = '';
         if (commentsStatus) commentsStatus.textContent = '';
-        await Promise.all([loadComments(), loadFeed()]);
+        await Promise.all([loadComments(), reloadVisibleFeed()]);
       } catch (error) {
         if (commentsStatus) commentsStatus.textContent = error.message || 'No se pudo guardar el comentario.';
       }
@@ -2910,6 +3023,7 @@
     openPostModal?.addEventListener('click', openPost);
     menuPublishBtn?.addEventListener('click', handleMenuPublishClick);
     homeTopbarBtn?.addEventListener('click', handleTopbarHomeClick);
+    homeLoadMoreBtn?.addEventListener('click', handleLoadMorePosts);
     homeAvatarButton?.addEventListener('click', handleHomeAvatarButtonClick);
     homeAvatarViewBtn?.addEventListener('click', handleHomeAvatarViewClick);
     homeAvatarUploadBtn?.addEventListener('click', handleHomeAvatarUploadClick);
@@ -3043,10 +3157,11 @@
       cleanupPurposeCover?.();
       if (selectedFileURL) URL.revokeObjectURL(selectedFileURL);
 
-      openPostModal?.removeEventListener('click', openPost);
-      menuPublishBtn?.removeEventListener('click', handleMenuPublishClick);
-      homeTopbarBtn?.removeEventListener('click', handleTopbarHomeClick);
-      homeAvatarButton?.removeEventListener('click', handleHomeAvatarButtonClick);
+	      openPostModal?.removeEventListener('click', openPost);
+	      menuPublishBtn?.removeEventListener('click', handleMenuPublishClick);
+	      homeTopbarBtn?.removeEventListener('click', handleTopbarHomeClick);
+	      homeLoadMoreBtn?.removeEventListener('click', handleLoadMorePosts);
+	      homeAvatarButton?.removeEventListener('click', handleHomeAvatarButtonClick);
       homeAvatarViewBtn?.removeEventListener('click', handleHomeAvatarViewClick);
       homeAvatarUploadBtn?.removeEventListener('click', handleHomeAvatarUploadClick);
       homeAvatarFile?.removeEventListener('change', handleHomeAvatarFileChange);
@@ -3417,6 +3532,12 @@
 
           <p class="posts-status" id="postsStatus"></p>
           <div class="posts-list" id="homePostsList"></div>
+          <div class="home-posts-load-more hidden" id="homeLoadMoreWrap">
+            <button class="btn btn-outline btn-compact" id="homeLoadMoreBtn" type="button">
+              Cargar 30 publicaciones más
+            </button>
+            <p class="posts-status" id="homeLoadMoreStatus" aria-live="polite"></p>
+          </div>
         </section>
       </section>
     </div>

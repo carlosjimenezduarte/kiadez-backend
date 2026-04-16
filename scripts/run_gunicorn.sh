@@ -3,12 +3,19 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_MODULE="${APP_MODULE:-app.main:app}"
-GUNICORN_BIN="${GUNICORN_BIN:-$ROOT_DIR/venv/bin/gunicorn}"
 CONFIG_FILE="${GUNICORN_CONFIG:-$ROOT_DIR/deploy/gunicorn.conf.py}"
+
+if [[ -z "${GUNICORN_BIN:-}" ]]; then
+  if [[ -x "$ROOT_DIR/.venv/bin/gunicorn" ]]; then
+    GUNICORN_BIN="$ROOT_DIR/.venv/bin/gunicorn"
+  else
+    GUNICORN_BIN="$ROOT_DIR/venv/bin/gunicorn"
+  fi
+fi
 
 if [[ ! -x "$GUNICORN_BIN" ]]; then
   echo "Gunicorn no esta instalado en $GUNICORN_BIN" >&2
-  echo "Ejecuta: ./venv/bin/pip install -r requirements-production.txt" >&2
+  echo "Ejecuta el pip real de tu entorno, por ejemplo: ./.venv/bin/pip install -r requirements-production.txt" >&2
   exit 1
 fi
 
@@ -19,4 +26,3 @@ fi
 
 cd "$ROOT_DIR"
 exec "$GUNICORN_BIN" -c "$CONFIG_FILE" "$APP_MODULE"
-
