@@ -553,7 +553,10 @@ def _purge_user_account_edges(*, db: Session, user_id: int) -> None:
 
     db.execute(text("DELETE FROM user_vaults WHERE user_id = :user_id"), {"user_id": user_id})
     db.execute(text("DELETE FROM notification_reads WHERE user_id = :user_id"), {"user_id": user_id})
-    db.execute(text("DELETE FROM private_desires WHERE user_id = :user_id"), {"user_id": user_id})
+
+    has_private_desires = db.execute(text("SELECT to_regclass('public.private_desires')")).scalar()
+    if has_private_desires:
+        db.execute(text("DELETE FROM private_desires WHERE user_id = :user_id"), {"user_id": user_id})
 
     db.execute(
         text("UPDATE profile_report_cases SET resolved_by_guardian_id = NULL WHERE resolved_by_guardian_id = :user_id"),
