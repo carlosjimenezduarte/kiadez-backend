@@ -39,6 +39,7 @@ from app.db.models.message_entry import MessageEntry
 from app.db.models.message_thread import MessageThread
 from app.db.models.oracle import OracleResponse, OracleUserState
 from app.db.models.post import Post, PostComment, PostReport, PostReportCase, PostStar
+from app.db.models.profile_report import ProfileReport, ProfileReportCase
 from app.db.models.private_personal_wish import PrivatePersonalWish
 from app.db.models.public_cooperative_wish import PublicCooperativeWish
 from app.db.models.public_cooperative_wish_fulfillment import PublicCooperativeWishFulfillment
@@ -445,6 +446,23 @@ def _recompute_post_counters(db: Session) -> None:
 
 
 def _purge_user_content_for_account_closure(*, db: Session, user_id: int) -> None:
+    db.execute(
+        text(
+            """
+            UPDATE users
+            SET profile_photo_media_id = NULL,
+                cover_photo_media_id = NULL,
+                emblem_media_id = NULL
+            WHERE id = :user_id
+            """
+        ),
+        {"user_id": user_id},
+    )
+    db.execute(
+        text("UPDATE users SET guardian_moderated_by_user_id = NULL WHERE guardian_moderated_by_user_id = :user_id"),
+        {"user_id": user_id},
+    )
+
     db.execute(delete(UserFollow).where(or_(UserFollow.follower_id == user_id, UserFollow.followed_id == user_id)))
 
     db.execute(text("UPDATE guardian_wish_requests SET guardian_id = NULL WHERE guardian_id = :user_id"), {"user_id": user_id})
@@ -526,6 +544,25 @@ def _purge_user_content_for_account_closure(*, db: Session, user_id: int) -> Non
     _recompute_post_counters(db)
 
 
+def _purge_user_account_edges(*, db: Session, user_id: int) -> None:
+    """Remove account/auth rows that are outside the profile-content purge."""
+    db.execute(delete(RefreshToken).where(RefreshToken.user_id == user_id))
+    db.execute(delete(User2FA).where(User2FA.user_id == user_id))
+    db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user_id))
+    db.execute(delete(EmailVerificationToken).where(EmailVerificationToken.user_id == user_id))
+
+    db.execute(text("DELETE FROM user_vaults WHERE user_id = :user_id"), {"user_id": user_id})
+    db.execute(text("DELETE FROM notification_reads WHERE user_id = :user_id"), {"user_id": user_id})
+    db.execute(text("DELETE FROM private_desires WHERE user_id = :user_id"), {"user_id": user_id})
+
+    db.execute(
+        text("UPDATE profile_report_cases SET resolved_by_guardian_id = NULL WHERE resolved_by_guardian_id = :user_id"),
+        {"user_id": user_id},
+    )
+    db.execute(delete(ProfileReport).where(or_(ProfileReport.reporter_id == user_id, ProfileReport.reported_user_id == user_id)))
+    db.execute(delete(ProfileReportCase).where(ProfileReportCase.reported_user_id == user_id))
+
+
 def _purge_expired_closed_accounts(*, db: Session, now: datetime) -> None:
     expired_users = db.execute(
         select(User)
@@ -542,6 +579,8 @@ def _purge_expired_closed_accounts(*, db: Session, now: datetime) -> None:
         return
 
     for user in expired_users:
+        _purge_user_content_for_account_closure(db=db, user_id=user.id)
+        _purge_user_account_edges(db=db, user_id=user.id)
         db.execute(
             text(
                 """
