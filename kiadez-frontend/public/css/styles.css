@@ -858,6 +858,11 @@ body {
     margin: 0;
 }
 
+.download-apk-hash {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
 .legal-doc h2 {
     margin: 8px 0 0;
     color: #0b5f2a;

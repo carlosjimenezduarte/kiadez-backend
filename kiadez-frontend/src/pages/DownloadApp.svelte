@@ -1,5 +1,6 @@
 <script>
   const APK_URL = "https://www.kiadez.com/app/KiadezV8.apk";
+  const APK_SHA256 = "10a20a7298adcd89d1bbee08e04406f27ce88705e33f4bc0a332748351bdcac6";
 </script>
 
 <svelte:head>
@@ -25,6 +26,10 @@
           <p class="download-link-line">
             <strong>Enlace:</strong>
             <a href={APK_URL} target="_blank" rel="noopener noreferrer">{APK_URL}</a>
+          </p>
+          <p class="download-link-line">
+            <strong>SHA-256:</strong>
+            <code class="download-apk-hash">{APK_SHA256}</code>
           </p>
         </div>
 
