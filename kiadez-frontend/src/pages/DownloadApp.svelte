@@ -1,6 +1,6 @@
 <script>
   const APK_URL = "https://www.kiadez.com/app/KiadezV8.apk";
-  const APK_SHA256 = "10a20a7298adcd89d1bbee08e04406f27ce88705e33f4bc0a332748351bdcac6";
+  const APK_SHA256 = "dbb95eba72ed8122c828c058e37a6b7de648f36f664a29318e3a11bdae3453b1";
 </script>
 
 <svelte:head>

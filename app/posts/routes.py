@@ -58,6 +58,9 @@ from app.posts.schemas import (
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
+POST_COMMENTS_DISABLED_DETAIL = "Los comentarios de publicaciones están desactivados temporalmente."
+POST_SHARING_DISABLED_DETAIL = "Compartir publicaciones está desactivado temporalmente."
+
 PUBLICATION_STAR_ACHIEVEMENTS: list[tuple[str, str, int, str]] = [
     ("astral_1a", "Alumbramiento", 1, "/css/AKI/Astral/Star1/1a.webp"),
     ("astral_1b", "Estelar", 5, "/css/AKI/Astral/Star1/1b.webp"),
@@ -599,6 +602,16 @@ def _post_out(
         mentions=mentions or [],
         created_at=post.created_at,
     )
+
+
+def _ensure_post_comments_enabled() -> None:
+    if not settings.POSTS_COMMENTS_ENABLED:
+        raise HTTPException(status_code=410, detail=POST_COMMENTS_DISABLED_DETAIL)
+
+
+def _ensure_post_sharing_enabled() -> None:
+    if not settings.POSTS_SHARING_ENABLED:
+        raise HTTPException(status_code=410, detail=POST_SHARING_DISABLED_DETAIL)
 
 def _query_posts(
     *,
@@ -1230,6 +1243,8 @@ def share_post(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _ensure_post_sharing_enabled()
+
     row = db.execute(
         select(Post, User)
         .join(User, User.id == Post.author_id)
@@ -1254,6 +1269,8 @@ def list_comments(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _ensure_post_comments_enabled()
+
     row = db.execute(
         select(Post, User)
         .join(User, User.id == Post.author_id)
@@ -1293,6 +1310,8 @@ def create_comment(
     current: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _ensure_post_comments_enabled()
+
     row = db.execute(
         select(Post, User)
         .join(User, User.id == Post.author_id)

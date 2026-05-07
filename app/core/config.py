@@ -94,6 +94,11 @@ class Settings(BaseSettings):
     MESSAGES_BROADCAST_ALLOW_USERNAMES: str = "carlosjimenezd"
     MESSAGES_BROADCAST_ALLOW_EMAILS: str = ""
 
+    # 🧊 Social post capabilities
+    # Keep the data model intact while freezing public interaction surfaces.
+    POSTS_COMMENTS_ENABLED: bool = False
+    POSTS_SHARING_ENABLED: bool = False
+
     @model_validator(mode="after")
     def validate_s3_for_environment(self):
         app_env = (self.APP_ENV or "").strip().lower()

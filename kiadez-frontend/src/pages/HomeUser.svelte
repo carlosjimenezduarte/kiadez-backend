@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { initPurposeCoverModule } from '../lib/purposeCover';
   import { logout } from '../lib/logout';
+  import { POST_COMMENTS_ENABLED, POST_SHARING_ENABLED } from '../lib/socialFeatures';
 
   onMount(() => {
     let cleanupPurposeCover = () => {};
@@ -20,6 +21,8 @@
     const postPreview = document.getElementById('postPreview');
     const publishPost = document.getElementById('publishPost');
     const postText = document.getElementById('postText');
+    const postTextCounter = document.getElementById('postTextCounter');
+    const postModalStatus = document.getElementById('postModalStatus');
     const postVisibility = document.getElementById('postVisibility');
     const postsList = document.getElementById('homePostsList');
     const postsStatus = document.getElementById('postsStatus');
@@ -40,6 +43,9 @@
     const minorRelationshipSelect = document.getElementById('minorRelationshipSelect');
     const minorAccreditationModalStatus = document.getElementById('minorAccreditationModalStatus');
     const starsTotalLabel = document.getElementById('homeStarsTotal');
+    const POST_TEXT_MAX_LENGTH = 2000;
+    const POST_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+    const POST_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 
     const deletePostOverlay = document.getElementById('deletePostModalOverlay');
     const closeDeletePostModal = document.getElementById('closeDeletePostModal');
@@ -152,6 +158,7 @@
 
     let selectedFile = null;
     let selectedFileURL = null;
+    let invalidPostFileMessage = '';
     let selectedCommentPostId = null;
     let selectedEditPostId = null;
     let selectedDeletePostId = null;
@@ -313,6 +320,34 @@
       if (!postsStatus) return;
       postsStatus.textContent = message || '';
       postsStatus.classList.toggle('posts-status-error', Boolean(isError));
+    };
+
+    const setPostModalStatus = (message, isError = false) => {
+      if (!postModalStatus) return;
+      postModalStatus.textContent = message || '';
+      postModalStatus.classList.toggle('posts-status-error', Boolean(isError));
+    };
+
+    const updatePostTextCounter = () => {
+      if (!postTextCounter) return;
+      const length = Math.min(String(postText?.value || '').length, POST_TEXT_MAX_LENGTH);
+      postTextCounter.textContent = `${length}/${POST_TEXT_MAX_LENGTH}`;
+      postTextCounter.classList.toggle('is-limit', length >= POST_TEXT_MAX_LENGTH);
+    };
+
+    const validatePostFileForModal = (file) => {
+      if (!file) return '';
+      const type = String(file.type || '').toLowerCase();
+      if (type.startsWith('image/') && file.size > POST_IMAGE_MAX_BYTES) {
+        return 'Las imagenes deben pesar menos de 10MB';
+      }
+      if (type.startsWith('video/') && file.size > POST_VIDEO_MAX_BYTES) {
+        return 'Los videos tienen un límite de peso de 100MB';
+      }
+      if (!type.startsWith('image/') && !type.startsWith('video/')) {
+        return 'Solo se permiten archivos de imagen o video.';
+      }
+      return '';
     };
 
     const setHomeLoadMoreStatus = (message, isError = false) => {
@@ -1180,10 +1215,12 @@
       if (profilePhotoCommentPost) {
         profilePhotoCommentPost.disabled = !post;
         profilePhotoCommentPost.textContent = `💬 Comentar (${Number(post?.comment_count || 0)})`;
+        profilePhotoCommentPost.classList.toggle('hidden', !POST_COMMENTS_ENABLED);
       }
       if (profilePhotoSharePost) {
         profilePhotoSharePost.disabled = !post;
         profilePhotoSharePost.textContent = `🔁 Compartir (${Number(post?.share_count || 0)})`;
+        profilePhotoSharePost.classList.toggle('hidden', !POST_SHARING_ENABLED);
       }
       setProfilePhotoPostStatus('');
     };
@@ -1995,8 +2032,8 @@
               ${mediaHtml}
               <div class="post-actions">
                 <button class="post-btn" type="button" data-action="star-post" data-post-id="${post.id}" ${starDisabled}>${starLabel}</button>
-                <button class="post-btn" type="button" data-action="comment-post" data-post-id="${post.id}">💬 Comentar (${post.comment_count})</button>
-                <button class="post-btn" type="button" data-action="share-post" data-post-id="${post.id}">🔁 Compartir (${post.share_count})</button>
+                ${POST_COMMENTS_ENABLED ? `<button class="post-btn" type="button" data-action="comment-post" data-post-id="${post.id}">💬 Comentar (${post.comment_count})</button>` : ''}
+                ${POST_SHARING_ENABLED ? `<button class="post-btn" type="button" data-action="share-post" data-post-id="${post.id}">🔁 Compartir (${post.share_count})</button>` : ''}
                 ${openAlbumBtn}
               </div>
             </article>
@@ -2177,6 +2214,8 @@
     const openPost = () => {
       if (!isViewingOwnProfile) return;
       syncPostVisibilityMinorGuard();
+      updatePostTextCounter();
+      setPostModalStatus('');
       postModalOverlay?.classList.remove('hidden');
       postModalOverlay?.setAttribute('aria-hidden', 'false');
     };
@@ -2194,8 +2233,11 @@
         selectedFileURL = null;
       }
       selectedFile = null;
+      invalidPostFileMessage = '';
       if (postFile) postFile.value = '';
       if (postText) postText.value = '';
+      updatePostTextCounter();
+      setPostModalStatus('');
       if (postVisibility) {
         postVisibility.value = minorAccreditationState?.is_minor_protected ? 'private' : 'public';
       }
@@ -2217,8 +2259,30 @@
     const handlePostFileChange = (event) => {
       const file = event?.target?.files?.[0];
       selectedFile = file || null;
-      if (!file) return;
+      invalidPostFileMessage = '';
+      setPostModalStatus('');
+      if (!file) {
+        if (uploadHint) uploadHint.textContent = 'Sin archivo adjunto';
+        return;
+      }
       if (uploadHint) uploadHint.textContent = file.name;
+
+      const validationMessage = validatePostFileForModal(file);
+      if (validationMessage) {
+        invalidPostFileMessage = validationMessage;
+        selectedFile = null;
+        if (postFile) postFile.value = '';
+        if (selectedFileURL) {
+          URL.revokeObjectURL(selectedFileURL);
+          selectedFileURL = null;
+        }
+        if (postPreview) {
+          postPreview.innerHTML = '';
+          postPreview.classList.add('hidden');
+        }
+        setPostModalStatus(validationMessage, true);
+        return;
+      }
 
       if (selectedFileURL) URL.revokeObjectURL(selectedFileURL);
       selectedFileURL = URL.createObjectURL(file);
@@ -2233,7 +2297,7 @@
         selectedFile = null;
         postPreview.innerHTML = '';
         postPreview.classList.add('hidden');
-        setPostsStatus('Solo se permiten archivos de imagen o video.', true);
+        setPostModalStatus('Solo se permiten archivos de imagen o video.', true);
       }
     };
 
@@ -2350,8 +2414,19 @@
     const handlePublishPost = async () => {
       if (!isViewingOwnProfile) return;
       const text = (postText?.value || '').trim();
+      if (invalidPostFileMessage) {
+        setPostModalStatus(invalidPostFileMessage, true);
+        return;
+      }
+
+      const validationMessage = validatePostFileForModal(selectedFile);
+      if (validationMessage) {
+        setPostModalStatus(validationMessage, true);
+        return;
+      }
+
       if (!text && !selectedFile) {
-        setPostsStatus('Debes escribir texto o adjuntar imagen/video.', true);
+        setPostModalStatus('Debes escribir texto o adjuntar imagen/video.', true);
         return;
       }
 
@@ -2366,7 +2441,7 @@
         if (minorAccreditationState?.is_minor_protected && visibilityValue === 'public') {
           visibilityValue = 'private';
           if (postVisibility) postVisibility.value = 'private';
-          setPostsStatus('Tu cuenta está en modo protegido. Esta publicación se guardará en privado.');
+          setPostModalStatus('Tu cuenta está en modo protegido. Esta publicación se guardará en privado.');
         }
         const mediaData = await uploadMediaIfNeeded(visibilityValue);
         const payload = {
@@ -2390,7 +2465,7 @@
         closePost();
         await Promise.all([reloadVisibleFeed(), loadMyStats(), loadHomeCalendar()]);
       } catch (error) {
-        setPostsStatus(error.message || 'No se pudo publicar.', true);
+        setPostModalStatus(error.message || 'No se pudo publicar.', true);
       } finally {
         if (publishPost) {
           publishPost.disabled = false;
@@ -2821,11 +2896,13 @@
       }
 
       if (action === 'comment-post') {
+        if (!POST_COMMENTS_ENABLED) return;
         await openCommentsForPost(postId);
         return;
       }
 
       if (action === 'share-post') {
+        if (!POST_SHARING_ENABLED) return;
         await sharePost(postId);
         return;
       }
@@ -3043,8 +3120,12 @@
     profilePhotoPrevBtn?.addEventListener('click', handleProfilePhotoPrevNav);
     profilePhotoNextBtn?.addEventListener('click', handleProfilePhotoNextNav);
     profilePhotoStarPost?.addEventListener('click', handleProfilePhotoStar);
-    profilePhotoCommentPost?.addEventListener('click', handleProfilePhotoComment);
-    profilePhotoSharePost?.addEventListener('click', handleProfilePhotoShare);
+    if (POST_COMMENTS_ENABLED) {
+      profilePhotoCommentPost?.addEventListener('click', handleProfilePhotoComment);
+    }
+    if (POST_SHARING_ENABLED) {
+      profilePhotoSharePost?.addEventListener('click', handleProfilePhotoShare);
+    }
     homeAboutEditBtn?.addEventListener('click', handleOpenHomeAboutModal);
     closeHomeAboutModal?.addEventListener('click', closeHomeAboutModalPanel);
     cancelHomeAboutModal?.addEventListener('click', closeHomeAboutModalPanel);
@@ -3054,6 +3135,7 @@
     closePostModal?.addEventListener('click', closePost);
     cancelPost?.addEventListener('click', closePost);
     postModalOverlay?.addEventListener('click', handlePostOverlayClick);
+    postText?.addEventListener('input', updatePostTextCounter);
     postFile?.addEventListener('change', handlePostFileChange);
     publishPost?.addEventListener('click', handlePublishPost);
     postsList?.addEventListener('click', handlePostsClick);
@@ -3098,12 +3180,14 @@
       .querySelectorAll('input[name="profileReportReason"]')
       .forEach((input) => input.addEventListener('change', handleProfileReportReasonChange));
 
-    closeCommentsModal?.addEventListener('click', closeComments);
-    cancelCommentsModal?.addEventListener('click', closeComments);
-    sendComment?.addEventListener('click', handleSendComment);
-    commentsOverlay?.addEventListener('click', (event) => {
-      if (event.target === commentsOverlay) closeComments();
-    });
+    if (POST_COMMENTS_ENABLED) {
+      closeCommentsModal?.addEventListener('click', closeComments);
+      cancelCommentsModal?.addEventListener('click', closeComments);
+      sendComment?.addEventListener('click', handleSendComment);
+      commentsOverlay?.addEventListener('click', (event) => {
+        if (event.target === commentsOverlay) closeComments();
+      });
+    }
 
     void (async () => {
       applyProfilePrivacyVisibility(DEFAULT_PROFILE_PRIVACY_VISIBILITY, { isOwner: true });
@@ -3180,8 +3264,12 @@
       profilePhotoPrevBtn?.removeEventListener('click', handleProfilePhotoPrevNav);
       profilePhotoNextBtn?.removeEventListener('click', handleProfilePhotoNextNav);
       profilePhotoStarPost?.removeEventListener('click', handleProfilePhotoStar);
-      profilePhotoCommentPost?.removeEventListener('click', handleProfilePhotoComment);
-      profilePhotoSharePost?.removeEventListener('click', handleProfilePhotoShare);
+      if (POST_COMMENTS_ENABLED) {
+        profilePhotoCommentPost?.removeEventListener('click', handleProfilePhotoComment);
+      }
+      if (POST_SHARING_ENABLED) {
+        profilePhotoSharePost?.removeEventListener('click', handleProfilePhotoShare);
+      }
       homeAboutEditBtn?.removeEventListener('click', handleOpenHomeAboutModal);
       closeHomeAboutModal?.removeEventListener('click', closeHomeAboutModalPanel);
       cancelHomeAboutModal?.removeEventListener('click', closeHomeAboutModalPanel);
@@ -3191,6 +3279,7 @@
       closePostModal?.removeEventListener('click', closePost);
       cancelPost?.removeEventListener('click', closePost);
       postModalOverlay?.removeEventListener('click', handlePostOverlayClick);
+      postText?.removeEventListener('input', updatePostTextCounter);
       postFile?.removeEventListener('change', handlePostFileChange);
       publishPost?.removeEventListener('click', handlePublishPost);
       postsList?.removeEventListener('click', handlePostsClick);
@@ -3222,9 +3311,11 @@
         .querySelectorAll('input[name="profileReportReason"]')
         .forEach((input) => input.removeEventListener('change', handleProfileReportReasonChange));
 
-      closeCommentsModal?.removeEventListener('click', closeComments);
-      cancelCommentsModal?.removeEventListener('click', closeComments);
-      sendComment?.removeEventListener('click', handleSendComment);
+      if (POST_COMMENTS_ENABLED) {
+        closeCommentsModal?.removeEventListener('click', closeComments);
+        cancelCommentsModal?.removeEventListener('click', closeComments);
+        sendComment?.removeEventListener('click', handleSendComment);
+      }
     };
 
   });
@@ -3616,7 +3707,11 @@
         </div>
       </div>
 
-      <textarea class="modal-textarea" id="postText" rows="5" placeholder="Escribe algo..."></textarea>
+      <textarea class="modal-textarea post-modal-textarea" id="postText" rows="5" maxlength="2000" placeholder="Escribe algo..."></textarea>
+      <div class="post-modal-meta">
+        <p class="posts-status post-modal-status" id="postModalStatus" aria-live="polite"></p>
+        <span class="post-text-counter" id="postTextCounter">0/2000</span>
+      </div>
 
       <div class="upload-row">
         <label class="upload-btn" for="postFile">Adjuntar imagen o video</label>
@@ -3720,8 +3815,12 @@
         </div>
         <div class="post-actions">
           <button class="post-btn" type="button" id="profilePhotoStarPost">⭐ Donar estrella (0)</button>
-          <button class="post-btn" type="button" id="profilePhotoCommentPost">💬 Comentar (0)</button>
-          <button class="post-btn" type="button" id="profilePhotoSharePost">🔁 Compartir (0)</button>
+          {#if POST_COMMENTS_ENABLED}
+            <button class="post-btn" type="button" id="profilePhotoCommentPost">💬 Comentar (0)</button>
+          {/if}
+          {#if POST_SHARING_ENABLED}
+            <button class="post-btn" type="button" id="profilePhotoSharePost">🔁 Compartir (0)</button>
+          {/if}
         </div>
       </article>
       <p class="profile-photo-post-status" id="profilePhotoPostStatus" aria-live="polite"></p>
@@ -3891,21 +3990,23 @@
   </div>
 </div>
 
-<div class="modal-overlay hidden" id="postCommentsModalOverlay" aria-hidden="true">
-  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="Comentarios de publicación">
-    <div class="modal-head">
-      <h3 id="postCommentsTitle">Comentarios</h3>
-      <button class="modal-close" type="button" id="closePostCommentsModal">✕</button>
-    </div>
-    <div class="modal-body">
-      <p class="posts-status" id="postCommentsStatus"></p>
-      <div class="post-comments-list" id="postCommentsList"></div>
-      <label class="modal-label" for="postCommentInput">Agregar comentario</label>
-      <textarea class="modal-textarea" id="postCommentInput" rows="3" maxlength="1200" placeholder="Escribe un comentario"></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline btn-compact" type="button" id="cancelPostCommentsModal">Cerrar</button>
-      <button class="btn btn-primary btn-compact" type="button" id="sendPostComment">Comentar</button>
+{#if POST_COMMENTS_ENABLED}
+  <div class="modal-overlay hidden" id="postCommentsModalOverlay" aria-hidden="true">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="Comentarios de publicación">
+      <div class="modal-head">
+        <h3 id="postCommentsTitle">Comentarios</h3>
+        <button class="modal-close" type="button" id="closePostCommentsModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="posts-status" id="postCommentsStatus"></p>
+        <div class="post-comments-list" id="postCommentsList"></div>
+        <label class="modal-label" for="postCommentInput">Agregar comentario</label>
+        <textarea class="modal-textarea" id="postCommentInput" rows="3" maxlength="1200" placeholder="Escribe un comentario"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-compact" type="button" id="cancelPostCommentsModal">Cerrar</button>
+        <button class="btn btn-primary btn-compact" type="button" id="sendPostComment">Comentar</button>
+      </div>
     </div>
   </div>
-</div>
+{/if}
