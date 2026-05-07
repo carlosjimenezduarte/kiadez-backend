@@ -3,7 +3,6 @@
   import { logout } from "../lib/logout";
   import { initPurposeCoverModule } from "../lib/purposeCover";
   import { syncProfileStarsTotal } from "../lib/starsCounter";
-  import { POST_COMMENTS_ENABLED, POST_SHARING_ENABLED } from "../lib/socialFeatures";
 
   const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
   const MIN_YEAR = 2000;
@@ -876,12 +875,6 @@
                       <p class="calendar-summary-post-text">{post.text || "Publicación sin texto."}</p>
                       <p class="calendar-summary-post-meta">
                         {formatTimeLabel(post.created_at)} UTC · ⭐ {formatCount(post.star_count || 0)}
-                        {#if POST_COMMENTS_ENABLED}
-                          · 💬 {formatCount(post.comment_count || 0)}
-                        {/if}
-                        {#if POST_SHARING_ENABLED}
-                          · 🔁 {formatCount(post.share_count || 0)}
-                        {/if}
                       </p>
                     </div>
                   </article>

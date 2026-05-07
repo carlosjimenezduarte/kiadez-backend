@@ -3980,17 +3980,20 @@ body {
     overflow-y: auto;
 }
 
+.post-textarea-wrap {
+    position: relative;
+}
+
 .post-modal-textarea {
     min-height: 124px;
     max-height: 220px;
+    padding-bottom: 34px;
 }
 
 .post-modal-meta {
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 28px;
+    min-height: 24px;
     margin-top: 6px;
 }
 
@@ -4003,28 +4006,25 @@ body {
 }
 
 .post-text-counter {
-    flex: 0 0 auto;
-    color: rgba(0, 0, 0, 0.58);
+    position: absolute;
+    right: 14px;
+    bottom: 12px;
+    z-index: 1;
+    min-width: 44px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.86);
+    color: rgba(0, 0, 0, 0.62);
     font-size: 0.88rem;
     line-height: 1.35;
+    text-align: center;
     white-space: nowrap;
+    pointer-events: none;
 }
 
 .post-text-counter.is-limit {
     color: #9d1c1c;
     font-weight: 700;
-}
-
-@media (max-width: 560px) {
-    .post-modal-meta {
-        align-items: stretch;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .post-text-counter {
-        align-self: flex-end;
-    }
 }
 
 /* Utilities */

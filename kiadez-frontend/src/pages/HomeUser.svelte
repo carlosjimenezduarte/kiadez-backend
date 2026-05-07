@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
   import { initPurposeCoverModule } from '../lib/purposeCover';
   import { logout } from '../lib/logout';
-  import { POST_COMMENTS_ENABLED, POST_SHARING_ENABLED } from '../lib/socialFeatures';
 
   onMount(() => {
     let cleanupPurposeCover = () => {};
@@ -331,7 +330,8 @@
     const updatePostTextCounter = () => {
       if (!postTextCounter) return;
       const length = Math.min(String(postText?.value || '').length, POST_TEXT_MAX_LENGTH);
-      postTextCounter.textContent = `${length}/${POST_TEXT_MAX_LENGTH}`;
+      const remaining = Math.max(0, POST_TEXT_MAX_LENGTH - length);
+      postTextCounter.textContent = String(remaining);
       postTextCounter.classList.toggle('is-limit', length >= POST_TEXT_MAX_LENGTH);
     };
 
@@ -1212,16 +1212,6 @@
           ? `⭐ Estrella donada (${starCount})`
           : `⭐ Donar estrella (${starCount})`;
       }
-      if (profilePhotoCommentPost) {
-        profilePhotoCommentPost.disabled = !post;
-        profilePhotoCommentPost.textContent = `💬 Comentar (${Number(post?.comment_count || 0)})`;
-        profilePhotoCommentPost.classList.toggle('hidden', !POST_COMMENTS_ENABLED);
-      }
-      if (profilePhotoSharePost) {
-        profilePhotoSharePost.disabled = !post;
-        profilePhotoSharePost.textContent = `🔁 Compartir (${Number(post?.share_count || 0)})`;
-        profilePhotoSharePost.classList.toggle('hidden', !POST_SHARING_ENABLED);
-      }
       setProfilePhotoPostStatus('');
     };
 
@@ -2032,8 +2022,6 @@
               ${mediaHtml}
               <div class="post-actions">
                 <button class="post-btn" type="button" data-action="star-post" data-post-id="${post.id}" ${starDisabled}>${starLabel}</button>
-                ${POST_COMMENTS_ENABLED ? `<button class="post-btn" type="button" data-action="comment-post" data-post-id="${post.id}">💬 Comentar (${post.comment_count})</button>` : ''}
-                ${POST_SHARING_ENABLED ? `<button class="post-btn" type="button" data-action="share-post" data-post-id="${post.id}">🔁 Compartir (${post.share_count})</button>` : ''}
                 ${openAlbumBtn}
               </div>
             </article>
@@ -2895,18 +2883,6 @@
         return;
       }
 
-      if (action === 'comment-post') {
-        if (!POST_COMMENTS_ENABLED) return;
-        await openCommentsForPost(postId);
-        return;
-      }
-
-      if (action === 'share-post') {
-        if (!POST_SHARING_ENABLED) return;
-        await sharePost(postId);
-        return;
-      }
-
       if (action === 'edit-post') {
         handleOpenEditPostModal(postId);
         return;
@@ -3120,12 +3096,6 @@
     profilePhotoPrevBtn?.addEventListener('click', handleProfilePhotoPrevNav);
     profilePhotoNextBtn?.addEventListener('click', handleProfilePhotoNextNav);
     profilePhotoStarPost?.addEventListener('click', handleProfilePhotoStar);
-    if (POST_COMMENTS_ENABLED) {
-      profilePhotoCommentPost?.addEventListener('click', handleProfilePhotoComment);
-    }
-    if (POST_SHARING_ENABLED) {
-      profilePhotoSharePost?.addEventListener('click', handleProfilePhotoShare);
-    }
     homeAboutEditBtn?.addEventListener('click', handleOpenHomeAboutModal);
     closeHomeAboutModal?.addEventListener('click', closeHomeAboutModalPanel);
     cancelHomeAboutModal?.addEventListener('click', closeHomeAboutModalPanel);
@@ -3180,14 +3150,6 @@
       .querySelectorAll('input[name="profileReportReason"]')
       .forEach((input) => input.addEventListener('change', handleProfileReportReasonChange));
 
-    if (POST_COMMENTS_ENABLED) {
-      closeCommentsModal?.addEventListener('click', closeComments);
-      cancelCommentsModal?.addEventListener('click', closeComments);
-      sendComment?.addEventListener('click', handleSendComment);
-      commentsOverlay?.addEventListener('click', (event) => {
-        if (event.target === commentsOverlay) closeComments();
-      });
-    }
 
     void (async () => {
       applyProfilePrivacyVisibility(DEFAULT_PROFILE_PRIVACY_VISIBILITY, { isOwner: true });
@@ -3264,12 +3226,6 @@
       profilePhotoPrevBtn?.removeEventListener('click', handleProfilePhotoPrevNav);
       profilePhotoNextBtn?.removeEventListener('click', handleProfilePhotoNextNav);
       profilePhotoStarPost?.removeEventListener('click', handleProfilePhotoStar);
-      if (POST_COMMENTS_ENABLED) {
-        profilePhotoCommentPost?.removeEventListener('click', handleProfilePhotoComment);
-      }
-      if (POST_SHARING_ENABLED) {
-        profilePhotoSharePost?.removeEventListener('click', handleProfilePhotoShare);
-      }
       homeAboutEditBtn?.removeEventListener('click', handleOpenHomeAboutModal);
       closeHomeAboutModal?.removeEventListener('click', closeHomeAboutModalPanel);
       cancelHomeAboutModal?.removeEventListener('click', closeHomeAboutModalPanel);
@@ -3311,11 +3267,6 @@
         .querySelectorAll('input[name="profileReportReason"]')
         .forEach((input) => input.removeEventListener('change', handleProfileReportReasonChange));
 
-      if (POST_COMMENTS_ENABLED) {
-        closeCommentsModal?.removeEventListener('click', closeComments);
-        cancelCommentsModal?.removeEventListener('click', closeComments);
-        sendComment?.removeEventListener('click', handleSendComment);
-      }
     };
 
   });
@@ -3707,10 +3658,12 @@
         </div>
       </div>
 
-      <textarea class="modal-textarea post-modal-textarea" id="postText" rows="5" maxlength="2000" placeholder="Escribe algo..."></textarea>
+      <div class="post-textarea-wrap">
+        <textarea class="modal-textarea post-modal-textarea" id="postText" rows="5" maxlength="2000" placeholder="Escribe algo..."></textarea>
+        <span class="post-text-counter" id="postTextCounter">2000</span>
+      </div>
       <div class="post-modal-meta">
         <p class="posts-status post-modal-status" id="postModalStatus" aria-live="polite"></p>
-        <span class="post-text-counter" id="postTextCounter">0/2000</span>
       </div>
 
       <div class="upload-row">
@@ -3815,12 +3768,6 @@
         </div>
         <div class="post-actions">
           <button class="post-btn" type="button" id="profilePhotoStarPost">⭐ Donar estrella (0)</button>
-          {#if POST_COMMENTS_ENABLED}
-            <button class="post-btn" type="button" id="profilePhotoCommentPost">💬 Comentar (0)</button>
-          {/if}
-          {#if POST_SHARING_ENABLED}
-            <button class="post-btn" type="button" id="profilePhotoSharePost">🔁 Compartir (0)</button>
-          {/if}
         </div>
       </article>
       <p class="profile-photo-post-status" id="profilePhotoPostStatus" aria-live="polite"></p>
@@ -3989,24 +3936,3 @@
     </div>
   </div>
 </div>
-
-{#if POST_COMMENTS_ENABLED}
-  <div class="modal-overlay hidden" id="postCommentsModalOverlay" aria-hidden="true">
-    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-label="Comentarios de publicación">
-      <div class="modal-head">
-        <h3 id="postCommentsTitle">Comentarios</h3>
-        <button class="modal-close" type="button" id="closePostCommentsModal">✕</button>
-      </div>
-      <div class="modal-body">
-        <p class="posts-status" id="postCommentsStatus"></p>
-        <div class="post-comments-list" id="postCommentsList"></div>
-        <label class="modal-label" for="postCommentInput">Agregar comentario</label>
-        <textarea class="modal-textarea" id="postCommentInput" rows="3" maxlength="1200" placeholder="Escribe un comentario"></textarea>
-      </div>
-      <div class="modal-actions">
-        <button class="btn btn-outline btn-compact" type="button" id="cancelPostCommentsModal">Cerrar</button>
-        <button class="btn btn-primary btn-compact" type="button" id="sendPostComment">Comentar</button>
-      </div>
-    </div>
-  </div>
-{/if}

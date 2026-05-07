@@ -5,7 +5,6 @@
   import { syncProfileStarsTotal } from "../lib/starsCounter";
   import { syncTopbarAvatar } from "../lib/topbarAvatar";
   import { showUiConfirm } from "../lib/uiFeedback";
-  import { POST_COMMENTS_ENABLED, POST_SHARING_ENABLED } from "../lib/socialFeatures";
 
   const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
   const RECENT_LIMIT = 20;
@@ -461,23 +460,16 @@
         : 0
     );
 
-    if (
-      POST_COMMENTS_ENABLED &&
-      showPostViewer &&
-      activeViewerPostId > 0 &&
-      activeViewerPostId !== Number(viewerLoadedPostId || 0)
-    ) {
-      void loadViewerCommentsForPost(activeViewerPostId);
+    if (showPostViewer && activeViewerPostId > 0) {
+      viewerLoadedPostId = activeViewerPostId;
     }
   };
 
   const loadViewerCommentsForPost = async (postId) => {
-    if (!POST_COMMENTS_ENABLED) {
-      viewerComments = [];
-      viewerCommentsLoading = false;
-      viewerLoadedPostId = Number(postId || 0);
-      return;
-    }
+    viewerComments = [];
+    viewerCommentsLoading = false;
+    viewerLoadedPostId = Number(postId || 0);
+    return;
 
     const normalizedPostId = Number(postId || 0);
     if (!normalizedPostId) {
@@ -949,7 +941,6 @@
     clearViewerStatus();
 
     const postId = Number(recentImagePosts[normalizedIndex]?.id || 0);
-    if (POST_COMMENTS_ENABLED) await loadViewerCommentsForPost(postId);
   };
 
   const goViewerPrev = async () => {
@@ -960,7 +951,6 @@
     clearViewerStatus();
 
     const postId = Number(recentImagePosts[nextIndex]?.id || 0);
-    if (POST_COMMENTS_ENABLED) await loadViewerCommentsForPost(postId);
   };
 
   const goViewerNext = async () => {
@@ -971,7 +961,6 @@
     clearViewerStatus();
 
     const postId = Number(recentImagePosts[nextIndex]?.id || 0);
-    if (POST_COMMENTS_ENABLED) await loadViewerCommentsForPost(postId);
   };
 
   const focusViewerCommentInput = () => {
@@ -1014,6 +1003,8 @@
   };
 
   const shareViewerPost = async () => {
+    return;
+
     const postId = Number(currentViewerPost?.id || 0);
     if (!postId || viewerActionLoading) return;
 
@@ -1066,6 +1057,8 @@
   };
 
   const submitViewerComment = async () => {
+    return;
+
     const postId = Number(currentViewerPost?.id || 0);
     if (!postId || viewerCommentSubmitting) return;
 
@@ -1620,22 +1613,6 @@
                 {/if}
               </button>
 
-              {#if POST_COMMENTS_ENABLED}
-                <button class="post-btn" type="button" on:click={focusViewerCommentInput}>
-                  💬 Comentar ({currentViewerPost.comment_count})
-                </button>
-              {/if}
-
-              {#if POST_SHARING_ENABLED}
-                <button
-                  class="post-btn"
-                  type="button"
-                  on:click={shareViewerPost}
-                  disabled={viewerActionLoading}
-                >
-                  🔁 Compartir ({currentViewerPost.share_count})
-                </button>
-              {/if}
             </div>
 
             {#if viewerStatusMessage}
@@ -1644,49 +1621,6 @@
               </p>
             {/if}
 
-            {#if POST_COMMENTS_ENABLED}
-              <section class="gallery-post-viewer-comments">
-                <h4>Comentarios</h4>
-
-                {#if viewerCommentsLoading}
-                  <p class="panel-muted">Cargando comentarios...</p>
-                {:else if viewerComments.length === 0}
-                  <p class="post-comments-empty">Aún no hay comentarios.</p>
-                {:else}
-                  <div class="post-comments-list gallery-viewer-comments-list">
-                    {#each viewerComments as comment (comment.id)}
-                      <article class="post-comment-item">
-                        <div class="post-comment-head">
-                          <strong>{comment.author?.name || "Usuario"}</strong>
-                          <span>{relativeTime(comment.created_at)}</span>
-                        </div>
-                        <p>{@html escapeHtml(comment.text)}</p>
-                      </article>
-                    {/each}
-                  </div>
-                {/if}
-              </section>
-
-              <form class="gallery-post-viewer-comment-form" on:submit|preventDefault={submitViewerComment}>
-                <textarea
-                  id="galleryViewerCommentInput"
-                  class="modal-textarea gallery-post-viewer-comment-input"
-                  rows="3"
-                  maxlength="1200"
-                  placeholder="Escribe un comentario..."
-                  bind:value={viewerCommentText}
-                ></textarea>
-                <div class="gallery-post-viewer-comment-actions">
-                  <button
-                    class="btn btn-primary btn-compact"
-                    type="submit"
-                    disabled={viewerCommentSubmitting}
-                  >
-                    {viewerCommentSubmitting ? "Enviando..." : "Comentar"}
-                  </button>
-                </div>
-              </form>
-            {/if}
           </aside>
         </div>
       </div>

@@ -3,7 +3,6 @@
   import { logout } from "../lib/logout";
   import { syncTopbarAvatar } from "../lib/topbarAvatar";
   import { showUiPrompt } from "../lib/uiFeedback";
-  import { POST_COMMENTS_ENABLED, POST_SHARING_ENABLED } from "../lib/socialFeatures";
 
   const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000";
   const FEED_LIMIT = 40;
@@ -1693,28 +1692,6 @@
                       ? `⭐ Estrella donada (${Number(post.star_count || 0)})`
                       : `⭐ Donar estrella (${Number(post.star_count || 0)})`}
                   </button>
-
-                  {#if POST_COMMENTS_ENABLED}
-                    <button
-                      class="post-btn"
-                      type="button"
-                      on:click={() => void commentOnPost(post)}
-                      disabled={isPostBusy(post.id)}
-                    >
-                      💬 Comentar ({Number(post.comment_count || 0)})
-                    </button>
-                  {/if}
-
-                  {#if POST_SHARING_ENABLED}
-                    <button
-                      class="post-btn"
-                      type="button"
-                      on:click={() => void sharePost(post)}
-                      disabled={isPostBusy(post.id)}
-                    >
-                      🔁 Compartir ({Number(post.share_count || 0)})
-                    </button>
-                  {/if}
 
                   {#if isAlbumGroup}
                     <button
