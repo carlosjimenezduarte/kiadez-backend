@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "live:server": "node scripts/live-media-server.cjs",
     "build": "vite build && node scripts/create-route-aliases.mjs",
     "preview": "vite preview",
     "android:icon": "bash scripts/android-icons.sh",
@@ -26,6 +27,7 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.1.0",
-    "@capacitor/core": "^8.1.0"
+    "@capacitor/core": "^8.1.0",
+    "node-media-server": "^2.7.0"
   }
 }
